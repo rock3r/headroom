@@ -49,8 +49,6 @@ public class WidgetActionReceiver : BroadcastReceiver() {
                 AppWidgetManager.INVALID_APPWIDGET_ID,
             )
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
-        (context.applicationContext as? HeadroomWidgetHost)?.onWidgetRefreshRequested(
-            intArrayOf(appWidgetId)
-        )
+        context.widgetHost()?.onWidgetRefreshRequested(intArrayOf(appWidgetId))
     }
 }
