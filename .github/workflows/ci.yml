@@ -83,7 +83,6 @@ jobs:
         run: >
           ./gradlew :app:pixel9api37DebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
-          -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20
 
       - name: Upload e2e reports
         if: always()
