@@ -24,29 +24,41 @@ internal class AlarmResetScheduler(
     private val store = context.getSharedPreferences(STORE, Context.MODE_PRIVATE)
 
     fun replaceAll(now: Instant, alarms: List<ResetAlarm>) {
-        val wanted = alarms.associateBy { it.requestCode }
-        pending().forEach { previous ->
-            val replacement = wanted[previous.requestCode]
-            if (replacement?.expectedResetAt == previous.expectedResetAt) return@forEach
-            if (!previous.expectedResetAt.isAfter(now)) {
-                handOver(previous)
-            }
-            if (replacement == null) cancel(previous.requestCode)
+        val previous = pendingAlarms().associateBy { it.requestCode }
+        val merged = alarms.map { wanted -> merge(previous[wanted.requestCode], wanted, now) }
+        val wantedCodes = merged.associateBy { it.requestCode }
+        previous.values.forEach { old ->
+            val replacement = wantedCodes[old.requestCode]
+            if (replacement?.expectedResetAt == old.expectedResetAt) return@forEach
+            if (!old.expectedResetAt.isAfter(now)) handOver(old)
+            if (replacement == null) cancel(old.requestCode)
         }
-        alarms.forEach { schedule(it) }
+        merged.forEach { schedule(it) }
         store.edit {
             clear()
-            alarms.forEach { putString(it.requestCode.toString(), encode(it)) }
+            merged.forEach { putString(it.requestCode.toString(), encode(it)) }
         }
     }
+
+    /**
+     * The same reset occurrence planned again keeps the usage that proves the reset later. Before
+     * the reset time, usage only grows, so the latest value is the best baseline. After it, a sync
+     * may already see the reset usage, so the baseline is frozen.
+     */
+    private fun merge(old: ResetAlarm?, wanted: ResetAlarm, now: Instant): ResetAlarm =
+        when {
+            old == null || old.expectedResetAt != wanted.expectedResetAt -> wanted
+            !old.expectedResetAt.isAfter(now) -> old
+            else -> wanted.copy(usedBefore = maxOf(old.usedBefore, wanted.usedBefore))
+        }
+
+    fun pendingAlarms(): List<ResetAlarm> =
+        store.all.values.mapNotNull { (it as? String)?.let(::decode) }
 
     /** Called when an alarm fires, so a later replan does not hand it over a second time. */
     fun markFired(alarm: ResetAlarm) {
         store.edit { remove(alarm.requestCode.toString()) }
     }
-
-    private fun pending(): List<ResetAlarm> =
-        store.all.values.mapNotNull { (it as? String)?.let(::decode) }
 
     // The manifest declares USE_EXACT_ALARM, which grants exact alarms without the user-toggled
     // SCHEDULE_EXACT_ALARM, and the call is guarded by canScheduleExactAlarms(). Lint only knows

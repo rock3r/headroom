@@ -88,4 +88,38 @@ class AlarmResetSchedulerTest {
         assertEquals(emptyList(), handedOver)
         assertEquals(0, shadowOf(alarmManager).scheduledAlarms.size)
     }
+
+    @Test
+    fun `a replan after the reset time keeps the pre-reset baseline`() {
+        val scheduler = scheduler()
+        val pending =
+            ResetAlarm(
+                "a",
+                "w",
+                Instant.parse("2026-09-28T06:01:00Z"),
+                Instant.parse("2026-09-28T06:00:00Z"),
+                88.0,
+            )
+        scheduler.replaceAll(now, listOf(pending))
+        val duringGrace = Instant.parse("2026-09-28T06:00:30Z")
+        scheduler.replaceAll(duringGrace, listOf(pending.copy(usedBefore = 0.0)))
+        assertEquals(88.0, scheduler.pendingAlarms().single().usedBefore)
+        assertEquals(emptyList(), handedOver)
+    }
+
+    @Test
+    fun `before the reset time the baseline follows the latest usage`() {
+        val scheduler = scheduler()
+        val pending =
+            ResetAlarm(
+                "a",
+                "w",
+                Instant.parse("2026-09-28T06:01:00Z"),
+                Instant.parse("2026-09-28T06:00:00Z"),
+                60.0,
+            )
+        scheduler.replaceAll(now, listOf(pending))
+        scheduler.replaceAll(now.plusSeconds(600), listOf(pending.copy(usedBefore = 70.0)))
+        assertEquals(70.0, scheduler.pendingAlarms().single().usedBefore)
+    }
 }

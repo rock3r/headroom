@@ -62,30 +62,32 @@ internal class RoomQuotaRepository(
     }
 
     override suspend fun refresh(accountId: String?) {
-        val targets = dao.accounts().filter { accountId == null || it.id == accountId }
+        val targets = if (accountId != null) listOf(accountId) else dao.accounts().map { it.id }
         coroutineScope { targets.map { async { refreshOne(it) } }.awaitAll() }
     }
 
-    private suspend fun refreshOne(entity: AccountEntity) {
+    /** Claims the account's in-flight slot before touching the database, so callers coalesce. */
+    private suspend fun refreshOne(accountId: String) {
         val (job, owner) =
             inFlightLock.withLock {
-                val existing = inFlight[entity.id]
+                val existing = inFlight[accountId]
                 if (existing != null) {
                     existing to false
                 } else {
-                    CompletableDeferred<Unit>().also { inFlight[entity.id] = it } to true
+                    CompletableDeferred<Unit>().also { inFlight[accountId] = it } to true
                 }
             }
         if (!owner) {
             job.await()
             return
         }
-        refreshing.update { it + entity.id }
+        refreshing.update { it + accountId }
         try {
+            val entity = dao.account(accountId) ?: return
             store(entity, fetchAccount(entity))
         } finally {
-            refreshing.update { it - entity.id }
-            inFlightLock.withLock { inFlight.remove(entity.id) }
+            refreshing.update { it - accountId }
+            inFlightLock.withLock { inFlight.remove(accountId) }
             job.complete(Unit)
         }
     }
