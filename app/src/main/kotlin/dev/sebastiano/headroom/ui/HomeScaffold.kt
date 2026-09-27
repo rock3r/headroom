@@ -41,10 +41,12 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,6 +92,8 @@ internal fun HomeScaffold(
     onOpenAccounts: () -> Unit,
     onAddWidget: (WidgetStyle) -> Unit,
     modifier: Modifier = Modifier,
+    openAccountRequest: OpenAccountRequest? = null,
+    onConsumeOpenAccount: () -> Unit = {},
 ) {
     val width = layoutWidth()
     var tab by rememberSaveable { mutableStateOf(HomeTab.Overview) }
@@ -103,28 +107,22 @@ internal fun HomeScaffold(
         }
         tab = next
     }
+    OpenAccountEffect(
+        request = openAccountRequest,
+        home = home,
+        onOpen = { accountId ->
+            tab = HomeTab.Overview
+            onSelectAccount(accountId)
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, accountId)
+        },
+        onConsume = onConsumeOpenAccount,
+    )
     val suiteType =
         if (width == LayoutWidth.Compact) NavigationSuiteType.None
         else NavigationSuiteType.WideNavigationRailCollapsed
 
     NavigationSuiteScaffold(
-        navigationItems = {
-            HomeTab.entries.forEach { item ->
-                NavigationSuiteItem(
-                    selected = item == tab,
-                    onClick = { selectTab(item) },
-                    icon = {
-                        Icon(
-                            painter =
-                                painterResource(if (item == tab) item.selectedIcon else item.icon),
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(item.label)) },
-                    navigationSuiteType = suiteType,
-                )
-            }
-        },
+        navigationItems = { HomeNavigationItems(tab, suiteType, selectTab) },
         navigationSuiteType = suiteType,
         primaryActionContent = {
             if (width != LayoutWidth.Compact) {
@@ -277,6 +275,52 @@ private fun OverviewPanes(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun HomeNavigationItems(
+    tab: HomeTab,
+    suiteType: NavigationSuiteType,
+    onSelect: (HomeTab) -> Unit,
+) {
+    HomeTab.entries.forEach { item ->
+        NavigationSuiteItem(
+            selected = item == tab,
+            onClick = { onSelect(item) },
+            icon = {
+                Icon(
+                    painter = painterResource(if (item == tab) item.selectedIcon else item.icon),
+                    contentDescription = null,
+                )
+            },
+            label = { Text(stringResource(item.label)) },
+            navigationSuiteType = suiteType,
+        )
+    }
+}
+
+/** Opens the requested account once it is on screen, and drops requests for unknown accounts. */
+@Composable
+private fun OpenAccountEffect(
+    request: OpenAccountRequest?,
+    home: HomeUiState,
+    onOpen: suspend (String) -> Unit,
+    onConsume: () -> Unit,
+) {
+    val open by rememberUpdatedState(onOpen)
+    val consume by rememberUpdatedState(onConsume)
+    val accountIds = home.accounts.map { it.id }
+    LaunchedEffect(request, accountIds, home.isDemo) {
+        val pending = request ?: return@LaunchedEffect
+        when (decideOpenAccount(pending.accountId, accountIds, home.isDemo)) {
+            OpenAccountDecision.Open -> {
+                open(pending.accountId)
+                consume()
+            }
+            OpenAccountDecision.Ignore -> consume()
+            OpenAccountDecision.Wait -> Unit
+        }
     }
 }
 

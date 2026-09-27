@@ -33,8 +33,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
 import dev.sebastiano.headroom.ui.accounts.AccountsScreen
+import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.home.HomeViewModel
@@ -49,6 +51,8 @@ import kotlinx.coroutines.launch
 fun HeadroomApp(
     graph: AppGraph,
     modifier: Modifier = Modifier,
+    openAccountRequest: OpenAccountRequest? = null,
+    onConsumeOpenAccount: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(factory = graph.homeViewModelFactory),
     accountsViewModel: AccountsViewModel = viewModel(factory = graph.accountsViewModelFactory),
 ) {
@@ -62,6 +66,9 @@ fun HeadroomApp(
     val snackbar = remember { SnackbarHostState() }
     val widgetUnavailable = stringResource(R.string.widget_add_unavailable)
     var accountsOpen by rememberSaveable { mutableStateOf(false) }
+    // A widget tap leaves the accounts screen, unless the user is in the middle of signing in.
+    val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
+    val showAccounts = accountsOpen && (openAccountRequest == null || signingIn)
 
     val accountsActions =
         AccountsActions(
@@ -87,7 +94,7 @@ fun HeadroomApp(
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedContent(
-            targetState = accountsOpen,
+            targetState = showAccounts,
             transitionSpec = {
                 (fadeIn(effects) + scaleIn(effects, initialScale = ENTER_SCALE)) togetherWith
                     fadeOut(fast)
@@ -105,6 +112,11 @@ fun HeadroomApp(
                     onSelectAccount = homeViewModel::select,
                     onAlertChange = homeViewModel::setAlert,
                     onOpenAccounts = { accountsOpen = true },
+                    openAccountRequest = openAccountRequest,
+                    onConsumeOpenAccount = {
+                        accountsOpen = false
+                        onConsumeOpenAccount()
+                    },
                     onAddWidget = { style ->
                         if (!graph.widgetPinner.requestPin(style)) {
                             scope.launch { snackbar.showSnackbar(widgetUnavailable) }
@@ -124,3 +136,6 @@ fun HeadroomApp(
 }
 
 private const val ENTER_SCALE = 0.96f
+
+private fun SignInState.isWaitingForUser() =
+    this is SignInState.Browser || this is SignInState.DeviceCode || this is SignInState.ApiKey

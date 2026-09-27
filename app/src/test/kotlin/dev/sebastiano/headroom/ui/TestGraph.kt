@@ -36,12 +36,13 @@ fun testGraph(
     signInController: SignInController = FakeSignInController(),
     widgetPinner: WidgetPinner = WidgetPinner { false },
     scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
+    demo: FakeQuotaRepository = FakeQuotaRepository({ FIXED_NOW }),
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
         DemoModeQuotaRepository(
             real = FakeQuotaRepository(clock, initial = realAccounts),
-            demo = FakeQuotaRepository(clock),
+            demo = demo,
             scope = scope,
             simulatedLatency = Duration.ZERO,
         )
