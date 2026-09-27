@@ -50,8 +50,15 @@ sealed interface SignInState {
         val verificationUrl: String,
     ) : SignInState
 
-    /** The provider signs in with an API key. [keyRejected] is true after a bad key. */
-    data class ApiKey(val provider: Provider, val keyRejected: Boolean = false) : SignInState
+    /**
+     * The provider signs in with an API key. [keyRejected] is true after a bad key; [saving] is
+     * true while an accepted key is being stored, and the form does not accept another one.
+     */
+    data class ApiKey(
+        val provider: Provider,
+        val keyRejected: Boolean = false,
+        val saving: Boolean = false,
+    ) : SignInState
 
     data class Success(val provider: Provider, val accountLabel: String) : SignInState
 

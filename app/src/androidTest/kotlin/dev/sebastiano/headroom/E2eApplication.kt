@@ -6,6 +6,8 @@ import java.time.ZoneOffset
 
 /** The app with a fixed clock and UTC, so every run shows the same numbers. */
 class E2eApplication : HeadroomApplication() {
+    override val usesDataLayer: Boolean = false
+
     override fun createGraph(): AppGraph =
         AppGraph.create(
             context = this,

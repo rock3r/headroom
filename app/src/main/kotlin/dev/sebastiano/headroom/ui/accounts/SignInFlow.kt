@@ -197,7 +197,11 @@ private fun ApiKeyStep(state: SignInState.ApiKey, actions: AccountsActions) {
                 },
             modifier = Modifier.fillMaxWidth().testTag(SIGN_IN_KEY_FIELD_TAG),
         )
-        Button(onClick = { actions.onSubmitApiKey(key) }, modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = { actions.onSubmitApiKey(key) },
+            enabled = !state.saving,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             ButtonIcon(HeadroomIcons.Key)
             Text(stringResource(R.string.signin_key_submit))
         }
