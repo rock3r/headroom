@@ -1,0 +1,31 @@
+package dev.sebastiano.headroom.model
+
+import java.time.Instant
+
+/** Everything one account reported in a single fetch. */
+public data class QuotaSnapshot(
+    val provider: Provider,
+    val accountId: String,
+    val planLabel: String?,
+    val windows: List<QuotaWindow>,
+    val fetchedAt: Instant,
+)
+
+/** Why a fetch did not produce a snapshot. The UI shows a different message for each. */
+public enum class QuotaErrorKind {
+    /** Sign-in expired or was revoked. The user must sign in again. */
+    Auth,
+    /** The account has no access to the usage endpoint, for example on a free plan. */
+    Access,
+    RateLimited,
+    Network,
+    /** The provider changed its response format. */
+    Parse,
+    Unknown,
+}
+
+public sealed interface QuotaResult {
+    public data class Success(val snapshot: QuotaSnapshot) : QuotaResult
+
+    public data class Failure(val kind: QuotaErrorKind, val message: String) : QuotaResult
+}
