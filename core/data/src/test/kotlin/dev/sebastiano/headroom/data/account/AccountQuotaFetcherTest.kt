@@ -139,4 +139,24 @@ class AccountQuotaFetcherTest {
             fetcherFor(RecordingFetcher(Provider.Claude)).fetch(Account("k1", Provider.Kimi, "sam"))
         assertEquals(QuotaErrorKind.Unknown, assertIs<QuotaResult.Failure>(result).kind)
     }
+
+    @Test
+    fun `a storage failure while refreshing is a failure result, not a crash`() = runTest {
+        val broken =
+            object : dev.sebastiano.headroom.auth.TokenStore {
+                override suspend fun load(accountId: String) = throw java.io.IOException("disk")
+
+                override suspend fun save(credential: StoredCredential, expectedRevision: Long?) =
+                    null
+
+                override suspend fun delete(accountId: String) = Unit
+            }
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(broken, emptyMap()),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Claude))),
+            )
+        val result = fetcher.fetch(Account("a1", Provider.Claude, "sam"))
+        assertEquals(QuotaErrorKind.Unknown, assertIs<QuotaResult.Failure>(result).kind)
+    }
 }

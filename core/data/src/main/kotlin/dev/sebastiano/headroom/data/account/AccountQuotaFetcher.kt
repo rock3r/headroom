@@ -9,6 +9,7 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetchers
+import java.io.IOException
 
 /** Fetches one account's quota with a credential that is valid now, refreshing it if needed. */
 public class AccountQuotaFetcher(
@@ -27,6 +28,9 @@ public class AccountQuotaFetcher(
                 credentials.validCredential(account.id)
             } catch (failure: AuthException) {
                 return QuotaResult.Failure(failure.toErrorKind(), failure.message.orEmpty())
+            } catch (failure: IOException) {
+                // The token store could not read or write the credential.
+                return QuotaResult.Failure(QuotaErrorKind.Unknown, failure.message.orEmpty())
             }
         return when (val result = fetcher.fetch(credential.toProviderCredentials())) {
             is QuotaResult.Success ->

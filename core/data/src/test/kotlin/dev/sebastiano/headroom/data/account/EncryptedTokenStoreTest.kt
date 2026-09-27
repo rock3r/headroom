@@ -79,4 +79,28 @@ class EncryptedTokenStoreTest {
         assertEquals(2, second.revision)
         assertNull(store.save(first, expectedRevision = first.revision))
     }
+
+    private fun failingPrefs(): android.content.SharedPreferences {
+        val real = context.getSharedPreferences("failing", Context.MODE_PRIVATE)
+        return object : android.content.SharedPreferences by real {
+            override fun edit(): android.content.SharedPreferences.Editor {
+                val delegate = real.edit()
+                // Simulates a full disk: commit reports failure and writes nothing.
+                return object : android.content.SharedPreferences.Editor by delegate {
+                    override fun commit() = false
+
+                    override fun apply() = delegate.apply()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a write that does not reach disk is an error, not a success`() = runTest {
+        val store = EncryptedTokenStore(context, XorCipher, failingPrefs())
+        kotlin.test.assertFailsWith<java.io.IOException> {
+            store.save(credential(), expectedRevision = null)
+        }
+        kotlin.test.assertFailsWith<java.io.IOException> { store.delete("a1") }
+    }
 }

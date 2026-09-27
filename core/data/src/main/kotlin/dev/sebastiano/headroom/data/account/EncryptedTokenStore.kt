@@ -1,8 +1,8 @@
 package dev.sebastiano.headroom.data.account
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Base64
-import androidx.core.content.edit
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeyTemplates
 import com.google.crypto.tink.RegistryConfiguration
@@ -11,6 +11,7 @@ import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import dev.sebastiano.headroom.auth.CredentialCodec
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.TokenStore
+import java.io.IOException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -51,9 +52,11 @@ public class TinkCredentialCipher(context: Context) : CredentialCipher {
  * The on-device [TokenStore]. Each credential is encrypted with [cipher] and stored in private
  * shared preferences, which the app excludes from backup and device transfer.
  */
-public class EncryptedTokenStore(context: Context, private val cipher: CredentialCipher) :
-    TokenStore {
-    private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+public class EncryptedTokenStore(
+    context: Context,
+    private val cipher: CredentialCipher,
+    private val prefs: SharedPreferences = context.getSharedPreferences(FILE, Context.MODE_PRIVATE),
+) : TokenStore {
     private val mutex = Mutex()
 
     override suspend fun load(accountId: String): StoredCredential? = mutex.withLock {
@@ -74,7 +77,7 @@ public class EncryptedTokenStore(context: Context, private val cipher: Credentia
                 CredentialCodec.encode(saved).toByteArray(),
                 saved.accountId.toByteArray(),
             )
-        prefs.edit(commit = true) {
+        commitOrThrow {
             putString(saved.accountId, Base64.encodeToString(encrypted, Base64.NO_WRAP))
             putLong(revisionKey(saved.accountId), next)
         }
@@ -82,7 +85,17 @@ public class EncryptedTokenStore(context: Context, private val cipher: Credentia
     }
 
     override suspend fun delete(accountId: String) {
-        mutex.withLock { prefs.edit(commit = true) { remove(accountId) } }
+        mutex.withLock { commitOrThrow { remove(accountId) } }
+    }
+
+    /**
+     * A credential that is reported as saved must survive a restart: a lost rotated refresh token
+     * can leave only a spent one on disk, and a lost delete undoes a sign-out.
+     */
+    private fun commitOrThrow(changes: SharedPreferences.Editor.() -> Unit) {
+        if (!prefs.edit().apply(changes).commit()) {
+            throw IOException("Could not write the sign-in to storage")
+        }
     }
 
     private fun revisionKey(accountId: String) = "$REVISION_PREFIX$accountId"
