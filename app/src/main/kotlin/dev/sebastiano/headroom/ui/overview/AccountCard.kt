@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -70,6 +71,10 @@ fun AccountCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             CardTop(account, sharedElements)
+            // On the highlighted card the default track colour would vanish into the container.
+            val track =
+                if (selected) MaterialTheme.colorScheme.surfaceContainerLowest
+                else MaterialTheme.colorScheme.secondaryContainer
             val primary = account.primary
             if (primary == null) {
                 Text(
@@ -83,6 +88,7 @@ fun AccountCard(
                     window = primary,
                     wavy = account.needsAttention,
                     trailing = primary.resetsAt?.let { formatter.short(it, now) },
+                    trackColor = track,
                 )
             }
             account.session?.let { session ->
@@ -92,6 +98,7 @@ fun AccountCard(
                     wavy = false,
                     showPace = false,
                     trailing = session.resetsAt?.let { formatter.countdown(now, it) },
+                    trackColor = track,
                 )
             }
             account.pace?.let { PaceChip(it) }
@@ -184,6 +191,7 @@ private fun MeterRow(
     window: WindowSummary,
     wavy: Boolean,
     trailing: String?,
+    trackColor: Color,
     showPace: Boolean = true,
 ) {
     Row(
@@ -201,6 +209,7 @@ private fun MeterRow(
         QuotaBar(
             progress = window.usedPercent.asFraction(),
             wavy = wavy,
+            trackColor = trackColor,
             paceFraction = if (showPace) window.expectedPercent?.asFraction() else null,
             modifier = Modifier.weight(1f),
         )

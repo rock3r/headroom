@@ -148,12 +148,21 @@ private fun DeviceCodeStep(state: SignInState.DeviceCode, actions: AccountsActio
                     modifier = Modifier.testTag(SIGN_IN_USER_CODE_TAG),
                 )
                 Text(text = state.verificationUrl, style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { actions.onCopy(state.userCode) }) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { actions.onCopy(state.userCode) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         ButtonIcon(HeadroomIcons.ContentCopy)
                         Text(stringResource(R.string.signin_device_copy))
                     }
-                    Button(onClick = { actions.onOpenUrl(state.verificationUrl) }) {
+                    Button(
+                        onClick = { actions.onOpenUrl(state.verificationUrl) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         ButtonIcon(HeadroomIcons.OpenInNew)
                         Text(
                             stringResource(R.string.signin_device_open, host(state.verificationUrl))

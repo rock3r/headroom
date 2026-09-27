@@ -75,17 +75,18 @@ fun AccountsScreen(
     val step = state.step
     BackHandler { if (step == AccountsStep.List) actions.onClose() else actions.onBack() }
     val effects = HeadroomMotion.effectsSpec<Float>()
-    AnimatedContent(
-        targetState = step,
-        contentKey = { it::class },
-        transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
-        modifier = modifier.fillMaxSize().testTag(ACCOUNTS_TAG),
-        label = "accounts step",
-    ) { current ->
-        when (current) {
-            AccountsStep.List -> AccountList(state, actions)
-            AccountsStep.PickProvider -> ProviderPicker(actions)
-            is AccountsStep.SignIn -> SignInFlow(current.state, actions)
+    Surface(modifier = modifier.fillMaxSize().testTag(ACCOUNTS_TAG)) {
+        AnimatedContent(
+            targetState = step,
+            contentKey = { it::class },
+            transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
+            label = "accounts step",
+        ) { current ->
+            when (current) {
+                AccountsStep.List -> AccountList(state, actions)
+                AccountsStep.PickProvider -> ProviderPicker(actions)
+                is AccountsStep.SignIn -> SignInFlow(current.state, actions)
+            }
         }
     }
 }
