@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.db
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
@@ -22,6 +23,10 @@ internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
             windows =
                 windows.sortedBy { window -> window.position }.map { window -> window.toDomain() },
             fetchedAt = it,
+            balance =
+                account.balanceAmount?.let { amount ->
+                    QuotaBalance(amount, account.balanceUnit.orEmpty())
+                },
         )
     }
     return AccountState(

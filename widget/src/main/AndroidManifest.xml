@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <receiver
+            android:name=".RingsWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_rings_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_rings_info" />
+        </receiver>
+
+        <receiver
+            android:name=".BarsWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_bars_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_bars_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ShapeWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_shape_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_shape_info" />
+        </receiver>
+
+        <receiver
+            android:name=".CountdownWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_countdown_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_countdown_info" />
+        </receiver>
+
+        <!-- Refresh taps from inside the widget documents. -->
+        <receiver
+            android:name=".WidgetActionReceiver"
+            android:exported="false" />
+    </application>
+
+</manifest>

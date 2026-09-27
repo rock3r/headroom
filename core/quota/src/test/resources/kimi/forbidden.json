@@ -1,0 +1,15 @@
+{
+  "code": "permission_denied",
+  "details": [
+    {
+      "type": "error_detail",
+      "debug": {
+        "reason": "MEMBERSHIP_REQUIRED",
+        "localizedMessage": {
+          "locale": "en-US",
+          "message": "You do not have permission to use this feature. Please subscribe to access."
+        }
+      }
+    }
+  ]
+}

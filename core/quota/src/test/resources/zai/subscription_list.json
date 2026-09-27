@@ -1,0 +1,19 @@
+{
+  "code": 200,
+  "msg": "Operation successful",
+  "data": [
+    {
+      "id": "sub-test-0001",
+      "productName": "GLM Coding Max",
+      "status": "EXPIRED",
+      "validTo": "2026-01-01 00:00:00"
+    },
+    {
+      "id": "sub-test-0002",
+      "productName": "GLM Coding Pro",
+      "status": "VALID",
+      "validTo": "2026-12-01 00:00:00"
+    }
+  ],
+  "success": true
+}
