@@ -1,0 +1,126 @@
+package dev.sebastiano.headroom.ui
+
+import android.content.ClipData
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.sebastiano.headroom.AppGraph
+import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.ui.accounts.AccountsActions
+import dev.sebastiano.headroom.ui.accounts.AccountsScreen
+import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
+import dev.sebastiano.headroom.ui.components.rememberResetFormatter
+import dev.sebastiano.headroom.ui.home.HomeViewModel
+import kotlinx.coroutines.launch
+
+/**
+ * The whole app: the home scaffold (overview, resets, widgets, and the account detail), and the
+ * accounts screen on top of it. State comes from the view models; this composable only wires it to
+ * the screens.
+ */
+@Composable
+fun HeadroomApp(
+    graph: AppGraph,
+    modifier: Modifier = Modifier,
+    homeViewModel: HomeViewModel = viewModel(factory = graph.homeViewModelFactory),
+    accountsViewModel: AccountsViewModel = viewModel(factory = graph.accountsViewModelFactory),
+) {
+    val home by homeViewModel.state.collectAsStateWithLifecycle()
+    val detail by homeViewModel.detail.collectAsStateWithLifecycle()
+    val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
+    val formatter = rememberResetFormatter(graph.zone)
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    val widgetUnavailable = stringResource(R.string.widget_add_unavailable)
+    var accountsOpen by rememberSaveable { mutableStateOf(false) }
+
+    val accountsActions =
+        AccountsActions(
+            onClose = { accountsOpen = false },
+            onAddAccount = accountsViewModel::addAccount,
+            onPickProvider = accountsViewModel::pickProvider,
+            onBack = accountsViewModel::back,
+            onSubmitCode = accountsViewModel::submitCode,
+            onSubmitApiKey = accountsViewModel::submitApiKey,
+            onRetry = accountsViewModel::retry,
+            onFinish = accountsViewModel::finish,
+            onOpenUrl = { url ->
+                CustomTabsIntent.Builder().build().launchUrl(context, url.toUri())
+            },
+            onCopy = { text ->
+                scope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))
+                }
+            },
+        )
+
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    Box(modifier = modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = accountsOpen,
+            transitionSpec = {
+                (fadeIn(effects) + scaleIn(effects, initialScale = ENTER_SCALE)) togetherWith
+                    fadeOut(fast)
+            },
+            label = "accounts",
+        ) { open ->
+            if (open) {
+                AccountsScreen(state = accounts, actions = accountsActions)
+            } else {
+                HomeScaffold(
+                    home = home,
+                    detail = detail,
+                    formatter = formatter,
+                    onRefresh = homeViewModel::refresh,
+                    onSelectAccount = homeViewModel::select,
+                    onAlertChange = homeViewModel::setAlert,
+                    onOpenAccounts = { accountsOpen = true },
+                    onAddWidget = { style ->
+                        if (!graph.widgetPinner.requestPin(style)) {
+                            scope.launch { snackbar.showSnackbar(widgetUnavailable) }
+                        }
+                    },
+                )
+            }
+        }
+        SnackbarHost(
+            hostState = snackbar,
+            modifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 88.dp),
+        )
+    }
+}
+
+private const val ENTER_SCALE = 0.96f

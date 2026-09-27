@@ -1,4 +1,148 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Headroom</string>
+
+    <!-- Navigation -->
+    <string name="tab_overview">Overview</string>
+    <string name="tab_resets">Resets</string>
+    <string name="tab_widgets">Widgets</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_refreshing">Refreshing</string>
+    <string name="action_back">Back</string>
+    <string name="action_accounts">Accounts</string>
+
+    <!-- Overview -->
+    <plurals name="overview_accounts">
+        <item quantity="one">%d account</item>
+        <item quantity="other">%d accounts</item>
+    </plurals>
+    <string name="overview_synced_just_now">synced just now</string>
+    <plurals name="overview_synced_minutes">
+        <item quantity="one">synced %d min ago</item>
+        <item quantity="other">synced %d min ago</item>
+    </plurals>
+    <plurals name="overview_synced_hours">
+        <item quantity="one">synced %d h ago</item>
+        <item quantity="other">synced %d h ago</item>
+    </plurals>
+    <string name="overview_never_synced">not synced yet</string>
+    <string name="overview_subtitle">%1$s · %2$s</string>
+    <string name="overview_demo_label">Demo data</string>
+    <string name="overview_demo_body">These numbers are examples. Add an account to see your own limits.</string>
+    <string name="overview_demo_action">Add account</string>
+    <string name="overview_next_weekly_reset">Next weekly reset</string>
+    <string name="overview_next_reset">Next reset</string>
+    <string name="overview_next_reset_when">%1$s · %2$s</string>
+    <string name="overview_alert_on">Alert on</string>
+    <string name="overview_alert_off">Alert off</string>
+    <string name="overview_all_resets">All resets</string>
+    <string name="overview_this_week">This week</string>
+    <string name="overview_empty">No accounts yet. Add one to see how much you have left.</string>
+
+    <!-- Account card and detail -->
+    <string name="percent">%1$d%%</string>
+    <string name="window_weekly">Weekly</string>
+    <string name="window_monthly">Monthly</string>
+    <string name="window_daily">Daily</string>
+    <string name="window_session">Session</string>
+    <string name="window_other">Limit</string>
+    <string name="used_weekly">weekly used</string>
+    <string name="used_monthly">monthly used</string>
+    <string name="used_daily">daily used</string>
+    <string name="used_session">session used</string>
+    <string name="used_other">used</string>
+    <string name="account_error_auth">Sign-in expired. Sign in again to update.</string>
+    <string name="account_error_access">This plan has no usage data.</string>
+    <string name="account_error_rate_limited">The provider asked us to slow down. Showing the last numbers.</string>
+    <string name="account_error_network">No connection. Showing the last numbers.</string>
+    <string name="account_error_parse">The provider changed its format. Showing the last numbers.</string>
+    <string name="account_error_unknown">Could not update. Showing the last numbers.</string>
+    <string name="account_no_data">No usage data yet.</string>
+    <string name="detail_plan_label">%1$s · %2$s</string>
+    <string name="detail_resets_in">Resets in %1$s</string>
+    <string name="detail_resets_in_no_alert">Resets in %1$s · no alert</string>
+    <string name="detail_resets_at">Resets %1$s</string>
+    <string name="detail_chart_week">This week</string>
+    <string name="detail_chart_month">This month</string>
+    <string name="detail_chart_window">This window</string>
+    <string name="detail_chart_legend">dashed = even pace</string>
+    <string name="detail_chart_limit">limit</string>
+    <string name="detail_chart_description_above">Usage so far: %1$d%%, above the even-pace line.</string>
+    <string name="detail_chart_description_below">Usage so far: %1$d%%, at or below the even-pace line.</string>
+    <string name="detail_projection_hit">At this rate you reach 100%% in about %1$s, %2$s before the reset.</string>
+    <string name="detail_projection_end_week">At this rate you end the week at about %1$d%%.</string>
+    <string name="detail_projection_end_month">At this rate you end the month at about %1$d%%.</string>
+    <string name="detail_projection_end_window">At this rate you end the window at about %1$d%%.</string>
+    <string name="detail_projection_fresh">The window just reset. Nothing used yet.</string>
+    <string name="detail_reset_alerts">Reset alerts</string>
+    <string name="detail_alert_at">Alert at %1$s</string>
+    <string name="detail_alert_off">Off</string>
+    <string name="detail_alert_monthly_default">Monthly windows are off by default</string>
+    <string name="detail_alert_switch">Alert when %1$s resets</string>
+    <string name="detail_session_never_alerts">Session limits never send alerts.</string>
+    <string name="detail_no_alertable_windows">This account has no weekly or monthly limits to alert on.</string>
+
+    <!-- Resets -->
+    <string name="resets_title">Resets</string>
+    <plurals name="resets_subtitle">
+        <item quantity="one">Alerts are on for %1$d of %2$d window</item>
+        <item quantity="other">Alerts are on for %1$d of %2$d windows</item>
+    </plurals>
+    <string name="resets_upcoming">Upcoming</string>
+    <string name="resets_row_title">%1$s · %2$s</string>
+    <string name="resets_row_when">%1$s · in %2$s</string>
+    <string name="resets_bell_on">Alert on</string>
+    <string name="resets_bell_off">Alert off</string>
+    <string name="resets_history">Used when each window reset</string>
+    <string name="resets_history_note">Red bars hit the limit. The last bar is the current window.</string>
+    <string name="resets_history_description">%1$s: %2$s at past resets, %3$d%% now</string>
+    <string name="resets_none">No weekly or monthly limits to show yet.</string>
+
+    <!-- Widgets -->
+    <string name="widgets_title">Widgets</string>
+    <string name="widgets_subtitle">Put your headroom on the home screen</string>
+    <string name="widget_rings_title">Rings · 2×2</string>
+    <string name="widget_rings_body">One account shows weekly outside and session inside. Two to four accounts show a grid of small rings.</string>
+    <string name="widget_bars_title">Bars · 4×1 to 4×3</string>
+    <string name="widget_bars_body">Many accounts in one widget, each with its pace tick, so you can compare them at a glance.</string>
+    <string name="widget_shape_title">Shape · 1×1 or 2×2</string>
+    <string name="widget_shape_body">A Material shape that changes as the limit fills up. The number always stays.</string>
+    <string name="widget_countdown_title">Countdown · 2×2</string>
+    <string name="widget_countdown_body">Counts down to the next weekly reset of the accounts you choose.</string>
+    <string name="widget_add">Add to home screen</string>
+    <string name="widget_add_description">Add the %1$s widget to the home screen</string>
+    <string name="widget_add_unavailable">Your launcher cannot add widgets from apps. Add it from the home screen instead.</string>
+    <string name="widget_countdown_label">Next weekly reset</string>
+
+    <!-- Accounts and sign-in -->
+    <string name="accounts_title">Accounts</string>
+    <string name="accounts_add">Add account</string>
+    <string name="accounts_demo_note">You are looking at demo accounts. Add your own to replace them.</string>
+    <string name="accounts_pick_provider">Choose a provider</string>
+    <string name="accounts_row_plan">%1$s · %2$s</string>
+    <string name="signin_title">Sign in to %1$s</string>
+    <string name="signin_cancel">Cancel sign-in</string>
+    <string name="signin_browser_body">Finish signing in on the page that opens in your browser. Headroom picks up the result by itself.</string>
+    <string name="signin_browser_open">Open the sign-in page</string>
+    <string name="signin_browser_waiting">Waiting for the browser</string>
+    <string name="signin_paste_heading">Or paste the code from the page</string>
+    <string name="signin_paste_label">Code</string>
+    <string name="signin_paste_submit">Continue</string>
+    <string name="signin_paste_rejected">That code did not work. Copy it again from the page.</string>
+    <string name="signin_device_body">Go to this address on any device and enter the code.</string>
+    <string name="signin_device_copy">Copy code</string>
+    <string name="signin_device_open">Open %1$s</string>
+    <string name="signin_device_waiting">Waiting for you to confirm</string>
+    <string name="signin_key_body">Paste your API key. Headroom stores it encrypted on this device only.</string>
+    <string name="signin_key_label">API key</string>
+    <string name="signin_key_submit">Save key</string>
+    <string name="signin_key_rejected">This key does not look right. Check that you copied all of it.</string>
+    <string name="signin_success">Signed in as %1$s</string>
+    <string name="signin_done">Done</string>
+    <string name="signin_failed_title">Sign-in did not finish</string>
+    <string name="signin_error_denied">The sign-in was declined on the provider\'s page.</string>
+    <string name="signin_error_expired">The sign-in took too long and expired.</string>
+    <string name="signin_error_network">There was no connection. Check it and try again.</string>
+    <string name="signin_error_unknown">Something went wrong. Try again.</string>
+    <string name="signin_retry">Try again</string>
 </resources>
