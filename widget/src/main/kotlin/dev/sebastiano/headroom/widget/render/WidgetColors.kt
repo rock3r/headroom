@@ -1,0 +1,130 @@
+package dev.sebastiano.headroom.widget.render
+
+import android.content.Context
+import android.content.res.Configuration
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.ui.graphics.Color
+import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.widget.ColourMode
+import dev.sebastiano.headroom.widget.style
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+
+/**
+ * The colours one widget draws with. The base comes from the system dynamic palette; the colour
+ * mode decides what the arcs, bars and shapes use.
+ */
+internal class WidgetColors
+private constructor(
+    private val scheme: ColorScheme,
+    private val mode: ColourMode,
+    private val tones: HueTones,
+) {
+    val background: Color = scheme.surfaceContainer.copy(alpha = BACKGROUND_ALPHA)
+    val onSurface: Color = scheme.onSurface
+    val onSurfaceVariant: Color = scheme.onSurfaceVariant
+    val track: Color = scheme.surfaceContainerHighest
+    val paceTick: Color = scheme.onSurface
+    val countdownContainer: Color = scheme.tertiaryContainer
+    val onCountdownContainer: Color = scheme.onTertiaryContainer
+    /** The text colour on an avatar, which always has the provider hue. */
+    val onAvatar: Color = scheme.surface
+
+    /** The main arc or bar of an account. */
+    fun accent(provider: Provider): Color =
+        when (mode) {
+            ColourMode.Wallpaper -> scheme.primary
+            ColourMode.PerAccount -> avatar(provider)
+            ColourMode.Mono -> scheme.onSurface
+        }
+
+    /** The inner (session) ring of a single-account Rings widget. */
+    fun secondaryAccent(provider: Provider): Color =
+        when (mode) {
+            ColourMode.Wallpaper -> scheme.tertiary
+            ColourMode.PerAccount -> avatar(provider)
+            ColourMode.Mono -> scheme.onSurface.copy(alpha = MONO_SECONDARY_ALPHA)
+        }
+
+    fun shapeFill(provider: Provider): Color =
+        when (mode) {
+            ColourMode.Wallpaper -> scheme.primaryContainer
+            ColourMode.PerAccount ->
+                oklch(tones.containerLightness, CONTAINER_CHROMA, provider.style.hue)
+            ColourMode.Mono -> scheme.surfaceContainerHighest
+        }
+
+    /** Text drawn on top of [shapeFill]. */
+    val onShapeFill: Color =
+        when (mode) {
+            ColourMode.Wallpaper -> scheme.onPrimaryContainer
+            ColourMode.PerAccount,
+            ColourMode.Mono -> scheme.onSurface
+        }
+
+    /** Avatars keep the provider hue in every mode, so accounts stay recognisable. */
+    fun avatar(provider: Provider): Color = oklch(tones.lightness, tones.chroma, provider.style.hue)
+
+    companion object {
+        private const val BACKGROUND_ALPHA = 0.92f
+        private const val MONO_SECONDARY_ALPHA = 0.55f
+        private const val CONTAINER_CHROMA = 0.07f
+
+        fun from(scheme: ColorScheme, mode: ColourMode, isDark: Boolean): WidgetColors =
+            WidgetColors(scheme, mode, if (isDark) HueTones.Dark else HueTones.Light)
+
+        /** Colours from the system dynamic palette, which follows the wallpaper. */
+        fun dynamic(context: Context, mode: ColourMode, forceDark: Boolean = false): WidgetColors {
+            val isDark = forceDark || context.isNightMode()
+            val scheme =
+                if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            return from(scheme, mode, isDark)
+        }
+
+        private fun Context.isNightMode(): Boolean =
+            resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES
+    }
+}
+
+/** OKLCH lightness and chroma for the provider hues, per theme. Values match the design. */
+private enum class HueTones(
+    val lightness: Float,
+    val chroma: Float,
+    val containerLightness: Float,
+) {
+    Light(lightness = 0.6f, chroma = 0.14f, containerLightness = 0.86f),
+    Dark(lightness = 0.8f, chroma = 0.1f, containerLightness = 0.42f),
+}
+
+/** Converts an OKLCH colour (lightness 0–1, chroma, hue in degrees) to an sRGB [Color]. */
+@Suppress("MagicNumber") // The OKLab matrices are published constants.
+internal fun oklch(lightness: Float, chroma: Float, hueDegrees: Float): Color {
+    val hue = Math.toRadians(hueDegrees.toDouble())
+    val a = chroma * cos(hue)
+    val b = chroma * sin(hue)
+    val l = lightness.toDouble()
+
+    val lPrime = l + 0.3963377774 * a + 0.2158037573 * b
+    val mPrime = l - 0.1055613458 * a - 0.0638541728 * b
+    val sPrime = l - 0.0894841775 * a - 1.2914855480 * b
+    val lCube = lPrime * lPrime * lPrime
+    val mCube = mPrime * mPrime * mPrime
+    val sCube = sPrime * sPrime * sPrime
+
+    val red = 4.0767416621 * lCube - 3.3077115913 * mCube + 0.2309699292 * sCube
+    val green = -1.2684380046 * lCube + 2.6097574011 * mCube - 0.3413193965 * sCube
+    val blue = -0.0041960863 * lCube - 0.7034186147 * mCube + 1.7076147010 * sCube
+    return Color(gamma(red), gamma(green), gamma(blue))
+}
+
+@Suppress("MagicNumber") // sRGB transfer function constants.
+private fun gamma(linear: Double): Float {
+    val clamped = linear.coerceIn(0.0, 1.0)
+    val encoded =
+        if (clamped <= 0.0031308) 12.92 * clamped else 1.055 * clamped.pow(1 / 2.4) - 0.055
+    return encoded.toFloat().coerceIn(0f, 1f)
+}

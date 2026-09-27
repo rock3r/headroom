@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget picker -->
+    <string name="widget_rings_label">Rings</string>
+    <string name="widget_rings_description">Weekly and session usage as rings. One account, or up to four in a grid.</string>
+    <string name="widget_bars_label">Bars</string>
+    <string name="widget_bars_description">One bar per account, with a tick where even pace would be.</string>
+    <string name="widget_shape_label">Shape</string>
+    <string name="widget_shape_description">A shape that gets busier as a limit fills up, with the number inside.</string>
+    <string name="widget_countdown_label">Countdown</string>
+    <string name="widget_countdown_description">Time left until the next weekly reset of your accounts.</string>
+
+    <!-- Numbers and windows -->
+    <string name="widget_percent">%1$d%%</string>
+    <string name="widget_window_session">session</string>
+    <string name="widget_window_daily">daily</string>
+    <string name="widget_window_weekly">weekly</string>
+    <string name="widget_window_monthly">monthly</string>
+    <string name="widget_window_other">limit</string>
+
+    <!-- Countdown and lock screen -->
+    <string name="widget_countdown_title">Next %1$s reset</string>
+    <string name="widget_countdown_none">No reset coming up</string>
+    <string name="widget_account_and_time">%1$s · %2$s</string>
+    <string name="widget_lock_footer">Next %1$s reset: %2$s, %3$s</string>
+
+    <!-- Empty states -->
+    <string name="widget_empty_no_accounts">Add an account in Headroom.</string>
+    <string name="widget_empty_no_data">No usage data yet. Tap to open Headroom.</string>
+    <string name="widget_empty_no_session">None of these accounts has a session limit.</string>
+
+    <!-- Accessibility -->
+    <string name="widget_cd_gauge">%1$s: %2$s of the %3$s limit used.</string>
+    <string name="widget_cd_gauge_attention">%1$s: %2$s of the %3$s limit used, over pace.</string>
+    <string name="widget_cd_resets">Resets %1$s.</string>
+    <string name="widget_cd_countdown">Next %1$s reset in %2$s: %3$s, %4$s</string>
+    <string name="widget_cd_refresh">Refresh usage</string>
+    <string name="widget_cd_open">Open %1$s in Headroom</string>
+    <string name="widget_cd_flip">Switch between the %1$s and session numbers</string>
+</resources>
