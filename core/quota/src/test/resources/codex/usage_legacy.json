@@ -1,0 +1,7 @@
+{
+  "plan_type": "pro",
+  "rate_limit": {
+    "primary_window": { "used_percent": 20 },
+    "secondary_window": { "used_percent": 30 }
+  }
+}

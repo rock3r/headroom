@@ -1,0 +1,13 @@
+{
+  "plan_type": "pro",
+  "monthly_quota": {
+    "used_percent": 25.0,
+    "resets_at": "2026-05-01T00:00:00Z",
+    "used_credits": 2000,
+    "monthly_limit": 10000
+  },
+  "bonus_quota": {
+    "used_percent": 10.0,
+    "resets_at": "2026-04-10T00:00:00Z"
+  }
+}

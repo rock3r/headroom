@@ -1,0 +1,15 @@
+{
+  "config": {
+    "creditUsagePercent": 37.5,
+    "subscriptionTier": "super_grok",
+    "currentPeriod": {
+      "type": "USAGE_PERIOD_TYPE_WEEKLY",
+      "start": "2026-03-31T09:00:00.000000+00:00",
+      "end": "2026-04-07T09:00:00.000000+00:00"
+    },
+    "productUsage": [
+      { "product": "GrokBuild", "usagePercent": 40.0 },
+      { "product": "Api", "usagePercent": 10.0 }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "plan_type": "pro",
+  "rate_limit": {
+    "primary_window": {
+      "used_percent": 20,
+      "limit_window_seconds": 2592000
+    },
+    "secondary_window": "not-an-object"
+  },
+  "additional_rate_limits": [
+    {
+      "limit_name": { "unexpected": true },
+      "metered_feature": ["unexpected"],
+      "rate_limit": {
+        "primary_window": {
+          "used_percent": 30,
+          "limit_window_seconds": { "unexpected": true },
+          "reset_at": [1775229900]
+        },
+        "secondary_window": {
+          "used_percent": { "unexpected": true },
+          "limit_window_seconds": 604800
+        }
+      }
+    }
+  ]
+}
