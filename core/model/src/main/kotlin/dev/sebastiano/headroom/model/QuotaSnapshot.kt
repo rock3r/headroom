@@ -9,7 +9,12 @@ public data class QuotaSnapshot(
     val planLabel: String?,
     val windows: List<QuotaWindow>,
     val fetchedAt: Instant,
+    /** A remaining balance, for providers that report one instead of (or besides) a percentage. */
+    val balance: QuotaBalance? = null,
 )
+
+/** An amount left to spend, such as AI credits. */
+public data class QuotaBalance(val amount: Double, val unit: String)
 
 /** Why a fetch did not produce a snapshot. The UI shows a different message for each. */
 public enum class QuotaErrorKind {
