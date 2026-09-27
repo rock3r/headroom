@@ -41,10 +41,12 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,6 +92,10 @@ internal fun HomeScaffold(
     onOpenAccounts: () -> Unit,
     onAddWidget: (WidgetStyle) -> Unit,
     modifier: Modifier = Modifier,
+    openAccountRequest: OpenAccountRequest? = null,
+    onConsumeOpenAccount: () -> Unit = {},
+    playEntrance: Boolean = false,
+    onEntranceStart: () -> Unit = {},
 ) {
     val width = layoutWidth()
     var tab by rememberSaveable { mutableStateOf(HomeTab.Overview) }
@@ -103,28 +109,21 @@ internal fun HomeScaffold(
         }
         tab = next
     }
+    OpenAccountEffect(
+        request = openAccountRequest,
+        onOpen = { accountId ->
+            tab = HomeTab.Overview
+            onSelectAccount(accountId)
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, accountId)
+        },
+        onConsume = onConsumeOpenAccount,
+    )
     val suiteType =
         if (width == LayoutWidth.Compact) NavigationSuiteType.None
         else NavigationSuiteType.WideNavigationRailCollapsed
 
     NavigationSuiteScaffold(
-        navigationItems = {
-            HomeTab.entries.forEach { item ->
-                NavigationSuiteItem(
-                    selected = item == tab,
-                    onClick = { selectTab(item) },
-                    icon = {
-                        Icon(
-                            painter =
-                                painterResource(if (item == tab) item.selectedIcon else item.icon),
-                            contentDescription = null,
-                        )
-                    },
-                    label = { Text(stringResource(item.label)) },
-                    navigationSuiteType = suiteType,
-                )
-            }
-        },
+        navigationItems = { HomeNavigationItems(tab, suiteType, selectTab) },
         navigationSuiteType = suiteType,
         primaryActionContent = {
             if (width != LayoutWidth.Compact) {
@@ -165,6 +164,8 @@ internal fun HomeScaffold(
                             onAllResets = { selectTab(HomeTab.Resets) },
                             onOpenAccounts = onOpenAccounts,
                             bottomPadding = bottomPadding,
+                            playEntrance = playEntrance,
+                            onEntranceStart = onEntranceStart,
                         )
                     HomeTab.Resets -> ResetsScreen(home, formatter, bottomPadding = bottomPadding)
                     HomeTab.Widgets ->
@@ -202,6 +203,8 @@ private fun OverviewPanes(
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
+    playEntrance: Boolean,
+    onEntranceStart: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val containerSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
@@ -246,6 +249,8 @@ private fun OverviewPanes(
                         selectedAccountId = if (twoPanes) detail?.account?.id else null,
                         bottomPadding = bottomPadding,
                         sharedElements = shared,
+                        playEntrance = playEntrance,
+                        onEntranceStart = onEntranceStart,
                     )
                 }
             },
@@ -277,6 +282,47 @@ private fun OverviewPanes(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun HomeNavigationItems(
+    tab: HomeTab,
+    suiteType: NavigationSuiteType,
+    onSelect: (HomeTab) -> Unit,
+) {
+    HomeTab.entries.forEach { item ->
+        NavigationSuiteItem(
+            selected = item == tab,
+            onClick = { onSelect(item) },
+            icon = {
+                Icon(
+                    painter = painterResource(if (item == tab) item.selectedIcon else item.icon),
+                    contentDescription = null,
+                )
+            },
+            label = { Text(stringResource(item.label)) },
+            navigationSuiteType = suiteType,
+        )
+    }
+}
+
+/**
+ * Opens the requested account. The caller passes only requests for accounts on screen; see
+ * [decideOpenAccount].
+ */
+@Composable
+private fun OpenAccountEffect(
+    request: OpenAccountRequest?,
+    onOpen: suspend (String) -> Unit,
+    onConsume: () -> Unit,
+) {
+    val open by rememberUpdatedState(onOpen)
+    val consume by rememberUpdatedState(onConsume)
+    LaunchedEffect(request) {
+        val pending = request ?: return@LaunchedEffect
+        open(pending.accountId)
+        consume()
     }
 }
 

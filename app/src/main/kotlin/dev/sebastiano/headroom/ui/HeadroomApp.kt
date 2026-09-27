@@ -1,8 +1,11 @@
 package dev.sebastiano.headroom.ui
 
 import android.content.ClipData
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -15,6 +18,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,11 +38,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
 import dev.sebastiano.headroom.ui.accounts.AccountsScreen
+import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.home.HomeViewModel
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -49,6 +57,8 @@ import kotlinx.coroutines.launch
 fun HeadroomApp(
     graph: AppGraph,
     modifier: Modifier = Modifier,
+    openAccountRequest: OpenAccountRequest? = null,
+    onConsumeOpenAccount: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(factory = graph.homeViewModelFactory),
     accountsViewModel: AccountsViewModel = viewModel(factory = graph.accountsViewModelFactory),
 ) {
@@ -62,6 +72,17 @@ fun HeadroomApp(
     val snackbar = remember { SnackbarHostState() }
     val widgetUnavailable = stringResource(R.string.widget_add_unavailable)
     var accountsOpen by rememberSaveable { mutableStateOf(false) }
+    // The cards' entrance plays on the first open only, not on returning to the overview.
+    var entrancePlayed by rememberSaveable { mutableStateOf(false) }
+    // A widget tap leaves the accounts screen, unless the user is in the middle of signing in.
+    val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
+    val decision = openAccountRequest?.let { request ->
+        decideOpenAccount(request.accountId, home.accounts.map { it.id }, home.accountsLoaded)
+    }
+    // Unknown accounts are dropped once loading is done; a pending request never blocks the UI.
+    SideEffect { if (decision == OpenAccountDecision.Ignore) onConsumeOpenAccount() }
+    val openNow = openAccountRequest.takeIf { decision == OpenAccountDecision.Open && !signingIn }
+    val showAccounts = accountsOpen && openNow == null
 
     val accountsActions =
         AccountsActions(
@@ -86,13 +107,27 @@ fun HeadroomApp(
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Box(modifier = modifier.fillMaxSize()) {
-        AnimatedContent(
-            targetState = accountsOpen,
+        // Seekable, so the predictive back gesture scrubs the accounts screen away.
+        val accountsTransition = remember { SeekableTransitionState(showAccounts) }
+        LaunchedEffect(showAccounts) { accountsTransition.animateTo(showAccounts) }
+        PredictiveBackHandler(enabled = showAccounts && accounts.step == AccountsStep.List) {
+            gesture ->
+            try {
+                gesture.collect { event ->
+                    accountsTransition.seekTo(event.progress, targetState = false)
+                }
+                accountsOpen = false
+            } catch (cancelled: CancellationException) {
+                // The gesture's coroutine is cancelled; settle back from a live scope.
+                scope.launch { accountsTransition.animateTo(true) }
+                throw cancelled
+            }
+        }
+        rememberTransition(accountsTransition, label = "accounts").AnimatedContent(
             transitionSpec = {
                 (fadeIn(effects) + scaleIn(effects, initialScale = ENTER_SCALE)) togetherWith
                     fadeOut(fast)
-            },
-            label = "accounts",
+            }
         ) { open ->
             if (open) {
                 AccountsScreen(state = accounts, actions = accountsActions)
@@ -105,6 +140,13 @@ fun HeadroomApp(
                     onSelectAccount = homeViewModel::select,
                     onAlertChange = homeViewModel::setAlert,
                     onOpenAccounts = { accountsOpen = true },
+                    playEntrance = !entrancePlayed,
+                    onEntranceStart = { entrancePlayed = true },
+                    openAccountRequest = openNow,
+                    onConsumeOpenAccount = {
+                        accountsOpen = false
+                        onConsumeOpenAccount()
+                    },
                     onAddWidget = { style ->
                         if (!graph.widgetPinner.requestPin(style)) {
                             scope.launch { snackbar.showSnackbar(widgetUnavailable) }
@@ -124,3 +166,6 @@ fun HeadroomApp(
 }
 
 private const val ENTER_SCALE = 0.96f
+
+private fun SignInState.isWaitingForUser() =
+    this is SignInState.Browser || this is SignInState.DeviceCode || this is SignInState.ApiKey

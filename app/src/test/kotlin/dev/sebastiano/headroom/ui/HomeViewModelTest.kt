@@ -38,6 +38,7 @@ class HomeViewModelTest {
             alertPreferences = InMemoryAlertPreferences(),
             clock = { now },
             isDemo = MutableStateFlow(true),
+            accountsLoaded = MutableStateFlow(true),
             resetHistory = DemoResetHistory,
             tickInterval = null,
             savedStateHandle = SavedStateHandle(),
@@ -178,12 +179,61 @@ class HomeViewModelTest {
             assertEquals("demo-codex", restored.detail.value?.account?.id)
         }
 
+    @Test
+    fun `a weekly reset while the app is open shows the account as just reset`() =
+        runTest(main.dispatcher) {
+            observe()
+            repository.set(
+                repository.accounts.value.map { state ->
+                    if (state.account.id != "demo-grok") return@map state
+                    val snapshot = requireNotNull(state.snapshot)
+                    state.copy(
+                        snapshot =
+                            snapshot.copy(
+                                windows =
+                                    snapshot.windows.map {
+                                        it.copy(
+                                            usedPercent = 1.0,
+                                            resetsAt = it.resetsAt?.plus(Duration.ofDays(7)),
+                                        )
+                                    }
+                            )
+                    )
+                }
+            )
+            runCurrent()
+            val grok = viewModel.state.value.accounts.first { it.id == "demo-grok" }
+            assertTrue(grok.justReset)
+            assertEquals(PaceChipState.JustReset, grok.pace)
+            assertFalse(viewModel.state.value.accounts.first().justReset)
+        }
+
+    @Test
+    fun `the first state agrees with the repository on demo mode and loading`() =
+        runTest(main.dispatcher) {
+            val loading =
+                HomeViewModel(
+                    repository = repository,
+                    alertPreferences = InMemoryAlertPreferences(),
+                    clock = { now },
+                    isDemo = MutableStateFlow(true),
+                    accountsLoaded = MutableStateFlow(false),
+                    resetHistory = DemoResetHistory,
+                    tickInterval = null,
+                    savedStateHandle = SavedStateHandle(),
+                )
+            val first = loading.state.value
+            assertTrue(first.isDemo)
+            assertFalse(first.accountsLoaded)
+        }
+
     private fun viewModel(saved: SavedStateHandle) =
         HomeViewModel(
             repository = repository,
             alertPreferences = InMemoryAlertPreferences(),
             clock = { now },
             isDemo = MutableStateFlow(true),
+            accountsLoaded = MutableStateFlow(true),
             resetHistory = DemoResetHistory,
             tickInterval = null,
             savedStateHandle = saved,

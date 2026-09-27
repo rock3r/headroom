@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -30,6 +30,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -69,7 +71,11 @@ fun OverviewScreen(
     selectedAccountId: String? = null,
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
     sharedElements: SharedElements? = null,
+    playEntrance: Boolean = false,
+    onEntranceStart: () -> Unit = {},
 ) {
+    // Cards composed from now on (on scroll, or on coming back) appear without an entrance.
+    SideEffect { if (playEntrance) onEntranceStart() }
     val pullState = rememberPullToRefreshState()
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     PullToRefreshBox(
@@ -129,15 +135,17 @@ fun OverviewScreen(
                 }
             } else {
                 fullWidth("section") { SectionLabel(stringResource(R.string.overview_this_week)) }
-                items(state.accounts, key = { it.id }) { account ->
-                    AccountCard(
-                        account = account,
-                        now = state.now,
-                        formatter = formatter,
-                        onClick = { onOpenAccount(account.id) },
-                        selected = account.id == selectedAccountId,
-                        sharedElements = sharedElements,
-                    )
+                itemsIndexed(state.accounts, key = { _, account -> account.id }) { index, account ->
+                    StaggeredEntrance(index = index, play = playEntrance) {
+                        AccountCard(
+                            account = account,
+                            now = state.now,
+                            formatter = formatter,
+                            onClick = { onOpenAccount(account.id) },
+                            selected = account.id == selectedAccountId,
+                            sharedElements = sharedElements,
+                        )
+                    }
                 }
             }
         }

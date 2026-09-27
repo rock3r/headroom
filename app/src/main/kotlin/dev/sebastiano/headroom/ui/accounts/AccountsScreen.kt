@@ -73,7 +73,9 @@ fun AccountsScreen(
     modifier: Modifier = Modifier,
 ) {
     val step = state.step
-    BackHandler { if (step == AccountsStep.List) actions.onClose() else actions.onBack() }
+    // Back from the list closes the screen with a predictive back gesture, handled by the caller;
+    // inside the picker and sign-in, back steps back one screen.
+    BackHandler(enabled = step != AccountsStep.List) { actions.onBack() }
     val effects = HeadroomMotion.effectsSpec<Float>()
     Surface(modifier = modifier.fillMaxSize().testTag(ACCOUNTS_TAG)) {
         AnimatedContent(

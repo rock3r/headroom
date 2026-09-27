@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.ui.home
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
@@ -37,7 +38,9 @@ class HomeViewModel(
     private val repository: QuotaRepository,
     private val alertPreferences: AlertPreferences,
     private val clock: () -> Instant,
-    isDemo: Flow<Boolean>,
+    private val isDemo: StateFlow<Boolean>,
+    /** True once the stored accounts have been read; see [DemoModeQuotaRepository.isLoaded]. */
+    private val accountsLoaded: StateFlow<Boolean>,
     resetHistory: ResetHistory,
     tickInterval: Duration? = Duration.ofMinutes(1),
     private val savedStateHandle: SavedStateHandle,
@@ -82,16 +85,33 @@ class HomeViewModel(
             if (histories.isEmpty()) flowOf(emptyMap()) else combine(histories) { it.toMap() }
         }
 
+    private val resetTracker = ResetTracker()
+
+    /** The accounts, with the ids of those whose weekly window reset while the app was open. */
+    private val accountsWithResets: Flow<Pair<List<AccountState>, Set<String>>> =
+        repository.accounts.map { it to resetTracker.update(it) }
+
     private val environment =
-        combine(isDemo, refreshing, ticks) { demo, busy, now -> Environment(demo, busy, now) }
+        combine(isDemo, accountsLoaded, refreshing, ticks) { demo, loaded, busy, now ->
+            Environment(demo, loaded, busy, now)
+        }
 
     val state: StateFlow<HomeUiState> =
-        combine(repository.accounts, alerts, pastResets, environment) {
-                accounts,
+        combine(accountsWithResets, alerts, pastResets, environment) {
+                (accounts, justReset),
                 switches,
                 history,
                 env ->
-                homeUiState(accounts, env.now, switches, history, env.isDemo, env.isRefreshing)
+                homeUiState(
+                    accounts = accounts,
+                    now = env.now,
+                    alerts = switches,
+                    pastResets = history,
+                    isDemo = env.isDemo,
+                    accountsLoaded = env.accountsLoaded,
+                    isRefreshing = env.isRefreshing,
+                    justReset = justReset,
+                )
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), initialState())
 
@@ -143,8 +163,9 @@ class HomeViewModel(
             now = clock(),
             alerts = emptyMap(),
             pastResets = emptyMap(),
-            isDemo = false,
+            isDemo = isDemo.value,
             isRefreshing = false,
+            accountsLoaded = accountsLoaded.value,
         )
 
     private fun List<AccountState>.primaryWindowOf(accountId: String) = firstOrNull {
@@ -152,7 +173,12 @@ class HomeViewModel(
     }
         ?.primaryWindow
 
-    private data class Environment(val isDemo: Boolean, val isRefreshing: Boolean, val now: Instant)
+    private data class Environment(
+        val isDemo: Boolean,
+        val accountsLoaded: Boolean,
+        val isRefreshing: Boolean,
+        val now: Instant,
+    )
 
     private companion object {
         const val STOP_TIMEOUT = 5_000L

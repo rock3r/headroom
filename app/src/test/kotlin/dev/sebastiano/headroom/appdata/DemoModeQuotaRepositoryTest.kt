@@ -65,5 +65,43 @@ class DemoModeQuotaRepositoryTest {
         assertEquals(before + 1, repository.accounts.value.first().primaryWindow!!.usedPercent)
     }
 
+    @Test
+    fun `it is loaded once the real repository has answered and its accounts are on show`() =
+        runTest {
+            val real = LoadingQuotaRepository()
+            val repository =
+                DemoModeQuotaRepository(
+                    real,
+                    FakeQuotaRepository({ now }),
+                    backgroundScope,
+                    Duration.ZERO,
+                )
+            runCurrent()
+            assertFalse(repository.isLoaded.value)
+
+            real.load(
+                listOf(AccountState(Account("real-1", Provider.Claude, "me"), snapshot = null))
+            )
+            runCurrent()
+            assertTrue(repository.isLoaded.value)
+            assertEquals(listOf("real-1"), repository.accountIds())
+        }
+
+    @Test
+    fun `with no real accounts it is loaded as soon as the first read is empty`() = runTest {
+        val real = LoadingQuotaRepository()
+        val repository =
+            DemoModeQuotaRepository(
+                real,
+                FakeQuotaRepository({ now }),
+                backgroundScope,
+                Duration.ZERO,
+            )
+        real.load(emptyList())
+        runCurrent()
+        assertTrue(repository.isLoaded.value)
+        assertTrue(repository.isDemo.value)
+    }
+
     private fun DemoModeQuotaRepository.accountIds() = accounts.value.map { it.account.id }
 }

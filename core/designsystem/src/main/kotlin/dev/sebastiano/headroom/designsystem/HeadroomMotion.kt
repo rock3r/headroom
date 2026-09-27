@@ -1,6 +1,8 @@
 package dev.sebastiano.headroom.designsystem
 
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -23,6 +25,15 @@ object HeadroomMotion {
     @ReadOnlyComposable
     fun <T> containerSpec(): FiniteAnimationSpec<T> =
         MaterialTheme.motionScheme.defaultSpatialSpec()
+
+    /**
+     * The one hero moment: a weekly reset drains the bar. Slower than [dataSpec] so it reads as an
+     * event, and critically damped so it never passes the new value.
+     */
+    fun <T> resetDrainSpec(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = RESET_DRAIN_STIFFNESS)
+
+    private const val RESET_DRAIN_STIFFNESS = 110f
 
     /** For fades and colour changes. */
     @Composable
