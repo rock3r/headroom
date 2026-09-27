@@ -192,4 +192,28 @@ class RoomQuotaRepositoryTest {
             repo.refresh()
             assertEquals(71.0, repo.current().single().primaryWindow!!.usedPercent)
         }
+
+    @Test
+    fun `a balance-only snapshot keeps its balance`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val jetbrains = Account("jb", Provider.JetBrains, "sam@example.com")
+            val snapshot =
+                dev.sebastiano.headroom.model.QuotaSnapshot(
+                    provider = Provider.JetBrains,
+                    accountId = "jb",
+                    planLabel = "JetBrains AI Pro",
+                    windows = emptyList(),
+                    fetchedAt = now,
+                    balance =
+                        dev.sebastiano.headroom.model.QuotaBalance(
+                            amount = 1234.5,
+                            unit = "credits",
+                        ),
+                )
+            val repo = repo({ QuotaResult.Success(snapshot) }, backgroundScope)
+            repo.addAccount(jetbrains)
+            repo.refresh()
+            assertEquals(1234.5, repo.current().single().snapshot!!.balance!!.amount)
+            assertEquals("credits", repo.current().single().snapshot!!.balance!!.unit)
+        }
 }

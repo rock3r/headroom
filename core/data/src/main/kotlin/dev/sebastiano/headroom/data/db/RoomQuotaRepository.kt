@@ -108,6 +108,8 @@ internal class RoomQuotaRepository(
                             planLabel = snapshot.planLabel ?: entity.planLabel,
                             fetchedAtEpochMs = snapshot.fetchedAt.toEpochMilli(),
                             lastError = null,
+                            balanceAmount = snapshot.balance?.amount,
+                            balanceUnit = snapshot.balance?.unit,
                         ),
                     windows =
                         snapshot.windows.mapIndexed { index, window ->

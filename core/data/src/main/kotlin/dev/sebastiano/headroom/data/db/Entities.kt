@@ -15,6 +15,8 @@ internal data class AccountEntity(
     val planLabel: String?,
     val fetchedAtEpochMs: Long?,
     val lastError: String?,
+    val balanceAmount: Double? = null,
+    val balanceUnit: String? = null,
 )
 
 @Entity(
