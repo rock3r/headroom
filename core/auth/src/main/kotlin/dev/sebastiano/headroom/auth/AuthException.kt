@@ -35,6 +35,10 @@ public sealed class AuthException(message: String, cause: Throwable? = null) :
     /** Sign-in was not finished in time, for example an expired device code. */
     public class TimedOut(message: String) : AuthException(message)
 
+    /** The saved sign-in expired and cannot be refreshed. The user must sign in again. */
+    public class SignInExpired(public val accountId: String) :
+        AuthException("The sign-in for account $accountId expired")
+
     /** No credential is saved for this account. */
     public class NotSignedIn(public val accountId: String) :
         AuthException("No saved sign-in for account $accountId")
