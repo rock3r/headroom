@@ -44,6 +44,12 @@ public interface QuotaRepository {
     public suspend fun refresh(accountId: String? = null)
 
     public fun history(accountId: String, windowId: String): Flow<List<UsagePoint>>
+
+    /**
+     * The committed state, read directly from storage. Use it right after [refresh] when the result
+     * must reflect that refresh: [accounts] may publish it a moment later.
+     */
+    public suspend fun current(): List<AccountState> = accounts.value
 }
 
 /** Per-window reset alert switches. */

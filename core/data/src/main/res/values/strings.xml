@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reset_channel_name">Weekly resets</string>
+    <string name="reset_channel_description">Tells you when a weekly limit has reset and is full again.</string>
+    <string name="reset_title_weekly">%1$s weekly limit has reset</string>
+    <string name="reset_title_monthly">%1$s monthly limit has reset</string>
+    <string name="reset_body_with_next">You have your full limit again. Next reset %1$s.</string>
+    <string name="reset_body">You have your full limit again.</string>
+    <string name="reset_action_open">Open</string>
+    <string name="reset_action_mute">Mute %1$s</string>
+</resources>

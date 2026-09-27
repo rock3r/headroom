@@ -21,4 +21,5 @@ dependencies {
     implementation(libs.tink.android)
     implementation(libs.okhttp)
     testImplementation(libs.androidx.work.testing)
+    testImplementation(libs.androidx.test.core)
 }
