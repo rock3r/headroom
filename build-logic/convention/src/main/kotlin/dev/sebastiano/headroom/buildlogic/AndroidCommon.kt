@@ -20,6 +20,7 @@ internal fun configureAndroidCommon(extension: CommonExtension) {
                 "--add-opens=java.base/java.io=ALL-UNNAMED",
                 "--add-opens=java.base/java.lang=ALL-UNNAMED",
                 "--add-opens=java.base/java.util=ALL-UNNAMED",
+                "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
             )
             test.maxHeapSize = "2g"
         }
