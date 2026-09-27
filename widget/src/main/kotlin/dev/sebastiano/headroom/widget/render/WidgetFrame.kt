@@ -23,6 +23,7 @@ import androidx.compose.remote.creation.compose.state.asRemoteTextUnit
 import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.remote.creation.compose.state.rs
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,7 +73,7 @@ internal fun WidgetCard(
 @Composable
 internal fun WidgetText(
     text: String,
-    color: androidx.compose.ui.graphics.Color,
+    color: Color,
     fontSize: RemoteTextUnit,
     modifier: RemoteModifier = RemoteModifier,
     fontWeight: FontWeight = FontWeight.Bold,

@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.widget
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.Pace
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
@@ -55,7 +56,7 @@ public data class Gauge(
     val accountId: String,
     val name: String,
     val glyph: String,
-    val provider: dev.sebastiano.headroom.model.Provider,
+    val provider: Provider,
     /** Share of the window used, from 0 to 100. */
     val usedPercent: Int,
     val window: GaugeWindow,

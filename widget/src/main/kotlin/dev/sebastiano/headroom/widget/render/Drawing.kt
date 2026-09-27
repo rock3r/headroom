@@ -12,6 +12,7 @@ import androidx.compose.remote.creation.compose.state.min as remoteMin
 import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.remote.creation.compose.state.rf
 import androidx.compose.remote.creation.compose.text.RemoteTypeface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PaintingStyle
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -151,12 +152,11 @@ internal fun RemoteDrawScope.drawPolarShape(
 }
 
 /** A paint for canvas text. */
-internal fun textPaint(color: androidx.compose.ui.graphics.Color, sizePx: Float, bold: Boolean) =
-    RemotePaint {
-        this.color = color.rc
-        textSize = sizePx.rf
-        typeface = if (bold) RemoteTypeface.DefaultBold else RemoteTypeface.Default
-    }
+internal fun textPaint(color: Color, sizePx: Float, bold: Boolean) = RemotePaint {
+    this.color = color.rc
+    textSize = sizePx.rf
+    typeface = if (bold) RemoteTypeface.DefaultBold else RemoteTypeface.Default
+}
 
 private fun strokePaint(color: RemoteColor, width: RemoteFloat) = RemotePaint {
     this.color = color
