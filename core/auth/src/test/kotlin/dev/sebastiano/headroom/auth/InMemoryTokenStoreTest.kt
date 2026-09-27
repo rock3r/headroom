@@ -42,4 +42,16 @@ class InMemoryTokenStoreTest {
         store.delete("zai-1")
         assertNull(store.load("zai-1"))
     }
+
+    @Test
+    fun `revisions keep counting after a delete, so a stale save cannot win`() = runTest {
+        val first = checkNotNull(store.save(credential, null))
+        store.delete("zai-1")
+
+        val again = checkNotNull(store.save(credential.copy(accessToken = "new"), null))
+
+        assertEquals(2, again.revision)
+        assertNull(store.save(first.copy(accessToken = "stale"), first.revision))
+        assertEquals("new", store.load("zai-1")?.accessToken)
+    }
 }
