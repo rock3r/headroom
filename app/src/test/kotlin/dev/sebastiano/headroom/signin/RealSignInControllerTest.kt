@@ -26,7 +26,11 @@ class RealSignInControllerTest {
             label = "sam@example.com",
         )
 
-    private class FakeBrowser(override val authorizeUrl: String) : BrowserSession {
+    /** [slowUnwind] makes a cancelled wait take a while to finish, as it can in production. */
+    private class FakeBrowser(
+        override val authorizeUrl: String,
+        private val slowUnwind: Boolean = false,
+    ) : BrowserSession {
         val result = CompletableDeferred<TokenSet>()
         val pasted = mutableListOf<String>()
         var closed = false
@@ -36,7 +40,15 @@ class RealSignInControllerTest {
             pasted += code
         }
 
-        override suspend fun awaitTokens(): TokenSet = result.await()
+        override suspend fun awaitTokens(): TokenSet =
+            try {
+                result.await()
+            } finally {
+                if (slowUnwind)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        kotlinx.coroutines.delay(1_000)
+                    }
+            }
 
         override fun close() {
             closed = true
@@ -50,8 +62,9 @@ class RealSignInControllerTest {
         override suspend fun awaitTokens(): TokenSet = result.await()
     }
 
-    private class FakeSteps : SignInSteps {
+    private class FakeSteps(private val slowUnwind: Boolean = false) : SignInSteps {
         var browser: FakeBrowser? = null
+        val browsers = mutableListOf<FakeBrowser>()
         var device: FakeDevice? = null
 
         override fun kindOf(provider: Provider) =
@@ -62,7 +75,10 @@ class RealSignInControllerTest {
             }
 
         override suspend fun startBrowser(provider: Provider) =
-            FakeBrowser("https://example.com/authorize").also { browser = it }
+            FakeBrowser("https://example.com/authorize", slowUnwind).also {
+                browser = it
+                browsers += it
+            }
 
         override suspend fun startDeviceCode(provider: Provider) =
             FakeDevice("ABCD-1234", "https://example.com/device").also { device = it }
@@ -76,8 +92,10 @@ class RealSignInControllerTest {
     private fun TestScope.controller(
         steps: FakeSteps,
         completed: MutableList<TokenSet> = mutableListOf(),
+        gate: CompletableDeferred<Unit>? = null,
     ) =
         RealSignInController(steps, backgroundScope) { tokens ->
+            gate?.await()
             completed += tokens
             Account("id", tokens.provider, tokens.label ?: tokens.provider.displayName)
         }
@@ -184,5 +202,36 @@ class RealSignInControllerTest {
             controller.cancel()
             assertEquals(SignInState.Idle, controller.state.value)
             assertTrue(steps.browser!!.closed)
+        }
+
+    @Test
+    fun `an API key is saved once, however often it is submitted`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val completed = mutableListOf<TokenSet>()
+            val gate = CompletableDeferred<Unit>()
+            val controller = controller(FakeSteps(), completed, gate)
+            controller.start(Provider.ZAi)
+            controller.submitApiKey("key-123")
+            assertEquals(SignInState.ApiKey(Provider.ZAi, saving = true), controller.state.value)
+            controller.submitApiKey("key-123")
+            controller.submitApiKey("key-123")
+            gate.complete(Unit)
+            assertEquals(1, completed.size)
+            assertEquals(SignInState.Success(Provider.ZAi, "Z.AI"), controller.state.value)
+        }
+
+    @Test
+    fun `a cancelled sign-in that unwinds late does not clear its replacement`() =
+        runTest(kotlinx.coroutines.test.StandardTestDispatcher()) {
+            val steps = FakeSteps(slowUnwind = true)
+            val controller = controller(steps)
+            controller.start(Provider.Claude)
+            testScheduler.runCurrent()
+            controller.cancel()
+            controller.start(Provider.Claude)
+            testScheduler.runCurrent()
+            testScheduler.advanceUntilIdle()
+            controller.submitCode("code#state")
+            assertEquals(listOf("code#state"), steps.browsers.last().pasted)
         }
 }

@@ -66,6 +66,8 @@ class RealSignInController(
     private val mutableState = MutableStateFlow<SignInState>(SignInState.Idle)
     override val state: StateFlow<SignInState> = mutableState.asStateFlow()
 
+    /** One sign-in attempt. Only the current attempt may change [browser] or the state. */
+    private var attempt = 0
     private var job: Job? = null
     private var browser: BrowserSession? = null
     private var provider: Provider? = null
@@ -75,14 +77,14 @@ class RealSignInController(
         this.provider = provider
         when (steps.kindOf(provider)) {
             SignInKind.ApiKey -> mutableState.value = SignInState.ApiKey(provider)
-            SignInKind.Browser -> run(provider) { browserSignIn(provider) }
-            SignInKind.DeviceCode -> run(provider) { deviceSignIn(provider) }
+            SignInKind.Browser -> run(provider) { id -> browserSignIn(provider, id) }
+            SignInKind.DeviceCode -> run(provider) { _ -> deviceSignIn(provider) }
         }
     }
 
-    private suspend fun browserSignIn(provider: Provider): TokenSet {
+    private suspend fun browserSignIn(provider: Provider, id: Int): TokenSet {
         val session = steps.startBrowser(provider)
-        browser = session
+        if (id == attempt) browser = session
         return session.use {
             mutableState.value = SignInState.Browser(provider, session.authorizeUrl)
             session.awaitTokens()
@@ -96,10 +98,11 @@ class RealSignInController(
         return session.awaitTokens()
     }
 
-    private fun run(provider: Provider, signIn: suspend () -> TokenSet) {
+    private fun run(provider: Provider, signIn: suspend (attemptId: Int) -> TokenSet) {
+        val id = attempt
         job = scope.launch {
             try {
-                finish(provider, signIn())
+                finish(provider, signIn(id))
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: AuthException) {
@@ -108,7 +111,8 @@ class RealSignInController(
                 // The sign-in worked but storing it did not.
                 mutableState.value = SignInState.Failed(provider, SignInError.Unknown)
             } finally {
-                browser = null
+                // A cancelled attempt can finish unwinding after a new one started.
+                if (id == attempt) browser = null
             }
         }
     }
@@ -134,6 +138,9 @@ class RealSignInController(
 
     override fun submitApiKey(key: String) {
         val current = provider ?: return
+        val state = mutableState.value
+        // One key at a time: a second tap while saving would add a second copy of the account.
+        if (state !is SignInState.ApiKey || state.saving) return
         val tokens =
             try {
                 steps.apiKeyTokens(current, key)
@@ -141,14 +148,13 @@ class RealSignInController(
                 mutableState.value = SignInState.ApiKey(current, keyRejected = true)
                 return
             }
-        job = scope.launch { runCatchingStorage(current) { finish(current, tokens) } }
-    }
-
-    private suspend fun runCatchingStorage(provider: Provider, block: suspend () -> Unit) {
-        try {
-            block()
-        } catch (_: IOException) {
-            mutableState.value = SignInState.Failed(provider, SignInError.Unknown)
+        mutableState.value = SignInState.ApiKey(current, saving = true)
+        job = scope.launch {
+            try {
+                finish(current, tokens)
+            } catch (_: IOException) {
+                mutableState.value = SignInState.Failed(current, SignInError.Unknown)
+            }
         }
     }
 
@@ -163,6 +169,7 @@ class RealSignInController(
     }
 
     private fun stop() {
+        attempt++
         job?.cancel()
         job = null
         browser?.close()
