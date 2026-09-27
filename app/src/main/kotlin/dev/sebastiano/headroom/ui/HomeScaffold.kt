@@ -366,10 +366,18 @@ private fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit, inToolbar:
         FloatingToolbarDefaults.VibrantFloatingActionButton(
             onClick = onRefresh,
             modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             content = content,
         )
     } else {
-        FloatingActionButton(onClick = onRefresh, modifier = modifier, content = content)
+        FloatingActionButton(
+            onClick = onRefresh,
+            modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            content = content,
+        )
     }
 }
 

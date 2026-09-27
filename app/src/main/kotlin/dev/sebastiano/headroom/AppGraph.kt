@@ -3,6 +3,7 @@ package dev.sebastiano.headroom
 import android.content.ComponentName
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.sebastiano.headroom.appdata.DemoAwareResetHistory
@@ -66,6 +67,7 @@ class AppGraph(
                 isDemo = isDemo,
                 resetHistory = resetHistory,
                 tickInterval = tickInterval,
+                savedStateHandle = createSavedStateHandle(),
             )
         }
     }

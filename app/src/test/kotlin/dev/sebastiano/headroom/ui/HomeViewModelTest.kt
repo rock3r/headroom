@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui
 
+import androidx.lifecycle.SavedStateHandle
 import dev.sebastiano.headroom.MainDispatcherRule
 import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
@@ -39,6 +40,7 @@ class HomeViewModelTest {
             isDemo = MutableStateFlow(true),
             resetHistory = DemoResetHistory,
             tickInterval = null,
+            savedStateHandle = SavedStateHandle(),
         )
     }
 
@@ -162,6 +164,30 @@ class HomeViewModelTest {
                 viewModel.state.value.accounts.first().pastResets,
             )
         }
+
+    @Test
+    fun `the selection survives the view model being recreated`() =
+        runTest(main.dispatcher) {
+            val saved = SavedStateHandle()
+            val first = viewModel(saved)
+            first.select("demo-codex")
+
+            val restored = viewModel(saved)
+            backgroundScope.launch { restored.detail.collect {} }
+            runCurrent()
+            assertEquals("demo-codex", restored.detail.value?.account?.id)
+        }
+
+    private fun viewModel(saved: SavedStateHandle) =
+        HomeViewModel(
+            repository = repository,
+            alertPreferences = InMemoryAlertPreferences(),
+            clock = { now },
+            isDemo = MutableStateFlow(true),
+            resetHistory = DemoResetHistory,
+            tickInterval = null,
+            savedStateHandle = saved,
+        )
 
     private fun <T> List<T>.distinctConsecutive() = filterIndexed { index, value ->
         index == 0 || this[index - 1] != value

@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui.home
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sebastiano.headroom.appdata.ResetHistory
@@ -39,9 +40,11 @@ class HomeViewModel(
     isDemo: Flow<Boolean>,
     resetHistory: ResetHistory,
     tickInterval: Duration? = Duration.ofMinutes(1),
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val refreshing = MutableStateFlow(false)
-    private val selectedId = MutableStateFlow<String?>(null)
+    /** Saved, so the detail pane shows the same account after the process is recreated. */
+    private val selectedId = savedStateHandle.getStateFlow<String?>(SELECTED_ACCOUNT_KEY, null)
 
     private val ticks: Flow<Instant> =
         if (tickInterval == null) {
@@ -115,7 +118,7 @@ class HomeViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
 
     fun select(accountId: String) {
-        selectedId.value = accountId
+        savedStateHandle[SELECTED_ACCOUNT_KEY] = accountId
     }
 
     fun refresh() {
@@ -153,5 +156,6 @@ class HomeViewModel(
 
     private companion object {
         const val STOP_TIMEOUT = 5_000L
+        const val SELECTED_ACCOUNT_KEY = "selectedAccountId"
     }
 }

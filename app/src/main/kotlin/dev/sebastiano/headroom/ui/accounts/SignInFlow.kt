@@ -23,7 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,6 +84,7 @@ internal fun SignInFlow(state: SignInState, actions: AccountsActions) {
     }
 }
 
+// Codes and keys are secrets: they stay in memory only, never in the saved instance state.
 @Composable
 private fun BrowserStep(state: SignInState.Browser, actions: AccountsActions) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -104,7 +105,7 @@ private fun BrowserStep(state: SignInState.Browser, actions: AccountsActions) {
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(top = 8.dp),
         )
-        var code by rememberSaveable { mutableStateOf("") }
+        var code by remember { mutableStateOf("") }
         OutlinedTextField(
             value = code,
             onValueChange = { code = it },
@@ -179,7 +180,7 @@ private fun DeviceCodeStep(state: SignInState.DeviceCode, actions: AccountsActio
 private fun ApiKeyStep(state: SignInState.ApiKey, actions: AccountsActions) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.signin_key_body), style = MaterialTheme.typography.bodyLarge)
-        var key by rememberSaveable { mutableStateOf("") }
+        var key by remember { mutableStateOf("") }
         OutlinedTextField(
             value = key,
             onValueChange = { key = it },
