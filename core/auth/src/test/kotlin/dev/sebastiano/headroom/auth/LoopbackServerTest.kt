@@ -99,6 +99,23 @@ class LoopbackServerTest {
     }
 
     @Test
+    fun `an idle connection does not delay the real callback`() = runTest {
+        val server = start()
+        java.net.Socket("127.0.0.1", server.port).use {
+            // A browser may open a speculative connection that never sends a request.
+            val started = System.nanoTime()
+            val browser = async(io) { get(server.port, "/callback?code=abc&state=$STATE") }
+
+            val callback = server.awaitCallback()
+            callback.respond(CallbackPage.success(RETURN_URL))
+
+            assertEquals(200, browser.await().status)
+            val elapsedMillis = (System.nanoTime() - started) / 1_000_000
+            assertTrue(elapsedMillis < 5_000, "took $elapsedMillis ms")
+        }
+    }
+
+    @Test
     fun `other paths get 404 and the server keeps waiting`() = runTest {
         val server = start()
         val favicon = async(io) { get(server.port, "/favicon.ico") }

@@ -8,9 +8,13 @@ import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Where and how long a [LoopbackServer] listens. */
@@ -64,28 +68,79 @@ private constructor(
      */
     public suspend fun awaitCallback(): LoopbackCallback =
         withContext(ioDispatcher) {
+            val outcome = CompletableDeferred<LoopbackCallback>()
+            val reading = ConcurrentHashMap.newKeySet<Socket>()
             val deadline = System.nanoTime() + config.timeout.toNanos()
-            acceptUntil(deadline, isActive = { ensureActive() })
+            val acceptor = launch { acceptUntil(deadline, outcome, reading) }
+            try {
+                outcome.await()
+            } finally {
+                acceptor.cancel()
+                // Unblocks connections that never sent a request, such as browser preconnects.
+                reading.forEach { it.closeQuietly() }
+            }
         }
 
     override fun close() {
         sockets.forEach { runCatching { it.close() } }
     }
 
-    private fun acceptUntil(deadline: Long, isActive: () -> Unit): LoopbackCallback {
-        while (true) {
-            isActive()
+    /** Accepts connections and serves each one in its own coroutine, so none can block another. */
+    private fun CoroutineScope.acceptUntil(
+        deadline: Long,
+        outcome: CompletableDeferred<LoopbackCallback>,
+        reading: MutableSet<Socket>,
+    ) {
+        while (isActive && !outcome.isCompleted) {
             if (System.nanoTime() >= deadline) {
                 close()
-                throw AuthException.TimedOut("Sign-in was not finished in time")
+                outcome.completeExceptionally(
+                    AuthException.TimedOut("Sign-in was not finished in time")
+                )
+                return
             }
             for (socket in sockets) {
-                val client = acceptOrNull(socket) ?: continue
-                val callback = handle(client)
-                if (callback != null) return callback
+                val client =
+                    try {
+                        acceptOrNull(socket)
+                    } catch (e: AuthException) {
+                        outcome.completeExceptionally(e)
+                        return
+                    } ?: continue
+                reading += client
+                launch { serve(client, reading, outcome) }
             }
         }
     }
+
+    private fun serve(
+        client: Socket,
+        reading: MutableSet<Socket>,
+        outcome: CompletableDeferred<LoopbackCallback>,
+    ) {
+        val request = readRequest(client)
+        reading -= client
+        if (request == null) {
+            client.closeQuietly()
+            return
+        }
+        try {
+            val callback = handle(client, request) ?: return
+            if (!outcome.complete(callback)) {
+                callback.respond(CallbackPage.failure("Sign-in has already finished", returnUrl))
+            }
+        } catch (e: AuthException) {
+            outcome.completeExceptionally(e)
+        }
+    }
+
+    private fun readRequest(client: Socket): HttpRequestHead? =
+        try {
+            client.soTimeout = READ_TIMEOUT_MILLIS
+            HttpRequestHead.read(client.getInputStream())
+        } catch (_: IOException) {
+            null
+        }
 
     private fun acceptOrNull(socket: ServerSocket): Socket? =
         try {
@@ -98,32 +153,19 @@ private constructor(
         }
 
     /** Answers everything that is not a valid callback, and returns the valid one. */
-    private fun handle(client: Socket): LoopbackCallback? {
-        val request =
-            try {
-                client.soTimeout = READ_TIMEOUT_MILLIS
-                HttpRequestHead.read(client.getInputStream())
-            } catch (_: IOException) {
+    private fun handle(client: Socket, request: HttpRequestHead): LoopbackCallback? {
+        val corsOrigin = request.headers["origin"]?.takeIf { it in config.allowedOrigins }
+        return when {
+            request.path != config.path -> {
+                client.answer(NOT_FOUND, "text/plain; charset=utf-8", "Not found", corsOrigin)
                 null
             }
-        if (request == null) {
-            client.closeQuietly()
-            return null
-        }
-        val corsOrigin = request.headers["origin"]?.takeIf { it in config.allowedOrigins }
-        val result =
-            when {
-                request.path != config.path -> {
-                    client.answer(NOT_FOUND, "text/plain; charset=utf-8", "Not found", corsOrigin)
-                    null
-                }
-                request.method == "OPTIONS" -> {
-                    client.answer(NO_CONTENT, null, "", corsOrigin)
-                    null
-                }
-                else -> validate(client, request, corsOrigin)
+            request.method == "OPTIONS" -> {
+                client.answer(NO_CONTENT, null, "", corsOrigin)
+                null
             }
-        return result
+            else -> validate(client, request, corsOrigin)
+        }
     }
 
     private fun validate(
