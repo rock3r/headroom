@@ -10,8 +10,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 
@@ -158,6 +161,62 @@ class BrowserOAuthFlowTest {
         signIn.awaitTokens()
 
         assertEquals(listOf("from-url" to "http://localhost:$port/callback"), spec.exchanges)
+    }
+
+    @Test
+    fun `a pasted loopback URL is exchanged with the loopback redirect URI`() = runTest {
+        listOf("localhost", "127.0.0.1").forEach { host ->
+            val spec = FakeSpec()
+            val signIn = BrowserOAuthFlow(spec, io).start(null)
+            val port = portOf(signIn)
+
+            signIn.submitPastedCode("http://$host:$port/callback?code=c&state=${stateOf(signIn)}")
+            signIn.awaitTokens()
+
+            assertEquals(listOf("c" to "http://localhost:$port/callback"), spec.exchanges)
+        }
+    }
+
+    @Test
+    fun `a pasted URL from the manual page keeps the manual redirect URI`() = runTest {
+        val spec = FakeSpec()
+        val signIn = BrowserOAuthFlow(spec, io).start(null)
+
+        signIn.submitPastedCode("https://example.com/manual?code=m&state=${stateOf(signIn)}")
+        signIn.awaitTokens()
+
+        assertEquals(listOf("m" to "https://example.com/manual"), spec.exchanges)
+    }
+
+    @Test
+    fun `cancelling during the exchange releases the browser connection`() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val spec = FakeSpec()
+        val stuck =
+            object : BrowserOAuthSpec by spec {
+                override suspend fun exchange(
+                    code: String,
+                    redirectUri: String,
+                    pkce: Pkce,
+                    state: String,
+                ): TokenSet {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                }
+            }
+        val signIn = BrowserOAuthFlow(stuck, io).start(null)
+        val url = "http://127.0.0.1:${portOf(signIn)}/callback?code=c&state=${stateOf(signIn)}"
+        val browser = async { runCatching { browserGet(io, url) } }
+        val tokens = async { signIn.awaitTokens() }
+
+        entered.await()
+        val started = System.nanoTime()
+        tokens.cancelAndJoin()
+
+        val reply = browser.await()
+        val elapsedMillis = (System.nanoTime() - started) / 1_000_000
+        assertTrue(reply.isFailure, "the browser got $reply")
+        assertTrue(elapsedMillis < 5_000, "the browser waited $elapsedMillis ms")
     }
 
     @Test
