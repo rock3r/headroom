@@ -108,11 +108,17 @@ internal fun RemoteDrawScope.drawGaugeBar(
     val end = halfStroke + usable * value.rf
 
     if (value < BAR_FULL) {
-        val trackStart = if (value > BAR_EMPTY) end + height * BAR_GAP_OF_HEIGHT.rf else halfStroke
+        val trackEnd = width - halfStroke
+        val afterGap = if (value > BAR_EMPTY) end + height * BAR_GAP_OF_HEIGHT.rf else halfStroke
+        // On a nearly full or very narrow bar the gap leaves no room for a track. The width is
+        // only known to the player, so clamp the start and hide the segment when it is empty;
+        // a backwards or zero-length line would still draw its round caps.
+        val trackStart = remoteMin(afterGap, trackEnd)
+        val hasTrack = trackEnd.isGreaterThan(afterGap)
         drawLine(
-            strokePaint(track, stroke),
+            strokePaint(hasTrack.select(track, Color.Transparent.rc), stroke),
             RemoteOffset(trackStart, y),
-            RemoteOffset(width - halfStroke, y),
+            RemoteOffset(trackEnd, y),
         )
         drawCircle(
             fillPaint(active),
