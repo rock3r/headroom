@@ -61,7 +61,9 @@ fun ResetsScreen(
     val upcoming =
         state.accounts
             .flatMap { account ->
-                account.windows.filter { it.canAlert && it.resetsAt != null }.map { account to it }
+                account.windows
+                    .filter { it.canAlert && it.resetsAt?.isAfter(state.now) == true }
+                    .map { account to it }
             }
             .sortedBy { (_, window) -> window.resetsAt }
     val insets = WindowInsets.safeDrawing.asPaddingValues()
