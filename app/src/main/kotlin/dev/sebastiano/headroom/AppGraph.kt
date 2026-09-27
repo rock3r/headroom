@@ -1,22 +1,30 @@
 package dev.sebastiano.headroom
 
+import android.content.ComponentName
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.sebastiano.headroom.appdata.DemoAwareResetHistory
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
 import dev.sebastiano.headroom.appdata.DemoResetHistory
+import dev.sebastiano.headroom.appdata.HistoryResetHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
 import dev.sebastiano.headroom.appdata.ResetHistory
+import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.signin.AuthSignInSteps
 import dev.sebastiano.headroom.signin.FakeSignInController
+import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.home.HomeViewModel
+import dev.sebastiano.headroom.widget.HeadroomWidgetProvider
 import dev.sebastiano.headroom.widgets.AppWidgetManagerPinner
 import dev.sebastiano.headroom.widgets.WidgetPinner
+import dev.sebastiano.headroom.widgets.WidgetStyle
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -74,8 +82,9 @@ class AppGraph(
 
     companion object {
         /**
-         * The graph the app runs with today: no real accounts yet, so it shows demo data. The data
-         * layer replaces `realAccounts` and the in-memory preferences when it is wired in.
+         * Builds the graph. With a [data] graph the app shows the signed-in accounts from the data
+         * layer, and demo data only while there are none. Without one (instrumented tests,
+         * previews) it runs on fakes.
          */
         fun create(
             context: Context,
@@ -84,8 +93,10 @@ class AppGraph(
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             demoLatency: Duration = Duration.ofMillis(DEMO_LATENCY_MILLIS),
             tickInterval: Duration? = Duration.ofMinutes(1),
+            data: DataGraph? = null,
         ): AppGraph {
-            val realAccounts: QuotaRepository = FakeQuotaRepository(clock, initial = emptyList())
+            val realAccounts: QuotaRepository =
+                data?.repository ?: FakeQuotaRepository(clock, initial = emptyList())
             val repository =
                 DemoModeQuotaRepository(
                     real = realAccounts,
@@ -93,18 +104,45 @@ class AppGraph(
                     scope = scope,
                     simulatedLatency = demoLatency,
                 )
+            val signInController =
+                if (data == null) {
+                    FakeSignInController()
+                } else {
+                    RealSignInController(AuthSignInSteps(data.authMethods), scope) { tokens ->
+                        data.signInManager.complete(tokens)
+                    }
+                }
             return AppGraph(
                 quotaRepository = repository,
                 isDemo = repository.isDemo,
-                alertPreferences = InMemoryAlertPreferences(),
+                alertPreferences = data?.alertPreferences ?: InMemoryAlertPreferences(),
                 clock = clock,
                 zone = zone,
-                signInController = FakeSignInController(),
-                widgetPinner = AppWidgetManagerPinner(context.applicationContext) { null },
-                resetHistory = DemoResetHistory,
+                signInController = signInController,
+                widgetPinner =
+                    AppWidgetManagerPinner(context.applicationContext) { style ->
+                        ComponentName(
+                            context,
+                            HeadroomWidgetProvider.classFor(style.toWidgetStyle()),
+                        )
+                    },
+                resetHistory =
+                    DemoAwareResetHistory(
+                        isDemo = repository.isDemo,
+                        real = HistoryResetHistory(realAccounts),
+                        demo = DemoResetHistory,
+                    ),
                 tickInterval = tickInterval,
             )
         }
+
+        private fun WidgetStyle.toWidgetStyle(): dev.sebastiano.headroom.widget.WidgetStyle =
+            when (this) {
+                WidgetStyle.Rings -> dev.sebastiano.headroom.widget.WidgetStyle.Rings
+                WidgetStyle.Bars -> dev.sebastiano.headroom.widget.WidgetStyle.Bars
+                WidgetStyle.Shape -> dev.sebastiano.headroom.widget.WidgetStyle.Shape
+                WidgetStyle.Countdown -> dev.sebastiano.headroom.widget.WidgetStyle.Countdown
+            }
 
         private const val DEMO_LATENCY_MILLIS = 900L
     }

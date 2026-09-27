@@ -51,6 +51,8 @@ dependencies {
     implementation(libs.compose.material3.adaptive.navigation)
     implementation(libs.compose.material3.adaptive.navigationSuite)
     implementation(libs.androidx.browser)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
