@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.quota
 
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import java.time.Clock
@@ -50,6 +51,11 @@ public class JetBrainsQuotaFetcher(
                 planLabel = authInfo.nonBlankStringOrNull("licenseType")?.let(::jetBrainsPlanLabel),
                 windows = emptyList(),
                 fetchedAt = clock.instant(),
+                balance =
+                    QuotaBalance(
+                        amount = authInfo.doubleOrNull("balanceLeft") ?: 0.0,
+                        unit = authInfo.stringOrNull("balanceUnit").orEmpty(),
+                    ),
             )
         )
     }
