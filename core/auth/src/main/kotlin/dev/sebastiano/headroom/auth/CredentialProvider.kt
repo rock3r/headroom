@@ -58,14 +58,19 @@ public class CredentialProvider(
                 // Another process may have spent the refresh token first and saved the result.
                 return newerValid(current) ?: throw failure
             }
-        val refreshed = current.refreshedWith(tokens)
-        return store.save(refreshed, expectedRevision = current.revision)
+        return store.save(current.refreshedWith(tokens), expectedRevision = current.revision)
             ?: newerValid(current)
-            ?: refreshed
+            ?: throw AuthException.SignInExpired(current.accountId)
     }
 
-    private suspend fun newerValid(current: StoredCredential): StoredCredential? =
-        store.load(current.accountId)?.takeIf {
-            it.revision != current.revision && !it.isExpired(clock.instant())
-        }
+    /**
+     * What another writer saved while the refresh ran. A sign-out wins: when nothing is stored any
+     * more this throws [AuthException.NotSignedIn]. Otherwise it returns a newer credential that
+     * still works, or null.
+     */
+    private suspend fun newerValid(current: StoredCredential): StoredCredential? {
+        val latest =
+            store.load(current.accountId) ?: throw AuthException.NotSignedIn(current.accountId)
+        return latest.takeIf { it.revision != current.revision && !it.isExpired(clock.instant()) }
+    }
 }
