@@ -6,6 +6,12 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerFactory
+import dev.sebastiano.headroom.auth.AuthMethods
+import dev.sebastiano.headroom.auth.TokenStore
+import dev.sebastiano.headroom.data.account.AccountQuotaFetcher
+import dev.sebastiano.headroom.data.account.EncryptedTokenStore
+import dev.sebastiano.headroom.data.account.SignInManager
+import dev.sebastiano.headroom.data.account.TinkCredentialCipher
 import dev.sebastiano.headroom.data.db.HeadroomDatabase
 import dev.sebastiano.headroom.data.db.RoomQuotaRepository
 import dev.sebastiano.headroom.data.prefs.DataStoreAlertPreferences
@@ -21,7 +27,7 @@ import dev.sebastiano.headroom.data.sync.SyncWorker
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.QuotaRepository
-import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.quota.QuotaFetchers
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -48,9 +54,13 @@ public interface DataGraphOwner {
  */
 public class DataGraph(
     context: Context,
-    fetch: suspend (Account) -> QuotaResult,
-    private val clock: () -> Instant = Instant::now,
     private val scope: CoroutineScope,
+    private val clock: () -> Instant = Instant::now,
+    /** Where sign-in tokens live. Defaults to the encrypted on-device store. */
+    public val tokenStore: TokenStore = EncryptedTokenStore(context, TinkCredentialCipher(context)),
+    /** How each provider signs in and refreshes its tokens. */
+    public val authMethods: AuthMethods = AuthMethods(),
+    quotaFetchers: QuotaFetchers = QuotaFetchers.create(),
 ) {
     private val appContext = context.applicationContext
 
@@ -62,7 +72,11 @@ public class DataGraph(
             appContext.preferencesDataStoreFile("alerts")
         }
 
-    private val roomRepository = RoomQuotaRepository(database.quotaDao(), fetch, clock, scope)
+    private val accountFetcher =
+        AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers)
+
+    private val roomRepository =
+        RoomQuotaRepository(database.quotaDao(), accountFetcher::fetch, clock, scope)
 
     public val repository: AccountsRepository =
         object : AccountsRepository, QuotaRepository by roomRepository {
@@ -73,6 +87,9 @@ public class DataGraph(
         }
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
+
+    /** Turns finished sign-ins into accounts, and signs accounts out. */
+    public val signInManager: SignInManager = SignInManager(tokenStore, repository)
 
     private val scheduler =
         AlarmResetScheduler(appContext) { overdue ->
