@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui.overview
 
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,7 +14,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -89,6 +93,7 @@ fun AccountCard(
                     wavy = account.needsAttention,
                     trailing = primary.resetsAt?.let { formatter.short(it, now) },
                     trackColor = track,
+                    draining = account.justReset,
                 )
             }
             account.session?.let { session ->
@@ -146,6 +151,7 @@ private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
             Column(horizontalAlignment = Alignment.End) {
                 AnimatedPercent(
                     percent = primary.usedPercent,
+                    draining = account.justReset,
                     modifier =
                         sharedElements?.run {
                             Modifier.sharedValue(
@@ -165,17 +171,22 @@ private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
     }
 }
 
-/** A percentage that moves to a new value without overshoot. */
+/**
+ * A percentage that moves to a new value without overshoot. With [draining], a drop (a weekly
+ * reset) moves on the slower reset spec, like the bar next to it.
+ */
 @Composable
 fun AnimatedPercent(
     percent: Double,
     modifier: Modifier = Modifier,
     style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineMedium,
+    draining: Boolean = false,
 ) {
+    val target = percent.toFloat()
     val animated by
         animateFloatAsState(
-            targetValue = percent.toFloat(),
-            animationSpec = HeadroomMotion.dataSpec(),
+            targetValue = target,
+            animationSpec = valueSpec(target, draining),
             label = "percent",
         )
     Text(
@@ -193,7 +204,9 @@ private fun MeterRow(
     trailing: String?,
     trackColor: Color,
     showPace: Boolean = true,
+    draining: Boolean = false,
 ) {
+    val progress = window.usedPercent.asFraction()
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -207,9 +220,10 @@ private fun MeterRow(
             maxLines = 1,
         )
         QuotaBar(
-            progress = window.usedPercent.asFraction(),
+            progress = progress,
             wavy = wavy,
             trackColor = trackColor,
+            animationSpec = valueSpec(progress, draining),
             paceFraction = if (showPace) window.expectedPercent?.asFraction() else null,
             modifier = Modifier.weight(1f),
         )
@@ -222,4 +236,16 @@ private fun MeterRow(
             modifier = Modifier.widthIn(min = 64.dp),
         )
     }
+}
+
+/**
+ * The spec for a value moving to [target]: the reset drain when the account just reset and the
+ * value went down, the regular data spec otherwise. Only the drop itself drains, once per reset.
+ */
+@Composable
+private fun valueSpec(target: Float, draining: Boolean): AnimationSpec<Float> {
+    val previous = remember { mutableFloatStateOf(target) }
+    val dropped = target < previous.floatValue
+    SideEffect { previous.floatValue = target }
+    return if (draining && dropped) HeadroomMotion.resetDrainSpec() else HeadroomMotion.dataSpec()
 }

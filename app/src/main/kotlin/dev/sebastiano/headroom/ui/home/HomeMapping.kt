@@ -21,6 +21,7 @@ internal fun homeUiState(
     pastResets: Map<String, List<Double>>,
     isDemo: Boolean,
     isRefreshing: Boolean,
+    justReset: Set<String> = emptySet(),
 ): HomeUiState {
     val nextReset =
         NextReset.find(accounts, now)?.let { next ->
@@ -35,7 +36,15 @@ internal fun homeUiState(
         }
     return HomeUiState(
         now = now,
-        accounts = accounts.map { it.toSummary(now, alerts, pastResets[it.account.id].orEmpty()) },
+        accounts =
+            accounts.map {
+                it.toSummary(
+                    now = now,
+                    alerts = alerts,
+                    pastResets = pastResets[it.account.id].orEmpty(),
+                    justReset = it.account.id in justReset,
+                )
+            },
         isDemo = isDemo,
         isRefreshing = isRefreshing || accounts.any { it.isRefreshing },
         lastSyncedAt = accounts.mapNotNull { it.snapshot?.fetchedAt }.maxOrNull(),
@@ -47,6 +56,7 @@ internal fun AccountState.toSummary(
     now: Instant,
     alerts: AlertSwitches,
     pastResets: List<Double>,
+    justReset: Boolean = false,
 ): AccountSummary {
     val primary = primaryWindow
     return AccountSummary(
@@ -63,10 +73,14 @@ internal fun AccountState.toSummary(
                 .filterNot { it.isUnlimited }
                 .sortedBy { it.kind.ordinal }
                 .map { it.toSummary(account.id, now, alerts) },
-        pace = primary?.let { PaceChipState.from(it, now) },
+        pace =
+            primary?.let {
+                if (justReset) PaceChipState.JustReset else PaceChipState.from(it, now)
+            },
         needsAttention = primary?.let { Pace.needsAttention(it, now) } ?: false,
         error = lastError,
         pastResets = pastResets,
+        justReset = justReset,
     )
 }
 

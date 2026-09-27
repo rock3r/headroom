@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.designsystem
 
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,11 +36,12 @@ fun QuotaBar(
     color: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.secondaryContainer,
     tickColor: Color = MaterialTheme.colorScheme.onSurface,
+    animationSpec: AnimationSpec<Float> = HeadroomMotion.dataSpec(),
 ) {
     val animated by
         animateFloatAsState(
             targetValue = progress.coerceIn(0f, 1f),
-            animationSpec = HeadroomMotion.dataSpec(),
+            animationSpec = animationSpec,
             label = "quota bar",
         )
     val isWavy = wavy && animationsEnabled()

@@ -82,16 +82,30 @@ class HomeViewModel(
             if (histories.isEmpty()) flowOf(emptyMap()) else combine(histories) { it.toMap() }
         }
 
+    private val resetTracker = ResetTracker()
+
+    /** The accounts, with the ids of those whose weekly window reset while the app was open. */
+    private val accountsWithResets: Flow<Pair<List<AccountState>, Set<String>>> =
+        repository.accounts.map { it to resetTracker.update(it) }
+
     private val environment =
         combine(isDemo, refreshing, ticks) { demo, busy, now -> Environment(demo, busy, now) }
 
     val state: StateFlow<HomeUiState> =
-        combine(repository.accounts, alerts, pastResets, environment) {
-                accounts,
+        combine(accountsWithResets, alerts, pastResets, environment) {
+                (accounts, justReset),
                 switches,
                 history,
                 env ->
-                homeUiState(accounts, env.now, switches, history, env.isDemo, env.isRefreshing)
+                homeUiState(
+                    accounts = accounts,
+                    now = env.now,
+                    alerts = switches,
+                    pastResets = history,
+                    isDemo = env.isDemo,
+                    isRefreshing = env.isRefreshing,
+                    justReset = justReset,
+                )
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), initialState())
 

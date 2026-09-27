@@ -178,6 +178,35 @@ class HomeViewModelTest {
             assertEquals("demo-codex", restored.detail.value?.account?.id)
         }
 
+    @Test
+    fun `a weekly reset while the app is open shows the account as just reset`() =
+        runTest(main.dispatcher) {
+            observe()
+            repository.set(
+                repository.accounts.value.map { state ->
+                    if (state.account.id != "demo-grok") return@map state
+                    val snapshot = requireNotNull(state.snapshot)
+                    state.copy(
+                        snapshot =
+                            snapshot.copy(
+                                windows =
+                                    snapshot.windows.map {
+                                        it.copy(
+                                            usedPercent = 1.0,
+                                            resetsAt = it.resetsAt?.plus(Duration.ofDays(7)),
+                                        )
+                                    }
+                            )
+                    )
+                }
+            )
+            runCurrent()
+            val grok = viewModel.state.value.accounts.first { it.id == "demo-grok" }
+            assertTrue(grok.justReset)
+            assertEquals(PaceChipState.JustReset, grok.pace)
+            assertFalse(viewModel.state.value.accounts.first().justReset)
+        }
+
     private fun viewModel(saved: SavedStateHandle) =
         HomeViewModel(
             repository = repository,

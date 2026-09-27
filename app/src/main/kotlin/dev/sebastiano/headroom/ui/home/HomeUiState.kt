@@ -34,6 +34,8 @@ data class AccountSummary(
     val error: QuotaErrorKind?,
     /** Used percent of the primary window at each past reset, oldest first. */
     val pastResets: List<Double>,
+    /** The weekly window reset while the app was open. The card says so for the session. */
+    val justReset: Boolean = false,
 )
 
 @Immutable
