@@ -5,9 +5,9 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.edit
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.ui.HeadroomApp
@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.enableEdgeToEdge(window)
+        // Dark or light system bar icons follow the theme, so the status bar stays readable.
+        enableEdgeToEdge()
         val graph = (application as HeadroomApplication).graph
         setContent { HeadroomTheme { HeadroomApp(graph = graph) } }
         askForNotificationsOnceSignedIn(graph)
