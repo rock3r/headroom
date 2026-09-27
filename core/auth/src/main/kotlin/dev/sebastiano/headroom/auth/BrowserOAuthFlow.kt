@@ -46,18 +46,19 @@ internal constructor(
         get() = spec.provider
 
     /**
-     * Binds the loopback listener and prepares the authorize URLs.
+     * Binds the loopback listener (off the calling thread) and prepares the authorize URLs.
      *
      * @param returnUrl a custom scheme URL such as `headroom://signed-in`. The page the browser
      *   shows after sign-in links to it.
      * @throws AuthException.SignInFailed when no local port is free.
      */
-    public fun start(returnUrl: String?): BrowserSignIn {
-        val pkce = Pkce.generate(random)
-        val state = spec.newState(random)
-        val server = LoopbackServer.start(spec.loopback, state, returnUrl, ioDispatcher)
-        return BrowserSignIn(spec, pkce, state, server, returnUrl, ioDispatcher)
-    }
+    public suspend fun start(returnUrl: String?): BrowserSignIn =
+        withContext(ioDispatcher) {
+            val pkce = Pkce.generate(random)
+            val state = spec.newState(random)
+            val server = LoopbackServer.start(spec.loopback, state, returnUrl, ioDispatcher)
+            BrowserSignIn(spec, pkce, state, server, returnUrl, ioDispatcher)
+        }
 }
 
 /** One browser sign-in in progress. The first of the loopback redirect and a pasted code wins. */

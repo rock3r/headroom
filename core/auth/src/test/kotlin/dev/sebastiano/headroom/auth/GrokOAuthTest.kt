@@ -54,7 +54,7 @@ class GrokOAuthTest {
     }
 
     @Test
-    fun `the authorize URL carries the xAI client, scopes and a nonce`() {
+    fun `the authorize URL carries the xAI client, scopes and a nonce`() = runTest {
         BrowserOAuthFlow(grok, io).start(null).use { signIn ->
             val params = queryPairs(signIn.authorizeUrl)
             assertTrue(signIn.authorizeUrl.startsWith("https://auth.x.ai/oauth2/authorize?"))

@@ -48,7 +48,7 @@ class JetBrainsOAuthTest {
     }
 
     @Test
-    fun `the authorize URL uses a localhost redirect without a path`() {
+    fun `the authorize URL uses a localhost redirect without a path`() = runTest {
         BrowserOAuthFlow(jetBrains, io).start(null).use { signIn ->
             val params = queryPairs(signIn.authorizeUrl)
             assertTrue(signIn.authorizeUrl.startsWith("https://junie.jetbrains.com/cli-auth?"))

@@ -59,7 +59,7 @@ class ClaudeOAuthTest {
     private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
 
     @Test
-    fun `the authorize URL matches the Claude Code CLI`() {
+    fun `the authorize URL matches the Claude Code CLI`() = runTest {
         val signIn = BrowserOAuthFlow(claude, io).start(null)
         signIn.use {
             val params = queryPairs(it.authorizeUrl)
@@ -97,7 +97,7 @@ class ClaudeOAuthTest {
     }
 
     @Test
-    fun `the manual URL differs only in its redirect URI`() {
+    fun `the manual URL differs only in its redirect URI`() = runTest {
         BrowserOAuthFlow(claude, io).start(null).use {
             val automatic = queryPairs(it.authorizeUrl).toMap()
             val manual = queryPairs(checkNotNull(it.manualAuthorizeUrl)).toMap()
@@ -165,7 +165,7 @@ class ClaudeOAuthTest {
     }
 
     @Test
-    fun `a pasted code must include its state`() {
+    fun `a pasted code must include its state`() = runTest {
         BrowserOAuthFlow(claude, io).start(null).use {
             assertFailsWith<AuthException.SignInFailed> { it.submitPastedCode("code-only") }
         }
