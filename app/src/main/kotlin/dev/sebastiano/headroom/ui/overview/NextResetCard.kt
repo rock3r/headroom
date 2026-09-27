@@ -1,5 +1,10 @@
 package dev.sebastiano.headroom.ui.overview
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,27 +76,7 @@ fun NextResetCard(
                         )
             )
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text =
-                        stringResource(
-                            if (next.kind == WindowKind.Weekly) R.string.overview_next_weekly_reset
-                            else R.string.overview_next_reset
-                        ),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Text(
-                    text = formatter.countdown(now, next.resetsAt),
-                    style = MaterialTheme.typography.displayMedium,
-                )
-                Text(
-                    text =
-                        stringResource(
-                            R.string.overview_next_reset_when,
-                            next.provider.displayName,
-                            formatter.long(next.resetsAt),
-                        ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                NextResetText(next, now, formatter)
                 FlowRow(
                     modifier = Modifier.padding(top = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -142,4 +127,48 @@ fun NextResetCard(
     }
 }
 
+/**
+ * What resets and when. When the next reset becomes a different window (after a reset, or a new
+ * account), the text fades through to it; the countdown ticking down does not animate.
+ */
+@Composable
+private fun NextResetText(next: NextResetSummary, now: Instant, formatter: ResetFormatter) {
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    AnimatedContent(
+        targetState = next,
+        contentKey = { Triple(it.accountId, it.windowId, it.resetsAt) },
+        transitionSpec = {
+            (fadeIn(effects) + scaleIn(effects, initialScale = FADE_THROUGH_SCALE)) togetherWith
+                fadeOut(fast)
+        },
+        label = "next reset",
+    ) { shown ->
+        Column {
+            Text(
+                text =
+                    stringResource(
+                        if (shown.kind == WindowKind.Weekly) R.string.overview_next_weekly_reset
+                        else R.string.overview_next_reset
+                    ),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Text(
+                text = formatter.countdown(now, shown.resetsAt),
+                style = MaterialTheme.typography.displayMedium,
+            )
+            Text(
+                text =
+                    stringResource(
+                        R.string.overview_next_reset_when,
+                        shown.provider.displayName,
+                        formatter.long(shown.resetsAt),
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+private const val FADE_THROUGH_SCALE = 0.96f
 private const val DECO_ALPHA = 0.22f

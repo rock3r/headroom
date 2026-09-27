@@ -94,6 +94,8 @@ internal fun HomeScaffold(
     modifier: Modifier = Modifier,
     openAccountRequest: OpenAccountRequest? = null,
     onConsumeOpenAccount: () -> Unit = {},
+    playEntrance: Boolean = false,
+    onEntranceStart: () -> Unit = {},
 ) {
     val width = layoutWidth()
     var tab by rememberSaveable { mutableStateOf(HomeTab.Overview) }
@@ -163,6 +165,8 @@ internal fun HomeScaffold(
                             onAllResets = { selectTab(HomeTab.Resets) },
                             onOpenAccounts = onOpenAccounts,
                             bottomPadding = bottomPadding,
+                            playEntrance = playEntrance,
+                            onEntranceStart = onEntranceStart,
                         )
                     HomeTab.Resets -> ResetsScreen(home, formatter, bottomPadding = bottomPadding)
                     HomeTab.Widgets ->
@@ -200,6 +204,8 @@ private fun OverviewPanes(
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
+    playEntrance: Boolean,
+    onEntranceStart: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val containerSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
@@ -244,6 +250,8 @@ private fun OverviewPanes(
                         selectedAccountId = if (twoPanes) detail?.account?.id else null,
                         bottomPadding = bottomPadding,
                         sharedElements = shared,
+                        playEntrance = playEntrance,
+                        onEntranceStart = onEntranceStart,
                     )
                 }
             },

@@ -71,6 +71,8 @@ fun HeadroomApp(
     val snackbar = remember { SnackbarHostState() }
     val widgetUnavailable = stringResource(R.string.widget_add_unavailable)
     var accountsOpen by rememberSaveable { mutableStateOf(false) }
+    // The cards' entrance plays on the first open only, not on returning to the overview.
+    var entrancePlayed by rememberSaveable { mutableStateOf(false) }
     // A widget tap leaves the accounts screen, unless the user is in the middle of signing in.
     val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
     val showAccounts = accountsOpen && (openAccountRequest == null || signingIn)
@@ -131,6 +133,8 @@ fun HeadroomApp(
                     onSelectAccount = homeViewModel::select,
                     onAlertChange = homeViewModel::setAlert,
                     onOpenAccounts = { accountsOpen = true },
+                    playEntrance = !entrancePlayed,
+                    onEntranceStart = { entrancePlayed = true },
                     openAccountRequest = openAccountRequest,
                     onConsumeOpenAccount = {
                         accountsOpen = false
