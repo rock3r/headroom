@@ -13,6 +13,7 @@ import dev.sebastiano.headroom.designsystem.IndicatorStyle
 import dev.sebastiano.headroom.designsystem.IndicatorStyleKey
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.FakeQuotaRepository
+import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.widgets.WidgetPinner
@@ -37,11 +38,12 @@ fun testGraph(
     widgetPinner: WidgetPinner = WidgetPinner { false },
     scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
     demo: FakeQuotaRepository = FakeQuotaRepository({ FIXED_NOW }),
+    real: QuotaRepository = FakeQuotaRepository({ FIXED_NOW }, initial = realAccounts),
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
         DemoModeQuotaRepository(
-            real = FakeQuotaRepository(clock, initial = realAccounts),
+            real = real,
             demo = demo,
             scope = scope,
             simulatedLatency = Duration.ZERO,
@@ -49,6 +51,7 @@ fun testGraph(
     return AppGraph(
         quotaRepository = repository,
         isDemo = repository.isDemo,
+        accountsLoaded = repository.isLoaded,
         alertPreferences = InMemoryAlertPreferences(),
         clock = clock,
         zone = ZoneOffset.UTC,

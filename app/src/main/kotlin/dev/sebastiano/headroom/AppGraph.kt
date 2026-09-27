@@ -49,6 +49,8 @@ import kotlinx.coroutines.flow.StateFlow
 class AppGraph(
     val quotaRepository: QuotaRepository,
     val isDemo: StateFlow<Boolean>,
+    /** True once the stored accounts have been read, so an empty list really means none. */
+    val accountsLoaded: StateFlow<Boolean>,
     val alertPreferences: AlertPreferences,
     val clock: () -> Instant,
     val zone: ZoneId,
@@ -65,6 +67,7 @@ class AppGraph(
                 alertPreferences = alertPreferences,
                 clock = clock,
                 isDemo = isDemo,
+                accountsLoaded = accountsLoaded,
                 resetHistory = resetHistory,
                 tickInterval = tickInterval,
                 savedStateHandle = createSavedStateHandle(),
@@ -117,6 +120,7 @@ class AppGraph(
             return AppGraph(
                 quotaRepository = repository,
                 isDemo = repository.isDemo,
+                accountsLoaded = repository.isLoaded,
                 alertPreferences = data?.alertPreferences ?: InMemoryAlertPreferences(),
                 clock = clock,
                 zone = zone,

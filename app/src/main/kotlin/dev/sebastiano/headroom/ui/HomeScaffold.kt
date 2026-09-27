@@ -111,7 +111,6 @@ internal fun HomeScaffold(
     }
     OpenAccountEffect(
         request = openAccountRequest,
-        home = home,
         onOpen = { accountId ->
             tab = HomeTab.Overview
             onSelectAccount(accountId)
@@ -308,27 +307,22 @@ private fun HomeNavigationItems(
     }
 }
 
-/** Opens the requested account once it is on screen, and drops requests for unknown accounts. */
+/**
+ * Opens the requested account. The caller passes only requests for accounts on screen; see
+ * [decideOpenAccount].
+ */
 @Composable
 private fun OpenAccountEffect(
     request: OpenAccountRequest?,
-    home: HomeUiState,
     onOpen: suspend (String) -> Unit,
     onConsume: () -> Unit,
 ) {
     val open by rememberUpdatedState(onOpen)
     val consume by rememberUpdatedState(onConsume)
-    val accountIds = home.accounts.map { it.id }
-    LaunchedEffect(request, accountIds, home.isDemo) {
+    LaunchedEffect(request) {
         val pending = request ?: return@LaunchedEffect
-        when (decideOpenAccount(pending.accountId, accountIds, home.isDemo)) {
-            OpenAccountDecision.Open -> {
-                open(pending.accountId)
-                consume()
-            }
-            OpenAccountDecision.Ignore -> consume()
-            OpenAccountDecision.Wait -> Unit
-        }
+        open(pending.accountId)
+        consume()
     }
 }
 

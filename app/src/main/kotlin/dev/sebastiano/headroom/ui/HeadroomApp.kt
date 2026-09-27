@@ -19,6 +19,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,7 +76,13 @@ fun HeadroomApp(
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
     // A widget tap leaves the accounts screen, unless the user is in the middle of signing in.
     val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
-    val showAccounts = accountsOpen && (openAccountRequest == null || signingIn)
+    val decision = openAccountRequest?.let { request ->
+        decideOpenAccount(request.accountId, home.accounts.map { it.id }, home.accountsLoaded)
+    }
+    // Unknown accounts are dropped once loading is done; a pending request never blocks the UI.
+    SideEffect { if (decision == OpenAccountDecision.Ignore) onConsumeOpenAccount() }
+    val openNow = openAccountRequest.takeIf { decision == OpenAccountDecision.Open && !signingIn }
+    val showAccounts = accountsOpen && openNow == null
 
     val accountsActions =
         AccountsActions(
@@ -135,7 +142,7 @@ fun HeadroomApp(
                     onOpenAccounts = { accountsOpen = true },
                     playEntrance = !entrancePlayed,
                     onEntranceStart = { entrancePlayed = true },
-                    openAccountRequest = openAccountRequest,
+                    openAccountRequest = openNow,
                     onConsumeOpenAccount = {
                         accountsOpen = false
                         onConsumeOpenAccount()

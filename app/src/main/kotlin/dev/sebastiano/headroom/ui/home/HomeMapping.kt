@@ -22,6 +22,7 @@ internal fun homeUiState(
     isDemo: Boolean,
     isRefreshing: Boolean,
     justReset: Set<String> = emptySet(),
+    accountsLoaded: Boolean = true,
 ): HomeUiState {
     val nextReset =
         NextReset.find(accounts, now)?.let { next ->
@@ -49,6 +50,7 @@ internal fun homeUiState(
         isRefreshing = isRefreshing || accounts.any { it.isRefreshing },
         lastSyncedAt = accounts.mapNotNull { it.snapshot?.fetchedAt }.maxOrNull(),
         nextReset = nextReset,
+        accountsLoaded = accountsLoaded,
     )
 }
 

@@ -7,11 +7,15 @@ import java.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /**
  * Shows the [real] accounts, or the [demo] accounts while there are no real ones. The UI reads
@@ -32,6 +36,24 @@ class DemoModeQuotaRepository(
     override val accounts: StateFlow<List<AccountState>> =
         combine(real.accounts, demo.accounts, ::pick)
             .stateIn(scope, SharingStarted.Eagerly, pick(real.accounts.value, demo.accounts.value))
+
+    private val loaded = MutableStateFlow(false)
+
+    /**
+     * True once the stored accounts have been read and are on show. Before that, an empty list (and
+     * so demo data) may only mean "not read yet": the real repository's [QuotaRepository.accounts]
+     * starts empty, while [QuotaRepository.current] answers from storage.
+     */
+    val isLoaded: StateFlow<Boolean> = loaded.asStateFlow()
+
+    init {
+        scope.launch {
+            val stored = runCatching { real.current() }.getOrDefault(emptyList())
+            val ids = stored.map { it.account.id }
+            accounts.first { shown -> shown.map { it.account.id }.containsAll(ids) }
+            loaded.value = true
+        }
+    }
 
     override suspend fun refresh(accountId: String?) {
         if (real.accounts.value.isEmpty()) {

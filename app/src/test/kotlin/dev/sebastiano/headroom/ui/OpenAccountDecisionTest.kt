@@ -6,17 +6,28 @@ import kotlin.test.assertEquals
 class OpenAccountDecisionTest {
     @Test
     fun `a known account opens`() {
-        assertEquals(OpenAccountDecision.Open, decideOpenAccount("a", listOf("a", "b"), false))
+        assertEquals(
+            OpenAccountDecision.Open,
+            decideOpenAccount("a", listOf("a", "b"), loaded = true),
+        )
+        assertEquals(OpenAccountDecision.Open, decideOpenAccount("a", listOf("a"), loaded = false))
     }
 
     @Test
-    fun `an unknown account is ignored once real accounts are loaded`() {
-        assertEquals(OpenAccountDecision.Ignore, decideOpenAccount("x", listOf("a"), false))
+    fun `an unknown account waits while the stored accounts are still loading`() {
+        assertEquals(
+            OpenAccountDecision.Wait,
+            decideOpenAccount("x", listOf("demo"), loaded = false),
+        )
+        assertEquals(OpenAccountDecision.Wait, decideOpenAccount("x", emptyList(), loaded = false))
     }
 
     @Test
-    fun `while only demo data or nothing is on screen the request waits`() {
-        assertEquals(OpenAccountDecision.Wait, decideOpenAccount("x", listOf("demo"), true))
-        assertEquals(OpenAccountDecision.Wait, decideOpenAccount("x", emptyList(), false))
+    fun `an unknown account is ignored once loading is done, demo mode or not`() {
+        assertEquals(OpenAccountDecision.Ignore, decideOpenAccount("x", listOf("a"), loaded = true))
+        assertEquals(
+            OpenAccountDecision.Ignore,
+            decideOpenAccount("x", listOf("demo"), loaded = true),
+        )
     }
 }

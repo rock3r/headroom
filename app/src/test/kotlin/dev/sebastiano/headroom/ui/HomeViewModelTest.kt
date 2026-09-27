@@ -38,6 +38,7 @@ class HomeViewModelTest {
             alertPreferences = InMemoryAlertPreferences(),
             clock = { now },
             isDemo = MutableStateFlow(true),
+            accountsLoaded = MutableStateFlow(true),
             resetHistory = DemoResetHistory,
             tickInterval = null,
             savedStateHandle = SavedStateHandle(),
@@ -207,12 +208,32 @@ class HomeViewModelTest {
             assertFalse(viewModel.state.value.accounts.first().justReset)
         }
 
+    @Test
+    fun `the first state agrees with the repository on demo mode and loading`() =
+        runTest(main.dispatcher) {
+            val loading =
+                HomeViewModel(
+                    repository = repository,
+                    alertPreferences = InMemoryAlertPreferences(),
+                    clock = { now },
+                    isDemo = MutableStateFlow(true),
+                    accountsLoaded = MutableStateFlow(false),
+                    resetHistory = DemoResetHistory,
+                    tickInterval = null,
+                    savedStateHandle = SavedStateHandle(),
+                )
+            val first = loading.state.value
+            assertTrue(first.isDemo)
+            assertFalse(first.accountsLoaded)
+        }
+
     private fun viewModel(saved: SavedStateHandle) =
         HomeViewModel(
             repository = repository,
             alertPreferences = InMemoryAlertPreferences(),
             clock = { now },
             isDemo = MutableStateFlow(true),
+            accountsLoaded = MutableStateFlow(true),
             resetHistory = DemoResetHistory,
             tickInterval = null,
             savedStateHandle = saved,

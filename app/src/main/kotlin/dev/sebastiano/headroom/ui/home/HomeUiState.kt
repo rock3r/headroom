@@ -17,6 +17,10 @@ data class HomeUiState(
     val isRefreshing: Boolean,
     val lastSyncedAt: Instant?,
     val nextReset: NextResetSummary?,
+    /**
+     * False until the stored accounts have been read; until then demo data may be a placeholder.
+     */
+    val accountsLoaded: Boolean = true,
 )
 
 @Immutable

@@ -84,6 +84,14 @@ class DeepLinkTest {
     }
 
     @Test
+    fun `an unknown account in demo mode does not block the accounts screen`() {
+        launch(widgetTap("removed-account"))
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
+    }
+
+    @Test
     @Config(qualifiers = "w1280dp-h800dp")
     fun `on a wide screen the account is selected in the detail pane`() {
         launch(widgetTap("demo-copilot"))

@@ -11,18 +11,22 @@ import androidx.compose.runtime.Immutable
 /** What to do with an [OpenAccountRequest] given the accounts on screen. */
 enum class OpenAccountDecision {
     Open,
-    /** The account may still be loading: real accounts replace demo data once they are read. */
+    /** The stored accounts are still being read: the account may be among them. */
     Wait,
     Ignore,
 }
 
+/**
+ * Opens a known account at once. An unknown one waits while the stored accounts are still [loaded]
+ * and is dropped after that, in demo mode too: a widget can outlive the account it shows.
+ */
 fun decideOpenAccount(
     accountId: String,
     accountIds: Collection<String>,
-    isDemo: Boolean,
+    loaded: Boolean,
 ): OpenAccountDecision =
     when {
         accountId in accountIds -> OpenAccountDecision.Open
-        accountIds.isEmpty() || isDemo -> OpenAccountDecision.Wait
+        !loaded -> OpenAccountDecision.Wait
         else -> OpenAccountDecision.Ignore
     }
