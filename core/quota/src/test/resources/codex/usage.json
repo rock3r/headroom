@@ -1,0 +1,50 @@
+{
+  "user_id": "user-test-0001",
+  "account_id": "account-test-0001",
+  "email": "user@example.com",
+  "plan_type": "plus",
+  "rate_limit": {
+    "allowed": true,
+    "limit_reached": false,
+    "primary_window": {
+      "used_percent": 12,
+      "limit_window_seconds": 18000,
+      "reset_after_seconds": 11100,
+      "reset_at": 1775229900
+    },
+    "secondary_window": {
+      "used_percent": 34.5,
+      "limit_window_seconds": 604800,
+      "reset_after_seconds": 359280,
+      "reset_at": 1775578080
+    }
+  },
+  "credits": {
+    "has_credits": false,
+    "unlimited": false,
+    "balance": "0"
+  },
+  "additional_rate_limits": [
+    {
+      "limit_name": "GPT-Codex-Mini",
+      "metered_feature": "codex_mini",
+      "rate_limit": {
+        "allowed": true,
+        "limit_reached": false,
+        "primary_window": {
+          "used_percent": 0,
+          "limit_window_seconds": 18000,
+          "reset_at": 1775229900
+        },
+        "secondary_window": {
+          "used_percent": 5,
+          "limit_window_seconds": 604800,
+          "reset_at": 1775578080
+        }
+      }
+    }
+  ],
+  "rate_limit_reset_credits": {
+    "available_count": 1
+  }
+}
