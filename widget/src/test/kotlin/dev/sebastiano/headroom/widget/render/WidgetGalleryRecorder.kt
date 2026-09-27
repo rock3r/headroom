@@ -33,7 +33,7 @@ import org.robolectric.annotation.GraphicsMode
  * player. It only runs when asked to: `./gradlew :widget:recordWidgetGallery`.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = RecordingHostApplication::class)
+@Config(sdk = [36], application = RecordingHostApplication::class, qualifiers = "xxhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WidgetGalleryRecorder {
     private val context = RuntimeEnvironment.getApplication()

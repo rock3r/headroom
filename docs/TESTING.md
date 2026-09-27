@@ -32,5 +32,13 @@ the same task runs with a software GPU.
 
 ### Screenshots
 
-Roborazzi records screenshots of the main screens from Robolectric. They are used for the
-README. They are not compared in CI, because font rendering differs between machines.
+Roborazzi records screenshots of the main screens from Robolectric with
+`./gradlew :app:recordRoborazziDebug`. `./gradlew :widget:recordWidgetGallery` plays each widget
+in the Android 16 widget player and saves it. Both are used for the README. They are not compared
+in CI, because font rendering differs between machines.
+
+### Widgets
+
+Widget tests play every captured document in Robolectric's copy of the Android 16 widget player
+and fail when only the card background is drawn. That player supports document level 6 only, so
+the widgets are captured at that level.
