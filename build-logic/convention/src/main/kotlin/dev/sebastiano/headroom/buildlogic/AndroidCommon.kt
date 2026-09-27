@@ -14,6 +14,15 @@ internal fun configureAndroidCommon(extension: CommonExtension) {
         compileOptions.targetCompatibility = JavaVersion.VERSION_21
         testOptions.unitTests.isIncludeAndroidResources = true
         testOptions.unitTests.isReturnDefaultValues = false
+        testOptions.unitTests.all { test ->
+            // Robolectric reaches into java.io and java.lang internals, which JDK 17+ hides.
+            test.jvmArgs(
+                "--add-opens=java.base/java.io=ALL-UNNAMED",
+                "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                "--add-opens=java.base/java.util=ALL-UNNAMED",
+            )
+            test.maxHeapSize = "2g"
+        }
         packaging.resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/LICENSE*")
     }
 }
