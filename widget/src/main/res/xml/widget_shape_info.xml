@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app pushes every update, so the system never polls (updatePeriodMillis is 0). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_shape_description"
+    android:initialLayout="@layout/widget_preview_shape"
+    android:maxResizeHeight="400dp"
+    android:maxResizeWidth="400dp"
+    android:minHeight="110dp"
+    android:minResizeHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minWidth="110dp"
+    android:previewLayout="@layout/widget_preview_shape"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen|keyguard" />
