@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+        TrulyRandom warns about a SecureRandom seeding bug on Android 4.3 and older. Headroom runs
+        on Android 16 and later only. The check reads bytecode, so a source @Suppress cannot reach
+        it. It is ignored for the one file that creates the SecureRandom, and nowhere else.
+    -->
+    <issue id="TrulyRandom">
+        <ignore path="src/main/kotlin/dev/sebastiano/headroom/auth/Pkce.kt" />
+    </issue>
+</lint>
