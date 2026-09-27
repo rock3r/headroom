@@ -167,6 +167,21 @@ class CodexQuotaFetcherTest {
     }
 
     @Test
+    fun `maps an out-of-range reset time to Parse instead of throwing`() = runTest {
+        server.enqueueJson(
+            """
+            {"plan_type": "pro", "rate_limit": {"primary_window": {"used_percent": 10,
+              "reset_at": 9223372036854775807, "limit_window_seconds": 18000}}}
+            """
+                .trimIndent()
+        )
+
+        val failure = assertIs<QuotaResult.Failure>(fetcher.fetch(credentials()))
+
+        assertEquals(QuotaErrorKind.Parse, failure.kind)
+    }
+
+    @Test
     fun `maps a transport failure to Network`() = runTest {
         val credentials = credentials()
         server.close()

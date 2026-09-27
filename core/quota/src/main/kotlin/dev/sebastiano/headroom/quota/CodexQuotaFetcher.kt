@@ -45,12 +45,13 @@ public class CodexQuotaFetcher(
         val root =
             parseOrNull { quotaJson.parseToJsonElement(body).jsonObject }
                 ?: return parseFailure(PROVIDER_NAME)
+        val windows = parseOrNull { parseWindows(root) } ?: return parseFailure(PROVIDER_NAME)
         return QuotaResult.Success(
             QuotaSnapshot(
                 provider = provider,
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = root.nonBlankStringOrNull("plan_type")?.let(::displayPlanLabel),
-                windows = parseWindows(root),
+                windows = windows,
                 fetchedAt = clock.instant(),
             )
         )
