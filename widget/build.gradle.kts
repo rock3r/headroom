@@ -6,7 +6,7 @@ plugins {
 android { namespace = "dev.sebastiano.headroom.widget" }
 
 dependencies {
-    implementation(projects.core.data)
+    implementation(projects.core.model)
     implementation(libs.remote.creation.compose)
     implementation(libs.remote.creation.core)
     implementation(libs.remote.core)
