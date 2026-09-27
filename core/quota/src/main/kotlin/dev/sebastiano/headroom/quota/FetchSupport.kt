@@ -6,6 +6,7 @@ import java.io.IOException
 import java.time.DateTimeException
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.format.DateTimeParseException
 import java.util.Locale
 import kotlinx.serialization.json.Json
 
@@ -91,6 +92,14 @@ internal inline fun <T : Any> parseOrNull(block: () -> T?): T? =
 
 /** Parses an ISO-8601 instant with a `Z` suffix or a numeric offset. */
 internal fun parseInstant(text: String): Instant = OffsetDateTime.parse(text).toInstant()
+
+/** Like [parseInstant], but `null` for text that is not an instant. */
+internal fun parseInstantOrNull(text: String): Instant? =
+    try {
+        parseInstant(text)
+    } catch (_: DateTimeParseException) {
+        null
+    }
 
 /** The plan name as the UI shows it: the provider's text with an upper case first letter. */
 internal fun displayPlanLabel(raw: String): String = raw.replaceFirstChar {
