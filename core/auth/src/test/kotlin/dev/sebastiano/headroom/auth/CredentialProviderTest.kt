@@ -162,4 +162,27 @@ class CredentialProviderTest {
         assertEquals("winner", credentials.validAccessToken("acc"))
         assertEquals("winner", store.load("acc")?.accessToken)
     }
+
+    @Test
+    fun `an account signed out during a refresh stays signed out`() = runTest {
+        saved(credential(expiresAt = now))
+        val credentials = provider { old ->
+            store.delete("acc")
+            rotating.refresh(old)
+        }
+
+        assertFailsWith<AuthException.NotSignedIn> { credentials.validAccessToken("acc") }
+        assertEquals(null, store.load("acc"))
+    }
+
+    @Test
+    fun `an account signed out during a failed refresh stays signed out`() = runTest {
+        saved(credential(expiresAt = now))
+        val credentials = provider {
+            store.delete("acc")
+            throw AuthException.Rejected(400, "invalid_grant", "gone")
+        }
+
+        assertFailsWith<AuthException.NotSignedIn> { credentials.validAccessToken("acc") }
+    }
 }

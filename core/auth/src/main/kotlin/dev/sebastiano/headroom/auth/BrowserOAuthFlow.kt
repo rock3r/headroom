@@ -1,6 +1,8 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
+import java.net.URI
+import java.net.URISyntaxException
 import java.security.SecureRandom
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -71,7 +73,7 @@ internal constructor(
     private val returnUrl: String?,
     private val ioDispatcher: CoroutineDispatcher,
 ) : AutoCloseable {
-    private val pasted = CompletableDeferred<String>()
+    private val pasted = CompletableDeferred<Pasted>()
     private val loopbackRedirectUri = spec.loopbackRedirectUri(server.port)
 
     public val provider: Provider
@@ -104,7 +106,31 @@ internal constructor(
             parsed.state != null && parsed.state != state ->
                 throw AuthException.SignInFailed("Invalid state parameter")
         }
-        pasted.complete(checkNotNull(parsed.code))
+        pasted.complete(Pasted(checkNotNull(parsed.code), redirectUriFor(parsed)))
+    }
+
+    /**
+     * The redirect URI the pasted code was issued for. A pasted loopback callback URL came from
+     * [authorizeUrl]; anything else came from the manual page, when there is one.
+     */
+    private fun redirectUriFor(parsed: PastedCode): String {
+        val fromLoopback = parsed.url?.let(::isLoopbackCallback) ?: false
+        return if (fromLoopback) loopbackRedirectUri
+        else spec.manualRedirectUri ?: loopbackRedirectUri
+    }
+
+    private fun isLoopbackCallback(url: String): Boolean {
+        val uri =
+            try {
+                URI(url)
+            } catch (_: URISyntaxException) {
+                return false
+            }
+        val path = uri.path.orEmpty().ifEmpty { "/" }
+        return uri.scheme == "http" &&
+            uri.host in LOOPBACK_HOSTS &&
+            uri.port == server.port &&
+            path == spec.loopback.path
     }
 
     /**
@@ -125,8 +151,8 @@ internal constructor(
                     is Arrival.Redirect -> exchangeAndAnswer(arrival.callback)
                     is Arrival.Pasted ->
                         spec.exchange(
-                            arrival.code,
-                            spec.manualRedirectUri ?: loopbackRedirectUri,
+                            arrival.pasted.code,
+                            arrival.pasted.redirectUri,
                             pkce,
                             state,
                         )
@@ -136,17 +162,19 @@ internal constructor(
             close()
         }
 
-    private suspend fun exchangeAndAnswer(callback: LoopbackCallback): TokenSet {
-        val tokens =
-            try {
-                spec.exchange(callback.code, loopbackRedirectUri, pkce, state)
-            } catch (failure: AuthException) {
-                answer(callback, CallbackPage.failure(failure.userMessage(), returnUrl))
-                throw failure
-            }
-        answer(callback, CallbackPage.success(returnUrl))
-        return tokens
-    }
+    private suspend fun exchangeAndAnswer(callback: LoopbackCallback): TokenSet =
+        // This sign-in owns the held browser connection; release it even when cancelled.
+        callback.use {
+            val tokens =
+                try {
+                    spec.exchange(callback.code, loopbackRedirectUri, pkce, state)
+                } catch (failure: AuthException) {
+                    answer(callback, CallbackPage.failure(failure.userMessage(), returnUrl))
+                    throw failure
+                }
+            answer(callback, CallbackPage.success(returnUrl))
+            tokens
+        }
 
     private suspend fun answer(callback: LoopbackCallback, page: CallbackPage) {
         withContext(ioDispatcher) { callback.respond(page) }
@@ -160,7 +188,13 @@ internal constructor(
     private sealed interface Arrival {
         class Redirect(val callback: LoopbackCallback) : Arrival
 
-        class Pasted(val code: String) : Arrival
+        class Pasted(val pasted: BrowserSignIn.Pasted) : Arrival
+    }
+
+    private class Pasted(val code: String, val redirectUri: String)
+
+    private companion object {
+        val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]", "::1")
     }
 }
 
@@ -171,7 +205,13 @@ private fun AuthException.userMessage(): String =
     }
 
 /** The parts of what a user pasted after a browser sign-in. */
-internal class PastedCode(val code: String?, val state: String?, val error: String?) {
+internal class PastedCode(
+    val code: String?,
+    val state: String?,
+    val error: String?,
+    /** The whole pasted text when it was a URL with a scheme. */
+    val url: String? = null,
+) {
     companion object {
         fun parse(input: String): PastedCode {
             val text = input.trim()
@@ -179,9 +219,10 @@ internal class PastedCode(val code: String?, val state: String?, val error: Stri
             if ("://" in text || text.startsWith("?") || "code=" in text || "error=" in text) {
                 val params = parseQuery(text.substringAfter('?').substringBefore('#'))
                 return PastedCode(
-                    params["code"]?.ifBlank { null },
-                    params["state"],
-                    params["error"],
+                    code = params["code"]?.ifBlank { null },
+                    state = params["state"],
+                    error = params["error"],
+                    url = text.takeIf { "://" in it },
                 )
             }
             val code = text.substringBefore('#').ifBlank { null }

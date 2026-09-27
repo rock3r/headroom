@@ -270,12 +270,20 @@ internal constructor(
     public val params: Map<String, String>,
     private val client: Socket,
     private val corsOrigin: String?,
-) {
+) : AutoCloseable {
     /**
      * Sends [page] to the browser and closes the connection. Blocking; call it off the UI thread.
      */
     public fun respond(page: CallbackPage) {
         client.answer(page.status, LoopbackServer.HTML, page.html, corsOrigin)
+    }
+
+    /**
+     * Drops the browser connection without an answer. The owner of a callback must call this (or
+     * [respond]) on every path, including cancellation. Calling it again does nothing.
+     */
+    override fun close() {
+        client.closeQuietly()
     }
 }
 
