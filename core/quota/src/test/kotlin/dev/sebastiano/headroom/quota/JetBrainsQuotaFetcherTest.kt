@@ -43,16 +43,21 @@ class JetBrainsQuotaFetcherTest {
     }
 
     @Test
-    fun `reports the plan but no windows, because a balance is not a used share`() = runTest {
-        server.enqueueJson(fixture("jetbrains/auth_test.json"))
+    fun `reports the plan and the balance, but no windows, because a balance is not a used share`() =
+        runTest {
+            server.enqueueJson(fixture("jetbrains/auth_test.json"))
 
-        val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+            val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
 
-        assertEquals(Provider.JetBrains, snapshot.provider)
-        assertEquals("JetBrains AI Pro", snapshot.planLabel)
-        assertEquals(emptyList(), snapshot.windows)
-        assertEquals(FIXED_NOW, snapshot.fetchedAt)
-    }
+            assertEquals(Provider.JetBrains, snapshot.provider)
+            assertEquals("JetBrains AI Pro", snapshot.planLabel)
+            assertEquals(emptyList(), snapshot.windows)
+            assertEquals(
+                dev.sebastiano.headroom.model.QuotaBalance(20.0, "AI Credits"),
+                snapshot.balance,
+            )
+            assertEquals(FIXED_NOW, snapshot.fetchedAt)
+        }
 
     @Test
     fun `maps license types to plan names`() {
