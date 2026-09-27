@@ -4,14 +4,18 @@ import android.content.Context
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerFactory
 import dev.sebastiano.headroom.data.db.HeadroomDatabase
 import dev.sebastiano.headroom.data.db.RoomQuotaRepository
 import dev.sebastiano.headroom.data.prefs.DataStoreAlertPreferences
 import dev.sebastiano.headroom.data.reset.AlarmResetScheduler
 import dev.sebastiano.headroom.data.reset.AndroidResetNotifier
+import dev.sebastiano.headroom.data.reset.ResetAlarm
 import dev.sebastiano.headroom.data.reset.ResetAlarmPlanner
+import dev.sebastiano.headroom.data.reset.ResetCheckWorker
 import dev.sebastiano.headroom.data.reset.ResetChecker
+import dev.sebastiano.headroom.data.reset.SharedPreferencesResetLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
 import dev.sebastiano.headroom.data.sync.SyncWorker
 import dev.sebastiano.headroom.model.Account
@@ -70,11 +74,29 @@ public class DataGraph(
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
 
-    private val scheduler = AlarmResetScheduler(appContext)
+    private val scheduler =
+        AlarmResetScheduler(appContext) { overdue ->
+            // Keep a check that is already running; only start one when none is queued.
+            ResetCheckWorker.enqueue(
+                appContext,
+                overdue,
+                attempt = 1,
+                delay = null,
+                policy = ExistingWorkPolicy.KEEP,
+            )
+        }
 
     public val workerFactory: WorkerFactory =
         HeadroomWorkerFactory(
-            resetChecker = ResetChecker(repository, AndroidResetNotifier(appContext)),
+            resetChecker =
+                ResetChecker(
+                    repository = repository,
+                    notifier = AndroidResetNotifier(appContext),
+                    ledger = SharedPreferencesResetLedger(appContext),
+                    isEnabled = { accountId, window ->
+                        alertPreferences.isEnabled(accountId, window).first()
+                    },
+                ),
             repository = repository,
         )
 
@@ -90,7 +112,7 @@ public class DataGraph(
     }
 
     public suspend fun rescheduleResetAlarms() {
-        val accounts = repository.accounts.value
+        val accounts = repository.current()
         val enabled =
             accounts
                 .flatMap { state ->
@@ -104,7 +126,11 @@ public class DataGraph(
             ResetAlarmPlanner.plan(accounts, clock()) { accountId, window ->
                 enabled[accountId to window.id] == true
             }
-        scheduler.replaceAll(alarms)
+        scheduler.replaceAll(clock(), alarms)
+    }
+
+    internal fun markAlarmFired(alarm: ResetAlarm) {
+        scheduler.markFired(alarm)
     }
 
     /** Runs work from broadcast receivers on the app's own scope and dispatcher. */

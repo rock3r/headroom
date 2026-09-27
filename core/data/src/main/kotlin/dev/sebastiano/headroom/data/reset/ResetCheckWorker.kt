@@ -38,7 +38,13 @@ internal class ResetCheckWorker(
         private const val KEY_USED = "used"
         private const val KEY_ATTEMPT = "attempt"
 
-        fun enqueue(context: Context, alarm: ResetAlarm, attempt: Int, delay: Duration?) {
+        fun enqueue(
+            context: Context,
+            alarm: ResetAlarm,
+            attempt: Int,
+            delay: Duration?,
+            policy: ExistingWorkPolicy = ExistingWorkPolicy.REPLACE,
+        ) {
             val builder =
                 OneTimeWorkRequestBuilder<ResetCheckWorker>()
                     .setInputData(
@@ -59,7 +65,7 @@ internal class ResetCheckWorker(
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(
                     "reset-${alarm.requestCode}",
-                    ExistingWorkPolicy.REPLACE,
+                    policy,
                     builder.build(),
                 )
         }

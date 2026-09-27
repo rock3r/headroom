@@ -32,7 +32,8 @@ internal object ResetAlarmPlanner {
             val resetsAt = window.resetsAt
             val eligible =
                 resetsAt != null &&
-                    resetsAt.isAfter(now) &&
+                    // Keep a window inside its grace minute: its alarm has not fired yet.
+                    resetsAt.plus(GRACE).isAfter(now) &&
                     ResetPolicy.canAlert(window) &&
                     isEnabled(state.account.id, window)
             if (eligible && resetsAt != null) {

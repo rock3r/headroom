@@ -123,8 +123,16 @@ internal class RoomQuotaRepository(
                     pruneBeforeEpochMs = now.minus(HISTORY_RETENTION).toEpochMilli(),
                 )
             }
-            is QuotaResult.Failure -> dao.upsertAccount(entity.copy(lastError = result.kind.name))
+            // An update, not an upsert: a removed account must stay removed.
+            is QuotaResult.Failure -> dao.updateError(entity.id, result.kind.name)
             null -> Unit
+        }
+    }
+
+    override suspend fun current(): List<AccountState> {
+        val busy = refreshing.value
+        return dao.accountsWithWindows().mapNotNull {
+            it.toState(refreshing = it.account.id in busy)
         }
     }
 

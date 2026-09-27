@@ -42,12 +42,21 @@ internal interface QuotaDao {
     suspend fun pruneHistory(beforeEpochMs: Long)
 
     @Transaction
+    @Query("SELECT * FROM accounts ORDER BY rowid")
+    suspend fun accountsWithWindows(): List<AccountWithWindows>
+
+    @Query("UPDATE accounts SET lastError = :error WHERE id = :id")
+    suspend fun updateError(id: String, error: String)
+
+    /** Stores a fetch result, unless the account was removed while the fetch was running. */
+    @Transaction
     suspend fun storeSnapshot(
         account: AccountEntity,
         windows: List<WindowEntity>,
         points: List<UsagePointEntity>,
         pruneBeforeEpochMs: Long,
     ) {
+        if (account(account.id) == null) return
         upsertAccount(account)
         deleteWindows(account.id)
         upsertWindows(windows)

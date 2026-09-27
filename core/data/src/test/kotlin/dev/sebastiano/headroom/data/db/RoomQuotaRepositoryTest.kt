@@ -144,4 +144,52 @@ class RoomQuotaRepositoryTest {
             repo.refresh()
             assertEquals(1, repo.history(claude.account.id, "seven_day").first().size)
         }
+
+    @Test
+    fun `removing an account during a refresh does not bring it back`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val gate = CompletableDeferred<Unit>()
+            var result: QuotaResult = QuotaResult.Success(claude.snapshot!!)
+            val repo =
+                repo(
+                    {
+                        gate.await()
+                        result
+                    },
+                    backgroundScope,
+                )
+            repo.addAccount(claude.account)
+            val refresh = async { repo.refresh(claude.account.id) }
+            repo.removeAccount(claude.account.id)
+            gate.complete(Unit)
+            refresh.await()
+            assertEquals(emptyList(), repo.current())
+
+            // The failure path must not resurrect it either.
+            result = QuotaResult.Failure(QuotaErrorKind.Network, "offline")
+            repo.addAccount(claude.account)
+            val gate2 = CompletableDeferred<Unit>()
+            val repo2 =
+                repo(
+                    {
+                        gate2.await()
+                        result
+                    },
+                    backgroundScope,
+                )
+            val refresh2 = async { repo2.refresh(claude.account.id) }
+            repo2.removeAccount(claude.account.id)
+            gate2.complete(Unit)
+            refresh2.await()
+            assertEquals(emptyList(), repo2.current())
+        }
+
+    @Test
+    fun `current reads the committed state right after a refresh`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.refresh()
+            assertEquals(71.0, repo.current().single().primaryWindow!!.usedPercent)
+        }
 }

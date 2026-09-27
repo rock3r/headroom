@@ -57,4 +57,12 @@ class ResetAlarmPlannerTest {
         assertEquals(first, second)
         assertEquals(first.size, first.toSet().size)
     }
+
+    @Test
+    fun `a window inside its grace minute keeps its alarm`() {
+        val resetsAt = now.plus(Duration.ofMinutes(928))
+        val alarms =
+            ResetAlarmPlanner.plan(accounts, resetsAt.plusSeconds(30), isEnabled = defaults)
+        assertEquals(true, alarms.any { it.accountId == "demo-grok" })
+    }
 }

@@ -12,6 +12,7 @@ import java.time.Instant
 internal class ResetAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val alarm = alarmFrom(intent) ?: return
+        (context.applicationContext as? DataGraphOwner)?.dataGraph?.markAlarmFired(alarm)
         ResetCheckWorker.enqueue(context, alarm, attempt = 1, delay = null)
     }
 

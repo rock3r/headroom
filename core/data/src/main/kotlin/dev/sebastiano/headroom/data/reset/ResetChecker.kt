@@ -16,18 +16,25 @@ internal sealed interface ResetCheckOutcome {
 internal class ResetChecker(
     private val repository: QuotaRepository,
     private val notifier: ResetNotifier,
+    private val ledger: ResetLedger,
+    private val isEnabled: suspend (accountId: String, window: QuotaWindow) -> Boolean,
 ) {
     suspend fun check(alarm: ResetAlarm, attempt: Int): ResetCheckOutcome {
-        val before = repository.accounts.value.windowOf(alarm)
+        if (ledger.wasNotified(alarm)) return ResetCheckOutcome.Notified
+        val before = repository.current().windowOf(alarm)
         repository.refresh(alarm.accountId)
-        val account = repository.accounts.value.firstOrNull { it.account.id == alarm.accountId }
+        // Read the committed state: the accounts flow may publish this refresh a moment later.
+        val account = repository.current().firstOrNull { it.account.id == alarm.accountId }
         val after = account?.snapshot?.windows?.firstOrNull { it.id == alarm.windowId }
         if (account == null || after == null) return ResetCheckOutcome.GaveUp
+        // The user may have turned the alert off while a retry was waiting.
+        if (!isEnabled(alarm.accountId, after)) return ResetCheckOutcome.GaveUp
 
         val reference =
             (before ?: after).copy(usedPercent = alarm.usedBefore, resetsAt = alarm.expectedResetAt)
         return if (ResetDetector.hasReset(reference, after)) {
             notifier.notifyReset(account, after)
+            ledger.markNotified(alarm)
             ResetCheckOutcome.Notified
         } else {
             ResetRetryPolicy.delayAfterAttempt(attempt)?.let { ResetCheckOutcome.Retry(it) }

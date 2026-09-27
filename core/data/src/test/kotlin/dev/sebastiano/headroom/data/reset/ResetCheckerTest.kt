@@ -28,18 +28,27 @@ class ResetCheckerTest {
             usedBefore = 88.0,
         )
 
+    /**
+     * Like the Room repository, [accounts] can lag behind a refresh; only [current] is guaranteed
+     * to reflect it. Pass `publish = false` to keep [accounts] stale.
+     */
     private class ScriptedRepository(
         initial: List<AccountState>,
+        private val publish: Boolean = true,
         private val next: () -> List<AccountState>,
     ) : QuotaRepository {
         val state = MutableStateFlow(initial)
+        private var committed = initial
         var refreshes = 0
         override val accounts: StateFlow<List<AccountState>> = state
 
         override suspend fun refresh(accountId: String?) {
             refreshes++
-            state.value = next()
+            committed = next()
+            if (publish) state.value = committed
         }
+
+        override suspend fun current(): List<AccountState> = committed
 
         override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
             emptyFlow()
@@ -52,6 +61,24 @@ class ResetCheckerTest {
             notified += account to window
         }
     }
+
+    private class MemoryLedger : ResetLedger {
+        val notified = mutableSetOf<Pair<Int, java.time.Instant>>()
+
+        override fun wasNotified(alarm: ResetAlarm) =
+            (alarm.requestCode to alarm.expectedResetAt) in notified
+
+        override fun markNotified(alarm: ResetAlarm) {
+            notified += alarm.requestCode to alarm.expectedResetAt
+        }
+    }
+
+    private fun checker(
+        repo: QuotaRepository,
+        notifier: ResetNotifier,
+        ledger: ResetLedger = MemoryLedger(),
+        enabled: Boolean = true,
+    ) = ResetChecker(repo, notifier, ledger) { _, _ -> enabled }
 
     private fun afterReset(): List<AccountState> = before.map { state ->
         if (state.account.id != "demo-grok") {
@@ -77,7 +104,7 @@ class ResetCheckerTest {
     fun `a confirmed reset posts one notification`() = runTest {
         val repo = ScriptedRepository(before) { afterReset() }
         val notifier = RecordingNotifier()
-        val outcome = ResetChecker(repo, notifier).check(alarm, attempt = 1)
+        val outcome = checker(repo, notifier).check(alarm, attempt = 1)
         assertEquals(ResetCheckOutcome.Notified, outcome)
         assertEquals(1, repo.refreshes)
         assertEquals("weekly", notifier.notified.single().second.id)
@@ -89,13 +116,13 @@ class ResetCheckerTest {
         val notifier = RecordingNotifier()
         assertEquals(
             ResetCheckOutcome.Retry(Duration.ofMinutes(2)),
-            ResetChecker(repo, notifier).check(alarm, 1),
+            checker(repo, notifier).check(alarm, 1),
         )
         assertEquals(
             ResetCheckOutcome.Retry(Duration.ofMinutes(60)),
-            ResetChecker(repo, notifier).check(alarm, 4),
+            checker(repo, notifier).check(alarm, 4),
         )
-        assertEquals(ResetCheckOutcome.GaveUp, ResetChecker(repo, notifier).check(alarm, 5))
+        assertEquals(ResetCheckOutcome.GaveUp, checker(repo, notifier).check(alarm, 5))
         assertEquals(emptyList(), notifier.notified)
     }
 
@@ -104,7 +131,37 @@ class ResetCheckerTest {
         val repo = ScriptedRepository(before) { before.filterNot { it.account.id == "demo-grok" } }
         assertEquals(
             ResetCheckOutcome.GaveUp,
-            ResetChecker(repo, RecordingNotifier()).check(alarm, 1),
+            checker(repo, RecordingNotifier()).check(alarm, 1),
         )
+    }
+
+    @Test
+    fun `the check reads the committed state even when the flow has not caught up`() = runTest {
+        val repo = ScriptedRepository(before, publish = false) { afterReset() }
+        val notifier = RecordingNotifier()
+        assertEquals(ResetCheckOutcome.Notified, checker(repo, notifier).check(alarm, 1))
+        assertEquals(1, notifier.notified.size)
+    }
+
+    @Test
+    fun `a disabled alert does not notify, even on a retry`() = runTest {
+        val repo = ScriptedRepository(before) { afterReset() }
+        val notifier = RecordingNotifier()
+        assertEquals(
+            ResetCheckOutcome.GaveUp,
+            checker(repo, notifier, enabled = false).check(alarm, 2),
+        )
+        assertEquals(emptyList(), notifier.notified)
+    }
+
+    @Test
+    fun `the same reset is notified only once`() = runTest {
+        val ledger = MemoryLedger()
+        val notifier = RecordingNotifier()
+        checker(ScriptedRepository(before) { afterReset() }, notifier, ledger).check(alarm, 1)
+        val second =
+            checker(ScriptedRepository(before) { afterReset() }, notifier, ledger).check(alarm, 1)
+        assertEquals(ResetCheckOutcome.Notified, second)
+        assertEquals(1, notifier.notified.size)
     }
 }

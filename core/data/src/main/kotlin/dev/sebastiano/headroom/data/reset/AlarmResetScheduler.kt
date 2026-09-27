@@ -6,23 +6,47 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.edit
+import java.time.Instant
 
 /**
  * Keeps exactly one alarm per planned reset. Exact alarms are used when the app may schedule them
  * (it declares USE_EXACT_ALARM); otherwise the alarm may arrive a little late in Doze.
+ *
+ * A replan can happen after a reset time but before its alarm fired, for example when a sync
+ * already sees next week's reset time. Such an overdue alarm is not dropped: it goes to [handOver],
+ * which checks it straight away.
  */
-internal class AlarmResetScheduler(private val context: Context) {
+internal class AlarmResetScheduler(
+    private val context: Context,
+    private val handOver: (ResetAlarm) -> Unit,
+) {
     private val alarmManager = context.getSystemService(AlarmManager::class.java)
     private val store = context.getSharedPreferences(STORE, Context.MODE_PRIVATE)
 
-    fun replaceAll(alarms: List<ResetAlarm>) {
+    fun replaceAll(now: Instant, alarms: List<ResetAlarm>) {
         val wanted = alarms.associateBy { it.requestCode }
-        val previous =
-            store.getStringSet(KEY_CODES, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }
-        (previous - wanted.keys).forEach { cancel(it) }
+        pending().forEach { previous ->
+            val replacement = wanted[previous.requestCode]
+            if (replacement?.expectedResetAt == previous.expectedResetAt) return@forEach
+            if (!previous.expectedResetAt.isAfter(now)) {
+                handOver(previous)
+            }
+            if (replacement == null) cancel(previous.requestCode)
+        }
         alarms.forEach { schedule(it) }
-        store.edit { putStringSet(KEY_CODES, wanted.keys.map { it.toString() }.toSet()) }
+        store.edit {
+            clear()
+            alarms.forEach { putString(it.requestCode.toString(), encode(it)) }
+        }
     }
+
+    /** Called when an alarm fires, so a later replan does not hand it over a second time. */
+    fun markFired(alarm: ResetAlarm) {
+        store.edit { remove(alarm.requestCode.toString()) }
+    }
+
+    private fun pending(): List<ResetAlarm> =
+        store.all.values.mapNotNull { (it as? String)?.let(::decode) }
 
     // The manifest declares USE_EXACT_ALARM, which grants exact alarms without the user-toggled
     // SCHEDULE_EXACT_ALARM, and the call is guarded by canScheduleExactAlarms(). Lint only knows
@@ -54,6 +78,30 @@ internal class AlarmResetScheduler(private val context: Context) {
 
     private companion object {
         const val STORE = "reset_alarms"
-        const val KEY_CODES = "request_codes"
+        const val SEPARATOR = "\u001f"
+        const val FIELDS = 5
+
+        fun encode(alarm: ResetAlarm): String =
+            listOf(
+                    alarm.accountId,
+                    alarm.windowId,
+                    alarm.triggerAt.toEpochMilli().toString(),
+                    alarm.expectedResetAt.toEpochMilli().toString(),
+                    alarm.usedBefore.toString(),
+                )
+                .joinToString(SEPARATOR)
+
+        fun decode(raw: String): ResetAlarm? {
+            val parts = raw.split(SEPARATOR)
+            if (parts.size != FIELDS) return null
+            val fields = parts.iterator()
+            return ResetAlarm(
+                accountId = fields.next(),
+                windowId = fields.next(),
+                triggerAt = Instant.ofEpochMilli(fields.next().toLongOrNull() ?: return null),
+                expectedResetAt = Instant.ofEpochMilli(fields.next().toLongOrNull() ?: return null),
+                usedBefore = fields.next().toDoubleOrNull() ?: return null,
+            )
+        }
     }
 }
