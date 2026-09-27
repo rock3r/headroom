@@ -1,8 +1,11 @@
 package dev.sebastiano.headroom.ui
 
 import android.content.ClipData
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -15,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +44,7 @@ import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.home.HomeViewModel
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 
 /**
@@ -93,13 +98,27 @@ fun HeadroomApp(
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Box(modifier = modifier.fillMaxSize()) {
-        AnimatedContent(
-            targetState = showAccounts,
+        // Seekable, so the predictive back gesture scrubs the accounts screen away.
+        val accountsTransition = remember { SeekableTransitionState(showAccounts) }
+        LaunchedEffect(showAccounts) { accountsTransition.animateTo(showAccounts) }
+        PredictiveBackHandler(enabled = showAccounts && accounts.step == AccountsStep.List) {
+            gesture ->
+            try {
+                gesture.collect { event ->
+                    accountsTransition.seekTo(event.progress, targetState = false)
+                }
+                accountsOpen = false
+            } catch (cancelled: CancellationException) {
+                // The gesture's coroutine is cancelled; settle back from a live scope.
+                scope.launch { accountsTransition.animateTo(true) }
+                throw cancelled
+            }
+        }
+        rememberTransition(accountsTransition, label = "accounts").AnimatedContent(
             transitionSpec = {
                 (fadeIn(effects) + scaleIn(effects, initialScale = ENTER_SCALE)) togetherWith
                     fadeOut(fast)
-            },
-            label = "accounts",
+            }
         ) { open ->
             if (open) {
                 AccountsScreen(state = accounts, actions = accountsActions)
