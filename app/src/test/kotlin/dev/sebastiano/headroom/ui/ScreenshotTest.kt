@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -36,6 +37,8 @@ class ScreenshotTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
     private fun launch(dark: Boolean = false) {
+        // Frames are driven by capture(), so that animations are drawn while they run.
+        rule.mainClock.autoAdvance = false
         rule.setContent {
             HeadroomTheme(darkTheme = dark, dynamicColor = false) {
                 HeadroomApp(graph = testGraph(rule.activity))
@@ -44,7 +47,12 @@ class ScreenshotTest {
     }
 
     private fun capture(name: String) {
-        rule.waitForIdle()
+        // Robolectric only draws when asked. The wavy ring builds its wave while its sweep-in
+        // animation is drawn, so draw every step until transitions and sweeps have settled.
+        repeat(SETTLE_STEPS) {
+            rule.mainClock.advanceTimeBy(STEP_MILLIS)
+            rule.onRoot().captureToImage()
+        }
         rule.onRoot().captureRoboImage(screenshot(name))
     }
 
@@ -100,6 +108,8 @@ class ScreenshotTest {
     @Test
     fun signInDeviceCode() {
         launch()
+        // Several steps in a row: let the clock run between them.
+        rule.mainClock.autoAdvance = true
         rule.onNodeWithContentDescription("Accounts").performClick()
         rule.onNodeWithText("Add account").performClick()
         rule
@@ -112,6 +122,8 @@ class ScreenshotTest {
     @Test
     fun signInBrowser() {
         launch()
+        // Several steps in a row: let the clock run between them.
+        rule.mainClock.autoAdvance = true
         rule.onNodeWithContentDescription("Accounts").performClick()
         rule.onNodeWithText("Add account").performClick()
         rule.onNodeWithTag(providerOptionTag(Provider.Claude)).performClick()
@@ -143,6 +155,8 @@ class ScreenshotTest {
 
 /** Header, demo banner, next reset, section label, Claude, Codex, then Grok. */
 private const val GROK_INDEX = 6
+private const val SETTLE_STEPS = 40
+private const val STEP_MILLIS = 50L
 private const val PHONE = "w411dp-h891dp-xxhdpi"
 private const val MEDIUM = "w700dp-h1000dp-xhdpi"
 private const val EXPANDED = "w1280dp-h800dp-xhdpi"
