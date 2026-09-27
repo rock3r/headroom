@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="designsystem_pace_over">
+        <item quantity="one">%d pt over pace</item>
+        <item quantity="other">%d pts over pace</item>
+    </plurals>
+    <plurals name="designsystem_pace_under">
+        <item quantity="one">%d pt under pace</item>
+        <item quantity="other">%d pts under pace</item>
+    </plurals>
+    <string name="designsystem_pace_on">On pace</string>
+    <string name="designsystem_pace_just_reset">Just reset</string>
+</resources>
