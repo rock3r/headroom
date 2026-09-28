@@ -68,6 +68,7 @@ internal fun AccountState.toSummary(
         name = account.name,
         label = account.label,
         plan = snapshot?.planLabel,
+        balance = snapshot?.balance,
         primary = primary?.toSummary(account.id, now, alerts),
         session = sessionWindow?.toSummary(account.id, now, alerts),
         windows =

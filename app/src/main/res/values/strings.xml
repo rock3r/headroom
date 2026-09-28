@@ -60,6 +60,8 @@
     <string name="account_error_unknown">Could not update. Showing the last numbers.</string>
     <string name="account_no_data">No usage data yet.</string>
     <string name="detail_plan_label">%1$s · %2$s</string>
+    <string name="detail_balance">Balance</string>
+    <string name="account_balance">Balance · %1$s</string>
     <string name="detail_resets_in">Resets in %1$s</string>
     <string name="detail_resets_in_no_alert">Resets in %1$s · no alert</string>
     <string name="detail_resets_at">Resets %1$s</string>

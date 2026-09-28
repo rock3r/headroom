@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.ui.home
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.designsystem.PaceChipState
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
@@ -42,6 +43,8 @@ data class AccountSummary(
     val justReset: Boolean = false,
     /** The name the user gave the account, or the provider's name. */
     val name: String = provider.displayName,
+    /** A remaining balance, for providers that report one. */
+    val balance: QuotaBalance? = null,
 )
 
 @Immutable

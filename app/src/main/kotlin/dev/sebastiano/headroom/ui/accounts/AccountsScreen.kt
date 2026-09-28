@@ -258,7 +258,9 @@ private fun AccountListRow(account: AccountRow, onClick: (() -> Unit)?) {
 @Composable
 @ReadOnlyComposable
 private fun AccountRow.details(): String {
-    val login = plan?.let { stringResource(R.string.accounts_row_plan, label, it) } ?: label
+    val login =
+        plan?.takeIf { it != label }?.let { stringResource(R.string.accounts_row_plan, label, it) }
+            ?: label
     return if (nickname == null) login
     else stringResource(R.string.accounts_row_plan, provider.displayName, login)
 }

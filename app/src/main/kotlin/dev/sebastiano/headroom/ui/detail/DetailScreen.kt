@@ -52,6 +52,7 @@ import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.usedLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
+import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.ChartSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
@@ -157,9 +158,10 @@ private fun DetailTopBar(
             )
             Text(
                 text =
-                    account.plan?.let {
-                        stringResource(R.string.detail_plan_label, it, account.label)
-                    } ?: account.label,
+                    account.plan
+                        ?.takeIf { it != account.label }
+                        ?.let { stringResource(R.string.detail_plan_label, it, account.label) }
+                        ?: account.label,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -234,7 +236,8 @@ private fun WindowList(
     formatter: ResetFormatter,
     modifier: Modifier = Modifier,
 ) {
-    if (account.windows.isEmpty()) return
+    val balance = account.balance
+    if (account.windows.isEmpty() && balance == null) return
     ListCard(modifier) {
         account.windows.forEachIndexed { index, window ->
             if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
@@ -254,6 +257,25 @@ private fun WindowList(
                 }
                 Text(
                     text = stringResource(R.string.percent, window.usedPercent.roundToInt()),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            }
+        }
+        if (balance != null) {
+            if (account.windows.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.surface)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.detail_balance),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = formatBalance(balance, LocalLocale.current.platformLocale),
                     style = MaterialTheme.typography.headlineSmall,
                 )
             }
@@ -385,15 +407,10 @@ private fun AlertSection(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                painter = painterResource(HeadroomIcons.NotificationsFilled),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            SectionLabel(stringResource(R.string.detail_reset_alerts))
-        }
+        SectionLabel(
+            text = stringResource(R.string.detail_reset_alerts),
+            icon = HeadroomIcons.NotificationsFilled,
+        )
         val alertable = account.windows.filter { it.canAlert }
         if (alertable.isEmpty()) {
             Text(

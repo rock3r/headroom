@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +38,7 @@ import dev.sebastiano.headroom.ui.asFraction
 import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.usedLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
+import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
 import java.time.Instant
@@ -80,7 +82,17 @@ fun AccountCard(
                 if (selected) MaterialTheme.colorScheme.surfaceContainerLowest
                 else MaterialTheme.colorScheme.secondaryContainer
             val primary = account.primary
-            if (primary == null) {
+            val balance = account.balance
+            if (primary == null && balance != null) {
+                Text(
+                    text =
+                        stringResource(
+                            R.string.account_balance,
+                            formatBalance(balance, LocalLocale.current.platformLocale),
+                        ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            } else if (primary == null) {
                 Text(
                     text = stringResource(R.string.account_no_data),
                     style = MaterialTheme.typography.bodyMedium,
@@ -137,15 +149,17 @@ private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            account.plan?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            account.plan
+                ?.takeIf { it != account.name }
+                ?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
         }
         account.primary?.let { primary ->
             Column(horizontalAlignment = Alignment.End) {
