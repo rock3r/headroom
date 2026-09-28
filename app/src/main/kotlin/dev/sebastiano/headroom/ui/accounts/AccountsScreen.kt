@@ -2,10 +2,12 @@ package dev.sebastiano.headroom.ui.accounts
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,38 +19,54 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
+import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.Provider
-import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.ReorderableLazyListState
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 const val ACCOUNTS_TAG: String = "accounts"
 
@@ -57,6 +75,8 @@ const val ACCOUNT_NAME_FIELD_TAG: String = "account-name-field"
 fun providerOptionTag(provider: Provider): String = "provider-${provider.id}"
 
 fun accountRowTag(accountId: String): String = "account-$accountId"
+
+fun accountDragHandleTag(accountId: String): String = "account-drag-$accountId"
 
 /** Callbacks of the accounts screen. */
 data class AccountsActions(
@@ -72,6 +92,8 @@ data class AccountsActions(
     val onCopy: (String) -> Unit,
     val onRename: (accountId: String, name: String) -> Unit,
     val onRemove: (accountId: String) -> Unit,
+    /** Saves the order the user put the accounts in. */
+    val onReorder: (orderedIds: List<String>) -> Unit,
 )
 
 /**
@@ -111,10 +133,12 @@ internal fun StepScaffold(
     navigationIcon: Int,
     navigationLabel: String,
     onNavigate: () -> Unit,
-    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+    listState: LazyListState = rememberLazyListState(),
+    /** The space between items. The title keeps [SECTION_SPACING] below it either way. */
+    itemSpacing: Dp = SECTION_SPACING,
+    content: LazyListScope.() -> Unit,
 ) {
     val insets = WindowInsets.safeDrawing.asPaddingValues()
-    val listState = rememberLazyListState()
     StatusBarBlurBox(scrollState = listState, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -126,12 +150,15 @@ internal fun StepScaffold(
                     top = insets.calculateTopPadding() + 4.dp,
                     bottom = insets.calculateBottomPadding() + 24.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(itemSpacing),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {
                 Row(
-                    modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
+                    modifier =
+                        Modifier.widthIn(max = 600.dp)
+                            .fillMaxWidth()
+                            .padding(bottom = (SECTION_SPACING - itemSpacing).coerceAtLeast(0.dp)),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onNavigate) {
@@ -149,80 +176,215 @@ internal fun StepScaffold(
     }
 }
 
+/**
+ * The accounts, one list item each so they can be reordered: drag a row's handle, or long press the
+ * row, and drop it in its new place. The order is saved on drop. Each row also offers move actions
+ * to accessibility services, and the new position is announced.
+ */
 @Composable
 private fun AccountList(state: AccountsUiState, actions: AccountsActions) {
     // The account being edited in place. One at a time: the others wait, dimmed, until it is done.
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
-    StepScaffold(
-        title = stringResource(R.string.accounts_title),
-        navigationIcon = HeadroomIcons.ArrowBack,
-        navigationLabel = stringResource(R.string.action_back),
-        onNavigate = actions.onClose,
-    ) {
-        val width = Modifier.widthIn(max = 600.dp).fillMaxWidth()
-        if (state.isDemo) {
+    val saved = state.accounts
+    val order = remember { AccountOrder() }
+    // Once storage has the order the user made, show storage again.
+    SideEffect { order.sync(saved) }
+    val listState = rememberLazyListState()
+    val haptics = LocalHapticFeedback.current
+    val reorder =
+        rememberReorderableLazyListState(
+            lazyListState = listState,
+            scrollThresholdPadding = WindowInsets.safeDrawing.asPaddingValues(),
+        ) { from, to ->
+            val target = order.rows(saved).indexOfFirst { it.id == to.key }
+            if (order.move(saved, from.key as String, target) != null) {
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+            }
+        }
+    var announcement by remember { mutableStateOf<String?>(null) }
+    val resources = LocalResources.current
+    val rowActions = { account: AccountRow ->
+        AccountRowActions(
+            onEdit = { editingId = account.id },
+            onSave = { name ->
+                actions.onRename(account.id, name)
+                editingId = null
+            },
+            onRemove = {
+                actions.onRemove(account.id)
+                editingId = null
+            },
+            onCancel = { editingId = null },
+            onMove = { toIndex ->
+                order.move(saved, account.id, toIndex)?.let { ids ->
+                    actions.onReorder(ids)
+                    announcement =
+                        resources.getString(
+                            R.string.accounts_moved,
+                            account.name,
+                            toIndex + 1,
+                            ids.size,
+                        )
+                }
+            },
+        )
+    }
+    val onDropped = {
+        val ids = order.rows(saved).map { it.id }
+        if (ids != saved.map { it.id }) actions.onReorder(ids)
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        StepScaffold(
+            title = stringResource(R.string.accounts_title),
+            navigationIcon = HeadroomIcons.ArrowBack,
+            navigationLabel = stringResource(R.string.action_back),
+            onNavigate = actions.onClose,
+            listState = listState,
+            itemSpacing = ROW_GAP,
+        ) {
+            val width = Modifier.widthIn(max = 600.dp).fillMaxWidth()
+            if (state.isDemo) item { DemoNote(width.padding(bottom = SECTION_SPACING - ROW_GAP)) }
+            accountRows(
+                rows = order.rows(saved),
+                reorder = reorder,
+                modeOf = { id ->
+                    when {
+                        // Demo accounts are not stored, so there is nothing to edit or move.
+                        state.isDemo -> AccountRowMode.ReadOnly
+                        editingId == null -> AccountRowMode.Idle
+                        editingId == id -> AccountRowMode.Editing
+                        else -> AccountRowMode.Waiting
+                    }
+                },
+                actionsOf = rowActions,
+                onDropped = onDropped,
+                modifier = width,
+            )
             item {
-                Surface(
-                    modifier = width,
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                Button(
+                    onClick = actions.onAddAccount,
+                    modifier = width.padding(top = SECTION_SPACING - ROW_GAP),
                 ) {
+                    Icon(
+                        painter = painterResource(HeadroomIcons.PersonAdd),
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize),
+                    )
                     Text(
-                        text = stringResource(R.string.accounts_demo_note),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(16.dp),
+                        text = stringResource(R.string.accounts_add),
+                        modifier = Modifier.padding(start = ButtonDefaults.IconSpacing),
                     )
                 }
             }
         }
-        item {
-            ListCard(width) {
-                state.accounts.forEachIndexed { index, account ->
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-                    key(account.id) {
-                        AccountListRow(
-                            account = account,
-                            mode =
-                                when {
-                                    // Demo accounts are not stored, so there is nothing to edit.
-                                    state.isDemo -> AccountRowMode.ReadOnly
-                                    editingId == null -> AccountRowMode.Idle
-                                    editingId == account.id -> AccountRowMode.Editing
-                                    else -> AccountRowMode.Waiting
-                                },
-                            actions =
-                                AccountRowActions(
-                                    onEdit = { editingId = account.id },
-                                    onSave = { name ->
-                                        actions.onRename(account.id, name)
-                                        editingId = null
-                                    },
-                                    onRemove = {
-                                        actions.onRemove(account.id)
-                                        editingId = null
-                                    },
-                                    onCancel = { editingId = null },
-                                ),
-                        )
-                    }
-                }
+        announcement?.let { Announcement(it) }
+    }
+}
+
+/**
+ * One reorderable item per account. A row can be picked up by its handle, or by a long press, only
+ * while no row is open for editing. Haptics mark the pick up, each slot crossed, and the drop.
+ */
+private fun LazyListScope.accountRows(
+    rows: List<AccountRow>,
+    reorder: ReorderableLazyListState,
+    modeOf: (accountId: String) -> AccountRowMode,
+    actionsOf: (AccountRow) -> AccountRowActions,
+    onDropped: () -> Unit,
+    modifier: Modifier,
+) {
+    itemsIndexed(rows, key = { _, row -> row.id }) { index, account ->
+        val mode = modeOf(account.id)
+        val haptics = LocalHapticFeedback.current
+        ReorderableItem(
+            state = reorder,
+            key = account.id,
+            modifier = modifier,
+            enabled = mode != AccountRowMode.ReadOnly,
+            animateItemModifier =
+                Modifier.animateItem(
+                    fadeInSpec = null,
+                    placementSpec = rowPlacementSpec(),
+                    fadeOutSpec = null,
+                ),
+        ) { lifted ->
+            val canDrag = mode == AccountRowMode.Idle
+            val onDragStarted: (Offset) -> Unit = {
+                haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
             }
-        }
-        item {
-            Button(onClick = actions.onAddAccount, modifier = width) {
-                Icon(
-                    painter = painterResource(HeadroomIcons.PersonAdd),
-                    contentDescription = null,
-                    modifier = Modifier.size(ButtonDefaults.IconSize),
-                )
-                Text(
-                    text = stringResource(R.string.accounts_add),
-                    modifier = Modifier.padding(start = ButtonDefaults.IconSpacing),
-                )
+            val onDragStopped = {
+                haptics.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                onDropped()
             }
+            AccountListRow(
+                account = account,
+                mode = mode,
+                placement =
+                    RowPlacement(
+                        index = index,
+                        count = rows.size,
+                        isLifted = lifted,
+                        canMove = canDrag,
+                        isAnyLifted = reorder.isAnyItemDragging,
+                    ),
+                actions = actionsOf(account),
+                drag =
+                    RowDrag(
+                        row =
+                            Modifier.longPressDraggableHandle(
+                                enabled = canDrag,
+                                onDragStarted = onDragStarted,
+                                onDragStopped = onDragStopped,
+                            ),
+                        handle =
+                            Modifier.draggableHandle(
+                                enabled = canDrag,
+                                onDragStarted = onDragStarted,
+                                onDragStopped = onDragStopped,
+                            ),
+                    ),
+            )
         }
     }
 }
+
+@Composable
+private fun DemoNote(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+    ) {
+        Text(
+            text = stringResource(R.string.accounts_demo_note),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+/** Says [message] to accessibility services, politely and without taking focus. Draws nothing. */
+@Composable
+private fun Announcement(message: String) {
+    Box(
+        modifier =
+            Modifier.size(1.dp).clearAndSetSemantics {
+                contentDescription = message
+                liveRegion = LiveRegionMode.Polite
+            }
+    )
+}
+
+/** How the other rows make way for a dragged row. With reduced motion they snap into place. */
+@Composable
+private fun rowPlacementSpec(): FiniteAnimationSpec<IntOffset>? =
+    if (animationsEnabled()) HeadroomMotion.containerSpec() else null
+
+/** The space between the account rows, which read as one rounded group. */
+private val ROW_GAP = 2.dp
+
+/** The space between the groups on the screen: the title, the note, the accounts, the button. */
+private val SECTION_SPACING = 12.dp
 
 @Composable
 private fun ProviderPicker(actions: AccountsActions) {
