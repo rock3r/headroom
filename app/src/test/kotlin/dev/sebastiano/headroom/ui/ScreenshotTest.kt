@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.ui
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -12,10 +13,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.percentOffset
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.AccountState
@@ -32,6 +35,7 @@ import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.accounts.accountRowTag
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
+import dev.sebastiano.headroom.ui.overview.NEXT_RESET_CARD_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.settings.REDUCE_MOTION_TAG
@@ -111,6 +115,26 @@ class ScreenshotTest {
     fun overviewDark() {
         launch(dark = true)
         capture("overview-dark")
+    }
+
+    @Test
+    fun nextResetRipple() {
+        launch()
+        settle()
+        rule.onNodeWithTag(NEXT_RESET_CARD_TAG).performTouchInput {
+            click(percentOffset(0.3f, 0.4f))
+        }
+        captureMidway("next-reset-ripple", RIPPLE_MIDWAY_MILLIS)
+    }
+
+    @Test
+    fun nextResetRippleDark() {
+        launch(dark = true)
+        settle()
+        rule.onNodeWithTag(NEXT_RESET_CARD_TAG).performTouchInput {
+            click(percentOffset(0.3f, 0.4f))
+        }
+        captureMidway("next-reset-ripple-dark", RIPPLE_MIDWAY_MILLIS)
     }
 
     @Test
@@ -351,6 +375,8 @@ private const val STEP_MILLIS = 50L
 private const val FRAME_MILLIS = 16L
 /** Part-way through the reveal into Settings, while the circle is still growing. */
 private const val REVEAL_MIDWAY_MILLIS = 64L
+/** A quarter of the way through the next reset card's ripple, while its rings are strong. */
+private const val RIPPLE_MIDWAY_MILLIS = 208L
 private const val BACK_PROGRESS = 0.5f
 private const val BACK_STEPS = 10
 
