@@ -41,6 +41,7 @@ import dev.sebastiano.headroom.ui.overview.NEXT_RESET_CARD_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_SORT_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
+import dev.sebastiano.headroom.ui.resets.RESETS_TAG
 import dev.sebastiano.headroom.ui.settings.REDUCE_MOTION_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import org.junit.Rule
@@ -198,6 +199,42 @@ class ScreenshotTest {
         launch()
         rule.onNodeWithContentDescription("Resets").performClick()
         capture("resets")
+    }
+
+    @Test
+    fun resetsHistoryDark() {
+        launch(dark = true)
+        rule.onNodeWithContentDescription("Resets").performClick()
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag(RESETS_TAG).performScrollToIndex(RESETS_HISTORY_INDEX)
+        rule.mainClock.autoAdvance = false
+        capture("resets-history-dark")
+    }
+
+    @Test
+    fun resetsHistoryLeft() {
+        launch(settings = InMemorySettingsRepository(AppSettings(quotaDisplay = QuotaDisplay.Left)))
+        rule.onNodeWithContentDescription("Resets").performClick()
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag(RESETS_TAG).performScrollToIndex(RESETS_HISTORY_INDEX)
+        rule.mainClock.autoAdvance = false
+        capture("resets-history-left")
+    }
+
+    @Test
+    @Config(qualifiers = MEDIUM)
+    fun resetsMedium() {
+        launch()
+        rule.onNodeWithText("Resets").performClick()
+        capture("resets-medium")
+    }
+
+    @Test
+    @Config(qualifiers = EXPANDED)
+    fun resetsExpandedDark() {
+        launch(dark = true)
+        rule.onNodeWithText("Resets").performClick()
+        capture("resets-expanded-dark")
     }
 
     @Test
@@ -403,6 +440,8 @@ class ScreenshotTest {
 
 /** Header, demo banner, next reset, section label, Claude, Codex, then Grok. */
 private const val GROK_INDEX = 6
+/** Header, upcoming label, upcoming list, history label, then the history chart. */
+private const val RESETS_HISTORY_INDEX = 4
 private const val SETTLE_STEPS = 40
 private const val STEP_MILLIS = 50L
 private const val FRAME_MILLIS = 16L

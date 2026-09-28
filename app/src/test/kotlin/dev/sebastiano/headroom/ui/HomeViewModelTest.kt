@@ -287,6 +287,21 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun `the usage at past resets comes with each window`() =
+        runTest(main.dispatcher) {
+            observe()
+            val claude = viewModel.state.value.accounts.first()
+            assertEquals(
+                listOf(82.0, 95.0, 100.0, 88.0, 100.0),
+                claude.windows.first { it.id == "seven_day" }.pastResets,
+            )
+            assertEquals(
+                emptyList(),
+                claude.windows.first { it.id == "seven_day_opus" }.pastResets,
+            )
+        }
+
+    @Test
     fun `the selection survives the view model being recreated`() =
         runTest(main.dispatcher) {
             val saved = SavedStateHandle()

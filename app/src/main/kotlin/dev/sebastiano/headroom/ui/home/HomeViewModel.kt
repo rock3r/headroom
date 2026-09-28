@@ -83,14 +83,20 @@ class HomeViewModel(
             if (switches.isEmpty()) flowOf(emptyMap()) else combine(switches) { it.toMap() }
         }
 
-    private val pastResets: Flow<Map<String, List<Double>>> =
+    private val pastResets: Flow<ResetHistories> =
         repository.accounts.flatMapLatest { accounts ->
-            val histories = accounts.mapNotNull { state ->
-                state.primaryWindow?.let { window ->
-                    resetHistory.usedAtReset(state.account.id, window.id).map {
-                        state.account.id to it
+            // The Resets tab charts every window that can alert; the primary one always comes too.
+            val histories = accounts.flatMap { state ->
+                val windows =
+                    state.snapshot?.windows.orEmpty().filter(ResetPolicy::canAlert) +
+                        listOfNotNull(state.primaryWindow)
+                windows
+                    .distinctBy { it.id }
+                    .map { window ->
+                        resetHistory.usedAtReset(state.account.id, window.id).map {
+                            (state.account.id to window.id) to it
+                        }
                     }
-                }
             }
             if (histories.isEmpty()) flowOf(emptyMap()) else combine(histories) { it.toMap() }
         }

@@ -120,14 +120,21 @@
     <string name="resets_upcoming">Upcoming</string>
     <string name="resets_row_title">%1$s · %2$s</string>
     <string name="resets_row_when">%1$s · in %2$s</string>
-    <string name="resets_bell_on">Alert on</string>
-    <string name="resets_bell_off">Alert off</string>
+    <string name="resets_account_with_label">%1$s (%2$s)</string>
+    <string name="resets_open_details">Open details</string>
+    <string name="resets_alert_toggle">Reset alert for %1$s</string>
     <string name="resets_history">Used when each window reset</string>
-    <string name="resets_history_note">Red bars hit the limit. The last bar is the current window.</string>
     <string name="resets_history_description">%1$s: %2$s at past resets, %3$d%% now</string>
+    <string name="resets_history_description_empty">%1$s: no past resets yet, %2$d%% now</string>
     <string name="resets_history_left">Left when each window reset</string>
-    <string name="resets_history_note_left">Red bars ran out. The last bar is the current window.</string>
     <string name="resets_history_description_left">%1$s: %2$s left at past resets, %3$d%% left now</string>
+    <string name="resets_history_description_empty_left">%1$s: no past resets yet, %2$d%% left now</string>
+    <string name="resets_history_empty">No past resets yet</string>
+    <string name="resets_history_now">now</string>
+    <string name="resets_legend_past">Past resets</string>
+    <string name="resets_legend_limit">Hit the limit</string>
+    <string name="resets_legend_limit_left">Ran out</string>
+    <string name="resets_legend_current">This window so far</string>
     <string name="resets_none">No weekly or monthly limits to show yet.</string>
 
     <!-- Widgets -->

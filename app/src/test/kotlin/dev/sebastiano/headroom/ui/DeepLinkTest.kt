@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -57,6 +58,17 @@ class DeepLinkTest {
     fun `a widget tap while the app is open opens that account`() {
         val activity = launch(widgetTap(null))
         rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+
+        activity.newIntent(widgetTap("demo-grok"))
+        rule.waitForIdle()
+        rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
+        rule.onNodeWithText("SuperGrok · sam").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a widget tap while the resets tab is open opens that account`() {
+        val activity = launch(widgetTap(null))
+        rule.onNodeWithContentDescription("Resets").performClick()
 
         activity.newIntent(widgetTap("demo-grok"))
         rule.waitForIdle()

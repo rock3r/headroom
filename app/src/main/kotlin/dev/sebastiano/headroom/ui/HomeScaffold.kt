@@ -45,6 +45,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -118,15 +119,8 @@ internal fun HomeScaffold(
         }
         tab = next
     }
-    OpenAccountEffect(
-        request = openAccountRequest,
-        onOpen = { accountId ->
-            tab = HomeTab.Overview
-            onSelectAccount(accountId)
-            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, accountId)
-        },
-        onConsume = onConsumeOpenAccount,
-    )
+    val opener =
+        rememberAccountOpener(openAccountRequest, onConsumeOpenAccount) { tab = HomeTab.Overview }
     val suiteType =
         if (width == LayoutWidth.Compact) NavigationSuiteType.None
         else NavigationSuiteType.WideNavigationRailCollapsed
@@ -183,8 +177,16 @@ internal fun HomeScaffold(
                             bottomPadding = bottomPadding,
                             playEntrance = playEntrance,
                             onEntranceStart = onEntranceStart,
+                            opener = opener,
                         )
-                    HomeTab.Resets -> ResetsScreen(home, formatter, bottomPadding = bottomPadding)
+                    HomeTab.Resets ->
+                        ResetsScreen(
+                            state = home,
+                            formatter = formatter,
+                            onOpenAccount = opener::open,
+                            onAlertChange = onAlertChange,
+                            bottomPadding = bottomPadding,
+                        )
                     HomeTab.Widgets ->
                         WidgetsScreen(home, formatter, onAddWidget, bottomPadding = bottomPadding)
                 }
@@ -269,7 +271,9 @@ private fun OverviewPanes(
     bottomPadding: androidx.compose.ui.unit.Dp,
     playEntrance: Boolean,
     onEntranceStart: () -> Unit,
+    opener: AccountOpener,
 ) {
+    OpenDetailEffect(navigator, opener, onSelectAccount)
     val scope = rememberCoroutineScope()
     val twoPanes = width == LayoutWidth.Expanded
     // With motion reduced, the card does not turn into the detail: the panes only fade.
@@ -386,6 +390,61 @@ private fun OpenAccountEffect(
         val pending = request ?: return@LaunchedEffect
         open(pending.accountId)
         consume()
+    }
+}
+
+/**
+ * The account whose detail opens next. A widget tap and a tap on the Resets tab both open an
+ * account through it: [open] switches to the Overview tab, and [OpenDetailEffect] then shows the
+ * detail.
+ */
+@Stable
+internal class AccountOpener(private val onShowOverview: () -> Unit) {
+    var pending: String? by mutableStateOf(null)
+        private set
+
+    fun open(accountId: String) {
+        onShowOverview()
+        pending = accountId
+    }
+
+    fun consume() {
+        pending = null
+    }
+}
+
+/** An [AccountOpener] that also opens the accounts that [request] asks for, such as widget taps. */
+@Composable
+private fun rememberAccountOpener(
+    request: OpenAccountRequest?,
+    onConsumeRequest: () -> Unit,
+    onShowOverview: () -> Unit,
+): AccountOpener {
+    val showOverview by rememberUpdatedState(onShowOverview)
+    val opener = remember { AccountOpener { showOverview() } }
+    OpenAccountEffect(request, { opener.open(it) }, onConsumeRequest)
+    return opener
+}
+
+/**
+ * Selects the account [opener] holds and shows its detail. It must be composed with the list-detail
+ * scaffold: a navigator whose scaffold is not on screen, for example while the Resets tab shows,
+ * ignores the request.
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+private fun OpenDetailEffect(
+    navigator: ThreePaneScaffoldNavigator<String>,
+    opener: AccountOpener,
+    onSelect: (String) -> Unit,
+) {
+    val select by rememberUpdatedState(onSelect)
+    val accountId = opener.pending
+    LaunchedEffect(accountId) {
+        val pending = accountId ?: return@LaunchedEffect
+        select(pending)
+        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pending)
+        opener.consume()
     }
 }
 

@@ -82,6 +82,8 @@ data class WindowSummary(
     /** The limit, in [amountUnit]. */
     val limitAmount: Double? = null,
     val amountUnit: String? = null,
+    /** Used percent at each past reset of this window, oldest first. */
+    val pastResets: List<Double> = emptyList(),
 )
 
 @Immutable

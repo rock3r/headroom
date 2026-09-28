@@ -90,7 +90,8 @@ class LeftModeTest {
     fun `the resets history shows what was left at each reset`() {
         launch()
         rule.onNodeWithContentDescription("Resets").performClick()
-        val description = "Claude: 18%, 5%, 0%, 12%, 0% left at past resets, 29% left now"
+        val description =
+            "Claude · Weekly · all models: 18%, 5%, 0%, 12%, 0% left at past resets, 29% left now"
         rule.onNodeWithTag(RESETS_TAG).performScrollToNode(hasContentDescription(description))
         rule.onNodeWithContentDescription(description).assertIsDisplayed()
         rule.onNodeWithText("Left when each window reset").assertExists()
