@@ -45,13 +45,17 @@ import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.home.HomeViewModel
+import dev.sebastiano.headroom.ui.settings.LicencesScreen
+import dev.sebastiano.headroom.ui.settings.SettingsActions
+import dev.sebastiano.headroom.ui.settings.SettingsScreen
+import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 
 /**
  * The whole app: the home scaffold (overview, resets, widgets, and the account detail), and the
- * accounts screen on top of it. State comes from the view models; this composable only wires it to
- * the screens.
+ * accounts and settings pages on top of it. State comes from the view models; this composable only
+ * wires it to the screens.
  */
 @Composable
 fun HeadroomApp(
@@ -61,20 +65,22 @@ fun HeadroomApp(
     onConsumeOpenAccount: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(factory = graph.homeViewModelFactory),
     accountsViewModel: AccountsViewModel = viewModel(factory = graph.accountsViewModelFactory),
+    settingsViewModel: SettingsViewModel = viewModel(factory = graph.settingsViewModelFactory),
 ) {
     val home by homeViewModel.state.collectAsStateWithLifecycle()
     val detail by homeViewModel.detail.collectAsStateWithLifecycle()
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
+    val settings by settingsViewModel.state.collectAsStateWithLifecycle()
     val formatter = rememberResetFormatter(graph.zone)
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val widgetUnavailable = stringResource(R.string.widget_add_unavailable)
-    var accountsOpen by rememberSaveable { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf(Page.Home) }
     // The cards' entrance plays on the first open only, not on returning to the overview.
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
-    // A widget tap leaves the accounts screen, unless the user is in the middle of signing in.
+    // A widget tap leaves the page on top, unless the user is in the middle of signing in.
     val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
     // A request is acted on once, even if the host is slow to clear it: a request left behind
     // must never keep the accounts screen from opening.
@@ -86,10 +92,10 @@ fun HeadroomApp(
     // Unknown accounts are dropped once loading is done; a pending request never blocks the UI.
     SideEffect { if (decision == OpenAccountDecision.Ignore) onConsumeOpenAccount() }
     val openNow = pending.takeIf { decision == OpenAccountDecision.Open && !signingIn }
-    val showAccounts = accountsOpen && openNow == null
+    val shown = if (openNow == null) page else Page.Home
 
     val accountsActions =
-        accountsActions(accountsViewModel, onClose = { accountsOpen = false }) { text ->
+        accountsActions(accountsViewModel, onClose = { page = Page.Home }) { text ->
                 scope.launch {
                     clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))
                 }
@@ -99,61 +105,62 @@ fun HeadroomApp(
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Box(modifier = modifier.fillMaxSize()) {
-        // Seekable, so the predictive back gesture scrubs the accounts screen away.
-        val accountsTransition = remember { SeekableTransitionState(showAccounts) }
-        LaunchedEffect(showAccounts) { accountsTransition.animateTo(showAccounts) }
-        PredictiveBackHandler(enabled = showAccounts && accounts.step == AccountsStep.List) {
-            gesture ->
-            try {
-                gesture.collect { event ->
-                    accountsTransition.seekTo(event.progress, targetState = false)
-                }
-                accountsOpen = false
-            } catch (cancelled: CancellationException) {
-                // The gesture's coroutine is cancelled; settle back from a live scope.
-                scope.launch { accountsTransition.animateTo(true) }
-                throw cancelled
-            }
-        }
-        rememberTransition(accountsTransition, label = "accounts").AnimatedContent(
+        // Inside a sign-in, the accounts screen handles back itself, one step at a time.
+        val back =
+            shown.back.takeIf { shown != Page.Accounts || accounts.step == AccountsStep.List }
+        val pageTransition = rememberPageTransition(shown, back) { page = it }
+        rememberTransition(pageTransition, label = "page").AnimatedContent(
             transitionSpec = {
                 (fadeIn(effects) + scaleIn(effects, initialScale = ENTER_SCALE)) togetherWith
                     fadeOut(fast)
             }
-        ) { open ->
-            if (open) {
-                AccountsScreen(state = accounts, actions = accountsActions)
-            } else {
-                HomeScaffold(
-                    home = home,
-                    detail = detail,
-                    formatter = formatter,
-                    onRefresh = homeViewModel::refresh,
-                    onSelectAccount = homeViewModel::select,
-                    onAlertChange = homeViewModel::setAlert,
-                    onChartWindowChange = homeViewModel::selectChartWindow,
-                    onOpenAccounts = {
-                        // The user's tap wins over an account a widget asked for earlier.
-                        pending?.let {
-                            handledRequest = it.serial
+        ) { current ->
+            when (current) {
+                Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
+                Page.Settings ->
+                    SettingsScreen(
+                        state = settings,
+                        actions =
+                            SettingsActions(
+                                onBack = { page = Page.Home },
+                                onQuotaDisplayChange = settingsViewModel::setQuotaDisplay,
+                                onSyncFrequencyChange = settingsViewModel::setSyncFrequency,
+                                onOpenLicences = { page = Page.Licences },
+                            ),
+                    )
+                Page.Licences -> LicencesScreen(onBack = { page = Page.Settings })
+                Page.Home ->
+                    HomeScaffold(
+                        home = home,
+                        detail = detail,
+                        formatter = formatter,
+                        onRefresh = homeViewModel::refresh,
+                        onSelectAccount = homeViewModel::select,
+                        onAlertChange = homeViewModel::setAlert,
+                        onChartWindowChange = homeViewModel::selectChartWindow,
+                        onOpenAccounts = {
+                            // The user's tap wins over an account a widget asked for earlier.
+                            pending?.let {
+                                handledRequest = it.serial
+                                onConsumeOpenAccount()
+                            }
+                            page = Page.Accounts
+                        },
+                        onOpenSettings = { page = Page.Settings },
+                        playEntrance = !entrancePlayed,
+                        onEntranceStart = { entrancePlayed = true },
+                        openAccountRequest = openNow,
+                        onConsumeOpenAccount = {
+                            handledRequest = openNow?.serial
+                            page = Page.Home
                             onConsumeOpenAccount()
-                        }
-                        accountsOpen = true
-                    },
-                    playEntrance = !entrancePlayed,
-                    onEntranceStart = { entrancePlayed = true },
-                    openAccountRequest = openNow,
-                    onConsumeOpenAccount = {
-                        handledRequest = openNow?.serial
-                        accountsOpen = false
-                        onConsumeOpenAccount()
-                    },
-                    onAddWidget = { style ->
-                        if (!graph.widgetPinner.requestPin(style)) {
-                            scope.launch { snackbar.showSnackbar(widgetUnavailable) }
-                        }
-                    },
-                )
+                        },
+                        onAddWidget = { style ->
+                            if (!graph.widgetPinner.requestPin(style)) {
+                                scope.launch { snackbar.showSnackbar(widgetUnavailable) }
+                            }
+                        },
+                    )
             }
         }
         SnackbarHost(
@@ -167,6 +174,51 @@ fun HeadroomApp(
 }
 
 private const val ENTER_SCALE = 0.96f
+
+/**
+ * The transition between the pages, seekable so the predictive back gesture scrubs the page on top
+ * away, towards [back]. [onBack] runs when the gesture completes; a cancelled gesture settles back
+ * on [shown].
+ */
+@Composable
+private fun rememberPageTransition(
+    shown: Page,
+    back: Page?,
+    onBack: (Page) -> Unit,
+): SeekableTransitionState<Page> {
+    val transition = remember { SeekableTransitionState(shown) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(shown) { transition.animateTo(shown) }
+    PredictiveBackHandler(enabled = back != null) { gesture ->
+        val target = back ?: return@PredictiveBackHandler
+        try {
+            gesture.collect { event -> transition.seekTo(event.progress, target) }
+            onBack(target)
+        } catch (cancelled: CancellationException) {
+            // The gesture's coroutine is cancelled; settle back from a live scope.
+            scope.launch { transition.animateTo(shown) }
+            throw cancelled
+        }
+    }
+    return transition
+}
+
+/** The home scaffold, or a page drawn over it. Back from a page goes to [back]. */
+private enum class Page {
+    Home,
+    Accounts,
+    Settings,
+    Licences;
+
+    val back: Page?
+        get() =
+            when (this) {
+                Home -> null
+                Accounts,
+                Settings -> Home
+                Licences -> Settings
+            }
+}
 
 private fun SignInState.isWaitingForUser() =
     this is SignInState.Browser ||

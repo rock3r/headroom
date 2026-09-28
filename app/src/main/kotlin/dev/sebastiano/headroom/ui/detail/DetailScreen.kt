@@ -47,6 +47,7 @@ import dev.sebastiano.headroom.designsystem.PaceChart
 import dev.sebastiano.headroom.designsystem.PaceChartModel
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
@@ -55,7 +56,8 @@ import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.components.errorText
-import dev.sebastiano.headroom.ui.components.usedLabel
+import dev.sebastiano.headroom.ui.components.percentDescription
+import dev.sebastiano.headroom.ui.components.quotaLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.home.AccountSummary
@@ -76,7 +78,9 @@ fun chartWindowTag(windowId: String): String = "chart-window-$windowId"
 
 /**
  * One account in depth: the hero ring (weekly outside, session inside), every window, the pace
- * chart drawn to scale, and the per-window reset alert switches.
+ * chart drawn to scale, and the per-window reset alert switches. The ring, the numbers and the
+ * chart text show how much is used or how much is left, as the state's display says; the chart
+ * itself always plots usage against even pace.
  */
 @Composable
 fun DetailScreen(
@@ -117,7 +121,7 @@ fun DetailScreen(
             ) {
                 val content = Modifier.widthIn(max = 600.dp).fillMaxWidth()
                 DetailTopBar(account, onBack, sharedElements, content)
-                account.primary?.let { HeroRing(account, it, sharedElements) }
+                account.primary?.let { HeroRing(account, it, state.display, sharedElements) }
                 account.error?.let {
                     Text(
                         text = errorText(it),
@@ -126,7 +130,7 @@ fun DetailScreen(
                         modifier = content,
                     )
                 }
-                WindowList(account, state.now, formatter, content)
+                WindowList(account, state.now, formatter, state.display, content)
                 state.chart?.let {
                     ChartCard(
                         chart = it,
@@ -135,6 +139,7 @@ fun DetailScreen(
                         windows = state.chartWindows,
                         selectedWindowId = state.chartWindowId,
                         onWindowChange = onChartWindowChange,
+                        display = state.display,
                         modifier = content,
                     )
                 }
@@ -194,6 +199,7 @@ private fun DetailTopBar(
 private fun HeroRing(
     account: AccountSummary,
     primary: WindowSummary,
+    display: QuotaDisplay,
     sharedElements: SharedElements?,
     modifier: Modifier = Modifier,
 ) {
@@ -203,15 +209,16 @@ private fun HeroRing(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         QuotaRing(
-            progress = primary.usedPercent.asFraction(),
-            innerProgress = account.session?.let { it.usedPercent.asFraction() },
+            progress = display.percent(primary.usedPercent).asFraction(),
+            innerProgress = account.session?.let { display.percent(it.usedPercent).asFraction() },
             wavy = account.needsAttention,
             modifier = Modifier.padding(top = 4.dp),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 AnimatedPercent(
-                    percent = primary.usedPercent,
+                    percent = display.percent(primary.usedPercent),
                     style = MaterialTheme.typography.displayMedium,
+                    display = display,
                     modifier =
                         sharedElements?.run {
                             Modifier.sharedValue(
@@ -222,7 +229,7 @@ private fun HeroRing(
                         } ?: Modifier,
                 )
                 Text(
-                    text = usedLabel(primary.kind),
+                    text = quotaLabel(primary.kind, display),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -255,6 +262,7 @@ private fun WindowList(
     account: AccountSummary,
     now: Instant,
     formatter: ResetFormatter,
+    display: QuotaDisplay,
     modifier: Modifier = Modifier,
 ) {
     val balance = account.balance
@@ -276,9 +284,12 @@ private fun WindowList(
                         )
                     }
                 }
+                val shown = display.percent(window.usedPercent).roundToInt()
+                val description = percentDescription(shown, display)
                 Text(
-                    text = stringResource(R.string.percent, window.usedPercent.roundToInt()),
+                    text = stringResource(R.string.percent, shown),
                     style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { contentDescription = description },
                 )
             }
         }
@@ -344,6 +355,7 @@ private fun ChartCard(
     windows: List<WindowSummary>,
     selectedWindowId: String?,
     onWindowChange: (String) -> Unit,
+    display: QuotaDisplay,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -376,7 +388,8 @@ private fun ChartCard(
                 ChartWindowPicker(windows, selectedWindowId, onWindowChange)
             }
             Spacer(Modifier.height(4.dp))
-            val used = chart.usedPercent.roundToInt()
+            val shown = display.percent(chart.usedPercent).roundToInt()
+            val above = chart.usedPercent > chart.expectedPercent
             PaceChart(
                 model =
                     PaceChartModel(
@@ -391,14 +404,19 @@ private fun ChartCard(
                 limitLabel = stringResource(R.string.detail_chart_limit),
                 contentDescription =
                     stringResource(
-                        if (chart.usedPercent > chart.expectedPercent)
-                            R.string.detail_chart_description_above
-                        else R.string.detail_chart_description_below,
-                        used,
+                        when (display) {
+                            QuotaDisplay.Used ->
+                                if (above) R.string.detail_chart_description_above
+                                else R.string.detail_chart_description_below
+                            QuotaDisplay.Left ->
+                                if (above) R.string.detail_chart_description_above_left
+                                else R.string.detail_chart_description_below_left
+                        },
+                        shown,
                     ),
             )
             Text(
-                text = projectionText(chart, now, formatter),
+                text = projectionText(chart, now, formatter, display),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
@@ -425,25 +443,37 @@ private fun tickLabels(chart: ChartSummary, formatter: ResetFormatter): List<Str
 }
 
 @Composable
-private fun projectionText(chart: ChartSummary, now: Instant, formatter: ResetFormatter): String {
+private fun projectionText(
+    chart: ChartSummary,
+    now: Instant,
+    formatter: ResetFormatter,
+    display: QuotaDisplay,
+): String {
     val hit = chart.projectedLimitAt
     val end = chart.projectedEndPercent
+    val left = display == QuotaDisplay.Left
     return when {
         chart.usedPercent <= FRESH_MAX_PERCENT -> stringResource(R.string.detail_projection_fresh)
         hit != null ->
             stringResource(
-                R.string.detail_projection_hit,
+                if (left) R.string.detail_projection_hit_left else R.string.detail_projection_hit,
                 formatter.countdown(now, hit),
                 formatter.countdown(hit, chart.end),
             )
         end != null ->
             stringResource(
                 when (chart.kind) {
-                    WindowKind.Weekly -> R.string.detail_projection_end_week
-                    WindowKind.Monthly -> R.string.detail_projection_end_month
-                    else -> R.string.detail_projection_end_window
+                    WindowKind.Weekly ->
+                        if (left) R.string.detail_projection_end_week_left
+                        else R.string.detail_projection_end_week
+                    WindowKind.Monthly ->
+                        if (left) R.string.detail_projection_end_month_left
+                        else R.string.detail_projection_end_month
+                    else ->
+                        if (left) R.string.detail_projection_end_window_left
+                        else R.string.detail_projection_end_window
                 },
-                end.roundToInt(),
+                display.percent(end).roundToInt(),
             )
         else -> ""
     }

@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,12 +38,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ScreenHeader
@@ -68,6 +72,7 @@ fun OverviewScreen(
     onNextResetAlertChange: (Boolean) -> Unit,
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     columns: Int = 1,
     selectedAccountId: String? = null,
@@ -115,7 +120,7 @@ fun OverviewScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                fullWidth("header") { OverviewHeader(state, onOpenAccounts) }
+                fullWidth("header") { OverviewHeader(state, onOpenAccounts, onOpenSettings) }
                 if (state.isDemo) {
                     fullWidth("demo") { DemoBanner(onAddAccount = onOpenAccounts) }
                 }
@@ -153,6 +158,7 @@ fun OverviewScreen(
                                 onClick = { onOpenAccount(account.id) },
                                 selected = account.id == selectedAccountId,
                                 sharedElements = sharedElements,
+                                display = state.display,
                             )
                         }
                     }
@@ -170,7 +176,11 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.fullWidth(
 }
 
 @Composable
-private fun OverviewHeader(state: HomeUiState, onOpenAccounts: () -> Unit) {
+private fun OverviewHeader(
+    state: HomeUiState,
+    onOpenAccounts: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val accounts =
         pluralStringResource(R.plurals.overview_accounts, state.accounts.size, state.accounts.size)
     ScreenHeader(
@@ -182,6 +192,13 @@ private fun OverviewHeader(state: HomeUiState, onOpenAccounts: () -> Unit) {
                 syncedText(state.lastSyncedAt, state.now),
             ),
     ) {
+        val settingsLabel = stringResource(R.string.action_settings)
+        IconButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.semantics { contentDescription = settingsLabel },
+        ) {
+            Icon(painter = painterResource(HeadroomIcons.SettingsFilled), contentDescription = null)
+        }
         val accountsLabel = stringResource(R.string.action_accounts)
         FilledTonalIconButton(
             onClick = onOpenAccounts,

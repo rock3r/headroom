@@ -1,0 +1,63 @@
+package dev.sebastiano.headroom.ui
+
+import dev.sebastiano.headroom.MainDispatcherRule
+import dev.sebastiano.headroom.model.AppSettings
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.ui.settings.SettingsUiState
+import dev.sebastiano.headroom.ui.settings.SettingsViewModel
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Rule
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class SettingsViewModelTest {
+    @get:Rule val main = MainDispatcherRule()
+
+    private val repository =
+        InMemorySettingsRepository(AppSettings(QuotaDisplay.Used, SyncFrequency.Hour1))
+
+    // Created lazily, after the rule has installed the test Main dispatcher.
+    private val viewModel by lazy { SettingsViewModel(repository, appVersion = "1.2.3") }
+
+    private fun TestScope.observe() {
+        backgroundScope.launch { viewModel.state.collect {} }
+        runCurrent()
+    }
+
+    @Test
+    fun `it shows the stored settings and the app version`() =
+        runTest(main.dispatcher) {
+            observe()
+            assertEquals(
+                SettingsUiState(QuotaDisplay.Used, SyncFrequency.Hour1, appVersion = "1.2.3"),
+                viewModel.state.value,
+            )
+        }
+
+    @Test
+    fun `choosing left stores it`() =
+        runTest(main.dispatcher) {
+            observe()
+            viewModel.setQuotaDisplay(QuotaDisplay.Left)
+            runCurrent()
+            assertEquals(QuotaDisplay.Left, repository.settings.value.quotaDisplay)
+            assertEquals(QuotaDisplay.Left, viewModel.state.value.quotaDisplay)
+        }
+
+    @Test
+    fun `choosing a frequency stores it`() =
+        runTest(main.dispatcher) {
+            observe()
+            viewModel.setSyncFrequency(SyncFrequency.OnOpen)
+            runCurrent()
+            assertEquals(SyncFrequency.OnOpen, repository.settings.value.syncFrequency)
+            assertEquals(SyncFrequency.OnOpen, viewModel.state.value.syncFrequency)
+        }
+}

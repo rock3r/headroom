@@ -1,0 +1,151 @@
+package dev.sebastiano.headroom.ui
+
+import androidx.activity.BackEventCompat
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import dev.sebastiano.headroom.designsystem.HeadroomTheme
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
+import dev.sebastiano.headroom.ui.overview.accountCardTag
+import dev.sebastiano.headroom.ui.settings.LICENCES_LIST_TAG
+import dev.sebastiano.headroom.ui.settings.LICENCES_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
+import dev.sebastiano.headroom.ui.settings.syncFrequencyTag
+import kotlin.test.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w411dp-h891dp")
+class SettingsTest {
+    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    private val settings = InMemorySettingsRepository()
+
+    private val dispatcher
+        get() = rule.activity.onBackPressedDispatcher
+
+    private fun openSettings() {
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                HeadroomApp(graph = testGraph(rule.activity, settings = settings))
+            }
+        }
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the settings button opens settings and back returns to the overview`() {
+        openSettings()
+        rule.onNodeWithContentDescription("Back").performClick()
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `the back gesture scrubs settings away and cancelling keeps it`() {
+        openSettings()
+        rule.runOnUiThread {
+            dispatcher.dispatchOnBackStarted(gesture(0f))
+            dispatcher.dispatchOnBackProgressed(gesture(0.5f))
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag(SETTINGS_TAG).assertExists()
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertExists()
+
+        rule.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
+        rule.waitForIdle()
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
+
+        rule.runOnUiThread { dispatcher.onBackPressed() }
+        rule.waitForIdle()
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `switching to left shows what is left on the overview cards`() {
+        openSettings()
+        rule.onNodeWithText("Used").assertIsSelected()
+        rule.onNodeWithText("Left").performClick()
+        rule.onNodeWithText("Left").assertIsSelected()
+        assertEquals(QuotaDisplay.Left, settings.settings.value.quotaDisplay)
+
+        rule.onNodeWithContentDescription("Back").performClick()
+
+        rule
+            .onNodeWithTag(accountCardTag("demo-claude"))
+            .assert(hasText("29%"))
+            .assert(hasText("weekly left"))
+    }
+
+    @Test
+    fun `choosing a frequency stores it and selects its row`() {
+        openSettings()
+        rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Minutes15)).assertIsSelected()
+
+        rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Hours3)).performScrollTo().performClick()
+
+        rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Hours3)).assertIsSelected()
+        rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Minutes15)).assertIsNotSelected()
+        assertEquals(SyncFrequency.Hours3, settings.settings.value.syncFrequency)
+    }
+
+    @Test
+    fun `the licences open from settings and back returns to settings`() {
+        openSettings()
+        rule.onNodeWithText("Open-source licences").performScrollTo().performClick()
+        rule.onNodeWithTag(LICENCES_TAG).assertIsDisplayed()
+        // The list comes from the licence data the build bundles into the app.
+        val material3 = "Compose Material3 Components"
+        rule.waitUntil(LOAD_TIMEOUT_MILLIS) {
+            runCatching {
+                rule.onNodeWithTag(LICENCES_LIST_TAG).performScrollToNode(hasText(material3))
+            }
+                .isSuccess
+        }
+        rule.onAllNodesWithText(material3).onFirst().assertIsDisplayed()
+
+        rule.runOnUiThread { dispatcher.onBackPressed() }
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(LICENCES_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `the app version is at the bottom of settings`() {
+        openSettings()
+        val version = "Version $TEST_APP_VERSION"
+        rule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasText(version))
+        rule.onNodeWithText(version).assertIsDisplayed()
+    }
+
+    private fun gesture(progress: Float) =
+        BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)
+
+    private companion object {
+        /** The licence data is read from resources off the main thread. */
+        const val LOAD_TIMEOUT_MILLIS = 5_000L
+    }
+}
