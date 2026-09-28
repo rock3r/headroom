@@ -57,6 +57,7 @@ class AccountRenameTest {
             onCopy = {},
             onRename = { id, name -> renames += id to name },
             onRemove = { id -> removals += id },
+            onReorder = {},
         )
 
     private fun show(isDemo: Boolean) {

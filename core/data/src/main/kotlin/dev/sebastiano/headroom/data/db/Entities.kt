@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -18,6 +19,8 @@ internal data class AccountEntity(
     val balanceAmount: Double? = null,
     val balanceUnit: String? = null,
     val nickname: String? = null,
+    /** Where the user put the account in their list. Lists read accounts in this order. */
+    @ColumnInfo(defaultValue = "0") val position: Int = 0,
 )
 
 @Entity(

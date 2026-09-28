@@ -13,6 +13,7 @@ object HeadroomIcons {
     @DrawableRes val Edit: Int = R.drawable.ic_edit
     @DrawableRes val ContentCopy: Int = R.drawable.ic_content_copy
     @DrawableRes val Dashboard: Int = R.drawable.ic_dashboard
+    @DrawableRes val DragIndicator: Int = R.drawable.ic_drag_indicator
     @DrawableRes val DashboardFilled: Int = R.drawable.ic_dashboard_filled
     @DrawableRes val Error: Int = R.drawable.ic_error
     @DrawableRes val EventRepeat: Int = R.drawable.ic_event_repeat

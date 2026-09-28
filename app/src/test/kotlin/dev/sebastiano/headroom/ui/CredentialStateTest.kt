@@ -44,6 +44,7 @@ class CredentialStateTest {
             onCopy = {},
             onRename = { _, _ -> },
             onRemove = {},
+            onReorder = {},
         )
 
     private fun restoreWith(state: SignInState, fieldTag: String) {

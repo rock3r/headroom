@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.ui
 
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
@@ -231,6 +232,22 @@ class ScreenshotTest {
     }
 
     @Test
+    fun accountReordering() {
+        // Demo accounts cannot be moved, so these are the demo accounts signed in for real.
+        launch(realAccounts = DemoData.accounts(FIXED_NOW))
+        rule.mainClock.autoAdvance = true
+        rule.openAccounts()
+        // Pick ChatGPT Codex up and hold it partway past Grok.
+        rule.onNodeWithTag(accountRowTag("demo-codex")).performTouchInput {
+            down(center)
+            advanceEventTime(REORDER_LONG_PRESS_MILLIS)
+            repeat(REORDER_STEPS) { moveBy(Offset(0f, height * REORDER_ROWS / REORDER_STEPS)) }
+        }
+        rule.mainClock.autoAdvance = false
+        capture("accounts-reordering")
+    }
+
+    @Test
     fun settings() {
         launch()
         rule.onNodeWithContentDescription("Settings").performClick()
@@ -395,6 +412,11 @@ private const val REVEAL_MIDWAY_MILLIS = 64L
 private const val RIPPLE_MIDWAY_MILLIS = 208L
 private const val BACK_PROGRESS = 0.5f
 private const val BACK_STEPS = 10
+
+/** A long press, then a drag of this many rows in small steps, for the reordering screenshot. */
+private const val REORDER_LONG_PRESS_MILLIS = 1_000L
+private const val REORDER_ROWS = 0.7f
+private const val REORDER_STEPS = 8
 
 private fun backEvent(progress: Float) =
     BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)

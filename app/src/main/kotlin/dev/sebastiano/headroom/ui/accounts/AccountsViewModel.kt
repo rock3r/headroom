@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -51,11 +52,13 @@ data class AccountsUiState(
 class AccountsViewModel(
     repository: QuotaRepository,
     private val signInController: SignInController,
-    isDemo: Flow<Boolean>,
+    private val isDemo: Flow<Boolean>,
     /** Stores the name the user gives an account. A blank name removes it. */
     private val renameAccount: suspend (accountId: String, name: String?) -> Unit = { _, _ -> },
     /** Signs the account out and forgets it, with its history. */
     private val removeAccount: suspend (accountId: String) -> Unit = {},
+    /** Stores the order the user put the accounts in. */
+    private val reorderAccounts: suspend (orderedIds: kotlin.collections.List<String>) -> Unit = {},
 ) : ViewModel() {
     private val picking = MutableStateFlow(false)
 
@@ -79,6 +82,11 @@ class AccountsViewModel(
 
     fun rename(accountId: String, name: String) {
         viewModelScope.launch { renameAccount(accountId, name) }
+    }
+
+    /** Saves a new order of the accounts. Demo accounts are not stored, so they keep theirs. */
+    fun reorder(orderedIds: kotlin.collections.List<String>) {
+        viewModelScope.launch { if (!isDemo.first()) reorderAccounts(orderedIds) }
     }
 
     fun remove(accountId: String) {

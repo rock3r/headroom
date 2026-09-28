@@ -49,6 +49,9 @@ public interface AccountsRepository : QuotaRepository {
 
     /** Names the account. A blank or null [nickname] removes the name. */
     public suspend fun renameAccount(accountId: String, nickname: String?)
+
+    /** Puts the accounts in the order of [orderedIds]. Every list of accounts follows it. */
+    public suspend fun reorderAccounts(orderedIds: List<String>)
 }
 
 /** Implemented by the Application, so receivers and workers can reach the [DataGraph]. */
@@ -75,7 +78,11 @@ public class DataGraph(
 
     private val database =
         Room.databaseBuilder(appContext, HeadroomDatabase::class.java, "headroom.db")
-            .addMigrations(HeadroomDatabase.MIGRATION_1_2, HeadroomDatabase.MIGRATION_2_3)
+            .addMigrations(
+                HeadroomDatabase.MIGRATION_1_2,
+                HeadroomDatabase.MIGRATION_2_3,
+                HeadroomDatabase.MIGRATION_3_4,
+            )
             .build()
 
     private val alertStore =
@@ -92,7 +99,13 @@ public class DataGraph(
         AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers)
 
     private val roomRepository =
-        RoomQuotaRepository(database.quotaDao(), accountFetcher::fetch, clock, scope)
+        RoomQuotaRepository(
+            database.quotaDao(),
+            database.accountOrderDao(),
+            accountFetcher::fetch,
+            clock,
+            scope,
+        )
 
     public val repository: AccountsRepository =
         object : AccountsRepository, QuotaRepository by roomRepository {
@@ -103,6 +116,9 @@ public class DataGraph(
 
             override suspend fun renameAccount(accountId: String, nickname: String?) =
                 roomRepository.renameAccount(accountId, nickname)
+
+            override suspend fun reorderAccounts(orderedIds: List<String>) =
+                roomRepository.reorderAccounts(orderedIds)
         }
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)

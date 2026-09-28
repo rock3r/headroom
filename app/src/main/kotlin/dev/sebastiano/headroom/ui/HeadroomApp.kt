@@ -352,6 +352,7 @@ private fun accountsActions(viewModel: AccountsViewModel, onClose: () -> Unit) =
         onFinish = viewModel::finish,
         onRename = viewModel::rename,
         onRemove = viewModel::remove,
+        onReorder = viewModel::reorder,
         onOpenUrl = {},
         onCopy = {},
     )

@@ -83,6 +83,42 @@ class AccountsViewModelTest {
         }
 
     @Test
+    fun `reordering the accounts passes the new order to storage`() =
+        runTest(main.dispatcher) {
+            val orders = mutableListOf<List<String>>()
+            val viewModel =
+                AccountsViewModel(
+                    repository = FakeQuotaRepository({ now }),
+                    signInController = signIn,
+                    isDemo = MutableStateFlow(false),
+                    reorderAccounts = { ids -> orders += ids },
+                )
+
+            viewModel.reorder(listOf("demo-codex", "demo-claude"))
+            runCurrent()
+
+            assertEquals(listOf(listOf("demo-codex", "demo-claude")), orders)
+        }
+
+    @Test
+    fun `demo accounts are not reordered`() =
+        runTest(main.dispatcher) {
+            val orders = mutableListOf<List<String>>()
+            val viewModel =
+                AccountsViewModel(
+                    repository = FakeQuotaRepository({ now }),
+                    signInController = signIn,
+                    isDemo = MutableStateFlow(true),
+                    reorderAccounts = { ids -> orders += ids },
+                )
+
+            viewModel.reorder(listOf("demo-codex", "demo-claude"))
+            runCurrent()
+
+            assertEquals(emptyList(), orders)
+        }
+
+    @Test
     fun `adding an account goes through the provider picker to sign-in`() =
         runTest(main.dispatcher) {
             observe()

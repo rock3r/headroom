@@ -5,8 +5,11 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColor
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -15,6 +18,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -56,6 +60,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -66,6 +72,7 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
+import dev.sebastiano.headroom.designsystem.animationsEnabled
 import kotlinx.coroutines.flow.collectLatest
 
 /** How a row of the accounts list behaves. */
@@ -87,15 +94,134 @@ internal data class AccountRowActions(
     val onSave: (name: String) -> Unit,
     val onRemove: () -> Unit,
     val onCancel: () -> Unit,
+    /** Moves the account to this index of the list, for accessibility services. */
+    val onMove: (toIndex: Int) -> Unit = {},
+)
+
+/** The gestures that pick a row up: a long press on the [row], and a drag on its [handle]. */
+@Immutable internal class RowDrag(val row: Modifier = Modifier, val handle: Modifier = Modifier)
+
+/** Where a row sits in the list, and whether it is being moved. */
+@Immutable
+internal data class RowPlacement(
+    val index: Int,
+    val count: Int,
+    /** The row is picked up and follows the finger. */
+    val isLifted: Boolean = false,
+    /** The row can be moved now: a stored account, while no row is open for editing. */
+    val canMove: Boolean = false,
+    /** Some row is being dragged, so taps must not open a row for editing. */
+    val isAnyLifted: Boolean = false,
 )
 
 /**
- * One account. Tapping it opens it in place: the row grows into a raised card that holds the name
- * field, and then the removal question. The container moves on the expressive spatial spring; the
- * content fades. With animations off, the row is simply open or closed.
+ * One account, a segment of the rounded group the accounts make. Tapping it opens it in place: the
+ * row grows into a raised card that holds the name field, and then the removal question. The
+ * container moves on the expressive spatial spring; the content fades. With animations off, the row
+ * is simply open or closed.
+ *
+ * [drag] picks the row up on a long press, or from its drag handle. A picked up row lifts: it
+ * rises, grows a little and rounds all its corners.
  */
 @Composable
-internal fun AccountListRow(account: AccountRow, mode: AccountRowMode, actions: AccountRowActions) {
+internal fun AccountListRow(
+    account: AccountRow,
+    mode: AccountRowMode,
+    placement: RowPlacement,
+    actions: AccountRowActions,
+    modifier: Modifier = Modifier,
+    drag: RowDrag = RowDrag(),
+) {
+    LiftableSegment(placement, modifier) {
+        AccountRowContent(account, mode, placement, actions, drag)
+    }
+}
+
+/**
+ * The row's segment: rounded on the outside of the group, and square where it meets its neighbours.
+ * Lifted, it is a card of its own. With reduced motion it does not grow, and changes at once.
+ */
+@Composable
+private fun LiftableSegment(
+    placement: RowPlacement,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val animate = animationsEnabled()
+    val lifted = placement.isLifted
+    val topCorner by
+        animateDpAsState(
+            targetValue =
+                when {
+                    lifted -> LIFTED_CORNER
+                    placement.index == 0 -> GROUP_CORNER
+                    else -> 0.dp
+                },
+            animationSpec = if (animate) HeadroomMotion.containerSpec() else snap(),
+            label = "top corner",
+        )
+    val bottomCorner by
+        animateDpAsState(
+            targetValue =
+                when {
+                    lifted -> LIFTED_CORNER
+                    placement.index == placement.count - 1 -> GROUP_CORNER
+                    else -> 0.dp
+                },
+            animationSpec = if (animate) HeadroomMotion.containerSpec() else snap(),
+            label = "bottom corner",
+        )
+    val elevation by
+        animateDpAsState(
+            targetValue = if (lifted) LIFTED_ELEVATION else 0.dp,
+            animationSpec = if (animate) HeadroomMotion.effectsSpec() else snap(),
+            label = "elevation",
+        )
+    val scale by
+        animateFloatAsState(
+            targetValue = if (lifted && animate) LIFTED_SCALE else 1f,
+            animationSpec = if (animate) MaterialTheme.motionScheme.fastSpatialSpec() else snap(),
+            label = "scale",
+        )
+    val color by
+        animateColorAsState(
+            targetValue =
+                if (lifted) MaterialTheme.colorScheme.surfaceContainerHigh
+                else MaterialTheme.colorScheme.surfaceContainer,
+            animationSpec = if (animate) HeadroomMotion.effectsSpec() else snap(),
+            label = "color",
+        )
+    Box(
+        modifier =
+            modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    shadowElevation = elevation.coerceAtLeast(0.dp).toPx()
+                    // The spatial spring may overshoot past square on the way back.
+                    shape =
+                        RoundedCornerShape(
+                            topStart = topCorner.coerceAtLeast(0.dp),
+                            topEnd = topCorner.coerceAtLeast(0.dp),
+                            bottomEnd = bottomCorner.coerceAtLeast(0.dp),
+                            bottomStart = bottomCorner.coerceAtLeast(0.dp),
+                        )
+                    clip = true
+                }
+                .drawBehind { drawRect(color) }
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun AccountRowContent(
+    account: AccountRow,
+    mode: AccountRowMode,
+    placement: RowPlacement,
+    actions: AccountRowActions,
+    drag: RowDrag,
+) {
     val editing = mode == AccountRowMode.Editing
     val transition = updateTransition(editing, label = "account row")
     val corner by
@@ -130,7 +256,7 @@ internal fun AccountListRow(account: AccountRow, mode: AccountRowMode, actions: 
                 }
                 .drawBehind { drawRect(container) }
     ) {
-        AccountHeader(account, mode, actions.onEdit)
+        AccountHeader(account, mode, placement, actions, drag)
         AnimatedVisibility(
             visible = editing,
             enter =
@@ -146,16 +272,31 @@ internal fun AccountListRow(account: AccountRow, mode: AccountRowMode, actions: 
 }
 
 @Composable
-private fun AccountHeader(account: AccountRow, mode: AccountRowMode, onEdit: () -> Unit) {
+private fun AccountHeader(
+    account: AccountRow,
+    mode: AccountRowMode,
+    placement: RowPlacement,
+    actions: AccountRowActions,
+    drag: RowDrag,
+) {
     val clickLabel = stringResource(R.string.accounts_edit)
+    val onEdit = actions.onEdit
+    val moves = moveActions(placement, actions.onMove)
     Row(
         modifier =
             Modifier.fillMaxWidth()
                 .testTag(accountRowTag(account.id))
+                .then(drag.row)
+                .semantics { if (moves.isNotEmpty()) customActions = moves }
                 .then(
                     when (mode) {
+                        // A tap that ends a drag must not open the row.
                         AccountRowMode.Idle ->
-                            Modifier.clickable(onClickLabel = clickLabel, onClick = onEdit)
+                            Modifier.clickable(
+                                enabled = !placement.isAnyLifted,
+                                onClickLabel = clickLabel,
+                                onClick = onEdit,
+                            )
                         // Disabled, so accessibility services also skip it while another row is
                         // open.
                         AccountRowMode.Waiting ->
@@ -181,12 +322,44 @@ private fun AccountHeader(account: AccountRow, mode: AccountRowMode, onEdit: () 
             enter = fadeIn(HeadroomMotion.effectsSpec()),
             exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
         ) {
-            Icon(
-                painter = painterResource(HeadroomIcons.Edit),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(HeadroomIcons.Edit),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // Accessibility services move rows with the row's actions instead.
+                Icon(
+                    painter = painterResource(HeadroomIcons.DragIndicator),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier =
+                        Modifier.padding(start = HANDLE_SPACING)
+                            .then(drag.handle)
+                            .testTag(accountDragHandleTag(account.id)),
+                )
+            }
         }
+    }
+}
+
+/** "Move up", "Move down" and "Move to top", where the row can go that way. */
+@Composable
+private fun moveActions(
+    placement: RowPlacement,
+    onMove: (toIndex: Int) -> Unit,
+): List<CustomAccessibilityAction> {
+    if (!placement.canMove) return emptyList()
+    val up = stringResource(R.string.accounts_move_up)
+    val down = stringResource(R.string.accounts_move_down)
+    val top = stringResource(R.string.accounts_move_to_top)
+    val index = placement.index
+    return buildList {
+        if (index > 0) add(CustomAccessibilityAction(up) { true.also { onMove(index - 1) } })
+        if (index < placement.count - 1) {
+            add(CustomAccessibilityAction(down) { true.also { onMove(index + 1) } })
+        }
+        if (index > 1) add(CustomAccessibilityAction(top) { true.also { onMove(0) } })
     }
 }
 
@@ -346,6 +519,21 @@ private fun RemoveQuestion(account: AccountRow, onRemove: () -> Unit, onCancel: 
 
 /** The corners of an open row: a card of its own, inside the list's rounded group. */
 private val EDITING_CORNER = 20.dp
+
+/** The outer corners of the group the rows make together. */
+private val GROUP_CORNER = 24.dp
+
+/** A lifted row is a card of its own, like an open one. */
+private val LIFTED_CORNER = EDITING_CORNER
+
+/** How high a lifted row rises: the dragged state of Material 3, level 4. */
+private val LIFTED_ELEVATION = 8.dp
+
+/** How much a lifted row grows. Enough to see it is picked up, not so much that it flies. */
+private const val LIFTED_SCALE = 1.02f
+
+/** The space between the edit icon and the drag handle. */
+private val HANDLE_SPACING = 12.dp
 
 /** The emphasis of the rows that wait while another is edited. */
 private const val WAITING_ALPHA = 0.38f

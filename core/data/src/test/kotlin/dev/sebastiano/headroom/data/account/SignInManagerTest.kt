@@ -33,6 +33,8 @@ class SignInManagerTest {
 
         override suspend fun renameAccount(accountId: String, nickname: String?) = Unit
 
+        override suspend fun reorderAccounts(orderedIds: List<String>) = Unit
+
         override suspend fun refresh(accountId: String?) {
             refreshed += accountId
         }

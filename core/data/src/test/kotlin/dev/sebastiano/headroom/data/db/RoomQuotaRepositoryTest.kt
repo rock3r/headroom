@@ -47,7 +47,14 @@ class RoomQuotaRepositoryTest {
     private fun repo(
         fetch: suspend (Account) -> QuotaResult,
         scope: kotlinx.coroutines.CoroutineScope,
-    ) = RoomQuotaRepository(db.quotaDao(), fetch, clock = { now }, scope = scope)
+    ) =
+        RoomQuotaRepository(
+            db.quotaDao(),
+            db.accountOrderDao(),
+            fetch,
+            clock = { now },
+            scope = scope,
+        )
 
     @Test
     fun `a new account shows up with no snapshot until the first refresh`() =
@@ -161,6 +168,7 @@ class RoomQuotaRepositoryTest {
             val repo =
                 RoomQuotaRepository(
                     db.quotaDao(),
+                    db.accountOrderDao(),
                     { QuotaResult.Success(claude.snapshot!!) },
                     { clock },
                     backgroundScope,
@@ -273,4 +281,71 @@ class RoomQuotaRepositoryTest {
             repo.refresh()
             assertEquals(listOf(window), repo.current().single().snapshot!!.windows)
         }
+
+    @Test
+    fun `accounts are listed in the order they were added`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            listOf("zeta", "alpha", "mid").forEach { repo.addAccount(account(it)) }
+
+            assertEquals(listOf("zeta", "alpha", "mid"), repo.current().ids())
+        }
+
+    @Test
+    fun `reordering saves the new order`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            listOf("a", "b", "c").forEach { repo.addAccount(account(it)) }
+
+            repo.reorderAccounts(listOf("c", "a", "b"))
+
+            assertEquals(listOf("c", "a", "b"), repo.current().ids())
+            assertEquals(
+                listOf("c", "a", "b"),
+                repo.accounts.first { it.ids() == listOf("c", "a", "b") }.ids(),
+            )
+            // A new repository over the same database, as after a restart, reads the same order.
+            val reopened = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            assertEquals(listOf("c", "a", "b"), reopened.current().ids())
+        }
+
+    @Test
+    fun `a new account goes last after a reorder`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            listOf("a", "b", "c").forEach { repo.addAccount(account(it)) }
+            repo.reorderAccounts(listOf("c", "a", "b"))
+            repo.removeAccount("b")
+
+            repo.addAccount(account("d"))
+
+            assertEquals(listOf("c", "a", "d"), repo.current().ids())
+        }
+
+    @Test
+    fun `a refresh keeps the order`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            listOf("a", "b").forEach { repo.addAccount(account(it)) }
+            repo.reorderAccounts(listOf("b", "a"))
+
+            repo.refresh()
+
+            assertEquals(listOf("b", "a"), repo.current().ids())
+        }
+
+    @Test
+    fun `accounts missing from a reorder keep their order after the listed ones`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            listOf("a", "b", "c", "d").forEach { repo.addAccount(account(it)) }
+
+            repo.reorderAccounts(listOf("c", "unknown", "a"))
+
+            assertEquals(listOf("c", "a", "b", "d"), repo.current().ids())
+        }
+
+    private fun account(id: String) = Account(id, Provider.Claude, "$id@example.com")
+
+    private fun List<dev.sebastiano.headroom.model.AccountState>.ids() = map { it.account.id }
 }

@@ -77,9 +77,42 @@ class HeadroomDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `accounts saved before they could be reordered keep the order they were added in`() =
+        runTest {
+            file.parentFile?.mkdirs()
+            SQLiteDatabase.openOrCreateDatabase(file, null).use { v3 ->
+                VERSION_1_SCHEMA.forEach(v3::execSQL)
+                v3.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+                v3.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+                v3.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+                v3.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+                // Not in id order, so the test tells rowid order from id order.
+                listOf("zeta", "alpha", "mid").forEach { id ->
+                    v3.execSQL(
+                        "INSERT INTO accounts (id, provider, label) VALUES ('$id', 'claude', '$id')"
+                    )
+                }
+                v3.version = 3
+            }
+
+            val db = openCurrent()
+            try {
+                val accounts = db.quotaDao().accounts()
+                assertEquals(listOf("zeta", "alpha", "mid"), accounts.map { it.id })
+                assertEquals(listOf(0, 1, 2), accounts.map { it.position })
+            } finally {
+                db.close()
+            }
+        }
+
     private fun openCurrent(): HeadroomDatabase =
         Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
-            .addMigrations(HeadroomDatabase.MIGRATION_1_2, HeadroomDatabase.MIGRATION_2_3)
+            .addMigrations(
+                HeadroomDatabase.MIGRATION_1_2,
+                HeadroomDatabase.MIGRATION_2_3,
+                HeadroomDatabase.MIGRATION_3_4,
+            )
             .allowMainThreadQueries()
             .build()
 

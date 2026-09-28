@@ -1,8 +1,6 @@
 package dev.sebastiano.headroom.data.db
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -11,15 +9,13 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 internal interface QuotaDao {
     @Transaction
-    @Query("SELECT * FROM accounts ORDER BY rowid")
+    @Query("SELECT * FROM accounts ORDER BY position, rowid")
     fun observeAccounts(): Flow<List<AccountWithWindows>>
 
-    @Query("SELECT * FROM accounts ORDER BY rowid") suspend fun accounts(): List<AccountEntity>
+    @Query("SELECT * FROM accounts ORDER BY position, rowid")
+    suspend fun accounts(): List<AccountEntity>
 
     @Query("SELECT * FROM accounts WHERE id = :id") suspend fun account(id: String): AccountEntity?
-
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertAccount(account: AccountEntity)
 
     @Upsert suspend fun upsertAccount(account: AccountEntity)
 
@@ -45,7 +41,7 @@ internal interface QuotaDao {
     suspend fun pruneHistory(beforeEpochMs: Long)
 
     @Transaction
-    @Query("SELECT * FROM accounts ORDER BY rowid")
+    @Query("SELECT * FROM accounts ORDER BY position, rowid")
     suspend fun accountsWithWindows(): List<AccountWithWindows>
 
     @Query("UPDATE accounts SET lastError = :error WHERE id = :id")

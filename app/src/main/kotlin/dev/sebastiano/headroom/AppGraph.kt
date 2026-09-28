@@ -68,6 +68,8 @@ class AppGraph(
     val renameAccount: suspend (accountId: String, name: String?) -> Unit = { _, _ -> },
     /** Signs an account out and forgets it. Does nothing without the data layer. */
     val removeAccount: suspend (accountId: String) -> Unit = {},
+    /** Stores the order the user put the accounts in. Does nothing without the data layer. */
+    val reorderAccounts: suspend (orderedIds: List<String>) -> Unit = {},
     /** How often countdowns re-read the clock. Null turns it off, for tests with a fixed clock. */
     val tickInterval: Duration? = Duration.ofMinutes(1),
     /** Used or left, how often to sync in the background, and how the overview sorts accounts. */
@@ -105,6 +107,7 @@ class AppGraph(
                 isDemo = isDemo,
                 renameAccount = renameAccount,
                 removeAccount = removeAccount,
+                reorderAccounts = reorderAccounts,
             )
         }
     }
@@ -174,6 +177,7 @@ class AppGraph(
                 tickInterval = tickInterval,
                 renameAccount = { id, name -> data?.repository?.renameAccount(id, name) },
                 removeAccount = { id -> data?.signInManager?.signOut(id) },
+                reorderAccounts = { ids -> data?.repository?.reorderAccounts(ids) },
                 settings = data?.settings ?: InMemorySettingsRepository(),
                 appVersion = versionName(context),
             )
