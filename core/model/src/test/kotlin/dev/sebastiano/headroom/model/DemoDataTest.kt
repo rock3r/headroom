@@ -20,6 +20,16 @@ class DemoDataTest {
     }
 
     @Test
+    fun `the long demo list adds one account for every other provider`() {
+        val accounts = DemoData.manyAccounts(now)
+
+        assertEquals(DemoData.accounts(now), accounts.take(4))
+        assertEquals(Provider.entries.toSet(), accounts.map { it.account.provider }.toSet())
+        assertEquals(accounts.size, accounts.map { it.account.id }.toSet().size)
+        assertTrue(accounts.all { it.primaryWindow != null })
+    }
+
+    @Test
     fun `the soonest weekly reset in demo data is Grok`() {
         val next = NextReset.find(DemoData.accounts(now), now)
         assertEquals(Provider.Grok, next?.account?.provider)
