@@ -59,7 +59,12 @@ class JetBrainsAccessOptionsTest {
         userManagementSwitch: MockResponse =
             jsonResponse(fixture("jetbrains/switch_audience.json")),
         options: MockResponse = jsonResponse(fixture("jetbrains/ai_access_options.json")),
-        seatAccepts: (form: Map<String, String>) -> Boolean = { true },
+        orgServiceSwitch: MockResponse = jsonResponse("""{"access_token":"$ORG_SERVICE_TOKEN"}"""),
+        orgsUserInfo: MockResponse = jsonResponse("""{"jwt":"$ORGS_JWT"}"""),
+        // Like the real token service, which answers "Parameter 'orgs_user_info' is required".
+        seatAccepts: (form: Map<String, String>) -> Boolean = { form ->
+            form["orgs_user_info"] == ORGS_JWT
+        },
         seatSwitch: (workspaceId: String) -> MockResponse = { workspaceId ->
             jsonResponse("""{"access_token":"${seatToken(workspaceId)}","expires_in":300}""")
         },
@@ -79,6 +84,7 @@ class JetBrainsAccessOptionsTest {
                         TOKEN ->
                             when (form["audience"]) {
                                 "jcp-user-management" -> userManagementSwitch
+                                "org-service" -> orgServiceSwitch
                                 "ai-access" ->
                                     if (seatAccepts(form))
                                         seatSwitch(form["workspace_id"].orEmpty())
@@ -86,6 +92,10 @@ class JetBrainsAccessOptionsTest {
                                 else -> MockResponse(code = 400)
                             }
                         OPTIONS -> options
+                        ORGS_USER_INFO ->
+                            if (request.headers["Authorization"] == bearer(ORG_SERVICE_TOKEN))
+                                orgsUserInfo
+                            else MockResponse(code = 401)
                         LICENSE -> jsonResponse(fixture("jetbrains/license_obtain.json"))
                         ACCESS -> accessFor(request.body?.utf8().orEmpty())
                         QUOTA ->
@@ -196,11 +206,13 @@ class JetBrainsAccessOptionsTest {
             val switches = seatSwitches()
             assertEquals(
                 "grant_type=switch_audience&refresh_token=$REFRESH_TOKEN&audience=ai-access" +
-                    "&client_id=junie-cli&org_id=$ORG_ID&workspace_id=$WORKSPACE_ID",
+                    "&client_id=junie-cli&org_id=$ORG_ID&workspace_id=$WORKSPACE_ID" +
+                    "&orgs_user_info=$ORGS_JWT",
                 switches.first().body?.utf8(),
             )
             assertEquals(ALUMNI_WORKSPACE_ID, switches.last().form()["workspace_id"])
             assertEquals(ALUMNI_ORG_ID, switches.last().form()["org_id"])
+            assertEquals(ORGS_JWT, switches.last().form()["orgs_user_info"])
             for (switch in switches) {
                 assertEquals("POST", switch.method)
                 assertEquals("application/x-www-form-urlencoded", switch.headers["Content-Type"])
@@ -208,16 +220,21 @@ class JetBrainsAccessOptionsTest {
         }
 
     @Test
-    fun `retries a rejected seat token with only the workspace, then only the organisation`() =
+    fun `retries a rejected seat token without the organisation, as the IDE asks for it`() =
         runTest {
             // The token service answers invalid_request when it does not take a parameter.
-            routes(seatAccepts = { form -> "org_id" !in form })
+            routes(seatAccepts = { form -> "org_id" !in form && "orgs_user_info" in form })
 
             val snapshot = fetchSnapshot()
 
             assertEquals(3, snapshot.windows.size)
             val first = seatSwitches().filter { it.form()["workspace_id"] == WORKSPACE_ID }
             assertEquals(listOf(true, false), first.map { "org_id" in it.form() })
+            assertEquals(listOf(ORGS_JWT, ORGS_JWT), first.map { it.form()["orgs_user_info"] })
+            assertTrue(
+                logs.any { "workspace 2 switch-audience, retry without org_id: HTTP 200" in it },
+                logs.toString(),
+            )
             assertTrue(logs.any { "invalid_request" in it }, logs.toString())
         }
 
@@ -228,8 +245,75 @@ class JetBrainsAccessOptionsTest {
         val snapshot = fetchSnapshot()
 
         assertEquals(1, snapshot.windows.size)
-        assertEquals(6, seatSwitches().size)
+        assertEquals(4, seatSwitches().size)
+        assertTrue(seatSwitches().all { "workspace_id" in it.form() }, "a seat token needs one")
     }
+
+    @Test
+    fun `reads the orgs user info JWT once, with an org-service token, like the Junie CLI`() =
+        runTest {
+            routes()
+
+            fetchSnapshot()
+
+            val switch = requests.single {
+                it.target == TOKEN && it.form()["audience"] == "org-service"
+            }
+            assertEquals(
+                "grant_type=switch_audience&refresh_token=$REFRESH_TOKEN" +
+                    "&audience=org-service&client_id=junie-cli",
+                switch.body?.utf8(),
+            )
+            val info = requests.single { it.target == ORGS_USER_INFO }
+            assertEquals("GET", info.method)
+            assertEquals(bearer(ORG_SERVICE_TOKEN), info.headers["Authorization"])
+            assertEquals("application/json", info.headers["Accept"])
+        }
+
+    @Test
+    fun `finds the orgs user info JWT anywhere in the response, as the Junie CLI does`() = runTest {
+        routes(orgsUserInfo = MockResponse(code = 200, body = ORGS_JWT))
+
+        assertEquals(3, fetchSnapshot().windows.size)
+    }
+
+    @Test
+    fun `skips the seats but keeps the licenses when the orgs user info cannot be read`() =
+        runTest {
+            val failures =
+                listOf(
+                    "org-service switch-audience: HTTP 400" to
+                        {
+                            routes(
+                                orgServiceSwitch =
+                                    jsonResponse("""{"error":"invalid_grant"}""", code = 400)
+                            )
+                        },
+                    "orgsuserinfo: HTTP 500" to
+                        {
+                            routes(orgsUserInfo = MockResponse(code = 500, body = "oops"))
+                        },
+                    "orgsuserinfo: response has no JWT" to
+                        {
+                            routes(orgsUserInfo = jsonResponse("""{"orgs":[]}"""))
+                        },
+                )
+            for ((reason, route) in failures) {
+                requests.clear()
+                logs.clear()
+                route()
+
+                val snapshot = fetchSnapshot()
+
+                assertEquals(listOf(LICENSE_LABEL), snapshot.windows.map { it.label })
+                assertTrue(seatSwitches().isEmpty(), "no seat token without orgs_user_info")
+                assertTrue(logs.any { it.startsWith(reason) }, "$reason in $logs")
+                assertTrue(
+                    logs.any { "workspace seats are skipped" in it },
+                    logs.toString(),
+                )
+            }
+        }
 
     @Test
     fun `reads a seat's quota and refill with GET and the seat token`() = runTest {
@@ -467,7 +551,13 @@ class JetBrainsAccessOptionsTest {
 
         fetchSnapshot()
 
-        for (step in listOf("switch-audience", "ai-access-options")) {
+        for (step in
+            listOf(
+                "switch-audience",
+                "ai-access-options",
+                "org-service switch-audience",
+                "orgsuserinfo",
+            )) {
             assertTrue(logs.any { step in it && "HTTP 200" in it }, "$step in $logs")
         }
         for (step in
@@ -519,6 +609,16 @@ class JetBrainsAccessOptionsTest {
             licenseQuota = jsonResponse("""{"message":"$OPTION_LICENSE"}""", code = 404),
         )
         fetchSnapshot()
+        routes(
+            orgServiceSwitch =
+                jsonResponse(
+                    """{"error":"invalid_grant","error_description":"$REFRESH_TOKEN is bad"}""",
+                    code = 400,
+                )
+        )
+        fetchSnapshot()
+        routes(orgsUserInfo = MockResponse(code = 403, body = """{"message":"sam@example.com"}"""))
+        fetchSnapshot()
 
         logs.assertNoSecrets()
     }
@@ -561,6 +661,10 @@ class JetBrainsAccessOptionsTest {
         const val WORKSPACE_ID = "test-workspace-id"
         const val ALUMNI_ORG_ID = "test-alumni-org-id"
         const val ALUMNI_WORKSPACE_ID = "test-alumni-workspace-id"
+        const val ORG_SERVICE_TOKEN = "test-org-service-token"
+
+        /** A made-up JWT: three base64url parts, which is all the reader looks for. */
+        const val ORGS_JWT = "test-orgs-header.test-orgs-payload.test-orgs-signature"
 
         const val LICENSE_LABEL = "JetBrains AI Pro"
         const val WORKSPACE_LABEL = "Example Workspace"
@@ -603,6 +707,8 @@ class JetBrainsAccessOptionsTest {
                     "test-new-refresh-token",
                     "test-jcp-token",
                     "test-seat-token",
+                    ORG_SERVICE_TOKEN,
+                    ORGS_JWT,
                     LITE_LICENSE,
                     "test-workspace-license-id",
                     OPTION_JWT,
@@ -617,6 +723,7 @@ class JetBrainsAccessOptionsTest {
         const val AUTH_TEST = "/auth/test"
         const val TOKEN = "/oauth2/token"
         const val OPTIONS = "/user-management/api/ai-access-options"
+        const val ORGS_USER_INFO = "/org/orgsuserinfo"
         const val LICENSE = "/auth/jetbrains-jwt/license/obtain/grazie-lite"
         const val ACCESS = "/auth/jetbrains-jwt/provide-access/license/v2"
         const val QUOTA = "/user/v5/quota/get"
