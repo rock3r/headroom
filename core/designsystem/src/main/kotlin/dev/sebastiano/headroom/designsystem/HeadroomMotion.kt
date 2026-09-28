@@ -1,8 +1,10 @@
 package dev.sebastiano.headroom.designsystem
 
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +49,25 @@ object HeadroomMotion {
         tween(durationMillis = SCRUB_DURATION_MILLIS, easing = LinearEasing)
 
     private const val SCRUB_DURATION_MILLIS = 350
+
+    /**
+     * For a liquid ripple spreading from a tap. It is linear because a ring on water spreads at a
+     * steady speed; the ripple's shader fades the ring out as it grows, which gives it its ease.
+     */
+    fun <T> rippleSpec(): FiniteAnimationSpec<T> =
+        tween(durationMillis = RIPPLE_DURATION_MILLIS, easing = LinearEasing)
+
+    private const val RIPPLE_DURATION_MILLIS = 800
+
+    /**
+     * For a slow decorative drift that never stops, such as the tilt of the next reset card's
+     * shape. It runs one linear turn of a phase per period, and the caller turns the phase into
+     * motion with a sine, which eases both ends of every swing.
+     */
+    fun <T> driftSpec(): InfiniteRepeatableSpec<T> =
+        infiniteRepeatable(tween(durationMillis = DRIFT_PERIOD_MILLIS, easing = LinearEasing))
+
+    private const val DRIFT_PERIOD_MILLIS = 24_000
 
     /** For fades and colour changes. */
     @Composable
