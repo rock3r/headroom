@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -58,9 +59,24 @@ class SettingsTest {
     }
 
     @Test
-    fun `the settings button opens settings and back returns to the overview`() {
+    fun `settings opens with its title and a close button, and the close button closes it`() {
         openSettings()
-        rule.onNodeWithContentDescription("Back").performClick()
+        rule.onNode(hasText("Settings") and isHeading()).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Close settings").assertIsDisplayed()
+        // The close button takes the place of the back arrow.
+        rule.onNodeWithContentDescription("Back").assertDoesNotExist()
+
+        rule.onNodeWithContentDescription("Close settings").performClick()
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_TAG).assertDoesNotExist()
+        rule.onNodeWithContentDescription("Settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun `system back closes settings`() {
+        openSettings()
+        rule.runOnUiThread { dispatcher.onBackPressed() }
+        rule.waitForIdle()
         rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
         rule.onNodeWithTag(SETTINGS_TAG).assertDoesNotExist()
     }
@@ -94,7 +110,7 @@ class SettingsTest {
         rule.onNodeWithText("Left").assertIsSelected()
         assertEquals(QuotaDisplay.Left, settings.settings.value.quotaDisplay)
 
-        rule.onNodeWithContentDescription("Back").performClick()
+        rule.onNodeWithContentDescription("Close settings").performClick()
 
         rule
             .onNodeWithTag(accountCardTag("demo-claude"))

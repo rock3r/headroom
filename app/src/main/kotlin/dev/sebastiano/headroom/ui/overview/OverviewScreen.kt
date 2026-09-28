@@ -20,8 +20,6 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,15 +34,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
-import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.ResetFormatter
+import dev.sebastiano.headroom.ui.SettingsButton
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.SectionLabel
@@ -76,6 +72,7 @@ fun OverviewScreen(
     selectedAccountId: String? = null,
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
     sharedElements: SharedElements? = null,
+    settingsReveal: PageReveal? = null,
     playEntrance: Boolean = false,
     onEntranceStart: () -> Unit = {},
 ) {
@@ -118,7 +115,7 @@ fun OverviewScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                fullWidth("header") { OverviewHeader(state, onOpenSettings) }
+                fullWidth("header") { OverviewHeader(state, onOpenSettings, settingsReveal) }
                 if (state.isDemo) {
                     fullWidth("demo") { DemoBanner(onAddAccount = onOpenAccounts) }
                 }
@@ -174,7 +171,11 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.fullWidth(
 }
 
 @Composable
-private fun OverviewHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
+private fun OverviewHeader(
+    state: HomeUiState,
+    onOpenSettings: () -> Unit,
+    settingsReveal: PageReveal?,
+) {
     val accounts =
         pluralStringResource(R.plurals.overview_accounts, state.accounts.size, state.accounts.size)
     ScreenHeader(
@@ -186,13 +187,7 @@ private fun OverviewHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
                 syncedText(state.lastSyncedAt, state.now),
             ),
     ) {
-        val settingsLabel = stringResource(R.string.action_settings)
-        IconButton(
-            onClick = onOpenSettings,
-            modifier = Modifier.semantics { contentDescription = settingsLabel },
-        ) {
-            Icon(painter = painterResource(HeadroomIcons.SettingsFilled), contentDescription = null)
-        }
+        SettingsButton(onClick = onOpenSettings, reveal = settingsReveal)
     }
 }
 

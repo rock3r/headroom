@@ -1,8 +1,10 @@
 package dev.sebastiano.headroom.designsystem
 
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -34,6 +36,16 @@ object HeadroomMotion {
         spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = RESET_DRAIN_STIFFNESS)
 
     private const val RESET_DRAIN_STIFFNESS = 110f
+
+    /**
+     * For motion a gesture drives, such as the predictive back gesture scrubbing a transition. It
+     * is linear, so the motion stays under the finger: a spring would run most of its way in the
+     * first part of the gesture. When the finger lifts, the rest plays out over the same duration.
+     */
+    fun <T> scrubSpec(): FiniteAnimationSpec<T> =
+        tween(durationMillis = SCRUB_DURATION_MILLIS, easing = LinearEasing)
+
+    private const val SCRUB_DURATION_MILLIS = 350
 
     /** For fades and colour changes. */
     @Composable

@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui
 
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
@@ -74,10 +75,23 @@ class ScreenshotTest {
     }
 
     private fun capture(name: String) {
+        settle()
+        rule.onRoot().captureRoboImage(screenshot(name))
+    }
+
+    private fun settle() {
         // Robolectric only draws when asked. The wavy ring builds its wave while its sweep-in
         // animation is drawn, so draw every step until transitions and sweeps have settled.
         repeat(SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(STEP_MILLIS)
+            rule.onRoot().captureToImage()
+        }
+    }
+
+    /** Draws [millis] of a transition that is still running, then captures it. */
+    private fun captureMidway(name: String, millis: Long) {
+        repeat((millis / FRAME_MILLIS).toInt()) {
+            rule.mainClock.advanceTimeBy(FRAME_MILLIS)
             rule.onRoot().captureToImage()
         }
         rule.onRoot().captureRoboImage(screenshot(name))
@@ -180,6 +194,31 @@ class ScreenshotTest {
     }
 
     @Test
+    fun settingsOpening() {
+        launch()
+        settle()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        captureMidway("settings-opening", REVEAL_MIDWAY_MILLIS)
+    }
+
+    @Test
+    fun settingsBackGesture() {
+        launch()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        settle()
+        val dispatcher = rule.activity.onBackPressedDispatcher
+        rule.runOnUiThread { dispatcher.dispatchOnBackStarted(backEvent(0f)) }
+        // A finger moves over several frames; each frame brings a little more progress.
+        repeat(BACK_STEPS) { step ->
+            rule.mainClock.advanceTimeBy(FRAME_MILLIS)
+            rule.onRoot().captureToImage()
+            val progress = BACK_PROGRESS * (step + 1) / BACK_STEPS
+            rule.runOnUiThread { dispatcher.dispatchOnBackProgressed(backEvent(progress)) }
+        }
+        captureMidway("settings-back-gesture", FRAME_MILLIS * 2)
+    }
+
+    @Test
     fun licences() {
         launch()
         // Two steps in a row, and the licence list loads off the main thread: let the clock run.
@@ -267,6 +306,15 @@ class ScreenshotTest {
 private const val GROK_INDEX = 6
 private const val SETTLE_STEPS = 40
 private const val STEP_MILLIS = 50L
+private const val FRAME_MILLIS = 16L
+/** Part-way through the reveal into Settings, while the circle is still growing. */
+private const val REVEAL_MIDWAY_MILLIS = 64L
+private const val BACK_PROGRESS = 0.5f
+private const val BACK_STEPS = 10
+
+private fun backEvent(progress: Float) =
+    BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)
+
 /** The licence data is read from resources off the main thread. */
 private const val LOAD_TIMEOUT_MILLIS = 5_000L
 /** 24dp at xxhdpi, the height of a phone status bar. */

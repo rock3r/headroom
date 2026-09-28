@@ -3,7 +3,11 @@ package dev.sebastiano.headroom.ui
 import android.content.ClipData
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,6 +23,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.signin.SignInState
@@ -112,26 +118,23 @@ fun HeadroomApp(
             }
             .withDeviceActions()
 
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Box(modifier = modifier.fillMaxSize()) {
         // Inside a sign-in, the accounts screen handles back itself, one step at a time.
         val back =
             (if (shown == Page.Accounts && accountsFromSettings) Page.Settings else shown.back)
                 .takeIf { shown != Page.Accounts || accounts.step == AccountsStep.List }
         val pageTransition = rememberPageTransition(shown, back) { page = it }
-        rememberTransition(pageTransition, label = "page").AnimatedContent(
-            transitionSpec = {
-                (fadeIn(effects) + scaleIn(effects, initialScale = ENTER_SCALE)) togetherWith
-                    fadeOut(fast)
-            }
-        ) { current ->
+        Pages(
+            transition = rememberTransition(pageTransition.state, label = "page"),
+            scrubbing = pageTransition.scrubbing,
+        ) { current, reveal ->
             when (current) {
                 Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
                 Page.Settings ->
                     SettingsPage(
                         settings = settings,
                         home = home,
+                        reveal = reveal,
                         onQuotaDisplayChange = settingsViewModel::setQuotaDisplay,
                         onSyncFrequencyChange = settingsViewModel::setSyncFrequency,
                         onNavigate = { next ->
@@ -158,6 +161,7 @@ fun HeadroomApp(
                             dropPending()
                             page = Page.Settings
                         },
+                        settingsReveal = reveal,
                         playEntrance = !entrancePlayed,
                         onEntranceStart = { entrancePlayed = true },
                         openAccountRequest = openNow,
@@ -180,6 +184,57 @@ fun HeadroomApp(
 
 private const val ENTER_SCALE = 0.96f
 
+/**
+ * The pages, one over the other. Settings opens from the overview with a circular reveal from the
+ * settings button (see [SettingsReveal]); every other page fades and scales in. With motion reduced
+ * or off, every page crossfades.
+ */
+@Composable
+private fun Pages(
+    transition: Transition<Page>,
+    scrubbing: Boolean,
+    content: @Composable (Page, PageReveal) -> Unit,
+) {
+    val animate = animationsEnabled()
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val revealing = animate && transition.isBetween(Page.Home, Page.Settings)
+    SharedTransitionLayout {
+        val reveal = remember(this) { SettingsReveal(this) }
+        transition.AnimatedContent(
+            transitionSpec = {
+                when {
+                    !animate -> fadeIn(fast) togetherWith fadeOut(fast)
+                    // Settings grows over the overview, which stays still underneath it.
+                    initialState == Page.Home && targetState == Page.Settings ->
+                        EnterTransition.None togetherWith
+                            ExitTransition.KeepUntilTransitionsFinished
+                    initialState == Page.Settings && targetState == Page.Home ->
+                        (EnterTransition.None togetherWith
+                                ExitTransition.KeepUntilTransitionsFinished)
+                            .apply { targetContentZIndex = -1f }
+                    else ->
+                        (fadeIn(effects) +
+                            scaleIn(effects, initialScale = ENTER_SCALE)) togetherWith fadeOut(fast)
+                }
+            }
+        ) { current ->
+            val scope = this
+            val pageReveal =
+                remember(reveal, scope, revealing, animate, scrubbing) {
+                    PageReveal(reveal, scope, revealing, animate, scrubbing)
+                }
+            val clip = rememberRevealClip(pageReveal, enabled = current == Page.Settings)
+            Box(modifier = Modifier.revealClip(clip)) { content(current, pageReveal) }
+        }
+    }
+}
+
+/** True while this transition runs between [first] and [second], in either direction. */
+private fun Transition<Page>.isBetween(first: Page, second: Page): Boolean =
+    (currentState == first && targetState == second) ||
+        (currentState == second && targetState == first)
+
 /** Snackbars sit above the floating toolbar. */
 @Composable
 private fun AppSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modifier) {
@@ -194,6 +249,7 @@ private fun AppSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modif
 private fun SettingsPage(
     settings: SettingsUiState,
     home: HomeUiState,
+    reveal: PageReveal,
     onQuotaDisplayChange: (QuotaDisplay) -> Unit,
     onSyncFrequencyChange: (SyncFrequency) -> Unit,
     onNavigate: (Page) -> Unit,
@@ -203,12 +259,13 @@ private fun SettingsPage(
         accounts = SettingsAccounts(home.accounts.map { it.provider }, home.isDemo),
         actions =
             SettingsActions(
-                onBack = { onNavigate(Page.Home) },
+                onClose = { onNavigate(Page.Home) },
                 onQuotaDisplayChange = onQuotaDisplayChange,
                 onSyncFrequencyChange = onSyncFrequencyChange,
                 onOpenLicences = { onNavigate(Page.Licences) },
                 onOpenAccounts = { onNavigate(Page.Accounts) },
             ),
+        reveal = reveal,
     )
 }
 
@@ -228,30 +285,47 @@ private fun AccountsActions.withDeviceActions(): AccountsActions {
 
 /**
  * The transition between the pages, seekable so the predictive back gesture scrubs the page on top
- * away, towards [back]. [onBack] runs when the gesture completes; a cancelled gesture settles back
- * on [shown].
+ * away. [scrubbing] is true from the start of a back gesture until the pages settle, so the reveal
+ * can follow the finger one to one.
+ */
+@Stable
+private class PageTransition(initial: Page) {
+    val state = SeekableTransitionState(initial)
+    var scrubbing by mutableStateOf(false)
+}
+
+/**
+ * The page transition, scrubbed by the predictive back gesture towards [back]. [onBack] runs when
+ * the gesture completes; a cancelled gesture settles back on [shown].
  */
 @Composable
 private fun rememberPageTransition(
     shown: Page,
     back: Page?,
     onBack: (Page) -> Unit,
-): SeekableTransitionState<Page> {
-    val transition = remember { SeekableTransitionState(shown) }
+): PageTransition {
+    val pages = remember { PageTransition(shown) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(shown) { transition.animateTo(shown) }
+    LaunchedEffect(shown) {
+        pages.state.animateTo(shown)
+        pages.scrubbing = false
+    }
     PredictiveBackHandler(enabled = back != null) { gesture ->
         val target = back ?: return@PredictiveBackHandler
+        pages.scrubbing = true
         try {
-            gesture.collect { event -> transition.seekTo(event.progress, target) }
+            gesture.collect { event -> pages.state.seekTo(event.progress, target) }
             onBack(target)
         } catch (cancelled: CancellationException) {
             // The gesture's coroutine is cancelled; settle back from a live scope.
-            scope.launch { transition.animateTo(shown) }
+            scope.launch {
+                pages.state.animateTo(shown)
+                pages.scrubbing = false
+            }
             throw cancelled
         }
     }
-    return transition
+    return pages
 }
 
 /** The home scaffold, or a page drawn over it. Back from a page goes to [back]. */
