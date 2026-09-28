@@ -5,7 +5,7 @@
     <!-- Navigation -->
     <string name="tab_overview">Overview</string>
     <string name="tab_resets">Resets</string>
-    <string name="tab_widgets">Widgets</string>
+    <string name="tab_stats">Stats</string>
     <string name="action_refresh">Refresh</string>
     <string name="action_refreshing">Refreshing</string>
     <string name="action_back">Back</string>
@@ -137,9 +137,68 @@
     <string name="resets_legend_current">This window so far</string>
     <string name="resets_none">No weekly or monthly limits to show yet.</string>
 
+    <!-- Stats -->
+    <string name="stats_title">Stats</string>
+    <plurals name="stats_subtitle_days">
+        <item quantity="one">From %d day of history</item>
+        <item quantity="other">From %d days of history</item>
+    </plurals>
+    <string name="stats_subtitle_today">From today\'s history</string>
+    <string name="stats_subtitle_none">No history yet. It builds up with every sync.</string>
+    <string name="stats_subtitle_demo">Example stats from demo data</string>
+    <string name="stats_loading">Reading your history</string>
+    <string name="stats_scope_note">Each account counts its main limit: the weekly one, or the longest.</string>
+    <string name="stats_resets_title">Clean resets</string>
+    <string name="stats_resets_count">%1$d of %2$d</string>
+    <string name="stats_resets_body">resets came without hitting the limit</string>
+    <string name="stats_resets_streak">in a row</string>
+    <string name="stats_resets_legend">One mark per reset, oldest first. Squares hit the limit.</string>
+    <plurals name="stats_resets_description">
+        <item quantity="one">%1$d of %2$d reset came without hitting the limit. Current streak: %3$d.</item>
+        <item quantity="other">%1$d of %2$d resets came without hitting the limit. Current streak: %3$d.</item>
+    </plurals>
+    <string name="stats_resets_empty">No resets recorded yet. This fills in once a limit resets.</string>
+    <string name="stats_shares_title">Who works hardest</string>
+    <string name="stats_shares_headline">%1$s does %2$d%% of the work</string>
+    <string name="stats_shares_note">Share of all the quota burned, in percentage points of each limit.</string>
+    <string name="stats_shares_description">Share of the quota burned: %1$s</string>
+    <string name="stats_shares_empty">Nothing burned yet. This fills in after a few syncs.</string>
+    <string name="stats_share_item">%1$s %2$d%%</string>
+    <string name="stats_heatmap_title">When you burn quota</string>
+    <string name="stats_heatmap_busiest">Busiest on %1$s around %2$s</string>
+    <string name="stats_heatmap_note">Local time, all accounts together. Darker means more quota used.</string>
+    <string name="stats_heatmap_description">Quota use by day and hour, in local time. Busiest on %1$s around %2$s. By day: %3$s.</string>
+    <string name="stats_heatmap_empty">Needs a week of history.</string>
+    <plurals name="stats_heatmap_empty_days">
+        <item quantity="one">Needs a week of history. %d day so far.</item>
+        <item quantity="other">Needs a week of history. %d days so far.</item>
+    </plurals>
+    <string name="stats_persona_early_bird">Early bird</string>
+    <string name="stats_persona_nine_to_five">Nine to five</string>
+    <string name="stats_persona_evening">Evening hacker</string>
+    <string name="stats_persona_night_owl">Night owl</string>
+    <string name="stats_persona_weekend">Weekend warrior</string>
+    <string name="stats_closest_title">Closest call</string>
+    <string name="stats_closest_body">%1$s reached %2$d%% on %3$s, then the limit reset.</string>
+    <string name="stats_closest_empty">Appears once a limit resets.</string>
+    <string name="stats_closest_all_hits">Every recorded reset hit the limit. No close calls, only direct hits.</string>
+    <string name="stats_biggest_title">Biggest day</string>
+    <string name="stats_biggest_body">%1$s used %2$d%% of its limit in one day, on %3$s.</string>
+    <string name="stats_biggest_empty">No busy days yet. This fills in after a few syncs.</string>
+    <string name="stats_leftover_title">Left on the table</string>
+    <plurals name="stats_leftover_body">
+        <item quantity="one">left unused, on average, when a limit reset. From %d reset.</item>
+        <item quantity="other">left unused, on average, when a limit reset. From %d resets.</item>
+    </plurals>
+    <string name="stats_leftover_description">On average, %1$d%% of each limit was left unused at reset. %2$s.</string>
+    <string name="stats_leftover_empty">No resets yet, so nothing was left on the table.</string>
+    <string name="stats_sparklines_title">Last 7 days</string>
+    <string name="stats_sparklines_note">Drops are resets.</string>
+    <string name="stats_sparkline_description">%1$s over the last 7 days: lowest %2$d%%, highest %3$d%%, %4$d%% now</string>
+    <string name="stats_sparkline_empty">No history in the last 7 days</string>
+    <string name="stats_sparklines_empty">No accounts to chart yet.</string>
+
     <!-- Widgets -->
-    <string name="widgets_title">Widgets</string>
-    <string name="widgets_subtitle">Put your headroom on the home screen</string>
     <string name="widget_rings_title">Rings · 2×2</string>
     <string name="widget_rings_body">One account shows weekly outside and session inside. Two to four accounts show a grid of small rings.</string>
     <string name="widget_bars_title">Bars · 4×1 to 4×3</string>
@@ -148,10 +207,8 @@
     <string name="widget_shape_body">A Material shape that changes as the limit fills up. The number always stays.</string>
     <string name="widget_countdown_title">Countdown · 2×2</string>
     <string name="widget_countdown_body">Counts down to the next weekly reset of the accounts you choose.</string>
-    <string name="widget_add">Add to home screen</string>
     <string name="widget_add_description">Add the %1$s widget to the home screen</string>
     <string name="widget_add_unavailable">Your launcher cannot add widgets from apps. Add it from the home screen instead.</string>
-    <string name="widget_countdown_label">Next weekly reset</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -187,6 +244,8 @@
     <string name="settings_sync_hours_6">Every 6 hours</string>
     <string name="settings_sync_on_open">Only when I open the app</string>
     <string name="settings_sync_note">Reset alerts arrive on time whatever you choose here.</string>
+    <string name="settings_widgets">Home screen widgets</string>
+    <string name="settings_widgets_note">Tap a style to add it. You can also add widgets from your home screen\'s widget list.</string>
     <string name="settings_about">About</string>
     <string name="settings_accounts">Accounts</string>
     <string name="settings_accounts_row">Your accounts</string>

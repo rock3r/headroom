@@ -27,4 +27,13 @@ class ResetPeaksTest {
     fun `small wobbles are not resets`() {
         assertEquals(emptyList<Double>(), ResetPeaks.usedAtResets(points(40.0, 38.0, 45.0)))
     }
+
+    @Test
+    fun `each reset keeps the time its peak was first reached`() {
+        val history = points(10.0, 90.0, 90.0, 88.0, 2.0, 40.0, 5.0)
+        assertEquals(
+            listOf(history[1], history[5]),
+            ResetPeaks.resets(history),
+        )
+    }
 }

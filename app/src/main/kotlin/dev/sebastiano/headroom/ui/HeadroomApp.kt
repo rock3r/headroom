@@ -56,11 +56,15 @@ import dev.sebastiano.headroom.ui.settings.SettingsAccounts
 import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
+import dev.sebastiano.headroom.ui.stats.StatsScreen
+import dev.sebastiano.headroom.ui.stats.StatsViewModel
+import dev.sebastiano.headroom.widgets.WidgetPinner
+import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 
 /**
- * The whole app: the home scaffold (overview, resets, widgets, and the account detail), and the
+ * The whole app: the home scaffold (overview, resets, stats, and the account detail), and the
  * accounts and settings pages on top of it. State comes from the view models; this composable only
  * wires it to the screens.
  */
@@ -73,15 +77,15 @@ fun HeadroomApp(
     homeViewModel: HomeViewModel = viewModel(factory = graph.homeViewModelFactory),
     accountsViewModel: AccountsViewModel = viewModel(factory = graph.accountsViewModelFactory),
     settingsViewModel: SettingsViewModel = viewModel(factory = graph.settingsViewModelFactory),
+    statsViewModel: StatsViewModel = viewModel(factory = graph.statsViewModelFactory),
 ) {
     val home by homeViewModel.state.collectAsStateWithLifecycle()
     val detail by homeViewModel.detail.collectAsStateWithLifecycle()
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
     val formatter = rememberResetFormatter(graph.zone)
-    val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
-    val widgetUnavailable = stringResource(R.string.widget_add_unavailable)
+    val addWidget = rememberWidgetAdder(graph.widgetPinner, snackbar)
     var page by rememberSaveable { mutableStateOf(Page.Home) }
     // Accounts open from Settings, or from the demo banner's shortcut; back returns there.
     var accountsFromSettings by rememberSaveable { mutableStateOf(false) }
@@ -135,7 +139,7 @@ fun HeadroomApp(
                                 home.isDemo,
                             ),
                         actions =
-                            settingsActions(settingsViewModel) { next ->
+                            settingsActions(settingsViewModel, addWidget) { next ->
                                 if (next == Page.Accounts) accountsFromSettings = true
                                 page = next
                             },
@@ -170,10 +174,10 @@ fun HeadroomApp(
                             page = Page.Home
                             onConsumeOpenAccount()
                         },
-                        onAddWidget = { style ->
-                            if (!graph.widgetPinner.requestPin(style)) {
-                                scope.launch { snackbar.showSnackbar(widgetUnavailable) }
-                            }
+                        stats = { bottomPadding ->
+                            // Collected only while the tab shows: no stats work off screen.
+                            val stats by statsViewModel.state.collectAsStateWithLifecycle()
+                            StatsScreen(stats, formatter, bottomPadding = bottomPadding)
                         },
                     )
             }
@@ -183,6 +187,21 @@ fun HeadroomApp(
 }
 
 private const val ENTER_SCALE = 0.96f
+
+/** Asks [pinner] for a widget, and says so in [snackbar] when the launcher cannot add it. */
+@Composable
+private fun rememberWidgetAdder(
+    pinner: WidgetPinner,
+    snackbar: SnackbarHostState,
+): (WidgetStyle) -> Unit {
+    val scope = rememberCoroutineScope()
+    val unavailable = stringResource(R.string.widget_add_unavailable)
+    return remember(pinner, snackbar, unavailable) {
+        { style ->
+            if (!pinner.requestPin(style)) scope.launch { snackbar.showSnackbar(unavailable) }
+        }
+    }
+}
 
 /**
  * The pages, one over the other. Settings opens from the overview with a circular reveal from the
@@ -244,8 +263,15 @@ private fun AppSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modif
     )
 }
 
-/** The settings screen's callbacks, wired to [viewModel]; [onNavigate] goes to another page. */
-private fun settingsActions(viewModel: SettingsViewModel, onNavigate: (Page) -> Unit) =
+/**
+ * The settings screen's callbacks, wired to [viewModel]; [onAddWidget] pins a widget and
+ * [onNavigate] goes to another page.
+ */
+private fun settingsActions(
+    viewModel: SettingsViewModel,
+    onAddWidget: (WidgetStyle) -> Unit,
+    onNavigate: (Page) -> Unit,
+) =
     SettingsActions(
         onClose = { onNavigate(Page.Home) },
         onQuotaDisplayChange = viewModel::setQuotaDisplay,
@@ -255,6 +281,7 @@ private fun settingsActions(viewModel: SettingsViewModel, onNavigate: (Page) -> 
         onThemeChange = viewModel::setTheme,
         onMotionChange = viewModel::setMotion,
         onPaletteChange = viewModel::setPalette,
+        onAddWidget = onAddWidget,
     )
 
 /** These actions, with copying to the clipboard and opening links in a browser tab wired up. */

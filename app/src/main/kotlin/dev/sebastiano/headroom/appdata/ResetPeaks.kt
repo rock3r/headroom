@@ -11,19 +11,25 @@ import kotlinx.coroutines.flow.map
 /** Reads "how much was used when each window reset" out of the stored usage history. */
 internal object ResetPeaks {
     /** A drop smaller than this is noise, not a reset. */
-    private const val MIN_DROP_POINTS = 5.0
+    const val MIN_DROP_POINTS: Double = 5.0
 
     /** The highest usage before each drop, oldest first. The window still running is left out. */
-    fun usedAtResets(points: List<UsagePoint>): List<Double> {
-        val peaks = mutableListOf<Double>()
-        var peak: Double? = null
+    fun usedAtResets(points: List<UsagePoint>): List<Double> = resets(points).map { it.usedPercent }
+
+    /**
+     * The highest point before each drop, oldest first, with the time it was first reached. The
+     * window still running is left out.
+     */
+    fun resets(points: List<UsagePoint>): List<UsagePoint> {
+        val peaks = mutableListOf<UsagePoint>()
+        var peak: UsagePoint? = null
         for (point in points) {
             val current = peak
-            if (current != null && current - point.usedPercent >= MIN_DROP_POINTS) {
+            if (current != null && current.usedPercent - point.usedPercent >= MIN_DROP_POINTS) {
                 peaks += current
-                peak = point.usedPercent
-            } else {
-                peak = maxOf(current ?: point.usedPercent, point.usedPercent)
+                peak = point
+            } else if (current == null || point.usedPercent > current.usedPercent) {
+                peak = point
             }
         }
         return peaks

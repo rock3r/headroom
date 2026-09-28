@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -55,6 +56,7 @@ import dev.sebastiano.headroom.ui.SettingsTitle
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.revealContentEntrance
+import dev.sebastiano.headroom.widgets.WidgetStyle
 
 const val SETTINGS_TAG: String = "settings"
 
@@ -67,6 +69,8 @@ const val SETTINGS_LIST_TAG: String = "settings-list"
 
 fun syncFrequencyTag(frequency: SyncFrequency): String = "sync-frequency-${frequency.name}"
 
+fun addWidgetTag(style: WidgetStyle): String = "add-widget-${style.name}"
+
 /** Callbacks of the settings screen. */
 data class SettingsActions(
     /** Closes Settings, back to the overview. */
@@ -78,13 +82,15 @@ data class SettingsActions(
     val onThemeChange: (ThemeMode) -> Unit = {},
     val onMotionChange: (MotionPreference) -> Unit = {},
     val onPaletteChange: (ThemePalette) -> Unit = {},
+    /** Asks the launcher to add a widget of this style to the home screen. */
+    val onAddWidget: (WidgetStyle) -> Unit = {},
 )
 
 /**
  * The app settings: the accounts, used or left, the appearance (light or dark, the colours and
- * reduced motion), how often to sync in the background, the open-source licences and the app
- * version. It closes with the close button in its header, which the overview's settings button
- * turns into. The caller handles back, with the predictive back gesture.
+ * reduced motion), how often to sync in the background, the home screen widgets, the open-source
+ * licences and the app version. It closes with the close button in its header, which the overview's
+ * settings button turns into. The caller handles back, with the predictive back gesture.
  */
 @Composable
 fun SettingsScreen(
@@ -112,6 +118,16 @@ fun SettingsScreen(
             item {
                 Text(
                     text = stringResource(R.string.settings_sync_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = width.padding(horizontal = 6.dp),
+                )
+            }
+            item { SectionLabel(stringResource(R.string.settings_widgets), width) }
+            item { WidgetList(actions.onAddWidget, width) }
+            item {
+                Text(
+                    text = stringResource(R.string.settings_widgets_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = width.padding(horizontal = 6.dp),
@@ -295,6 +311,60 @@ private fun SyncFrequencyList(
         }
     }
 }
+
+/** One row per widget style; a tap asks the launcher to add that widget to the home screen. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun WidgetList(onAddWidget: (WidgetStyle) -> Unit, modifier: Modifier = Modifier) {
+    val styles = WidgetStyle.entries
+    val colors =
+        ListItemDefaults.segmentedColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
+    ) {
+        styles.forEachIndexed { index, style ->
+            val title = stringResource(style.title)
+            SegmentedListItem(
+                onClick = { onAddWidget(style) },
+                shapes = ListItemDefaults.segmentedShapes(index = index, count = styles.size),
+                colors = colors,
+                supportingContent = { Text(stringResource(style.body)) },
+                trailingContent = {
+                    Icon(
+                        painter = painterResource(HeadroomIcons.Add),
+                        contentDescription = stringResource(R.string.widget_add_description, title),
+                    )
+                },
+                modifier = Modifier.testTag(addWidgetTag(style)),
+            ) {
+                Text(title)
+            }
+        }
+    }
+}
+
+private val WidgetStyle.title: Int
+    @StringRes
+    get() =
+        when (this) {
+            WidgetStyle.Rings -> R.string.widget_rings_title
+            WidgetStyle.Bars -> R.string.widget_bars_title
+            WidgetStyle.Shape -> R.string.widget_shape_title
+            WidgetStyle.Countdown -> R.string.widget_countdown_title
+        }
+
+private val WidgetStyle.body: Int
+    @StringRes
+    get() =
+        when (this) {
+            WidgetStyle.Rings -> R.string.widget_rings_body
+            WidgetStyle.Bars -> R.string.widget_bars_body
+            WidgetStyle.Shape -> R.string.widget_shape_body
+            WidgetStyle.Countdown -> R.string.widget_countdown_body
+        }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

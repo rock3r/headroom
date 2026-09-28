@@ -18,9 +18,9 @@ The recording is also available as a [video](docs/media/demo.mp4). It shows demo
 
 ## Screenshots
 
-| Overview | Account detail | Resets | Widgets |
+| Overview | Account detail | Resets | Stats |
 |---|---|---|---|
-| ![Overview](docs/screenshots/overview.png) | ![Detail](docs/screenshots/detail.png) | ![Resets](docs/screenshots/resets.png) | ![Widgets](docs/screenshots/widgets.png) |
+| ![Overview](docs/screenshots/overview.png) | ![Detail](docs/screenshots/detail.png) | ![Resets](docs/screenshots/resets.png) | ![Stats](docs/screenshots/stats.png) |
 
 | Dark theme | Accounts | Sign-in with a device code |
 |---|---|---|
@@ -56,7 +56,11 @@ Android 16 widget player.
   the account again and notifies you only if the reset really happened. Session and daily limits
   never alert; monthly ones can be turned on.
 - **Widgets for the home screen and the lock screen.** There are four styles (Rings, Bars, Shape
-  and Countdown), and each widget remembers its own accounts, window and colours.
+  and Countdown), and each widget remembers its own accounts, window and colours. Settings can
+  add any style to the home screen.
+- **Stats.** The Stats tab reads the usage history stored on the device: how many resets came
+  without hitting the limit, each provider's share of the quota burned, the hours you use most,
+  the closest call, the headroom left at resets, and a 7-day line per account.
 - **Adaptive layouts.** Phones get a floating toolbar; foldables and tablets get a navigation rail,
   and on wide screens the list and the detail show side by side.
 - **Demo mode.** With no account signed in, the app shows clearly labelled example data.
