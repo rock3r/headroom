@@ -52,6 +52,12 @@ class SettingsTest {
     }
 
     @Test
+    fun `the delights are on until the user turns them off`() {
+        assertEquals(true, AppSettings().refreshShimmer)
+        assertEquals(true, AppSettings().resetConfetti)
+    }
+
+    @Test
     fun `there are eight fixed palettes besides the wallpaper`() {
         assertEquals(8, ThemePalette.entries.count { it != ThemePalette.Wallpaper })
     }
@@ -66,6 +72,8 @@ class SettingsTest {
             repository.setMotion(MotionPreference.Reduced)
             repository.setPalette(ThemePalette.Lagoon)
             repository.setOverviewSort(OverviewSort.SoonestResetFirst)
+            repository.setRefreshShimmer(false)
+            repository.setResetConfetti(false)
             assertEquals(
                 AppSettings(
                     QuotaDisplay.Left,
@@ -74,6 +82,8 @@ class SettingsTest {
                     motion = MotionPreference.Reduced,
                     palette = ThemePalette.Lagoon,
                     overviewSort = OverviewSort.SoonestResetFirst,
+                    refreshShimmer = false,
+                    resetConfetti = false,
                 ),
                 repository.settings.value,
             )

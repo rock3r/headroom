@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
+import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
@@ -84,13 +85,16 @@ data class SettingsActions(
     val onPaletteChange: (ThemePalette) -> Unit = {},
     /** Asks the launcher to add a widget of this style to the home screen. */
     val onAddWidget: (WidgetStyle) -> Unit = {},
+    val onRefreshShimmerChange: (Boolean) -> Unit = {},
+    val onResetConfettiChange: (Boolean) -> Unit = {},
 )
 
 /**
  * The app settings: the accounts, used or left, the appearance (light or dark, the colours and
- * reduced motion), how often to sync in the background, the home screen widgets, the open-source
- * licences and the app version. It closes with the close button in its header, which the overview's
- * settings button turns into. The caller handles back, with the predictive back gesture.
+ * reduced motion), the delights, how often to sync in the background, the home screen widgets, the
+ * open-source licences and the app version. It closes with the close button in its header, which
+ * the overview's settings button turns into. The caller handles back, with the predictive back
+ * gesture.
  */
 @Composable
 fun SettingsScreen(
@@ -102,6 +106,9 @@ fun SettingsScreen(
 ) {
     // Everything below the header arrives with the reveal: see revealContentEntrance.
     val entrance = Modifier.revealContentEntrance(reveal)
+    // The delights do not play with reduced motion: the in-app switch, or animations off on the
+    // device. The section says so.
+    val animate = animationsEnabled()
     Surface(modifier = modifier.fillMaxSize().testTag(SETTINGS_TAG)) {
         PageScaffold(onClose = actions.onClose, reveal = reveal) {
             val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().then(entrance)
@@ -113,6 +120,26 @@ fun SettingsScreen(
             item { ThemePicker(state.theme, actions.onThemeChange, width) }
             item { PalettePicker(state.palette, actions.onPaletteChange, width) }
             item { ReduceMotionRow(state.motion, actions.onMotionChange, width) }
+            item { SectionLabel(stringResource(R.string.settings_delights), width) }
+            item {
+                DelightsList(
+                    refreshShimmer = state.refreshShimmer,
+                    resetConfetti = state.resetConfetti,
+                    onRefreshShimmerChange = actions.onRefreshShimmerChange,
+                    onResetConfettiChange = actions.onResetConfettiChange,
+                    modifier = width,
+                )
+            }
+            if (!animate) {
+                item {
+                    Text(
+                        text = stringResource(R.string.settings_delights_reduced),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = width.padding(horizontal = 6.dp),
+                    )
+                }
+            }
             item { SectionLabel(stringResource(R.string.settings_sync), width) }
             item { SyncFrequencyList(state.syncFrequency, actions.onSyncFrequencyChange, width) }
             item {

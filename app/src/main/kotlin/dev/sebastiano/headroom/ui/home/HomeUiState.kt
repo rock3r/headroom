@@ -36,6 +36,8 @@ data class HomeUiState(
     val sortLoaded: Boolean = true,
     /** The accounts in the repository's order, for the screens that do not follow the sort. */
     val accountsInYourOrder: List<AccountSummary> = accounts,
+    /** Resets seen while the app was open whose confetti has not played yet. */
+    val resetBursts: List<ResetBurst> = emptyList(),
 )
 
 @Immutable

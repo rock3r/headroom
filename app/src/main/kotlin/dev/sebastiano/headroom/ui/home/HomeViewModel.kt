@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -101,11 +102,19 @@ class HomeViewModel(
             if (histories.isEmpty()) flowOf(emptyMap()) else combine(histories) { it.toMap() }
         }
 
-    private val resetTracker = ResetTracker()
+    private val resetTracker = ResetTracker(sessionStart = clock())
+
+    /** Resets seen live that still wait for their confetti; see [onResetBurstShown]. */
+    private val resetBursts = MutableStateFlow<List<ResetBurst>>(emptyList())
 
     /** The accounts, with the ids of those whose weekly window reset while the app was open. */
     private val accountsWithResets: Flow<Pair<List<AccountState>, Set<String>>> =
-        repository.accounts.map { it to resetTracker.update(it) }
+        repository.accounts.map { accounts ->
+            val justReset = resetTracker.update(accounts)
+            val live = resetTracker.lastLiveResets
+            if (live.isNotEmpty()) resetBursts.update { it + live }
+            accounts to justReset
+        }
 
     private val choices: Flow<Pair<QuotaDisplay, OverviewSort>> =
         combine(quotaDisplay, overviewSort) { display, sort -> display to sort }
@@ -121,11 +130,12 @@ class HomeViewModel(
         }
 
     val state: StateFlow<HomeUiState> =
-        combine(accountsWithResets, alerts, pastResets, environment) {
+        combine(accountsWithResets, alerts, pastResets, environment, resetBursts) {
                 (accounts, justReset),
                 switches,
                 history,
-                env ->
+                env,
+                bursts ->
                 homeUiState(
                         accounts = accounts,
                         now = env.now,
@@ -142,6 +152,7 @@ class HomeViewModel(
                             accounts = home.accounts.sortedFor(env.sort),
                             overviewSort = env.sort,
                             accountsInYourOrder = home.accounts,
+                            resetBursts = bursts,
                         )
                     }
             }
@@ -222,6 +233,13 @@ class HomeViewModel(
                 refreshing.value = false
             }
         }
+    }
+
+    /**
+     * The confetti for [accountId]'s reset has played, or was skipped: it is not asked for again.
+     */
+    fun onResetBurstShown(accountId: String) {
+        resetBursts.update { bursts -> bursts.filterNot { it.accountId == accountId } }
     }
 
     fun setAlert(accountId: String, windowId: String, enabled: Boolean) {
