@@ -243,4 +243,34 @@ class RoomQuotaRepositoryTest {
             assertEquals(1234.5, repo.current().single().snapshot!!.balance!!.amount)
             assertEquals("credits", repo.current().single().snapshot!!.balance!!.unit)
         }
+
+    @Test
+    fun `a window's credit amounts survive storage`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val jetbrains = Account("jb", Provider.JetBrains, "sam@example.com")
+            val window =
+                dev.sebastiano.headroom.model.QuotaWindow(
+                    id = "jb:ws:0123456789ab",
+                    label = "JetBrains Team",
+                    kind = dev.sebastiano.headroom.model.WindowKind.Monthly,
+                    usedPercent = 6.0,
+                    resetsAt = now.plus(Duration.ofDays(10)),
+                    length = Duration.ofDays(30),
+                    usedAmount = 12.0,
+                    limitAmount = 200.0,
+                    amountUnit = "credits",
+                )
+            val snapshot =
+                dev.sebastiano.headroom.model.QuotaSnapshot(
+                    provider = Provider.JetBrains,
+                    accountId = "jb",
+                    planLabel = "JetBrains AI Pro",
+                    windows = listOf(window),
+                    fetchedAt = now,
+                )
+            val repo = repo({ QuotaResult.Success(snapshot) }, backgroundScope)
+            repo.addAccount(jetbrains)
+            repo.refresh()
+            assertEquals(listOf(window), repo.current().single().snapshot!!.windows)
+        }
 }

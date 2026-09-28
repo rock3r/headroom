@@ -48,6 +48,9 @@ internal fun WindowEntity.toDomain() =
         length = lengthSeconds?.let(Duration::ofSeconds),
         group = groupLabel,
         isUnlimited = isUnlimited,
+        usedAmount = usedAmount,
+        limitAmount = limitAmount,
+        amountUnit = amountUnit,
     )
 
 internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
@@ -62,4 +65,7 @@ internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
         lengthSeconds = length?.seconds,
         groupLabel = group,
         isUnlimited = isUnlimited,
+        usedAmount = usedAmount,
+        limitAmount = limitAmount,
+        amountUnit = amountUnit,
     )

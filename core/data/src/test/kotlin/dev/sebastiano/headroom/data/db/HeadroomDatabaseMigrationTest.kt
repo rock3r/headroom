@@ -8,6 +8,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -33,11 +34,7 @@ class HeadroomDatabaseMigrationTest {
             v1.version = 1
         }
 
-        val db =
-            Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
-                .addMigrations(HeadroomDatabase.MIGRATION_1_2)
-                .allowMainThreadQueries()
-                .build()
+        val db = openCurrent()
         try {
             val account = db.quotaDao().accounts().single()
             assertEquals("a1", account.id)
@@ -47,6 +44,44 @@ class HeadroomDatabaseMigrationTest {
             db.close()
         }
     }
+
+    @Test
+    fun `windows saved before credit amounts existed survive the upgrade`() = runTest {
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { v2 ->
+            VERSION_1_SCHEMA.forEach(v2::execSQL)
+            v2.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+            v2.execSQL(
+                "INSERT INTO accounts (id, provider, label, nickname) " +
+                    "VALUES ('a1', 'jetbrains', 'sam@example.com', 'Work')"
+            )
+            v2.execSQL(
+                "INSERT INTO windows (accountId, windowId, position, label, kind, usedPercent, " +
+                    "isUnlimited) VALUES ('a1', 'ai_credits', 0, 'Monthly', 'Monthly', 25.0, 0)"
+            )
+            v2.version = 2
+        }
+
+        val db = openCurrent()
+        try {
+            val stored = db.quotaDao().accounts().single()
+            assertEquals("Work", stored.nickname)
+            val window = db.quotaDao().observeAccounts().first().single().windows.single()
+            assertEquals("ai_credits", window.windowId)
+            assertEquals(25.0, window.usedPercent)
+            assertNull(window.usedAmount)
+            assertNull(window.limitAmount)
+            assertNull(window.amountUnit)
+        } finally {
+            db.close()
+        }
+    }
+
+    private fun openCurrent(): HeadroomDatabase =
+        Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
+            .addMigrations(HeadroomDatabase.MIGRATION_1_2, HeadroomDatabase.MIGRATION_2_3)
+            .allowMainThreadQueries()
+            .build()
 
     private companion object {
         const val NAME = "migration-test.db"

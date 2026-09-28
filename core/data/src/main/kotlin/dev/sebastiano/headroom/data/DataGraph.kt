@@ -75,7 +75,7 @@ public class DataGraph(
 
     private val database =
         Room.databaseBuilder(appContext, HeadroomDatabase::class.java, "headroom.db")
-            .addMigrations(HeadroomDatabase.MIGRATION_1_2)
+            .addMigrations(HeadroomDatabase.MIGRATION_1_2, HeadroomDatabase.MIGRATION_2_3)
             .build()
 
     private val alertStore =
