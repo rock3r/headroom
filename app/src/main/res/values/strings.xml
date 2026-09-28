@@ -140,6 +140,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">Accounts, display and updates</string>
     <string name="settings_display">Display</string>
     <string name="settings_quota_display">Show quotas as</string>
     <string name="settings_quota_used">Used</string>

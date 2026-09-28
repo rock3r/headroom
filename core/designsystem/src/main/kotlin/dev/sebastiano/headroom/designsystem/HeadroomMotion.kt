@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.designsystem
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.LinearEasing
@@ -49,6 +50,21 @@ object HeadroomMotion {
         tween(durationMillis = SCRUB_DURATION_MILLIS, easing = LinearEasing)
 
     private const val SCRUB_DURATION_MILLIS = 350
+
+    /**
+     * For a reveal the eye should follow: a circle growing over the screen. A spring puts most of
+     * the growth in the first frames, so it reads as a cut; a timed curve with a soft start does
+     * not. [delayMillis] lets content follow the reveal a moment later.
+     */
+    fun <T> revealSpec(delayMillis: Int = 0): FiniteAnimationSpec<T> =
+        tween(
+            durationMillis = REVEAL_DURATION_MILLIS,
+            delayMillis = delayMillis,
+            easing = REVEAL_EASING,
+        )
+
+    private const val REVEAL_DURATION_MILLIS = 520
+    private val REVEAL_EASING = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
     /**
      * For a liquid ripple spreading from a tap. It is linear because a ring on water spreads at a

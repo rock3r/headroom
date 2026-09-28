@@ -1,7 +1,6 @@
 package dev.sebastiano.headroom.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -184,8 +183,16 @@ private fun SettingsHeader(
                 .padding(top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.weight(1f)) {
+        // A subtitle like the overview's keeps this row as tall, so the close button lands
+        // exactly where the settings button was.
+        Column(modifier = Modifier.weight(1f)) {
             SettingsTitle(text = stringResource(R.string.settings_title), reveal = reveal)
+            Text(
+                text = stringResource(R.string.settings_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.revealContentEntrance(reveal),
+            )
         }
         CloseSettingsButton(onClick = onClose, reveal = reveal)
     }
