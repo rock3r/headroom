@@ -118,10 +118,7 @@ class ScreenshotTest {
 
     /** Draws [millis] of a transition that is still running, then captures it. */
     private fun captureMidway(name: String, millis: Long) {
-        repeat((millis / FRAME_MILLIS).toInt()) {
-            rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
-        }
+        rule.mainClock.advanceTimeBy(millis)
         rule.onRoot().captureRoboImage(screenshot(name))
     }
 
