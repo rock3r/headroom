@@ -32,11 +32,12 @@ import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.PaceChip
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaBar
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.asFraction
 import dev.sebastiano.headroom.ui.components.errorText
-import dev.sebastiano.headroom.ui.components.usedLabel
+import dev.sebastiano.headroom.ui.components.quotaLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.home.AccountSummary
@@ -47,6 +48,7 @@ import kotlin.math.roundToInt
 /**
  * One account on the overview: the big number, the primary window's bar with its pace tick, the
  * session bar, and the pace chip. The primary bar is wavy only when the account needs attention.
+ * The number and the bars show how much is used or how much is left, as [display] says.
  */
 @Composable
 fun AccountCard(
@@ -57,6 +59,7 @@ fun AccountCard(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     sharedElements: SharedElements? = null,
+    display: QuotaDisplay = QuotaDisplay.Used,
 ) {
     val container =
         sharedElements?.run {
@@ -76,7 +79,7 @@ fun AccountCard(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CardTop(account, sharedElements)
+            CardTop(account, sharedElements, display)
             // On the highlighted card the default track colour would vanish into the container.
             val track =
                 if (selected) MaterialTheme.colorScheme.surfaceContainerLowest
@@ -105,6 +108,7 @@ fun AccountCard(
                     wavy = account.needsAttention,
                     trailing = primary.resetsAt?.let { formatter.short(it, now) },
                     trackColor = track,
+                    display = display,
                     draining = account.justReset,
                 )
             }
@@ -116,6 +120,7 @@ fun AccountCard(
                     showPace = false,
                     trailing = session.resetsAt?.let { formatter.countdown(now, it) },
                     trackColor = track,
+                    display = display,
                 )
             }
             account.pace?.let { PaceChip(it) }
@@ -133,7 +138,11 @@ fun AccountCard(
 fun accountCardTag(accountId: String): String = "account-card-$accountId"
 
 @Composable
-private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
+private fun CardTop(
+    account: AccountSummary,
+    sharedElements: SharedElements?,
+    display: QuotaDisplay,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         val avatar =
             sharedElements?.run {
@@ -164,8 +173,9 @@ private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
         account.primary?.let { primary ->
             Column(horizontalAlignment = Alignment.End) {
                 AnimatedPercent(
-                    percent = primary.usedPercent,
+                    percent = display.percent(primary.usedPercent),
                     draining = account.justReset,
+                    display = display,
                     modifier =
                         sharedElements?.run {
                             Modifier.sharedValue(
@@ -176,7 +186,7 @@ private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
                         } ?: Modifier,
                 )
                 Text(
-                    text = usedLabel(primary.kind),
+                    text = quotaLabel(primary.kind, display),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -186,8 +196,9 @@ private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
 }
 
 /**
- * A percentage that moves to a new value without overshoot. With [draining], a drop (a weekly
- * reset) moves on the slower reset spec, like the bar next to it.
+ * A percentage that moves to a new value without overshoot. With [draining], a weekly reset (a drop
+ * in used mode, a rise in left mode, see [display]) moves on the slower reset spec, like the bar
+ * next to it.
  */
 @Composable
 fun AnimatedPercent(
@@ -195,12 +206,13 @@ fun AnimatedPercent(
     modifier: Modifier = Modifier,
     style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineMedium,
     draining: Boolean = false,
+    display: QuotaDisplay = QuotaDisplay.Used,
 ) {
     val target = percent.toFloat()
     val animated by
         animateFloatAsState(
             targetValue = target,
-            animationSpec = valueSpec(target, draining),
+            animationSpec = valueSpec(target, draining, display),
             label = "percent",
         )
     Text(
@@ -217,10 +229,11 @@ private fun MeterRow(
     wavy: Boolean,
     trailing: String?,
     trackColor: Color,
+    display: QuotaDisplay,
     showPace: Boolean = true,
     draining: Boolean = false,
 ) {
-    val progress = window.usedPercent.asFraction()
+    val progress = display.percent(window.usedPercent).asFraction()
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -237,8 +250,10 @@ private fun MeterRow(
             progress = progress,
             wavy = wavy,
             trackColor = trackColor,
-            animationSpec = valueSpec(progress, draining),
-            paceFraction = if (showPace) window.expectedPercent?.asFraction() else null,
+            animationSpec = valueSpec(progress, draining, display),
+            paceFraction =
+                if (showPace) window.expectedPercent?.let { display.percent(it).asFraction() }
+                else null,
             modifier = Modifier.weight(1f),
         )
         Text(
@@ -254,12 +269,21 @@ private fun MeterRow(
 
 /**
  * The spec for a value moving to [target]: the reset drain when the account just reset and the
- * value went down, the regular data spec otherwise. Only the drop itself drains, once per reset.
+ * value moved the way a reset moves it (down in used mode, up in left mode), the regular data spec
+ * otherwise. Only that move itself drains, once per reset.
  */
 @Composable
-private fun valueSpec(target: Float, draining: Boolean): AnimationSpec<Float> {
+private fun valueSpec(
+    target: Float,
+    draining: Boolean,
+    display: QuotaDisplay,
+): AnimationSpec<Float> {
     val previous = remember { mutableFloatStateOf(target) }
-    val dropped = target < previous.floatValue
+    val reset =
+        when (display) {
+            QuotaDisplay.Used -> target < previous.floatValue
+            QuotaDisplay.Left -> target > previous.floatValue
+        }
     SideEffect { previous.floatValue = target }
-    return if (draining && dropped) HeadroomMotion.resetDrainSpec() else HeadroomMotion.dataSpec()
+    return if (draining && reset) HeadroomMotion.resetDrainSpec() else HeadroomMotion.dataSpec()
 }

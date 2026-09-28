@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
@@ -122,17 +123,41 @@ fun windowKindLabel(kind: WindowKind): String =
         }
     )
 
+/** The words under a big percentage: "weekly used", or "weekly left" in left mode. */
 @Composable
 @ReadOnlyComposable
-fun usedLabel(kind: WindowKind): String =
+fun quotaLabel(kind: WindowKind, display: QuotaDisplay): String =
     stringResource(
-        when (kind) {
-            WindowKind.Weekly -> R.string.used_weekly
-            WindowKind.Monthly -> R.string.used_monthly
-            WindowKind.Daily -> R.string.used_daily
-            WindowKind.Session -> R.string.used_session
-            WindowKind.Other -> R.string.used_other
+        when (display) {
+            QuotaDisplay.Used ->
+                when (kind) {
+                    WindowKind.Weekly -> R.string.used_weekly
+                    WindowKind.Monthly -> R.string.used_monthly
+                    WindowKind.Daily -> R.string.used_daily
+                    WindowKind.Session -> R.string.used_session
+                    WindowKind.Other -> R.string.used_other
+                }
+            QuotaDisplay.Left ->
+                when (kind) {
+                    WindowKind.Weekly -> R.string.left_weekly
+                    WindowKind.Monthly -> R.string.left_monthly
+                    WindowKind.Daily -> R.string.left_daily
+                    WindowKind.Session -> R.string.left_session
+                    WindowKind.Other -> R.string.left_other
+                }
         }
+    )
+
+/** A percentage with its meaning, for screen readers: "71% used" or "29% left". */
+@Composable
+@ReadOnlyComposable
+fun percentDescription(percent: Int, display: QuotaDisplay): String =
+    stringResource(
+        when (display) {
+            QuotaDisplay.Used -> R.string.percent_used
+            QuotaDisplay.Left -> R.string.percent_left
+        },
+        percent,
     )
 
 @Composable

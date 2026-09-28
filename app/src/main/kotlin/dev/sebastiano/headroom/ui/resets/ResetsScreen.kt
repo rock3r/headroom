@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.ScreenHeader
@@ -52,7 +53,10 @@ import kotlin.math.roundToInt
 
 const val RESETS_TAG: String = "resets"
 
-/** Upcoming resets with their alert state, and how full each window was when it last reset. */
+/**
+ * Upcoming resets with their alert state, and how full each window was when it last reset: how much
+ * was used, or how much was left, as the state's display says.
+ */
 @Composable
 fun ResetsScreen(
     state: HomeUiState,
@@ -122,8 +126,18 @@ fun ResetsScreen(
                     }
                 }
             }
-            item { SectionLabel(stringResource(R.string.resets_history), width) }
-            item { HistoryCard(state.accounts, width) }
+            item {
+                SectionLabel(
+                    stringResource(
+                        when (state.display) {
+                            QuotaDisplay.Used -> R.string.resets_history
+                            QuotaDisplay.Left -> R.string.resets_history_left
+                        }
+                    ),
+                    width,
+                )
+            }
+            item { HistoryCard(state.accounts, state.display, width) }
         }
     }
 }
@@ -180,7 +194,11 @@ private fun UpcomingRow(
 }
 
 @Composable
-private fun HistoryCard(accounts: List<AccountSummary>, modifier: Modifier = Modifier) {
+private fun HistoryCard(
+    accounts: List<AccountSummary>,
+    display: QuotaDisplay,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
@@ -192,10 +210,16 @@ private fun HistoryCard(accounts: List<AccountSummary>, modifier: Modifier = Mod
         ) {
             accounts.forEach { account ->
                 val current = account.primary?.usedPercent ?: return@forEach
-                HistoryRow(account, current)
+                HistoryRow(account, current, display)
             }
             Text(
-                text = stringResource(R.string.resets_history_note),
+                text =
+                    stringResource(
+                        when (display) {
+                            QuotaDisplay.Used -> R.string.resets_history_note
+                            QuotaDisplay.Left -> R.string.resets_history_note_left
+                        }
+                    ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -204,14 +228,17 @@ private fun HistoryCard(accounts: List<AccountSummary>, modifier: Modifier = Mod
 }
 
 @Composable
-private fun HistoryRow(account: AccountSummary, current: Double) {
-    val values = account.pastResets + current
+private fun HistoryRow(account: AccountSummary, current: Double, display: QuotaDisplay) {
+    val used = account.pastResets + current
     val description =
         stringResource(
-            R.string.resets_history_description,
+            when (display) {
+                QuotaDisplay.Used -> R.string.resets_history_description
+                QuotaDisplay.Left -> R.string.resets_history_description_left
+            },
             account.name,
-            account.pastResets.joinToString { "${it.roundToInt()}%" },
-            current.roundToInt(),
+            account.pastResets.joinToString { "${display.percent(it).roundToInt()}%" },
+            display.percent(current).roundToInt(),
         )
     Row(
         modifier =
@@ -229,9 +256,10 @@ private fun HistoryRow(account: AccountSummary, current: Double) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            values.forEachIndexed { index, value ->
-                val isCurrent = index == values.lastIndex
-                val hitLimit = !isCurrent && value >= FULL
+            used.forEachIndexed { index, usedPercent ->
+                val isCurrent = index == used.lastIndex
+                val hitLimit = !isCurrent && usedPercent >= FULL
+                val value = display.percent(usedPercent)
                 val color =
                     when {
                         hitLimit -> MaterialTheme.colorScheme.error

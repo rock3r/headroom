@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.designsystem.PaceChipState
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
@@ -22,6 +23,8 @@ data class HomeUiState(
      * False until the stored accounts have been read; until then demo data may be a placeholder.
      */
     val accountsLoaded: Boolean = true,
+    /** Whether percentages, rings and bars show how much is used or how much is left. */
+    val display: QuotaDisplay = QuotaDisplay.Used,
 )
 
 @Immutable
@@ -82,6 +85,8 @@ data class DetailUiState(
     val chartWindows: List<WindowSummary> = emptyList(),
     /** The window the chart shows. */
     val chartWindowId: String? = null,
+    /** Whether percentages, rings and chart text show how much is used or how much is left. */
+    val display: QuotaDisplay = QuotaDisplay.Used,
 )
 
 @Immutable

@@ -4,6 +4,7 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.Pace
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
@@ -62,9 +63,20 @@ public data class Gauge(
     val pacePercent: Int?,
     /** Over pace or nearly full, see [Pace.needsAttention]. */
     val needsAttention: Boolean,
+    /** Follows how full the window is, whatever the [display]. */
     val shape: UsageShape,
     val reset: ResetLabel?,
-)
+    /** Whether the widget shows how much is used or how much is left. */
+    val display: QuotaDisplay = QuotaDisplay.Used,
+) {
+    /** The number the widget shows, and how much of its ring or bar is filled: 0 to 100. */
+    val shownPercent: Int
+        get() = display.percent(usedPercent.toDouble()).roundToInt()
+
+    /** Where "even pace" sits on a bar filled to [shownPercent]. Null for session windows. */
+    val shownPacePercent: Int?
+        get() = pacePercent?.let { display.percent(it.toDouble()).roundToInt() }
+}
 
 /** The next reset shown by the countdown and the lock screen footer. */
 public data class NextResetUi(
@@ -140,6 +152,8 @@ public sealed interface WidgetUiState {
             now: Instant,
             size: WidgetSize,
             host: WidgetHostCategory,
+            /** Whether the gauges show how much is used or how much is left. */
+            display: QuotaDisplay = QuotaDisplay.Used,
         ): WidgetUiState {
             val selected = select(accounts, config.accountIds)
             val mode = config.colourMode
@@ -152,7 +166,7 @@ public sealed interface WidgetUiState {
                         WidgetWindow.Weekly -> state.primaryWindow
                         WidgetWindow.Session -> state.sessionWindow
                     } ?: return@mapNotNull null
-                gauge(state, names.getValue(state.account.id), window, now)
+                gauge(state, names.getValue(state.account.id), window, now).copy(display = display)
             }
             val next = nextReset(selected, names, now)
 
@@ -214,6 +228,7 @@ public sealed interface WidgetUiState {
                 if (config.window == WidgetWindow.Weekly) {
                     state.sessionWindow?.let {
                         gauge(state, names.getValue(main.accountId), it, now)
+                            .copy(display = main.display)
                     }
                 } else {
                     null

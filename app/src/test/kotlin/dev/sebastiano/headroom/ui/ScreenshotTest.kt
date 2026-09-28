@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -15,8 +16,12 @@ import androidx.compose.ui.test.performScrollToNode
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.signin.SignInState
@@ -47,6 +52,7 @@ class ScreenshotTest {
         dark: Boolean = false,
         signIn: SignInController = FakeSignInController(),
         realAccounts: List<AccountState> = emptyList(),
+        settings: SettingsRepository = InMemorySettingsRepository(),
     ) {
         // Frames are driven by capture(), so that animations are drawn while they run.
         rule.mainClock.autoAdvance = false
@@ -58,6 +64,7 @@ class ScreenshotTest {
                             rule.activity,
                             realAccounts = realAccounts,
                             signInController = signIn,
+                            settings = settings,
                         )
                 )
             }
@@ -164,6 +171,33 @@ class ScreenshotTest {
     }
 
     @Test
+    fun settings() {
+        launch()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        capture("settings")
+    }
+
+    @Test
+    fun licences() {
+        launch()
+        // Two steps in a row, and the licence list loads off the main thread: let the clock run.
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithText("Open-source licences").performScrollTo().performClick()
+        rule.waitUntil(LOAD_TIMEOUT_MILLIS) {
+            rule.onAllNodesWithText("Activity").fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.mainClock.autoAdvance = false
+        capture("licences")
+    }
+
+    @Test
+    fun overviewLeft() {
+        launch(settings = InMemorySettingsRepository(AppSettings(quotaDisplay = QuotaDisplay.Left)))
+        capture("overview-left")
+    }
+
+    @Test
     fun signInDeviceCode() {
         launch()
         // Several steps in a row: let the clock run between them.
@@ -230,6 +264,8 @@ class ScreenshotTest {
 private const val GROK_INDEX = 6
 private const val SETTLE_STEPS = 40
 private const val STEP_MILLIS = 50L
+/** The licence data is read from resources off the main thread. */
+private const val LOAD_TIMEOUT_MILLIS = 5_000L
 /** 24dp at xxhdpi, the height of a phone status bar. */
 private const val STATUS_BAR_PX = 72
 private const val PHONE = "w411dp-h891dp-xxhdpi"

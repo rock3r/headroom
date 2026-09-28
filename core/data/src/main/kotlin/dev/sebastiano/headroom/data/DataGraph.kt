@@ -16,6 +16,7 @@ import dev.sebastiano.headroom.data.account.TinkCredentialCipher
 import dev.sebastiano.headroom.data.db.HeadroomDatabase
 import dev.sebastiano.headroom.data.db.RoomQuotaRepository
 import dev.sebastiano.headroom.data.prefs.DataStoreAlertPreferences
+import dev.sebastiano.headroom.data.prefs.DataStoreSettingsRepository
 import dev.sebastiano.headroom.data.reset.AlarmResetScheduler
 import dev.sebastiano.headroom.data.reset.AndroidResetNotifier
 import dev.sebastiano.headroom.data.reset.ResetAlarm
@@ -28,13 +29,16 @@ import dev.sebastiano.headroom.data.sync.SyncWorker
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.quota.QuotaFetchers
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** A [QuotaRepository] that also manages which accounts exist. */
@@ -53,8 +57,8 @@ public interface DataGraphOwner {
 }
 
 /**
- * Builds and owns the data layer: Room, DataStore, the repository, reset alarms and background
- * work. The app creates one per process and passes in how to fetch an account's quota.
+ * Builds and owns the data layer: Room, DataStore, the repository, the settings, reset alarms and
+ * background work. The app creates one per process and passes in how to fetch an account's quota.
  */
 public class DataGraph(
     context: Context,
@@ -79,6 +83,11 @@ public class DataGraph(
             appContext.preferencesDataStoreFile("alerts")
         }
 
+    private val settingsStore =
+        PreferenceDataStoreFactory.create(scope = scope) {
+            appContext.preferencesDataStoreFile("settings")
+        }
+
     private val accountFetcher =
         AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers)
 
@@ -97,6 +106,9 @@ public class DataGraph(
         }
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
+
+    /** The user's app settings: used or left, and how often to sync in the background. */
+    public val settings: SettingsRepository = DataStoreSettingsRepository(settingsStore)
 
     /** Turns finished sign-ins into accounts, and signs accounts out. */
     public val signInManager: SignInManager = SignInManager(tokenStore, repository)
@@ -127,10 +139,18 @@ public class DataGraph(
             repository = repository,
         )
 
-    /** Starts periodic sync and keeps reset alarms in step with accounts and alert switches. */
+    /**
+     * Keeps the periodic sync on the period from the settings, and reset alarms in step with
+     * accounts and alert switches. Reset alarms do not depend on the sync period.
+     */
     @OptIn(FlowPreview::class)
     public fun start() {
-        SyncWorker.schedulePeriodic(appContext)
+        scope.launch {
+            settings.settings
+                .map { it.syncFrequency }
+                .distinctUntilChanged()
+                .collect { SyncWorker.schedule(appContext, it) }
+        }
         scope.launch {
             combine(repository.accounts, alertStore.data) { _, _ -> Unit }
                 .debounce(RESCHEDULE_DEBOUNCE_MS)

@@ -16,13 +16,16 @@ import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.signin.AuthSignInSteps
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.home.HomeViewModel
+import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import dev.sebastiano.headroom.widget.HeadroomWidgetProvider
 import dev.sebastiano.headroom.widgets.AppWidgetManagerPinner
 import dev.sebastiano.headroom.widgets.WidgetPinner
@@ -34,6 +37,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /**
  * The app's object graph, built once by [HeadroomApplication]. There is no DI framework: every
@@ -46,6 +51,7 @@ import kotlinx.coroutines.flow.StateFlow
  * - [signInController]: the auth layer's controller replaces [FakeSignInController].
  * - [widgetPinner]: the widget module supplies the `AppWidgetProvider` for each style.
  * - [resetHistory]: the data layer answers it from the Room history.
+ * - [settings]: the data layer's DataStore settings, or settings in memory without it.
  */
 class AppGraph(
     val quotaRepository: QuotaRepository,
@@ -64,6 +70,10 @@ class AppGraph(
     val removeAccount: suspend (accountId: String) -> Unit = {},
     /** How often countdowns re-read the clock. Null turns it off, for tests with a fixed clock. */
     val tickInterval: Duration? = Duration.ofMinutes(1),
+    /** Used or left, and how often to sync in the background. */
+    val settings: SettingsRepository = InMemorySettingsRepository(),
+    /** The version name the settings screen shows. */
+    val appVersion: String = "",
 ) {
     val homeViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
@@ -76,8 +86,13 @@ class AppGraph(
                 resetHistory = resetHistory,
                 tickInterval = tickInterval,
                 savedStateHandle = createSavedStateHandle(),
+                quotaDisplay = settings.settings.map { it.quotaDisplay }.distinctUntilChanged(),
             )
         }
+    }
+
+    val settingsViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
+        initializer { SettingsViewModel(settings = settings, appVersion = appVersion) }
     }
 
     val accountsViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
@@ -157,6 +172,8 @@ class AppGraph(
                 tickInterval = tickInterval,
                 renameAccount = { id, name -> data?.repository?.renameAccount(id, name) },
                 removeAccount = { id -> data?.signInManager?.signOut(id) },
+                settings = data?.settings ?: InMemorySettingsRepository(),
+                appVersion = versionName(context),
             )
         }
 
@@ -167,6 +184,9 @@ class AppGraph(
                 WidgetStyle.Shape -> dev.sebastiano.headroom.widget.WidgetStyle.Shape
                 WidgetStyle.Countdown -> dev.sebastiano.headroom.widget.WidgetStyle.Countdown
             }
+
+        private fun versionName(context: Context): String =
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
 
         private const val DEMO_LATENCY_MILLIS = 900L
     }

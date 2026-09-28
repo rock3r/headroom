@@ -8,6 +8,7 @@ import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.data.DataGraphOwner
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.widget.HeadroomWidgetHost
 import dev.sebastiano.headroom.widget.WidgetConfigStore
 import dev.sebastiano.headroom.widget.WidgetUpdater
@@ -18,7 +19,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -57,11 +62,14 @@ open class HeadroomApplication :
         super.onCreate()
         if (!usesDataLayer) return
         dataGraph.start()
-        // Widgets redraw whenever the stored data changes; they never fetch on their own.
+        // Widgets redraw whenever the stored data or the used or left setting changes; they never
+        // fetch on their own.
         appScope.launch {
-            dataGraph.repository.accounts.debounce(WIDGET_UPDATE_DEBOUNCE_MS).collect {
-                updateWidgets(it)
-            }
+            combine(dataGraph.repository.accounts, quotaDisplay()) { accounts, display ->
+                    accounts to display
+                }
+                .debounce(WIDGET_UPDATE_DEBOUNCE_MS)
+                .collect { (accounts, display) -> updateWidgets(accounts, display) }
         }
     }
 
@@ -69,14 +77,17 @@ open class HeadroomApplication :
         if (!usesDataLayer) return
         appScope.launch {
             dataGraph.repository.refresh()
-            updateWidgets(dataGraph.repository.current())
+            updateWidgets(dataGraph.repository.current(), quotaDisplay().first())
         }
     }
 
     override fun onWidgetUpdateRequested(appWidgetIds: IntArray) {
         if (!usesDataLayer) return
-        appScope.launch { updateWidgets(dataGraph.repository.current()) }
+        appScope.launch { updateWidgets(dataGraph.repository.current(), quotaDisplay().first()) }
     }
+
+    private fun quotaDisplay() =
+        dataGraph.settings.settings.map { it.quotaDisplay }.distinctUntilChanged()
 
     /**
      * Draws every placed widget from the demo accounts. Only the debug build's
@@ -89,8 +100,8 @@ open class HeadroomApplication :
         }
     }
 
-    private suspend fun updateWidgets(accounts: List<AccountState>) {
-        widgetUpdater.updateAll(this, accounts, Instant.now())
+    private suspend fun updateWidgets(accounts: List<AccountState>, display: QuotaDisplay) {
+        widgetUpdater.updateAll(this, accounts, Instant.now(), display)
     }
 
     private companion object {

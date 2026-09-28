@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
 import dev.sebastiano.headroom.designsystem.PaceChipState
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import java.time.Duration
@@ -44,6 +45,34 @@ class HomeViewModelTest {
             savedStateHandle = SavedStateHandle(),
         )
     }
+
+    @Test
+    fun `the used or left setting reaches the overview and the detail`() =
+        runTest(main.dispatcher) {
+            val display = MutableStateFlow(QuotaDisplay.Used)
+            val withDisplay =
+                HomeViewModel(
+                    repository = repository,
+                    alertPreferences = InMemoryAlertPreferences(),
+                    clock = { now },
+                    isDemo = MutableStateFlow(true),
+                    accountsLoaded = MutableStateFlow(true),
+                    resetHistory = DemoResetHistory,
+                    tickInterval = null,
+                    savedStateHandle = SavedStateHandle(),
+                    quotaDisplay = display,
+                )
+            backgroundScope.launch { withDisplay.state.collect {} }
+            backgroundScope.launch { withDisplay.detail.collect {} }
+            runCurrent()
+            assertEquals(QuotaDisplay.Used, withDisplay.state.value.display)
+
+            display.value = QuotaDisplay.Left
+            runCurrent()
+
+            assertEquals(QuotaDisplay.Left, withDisplay.state.value.display)
+            assertEquals(QuotaDisplay.Left, withDisplay.detail.value?.display)
+        }
 
     @Test
     fun `the demo accounts are listed in order`() =

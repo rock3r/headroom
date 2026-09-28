@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.widget.render
 
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.widget.EmptyReason
 import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.GaugeWindow
@@ -84,6 +85,20 @@ class WidgetStringsTest {
         assertEquals(
             "Claude: 71% of the weekly limit used. Resets Thu 15:48.",
             strings.gaugeDescription(gauge.copy(needsAttention = false)),
+        )
+    }
+
+    @Test
+    fun `describes a gauge by what is left in left mode`() {
+        val left = gauge.copy(display = QuotaDisplay.Left)
+        assertEquals("29%", strings.percent(left.shownPercent))
+        assertEquals(
+            "Claude: 29% of the weekly limit left, over pace. Resets Thu 15:48.",
+            strings.gaugeDescription(left),
+        )
+        assertEquals(
+            "Claude: 29% of the weekly limit left. Resets Thu 15:48.",
+            strings.gaugeDescription(left.copy(needsAttention = false)),
         )
     }
 

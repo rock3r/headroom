@@ -165,8 +165,8 @@ private fun BarRow(
         ) {
             RemoteCanvas(RemoteModifier.fillMaxSize()) {
                 drawGaugeBar(
-                    fraction = gauge.usedPercent / PERCENT,
-                    paceFraction = gauge.pacePercent?.let { it / PERCENT },
+                    fraction = gauge.shownPercent / PERCENT,
+                    paceFraction = gauge.shownPacePercent?.let { it / PERCENT },
                     active = colors.accent(gauge.provider).rc,
                     track = colors.track.rc,
                     tick = colors.paceTick.rc,
@@ -174,7 +174,7 @@ private fun BarRow(
             }
         }
         WidgetText(
-            text = strings.percent(gauge.usedPercent),
+            text = strings.percent(gauge.shownPercent),
             color = colors.onSurface,
             fontSize = (VALUE_SP * scale).sp.asRemoteTextUnit(),
             modifier = RemoteModifier.width(render.fixedPx(VALUE_WIDTH * scale)),

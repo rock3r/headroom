@@ -193,23 +193,31 @@ private val WidgetStyle.body: Int
             WidgetStyle.Countdown -> R.string.widget_countdown_body
         }
 
-/** A static preview drawn with the same components as the app, from the current data. */
+/**
+ * A static preview drawn with the same components as the app, from the current data, showing how
+ * much is used or left like the widgets do.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun WidgetPreview(style: WidgetStyle, state: HomeUiState, formatter: ResetFormatter) {
     val accounts = state.accounts.filter { it.primary != null }
     val first = accounts.firstOrNull() ?: return
     val firstPrimary = first.primary ?: return
+    val display = state.display
     when (style) {
         WidgetStyle.Rings ->
             QuotaRing(
-                progress = firstPrimary.usedPercent.asFraction(),
-                innerProgress = first.session?.let { it.usedPercent.asFraction() },
+                progress = display.percent(firstPrimary.usedPercent).asFraction(),
+                innerProgress = first.session?.let { display.percent(it.usedPercent).asFraction() },
                 wavy = first.needsAttention,
                 size = 140.dp,
             ) {
                 Text(
-                    text = stringResource(R.string.percent, firstPrimary.usedPercent.roundToInt()),
+                    text =
+                        stringResource(
+                            R.string.percent,
+                            display.percent(firstPrimary.usedPercent).roundToInt(),
+                        ),
                     style = MaterialTheme.typography.headlineMedium,
                 )
             }
@@ -223,14 +231,18 @@ private fun WidgetPreview(style: WidgetStyle, state: HomeUiState, formatter: Res
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ProviderAvatar(account.provider, size = 22.dp)
                         QuotaBar(
-                            progress = primary.usedPercent.asFraction(),
+                            progress = display.percent(primary.usedPercent).asFraction(),
                             wavy = account.needsAttention,
-                            paceFraction = primary.expectedPercent?.asFraction(),
+                            paceFraction =
+                                primary.expectedPercent?.let { display.percent(it).asFraction() },
                             modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
                         )
                         Text(
                             text =
-                                stringResource(R.string.percent, primary.usedPercent.roundToInt()),
+                                stringResource(
+                                    R.string.percent,
+                                    display.percent(primary.usedPercent).roundToInt(),
+                                ),
                             style = MaterialTheme.typography.labelLarge,
                             modifier = Modifier.width(40.dp),
                         )
@@ -251,7 +263,7 @@ private fun WidgetPreview(style: WidgetStyle, state: HomeUiState, formatter: Res
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = stringResource(R.string.percent, used.roundToInt()),
+                    text = stringResource(R.string.percent, display.percent(used).roundToInt()),
                     style = MaterialTheme.typography.headlineMedium,
                     color = colors.onContainer,
                 )

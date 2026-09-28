@@ -13,7 +13,9 @@ import dev.sebastiano.headroom.designsystem.IndicatorStyle
 import dev.sebastiano.headroom.designsystem.IndicatorStyleKey
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.FakeQuotaRepository
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.widgets.WidgetPinner
@@ -39,6 +41,7 @@ fun testGraph(
     scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
     demo: FakeQuotaRepository = FakeQuotaRepository({ FIXED_NOW }),
     real: QuotaRepository = FakeQuotaRepository({ FIXED_NOW }, initial = realAccounts),
+    settings: SettingsRepository = InMemorySettingsRepository(),
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
@@ -59,8 +62,13 @@ fun testGraph(
         widgetPinner = widgetPinner,
         resetHistory = DemoResetHistory,
         tickInterval = null,
+        settings = settings,
+        appVersion = TEST_APP_VERSION,
     )
 }
+
+/** The version the settings screen shows in tests and screenshots. */
+const val TEST_APP_VERSION: String = "0.1.0"
 
 /** Matches the progress indicators inside the node tagged [tag]. */
 fun indicatorsIn(tag: String): SemanticsMatcher =

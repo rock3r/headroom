@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
@@ -46,6 +47,8 @@ class HomeViewModel(
     resetHistory: ResetHistory,
     tickInterval: Duration? = Duration.ofMinutes(1),
     private val savedStateHandle: SavedStateHandle,
+    /** Whether the screens show how much of each limit is used or how much is left. */
+    quotaDisplay: Flow<QuotaDisplay> = flowOf(QuotaDisplay.Used),
 ) : ViewModel() {
     private val refreshing = MutableStateFlow(false)
     /** Saved, so the detail pane shows the same account after the process is recreated. */
@@ -94,8 +97,13 @@ class HomeViewModel(
         repository.accounts.map { it to resetTracker.update(it) }
 
     private val environment =
-        combine(isDemo, accountsLoaded, refreshing, ticks) { demo, loaded, busy, now ->
-            Environment(demo, loaded, busy, now)
+        combine(isDemo, accountsLoaded, refreshing, ticks, quotaDisplay) {
+            demo,
+            loaded,
+            busy,
+            now,
+            display ->
+            Environment(demo, loaded, busy, now, display)
         }
 
     val state: StateFlow<HomeUiState> =
@@ -105,15 +113,16 @@ class HomeViewModel(
                 history,
                 env ->
                 homeUiState(
-                    accounts = accounts,
-                    now = env.now,
-                    alerts = switches,
-                    pastResets = history,
-                    isDemo = env.isDemo,
-                    accountsLoaded = env.accountsLoaded,
-                    isRefreshing = env.isRefreshing,
-                    justReset = justReset,
-                )
+                        accounts = accounts,
+                        now = env.now,
+                        alerts = switches,
+                        pastResets = history,
+                        isDemo = env.isDemo,
+                        accountsLoaded = env.accountsLoaded,
+                        isRefreshing = env.isRefreshing,
+                        justReset = justReset,
+                    )
+                    .copy(display = env.display)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), initialState())
 
@@ -126,20 +135,26 @@ class HomeViewModel(
                 val account =
                     home.accounts.firstOrNull { it.id == id } ?: home.accounts.firstOrNull()
                 account?.let {
-                    Triple(home.now, it, picked?.takeIf { p -> p.first == it.id }?.second)
+                    DetailSelection(
+                        now = home.now,
+                        account = it,
+                        pickedWindowId = picked?.takeIf { p -> p.first == it.id }?.second,
+                        display = home.display,
+                    )
                 }
             }
             .distinctUntilChanged()
             .flatMapLatest { selection ->
                 if (selection == null) return@flatMapLatest flowOf(null)
                 val (now, account, picked) = selection
+                val display = selection.display
                 val state = repository.accounts.value.firstOrNull { it.account.id == account.id }
                 val options = state?.snapshot?.windows.orEmpty().filter { it.isChartable }
                 val window = options.firstOrNull { it.id == picked } ?: state?.primaryWindow
                 val chartWindows =
                     account.windows.filter { summary -> options.any { it.id == summary.id } }
                 if (window == null) {
-                    flowOf(DetailUiState(now, account, chart = null))
+                    flowOf(DetailUiState(now, account, chart = null, display = display))
                 } else {
                     repository.history(account.id, window.id).map { points ->
                         DetailUiState(
@@ -148,6 +163,7 @@ class HomeViewModel(
                             chart = chartSummary(window, points, now),
                             chartWindows = chartWindows,
                             chartWindowId = window.id,
+                            display = display,
                         )
                     }
                 }
@@ -204,6 +220,14 @@ class HomeViewModel(
         val accountsLoaded: Boolean,
         val isRefreshing: Boolean,
         val now: Instant,
+        val display: QuotaDisplay,
+    )
+
+    private data class DetailSelection(
+        val now: Instant,
+        val account: AccountSummary,
+        val pickedWindowId: String?,
+        val display: QuotaDisplay,
     )
 
     private companion object {

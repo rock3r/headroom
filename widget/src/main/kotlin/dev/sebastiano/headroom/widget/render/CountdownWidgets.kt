@@ -164,7 +164,7 @@ private fun LockScreenGauge(
         ) {
             RemoteCanvas(RemoteModifier.fillMaxSize()) {
                 drawGaugeRing(
-                    fraction = gauge.usedPercent / PERCENT,
+                    fraction = gauge.shownPercent / PERCENT,
                     geometry = LockRing,
                     active = colors.accent(gauge.provider).rc,
                     track = colors.track.rc,
@@ -173,7 +173,7 @@ private fun LockScreenGauge(
             ProviderLogoIcon(gauge.provider, render.pxValue(LOCK_LOGO), colors.onSurface)
         }
         WidgetText(
-            text = render.strings.percent(gauge.usedPercent),
+            text = render.strings.percent(gauge.shownPercent),
             color = colors.onSurface,
             fontSize = render.sp(LOCK_NUMBER),
             fontWeight = FontWeight.ExtraBold,

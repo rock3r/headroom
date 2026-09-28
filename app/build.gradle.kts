@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.headroom.android.application)
     alias(libs.plugins.headroom.android.compose)
     alias(libs.plugins.roborazzi)
+    // Collects the licence of every dependency at build time into res/raw/aboutlibraries.json.
+    alias(libs.plugins.aboutlibraries.android)
 }
 
 android {
@@ -55,6 +57,7 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.haze)
     implementation(libs.haze.blur)
+    implementation(libs.aboutlibraries.compose.m3)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)

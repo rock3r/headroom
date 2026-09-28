@@ -14,6 +14,7 @@ import android.widget.RemoteViews
 import androidx.core.graphics.createBitmap
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.logo
 import dev.sebastiano.headroom.widget.ColourMode
 import dev.sebastiano.headroom.widget.WidgetConfig
@@ -99,6 +100,38 @@ class WidgetRendererTest {
         doc.assertText("Claude: 38% of the session limit used. Resets 1h 12m.")
         doc.assertText("Switch between the weekly and session numbers")
         assertEquals(listOf(Tap.Refresh, Tap.Open("demo-claude")), doc.taps())
+    }
+
+    @Test
+    fun `in left mode the ring and bars show what is left`() = runTest {
+        val size = WidgetSize(280f, 180f)
+        val ring =
+            WidgetUiState.from(
+                accounts,
+                WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-claude")),
+                now,
+                size,
+                WidgetHostCategory.HomeScreen,
+                QuotaDisplay.Left,
+            )
+        val bars =
+            WidgetUiState.from(
+                accounts,
+                WidgetConfig(WidgetStyle.Bars),
+                now,
+                size,
+                WidgetHostCategory.HomeScreen,
+                QuotaDisplay.Left,
+            )
+
+        val ringDoc = WidgetRenderer.capture(context, ring, APP_WIDGET_ID, size, strings)
+        val barsDoc = WidgetRenderer.capture(context, bars, APP_WIDGET_ID, size, strings)
+
+        ringDoc.assertText("29%", "62%")
+        ringDoc.assertText("Claude: 29% of the weekly limit left, over pace. Resets Wed 06:28.")
+        ringDoc.assertText("Claude: 62% of the session limit left. Resets 1h 12m.")
+        ringDoc.assertNoText("71%")
+        barsDoc.assertText("29%", "66%", "12%", "42%")
     }
 
     @Test

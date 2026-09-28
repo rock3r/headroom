@@ -11,6 +11,7 @@
     <string name="action_back">Back</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_accounts">Accounts</string>
+    <string name="action_settings">Settings</string>
 
     <!-- Overview -->
     <plurals name="overview_accounts">
@@ -52,6 +53,13 @@
     <string name="used_daily">daily used</string>
     <string name="used_session">session used</string>
     <string name="used_other">used</string>
+    <string name="left_weekly">weekly left</string>
+    <string name="left_monthly">monthly left</string>
+    <string name="left_daily">daily left</string>
+    <string name="left_session">session left</string>
+    <string name="left_other">left</string>
+    <string name="percent_used">%1$d%% used</string>
+    <string name="percent_left">%1$d%% left</string>
     <string name="account_error_auth">Sign-in expired. Sign in again to update.</string>
     <string name="account_error_access">This plan has no usage data.</string>
     <string name="account_error_rate_limited">The provider asked us to slow down. Showing the last numbers.</string>
@@ -76,6 +84,12 @@
     <string name="detail_projection_end_week">At this rate you end the week at about %1$d%%.</string>
     <string name="detail_projection_end_month">At this rate you end the month at about %1$d%%.</string>
     <string name="detail_projection_end_window">At this rate you end the window at about %1$d%%.</string>
+    <string name="detail_chart_description_above_left">%1$d%% left, usage above the even-pace line.</string>
+    <string name="detail_chart_description_below_left">%1$d%% left, usage at or below the even-pace line.</string>
+    <string name="detail_projection_hit_left">At this rate you run out in about %1$s, %2$s before the reset.</string>
+    <string name="detail_projection_end_week_left">At this rate you end the week with about %1$d%% left.</string>
+    <string name="detail_projection_end_month_left">At this rate you end the month with about %1$d%% left.</string>
+    <string name="detail_projection_end_window_left">At this rate you end the window with about %1$d%% left.</string>
     <string name="detail_projection_fresh">The window just reset. Nothing used yet.</string>
     <string name="detail_reset_alerts">Reset alerts</string>
     <string name="detail_alert_at">Alert at %1$s</string>
@@ -99,6 +113,9 @@
     <string name="resets_history">Used when each window reset</string>
     <string name="resets_history_note">Red bars hit the limit. The last bar is the current window.</string>
     <string name="resets_history_description">%1$s: %2$s at past resets, %3$d%% now</string>
+    <string name="resets_history_left">Left when each window reset</string>
+    <string name="resets_history_note_left">Red bars ran out. The last bar is the current window.</string>
+    <string name="resets_history_description_left">%1$s: %2$s left at past resets, %3$d%% left now</string>
     <string name="resets_none">No weekly or monthly limits to show yet.</string>
 
     <!-- Widgets -->
@@ -116,6 +133,29 @@
     <string name="widget_add_description">Add the %1$s widget to the home screen</string>
     <string name="widget_add_unavailable">Your launcher cannot add widgets from apps. Add it from the home screen instead.</string>
     <string name="widget_countdown_label">Next weekly reset</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_display">Display</string>
+    <string name="settings_quota_display">Show quotas as</string>
+    <string name="settings_quota_used">Used</string>
+    <string name="settings_quota_left">Left</string>
+    <string name="settings_quota_used_body">Numbers, rings and bars show how much of each limit you have used.</string>
+    <string name="settings_quota_left_body">Numbers, rings and bars show how much of each limit you have left.</string>
+    <string name="settings_sync">Background updates</string>
+    <string name="settings_sync_minutes_15">Every 15 minutes</string>
+    <string name="settings_sync_minutes_30">Every 30 minutes</string>
+    <string name="settings_sync_hour_1">Every hour</string>
+    <string name="settings_sync_hours_3">Every 3 hours</string>
+    <string name="settings_sync_hours_6">Every 6 hours</string>
+    <string name="settings_sync_on_open">Only when I open the app</string>
+    <string name="settings_sync_note">Reset alerts arrive on time whatever you choose here.</string>
+    <string name="settings_about">About</string>
+    <string name="settings_licences">Open-source licences</string>
+    <string name="settings_licences_body">The libraries Headroom is built with</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="licences_title">Open-source licences</string>
+    <string name="licences_close">Close</string>
 
     <!-- Accounts and sign-in -->
     <string name="accounts_title">Accounts</string>

@@ -59,11 +59,11 @@ internal fun SingleRingWidget(
     val innerColor = showSession.select(sessionColor.rc, sessionColor.copy(alpha = DIMMED).rc)
 
     val number =
-        if (session == null) strings.percent(gauge.usedPercent).rs
+        if (session == null) strings.percent(gauge.shownPercent).rs
         else
             showSession.select(
-                strings.percent(session.usedPercent).rs,
-                strings.percent(gauge.usedPercent).rs,
+                strings.percent(session.shownPercent).rs,
+                strings.percent(gauge.shownPercent).rs,
             )
     val word =
         if (session == null) strings.windowWord(gauge.window).rs
@@ -93,7 +93,7 @@ internal fun SingleRingWidget(
         ) {
             RemoteCanvas(RemoteModifier.fillMaxSize().padding(render.px(RING_PADDING))) {
                 drawGaugeRing(
-                    fraction = gauge.usedPercent / PERCENT,
+                    fraction = gauge.shownPercent / PERCENT,
                     geometry = HeroOuter,
                     active = outerColor,
                     track = colors.track.rc,
@@ -101,7 +101,7 @@ internal fun SingleRingWidget(
                 )
                 if (session != null) {
                     drawGaugeRing(
-                        fraction = session.usedPercent / PERCENT,
+                        fraction = session.shownPercent / PERCENT,
                         geometry = HeroInner,
                         active = innerColor,
                         track = colors.track.rc,
@@ -223,14 +223,14 @@ private fun SmallRing(
         ) {
             RemoteCanvas(RemoteModifier.fillMaxSize()) {
                 drawGaugeRing(
-                    fraction = gauge.usedPercent / PERCENT,
+                    fraction = gauge.shownPercent / PERCENT,
                     geometry = SmallRing,
                     active = colors.accent(gauge.provider).rc,
                     track = colors.track.rc,
                 )
             }
             WidgetText(
-                text = gauge.usedPercent.toString(),
+                text = gauge.shownPercent.toString(),
                 color = colors.onSurface,
                 fontSize = render.sp(SMALL_NUMBER),
                 fontWeight = FontWeight.ExtraBold,
