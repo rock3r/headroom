@@ -33,9 +33,16 @@ internal constructor(
             widgets.appWidgetIds(HeadroomWidgetProvider.classFor(style)).forEach { appWidgetId ->
                 val config = configStore.get(appWidgetId) ?: WidgetConfig.defaultFor(style)
                 val options = widgets.options(appWidgetId)
-                val size = options.widgetSize() ?: HeadroomWidgetProvider.defaultSize(style)
-                val state = WidgetUiState.from(accounts, config, now, size, options.hostCategory())
-                widgets.update(appWidgetId, render(context, state, appWidgetId, size))
+                val sizes =
+                    options.widgetSizes().ifEmpty {
+                        listOf(HeadroomWidgetProvider.defaultSize(style))
+                    }
+                val layouts = sizes.associateWith { size ->
+                    val state =
+                        WidgetUiState.from(accounts, config, now, size, options.hostCategory())
+                    render(context, state, appWidgetId, size)
+                }
+                widgets.update(appWidgetId, layouts)
             }
         }
     }
@@ -77,7 +84,8 @@ internal interface AppWidgetGateway {
 
     fun options(appWidgetId: Int): Bundle
 
-    fun update(appWidgetId: Int, views: RemoteViews)
+    /** Shows [layouts], one per size the launcher lists for the widget. */
+    fun update(appWidgetId: Int, layouts: Map<WidgetSize, RemoteViews>)
 
     fun setPreview(provider: Class<out HeadroomWidgetProvider>, views: RemoteViews)
 }
@@ -90,8 +98,8 @@ internal class SystemAppWidgetGateway(private val context: Context) : AppWidgetG
 
     override fun options(appWidgetId: Int): Bundle = manager.getAppWidgetOptions(appWidgetId)
 
-    override fun update(appWidgetId: Int, views: RemoteViews) {
-        manager.updateAppWidget(appWidgetId, views)
+    override fun update(appWidgetId: Int, layouts: Map<WidgetSize, RemoteViews>) {
+        manager.updateAppWidget(appWidgetId, layouts.toRemoteViews())
     }
 
     override fun setPreview(provider: Class<out HeadroomWidgetProvider>, views: RemoteViews) {
@@ -104,18 +112,26 @@ internal class SystemAppWidgetGateway(private val context: Context) : AppWidgetG
 }
 
 /**
- * The widget size from the launcher's options. When the launcher lists several sizes (one per
- * orientation), the smallest width and height are used so nothing overflows.
+ * The widget sizes from the launcher's options, in dp. A launcher usually lists one size per
+ * orientation; each gets its own layout, so the widget fills the space it has in both.
  */
-internal fun Bundle.widgetSize(): WidgetSize? {
+internal fun Bundle.widgetSizes(): List<WidgetSize> {
     val sizes = getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF::class.java)
     if (!sizes.isNullOrEmpty()) {
-        return WidgetSize(sizes.minOf { it.width }, sizes.minOf { it.height })
+        return sizes.map { WidgetSize(it.width, it.height) }.distinct()
     }
     val width = getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
     val height = getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
-    return if (width > 0 && height > 0) WidgetSize(width.toFloat(), height.toFloat()) else null
+    return if (width > 0 && height > 0) listOf(WidgetSize(width.toFloat(), height.toFloat()))
+    else emptyList()
 }
+
+/** One layout as is, or several as views the launcher picks from by the widget's size. */
+internal fun Map<WidgetSize, RemoteViews>.toRemoteViews(): RemoteViews =
+    values.singleOrNull()
+        ?: RemoteViews(
+            entries.associate { (size, views) -> SizeF(size.widthDp, size.heightDp) to views }
+        )
 
 internal fun Bundle.hostCategory(): WidgetHostCategory =
     if (

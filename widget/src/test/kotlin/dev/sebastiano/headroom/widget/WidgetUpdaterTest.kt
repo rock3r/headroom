@@ -10,6 +10,8 @@ import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -27,9 +29,11 @@ class WidgetUpdaterTest {
     private val store = InMemoryWidgetConfigStore()
     private val gateway = FakeGateway()
     private val rendered = mutableMapOf<Int, Pair<WidgetUiState, WidgetSize>>()
+    private val renderedSizes = mutableMapOf<Int, MutableList<WidgetSize>>()
     private val updater =
         WidgetUpdater(store, { gateway }) { _, state, appWidgetId, size ->
             rendered[appWidgetId] = state to size
+            renderedSizes.getOrPut(appWidgetId) { mutableListOf() } += size
             RemoteViews(context.packageName, android.R.layout.simple_list_item_1)
         }
 
@@ -63,30 +67,44 @@ class WidgetUpdaterTest {
 
     @Test
     fun `reads the size from the widget options`() = runTest {
-        gateway.ids[BarsWidgetProvider::class.java] = intArrayOf(3, 4, 5)
+        gateway.ids[BarsWidgetProvider::class.java] = intArrayOf(3, 5)
         gateway.options[3] =
             Bundle().apply {
                 putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 300)
                 putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 110)
-            }
-        gateway.options[4] =
-            Bundle().apply {
-                putParcelableArrayList(
-                    AppWidgetManager.OPTION_APPWIDGET_SIZES,
-                    arrayListOf(SizeF(320f, 60f), SizeF(280f, 90f)),
-                )
             }
 
         updater.updateAll(context, accounts, now)
 
         assertEquals(WidgetSize(300f, 110f), rendered.getValue(3).second)
         assertEquals(3, assertIs<WidgetUiState.Bars>(rendered.getValue(3).first).gauges.size)
-        // With several sizes, use the smallest width and height so nothing overflows.
-        assertEquals(WidgetSize(280f, 60f), rendered.getValue(4).second)
         // Without options, the style's default size.
         assertEquals(
             HeadroomWidgetProvider.defaultSize(WidgetStyle.Bars),
             rendered.getValue(5).second,
+        )
+    }
+
+    @Test
+    fun `draws one layout per size the launcher lists`() = runTest {
+        gateway.ids[BarsWidgetProvider::class.java] = intArrayOf(4)
+        gateway.options[4] =
+            Bundle().apply {
+                putParcelableArrayList(
+                    AppWidgetManager.OPTION_APPWIDGET_SIZES,
+                    arrayListOf(SizeF(320f, 60f), SizeF(280f, 90f), SizeF(320f, 60f)),
+                )
+            }
+
+        updater.updateAll(context, accounts, now)
+
+        assertEquals(
+            listOf(WidgetSize(320f, 60f), WidgetSize(280f, 90f)),
+            renderedSizes.getValue(4),
+        )
+        assertEquals(
+            setOf(WidgetSize(320f, 60f), WidgetSize(280f, 90f)),
+            gateway.updated.getValue(4).keys,
         )
     }
 
@@ -131,10 +149,22 @@ class WidgetUpdaterTest {
         assertEquals(setOf(1), gateway.updated.keys)
     }
 
+    @Test
+    fun `one layout is sent as is and several become one sized view`() {
+        val small = RemoteViews(context.packageName, android.R.layout.simple_list_item_1)
+        val large = RemoteViews(context.packageName, android.R.layout.simple_list_item_2)
+
+        assertSame(small, mapOf(WidgetSize(100f, 100f) to small).toRemoteViews())
+        val sized =
+            mapOf(WidgetSize(100f, 100f) to small, WidgetSize(200f, 200f) to large).toRemoteViews()
+        assertNotSame(small, sized)
+        assertNotSame(large, sized)
+    }
+
     private class FakeGateway : AppWidgetGateway {
         val ids = mutableMapOf<Class<*>, IntArray>()
         val options = mutableMapOf<Int, Bundle>()
-        val updated = mutableMapOf<Int, RemoteViews>()
+        val updated = mutableMapOf<Int, Map<WidgetSize, RemoteViews>>()
         val previews = mutableMapOf<Class<*>, RemoteViews>()
 
         override fun appWidgetIds(provider: Class<out HeadroomWidgetProvider>): IntArray =
@@ -142,8 +172,8 @@ class WidgetUpdaterTest {
 
         override fun options(appWidgetId: Int): Bundle = options[appWidgetId] ?: Bundle()
 
-        override fun update(appWidgetId: Int, views: RemoteViews) {
-            updated[appWidgetId] = views
+        override fun update(appWidgetId: Int, layouts: Map<WidgetSize, RemoteViews>) {
+            updated[appWidgetId] = layouts
         }
 
         override fun setPreview(provider: Class<out HeadroomWidgetProvider>, views: RemoteViews) {
