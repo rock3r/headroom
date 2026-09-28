@@ -53,6 +53,8 @@ dependencies {
     implementation(libs.androidx.browser)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.haze)
+    implementation(libs.haze.blur)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)

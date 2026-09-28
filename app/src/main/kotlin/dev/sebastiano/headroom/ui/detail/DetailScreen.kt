@@ -53,6 +53,7 @@ import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.asFraction
 import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.SectionLabel
+import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.usedLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
@@ -99,43 +100,46 @@ fun DetailScreen(
         modifier = modifier.fillMaxSize().then(container).testTag(DETAIL_TAG),
         color = Color.Transparent,
     ) {
-        Column(
-            modifier =
-                Modifier.fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = insets.calculateTopPadding() + 4.dp,
-                        bottom = insets.calculateBottomPadding() + 24.dp,
-                    ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            val content = Modifier.widthIn(max = 600.dp).fillMaxWidth()
-            DetailTopBar(account, onBack, sharedElements, content)
-            account.primary?.let { HeroRing(account, it, sharedElements) }
-            account.error?.let {
-                Text(
-                    text = errorText(it),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = content,
-                )
+        val scrollState = rememberScrollState()
+        StatusBarBlurBox(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier =
+                    Modifier.fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = insets.calculateTopPadding() + 4.dp,
+                            bottom = insets.calculateBottomPadding() + 24.dp,
+                        ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                val content = Modifier.widthIn(max = 600.dp).fillMaxWidth()
+                DetailTopBar(account, onBack, sharedElements, content)
+                account.primary?.let { HeroRing(account, it, sharedElements) }
+                account.error?.let {
+                    Text(
+                        text = errorText(it),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = content,
+                    )
+                }
+                WindowList(account, state.now, formatter, content)
+                state.chart?.let {
+                    ChartCard(
+                        chart = it,
+                        now = state.now,
+                        formatter = formatter,
+                        windows = state.chartWindows,
+                        selectedWindowId = state.chartWindowId,
+                        onWindowChange = onChartWindowChange,
+                        modifier = content,
+                    )
+                }
+                AlertSection(account, formatter, onAlertChange, content)
             }
-            WindowList(account, state.now, formatter, content)
-            state.chart?.let {
-                ChartCard(
-                    chart = it,
-                    now = state.now,
-                    formatter = formatter,
-                    windows = state.chartWindows,
-                    selectedWindowId = state.chartWindowId,
-                    onWindowChange = onChartWindowChange,
-                    modifier = content,
-                )
-            }
-            AlertSection(account, formatter, onAlertChange, content)
         }
     }
 }

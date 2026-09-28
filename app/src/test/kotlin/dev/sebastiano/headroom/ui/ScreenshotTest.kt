@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -85,6 +86,29 @@ class ScreenshotTest {
         rule.onNodeWithTag(OVERVIEW_LIST_TAG).performScrollToIndex(GROK_INDEX)
         rule.onNodeWithTag(accountCardTag("demo-grok")).performClick()
         capture("detail-dark")
+    }
+
+    @Test
+    fun detailScrolled() {
+        launch()
+        // A status bar, so the detail scrolls under it and the blur behind it shows.
+        rule.runOnUiThread { rule.activity.giveStatusBar(STATUS_BAR_PX) }
+        // With the clock paused, the scroll never goes idle once the blur runs, so let it run.
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag(accountCardTag("demo-claude")).performClick()
+        rule.onNodeWithText("Session limits never send alerts.").performScrollTo()
+        rule.mainClock.autoAdvance = false
+        capture("detail-scrolled")
+    }
+
+    @Test
+    fun overviewScrolledDark() {
+        launch(dark = true)
+        rule.runOnUiThread { rule.activity.giveStatusBar(STATUS_BAR_PX) }
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).performScrollToIndex(GROK_INDEX)
+        rule.mainClock.autoAdvance = false
+        capture("overview-scrolled-dark")
     }
 
     @Test
@@ -175,6 +199,8 @@ class ScreenshotTest {
 private const val GROK_INDEX = 6
 private const val SETTLE_STEPS = 40
 private const val STEP_MILLIS = 50L
+/** 24dp at xxhdpi, the height of a phone status bar. */
+private const val STATUS_BAR_PX = 72
 private const val PHONE = "w411dp-h891dp-xxhdpi"
 private const val MEDIUM = "w700dp-h1000dp-xhdpi"
 private const val EXPANDED = "w1280dp-h800dp-xhdpi"

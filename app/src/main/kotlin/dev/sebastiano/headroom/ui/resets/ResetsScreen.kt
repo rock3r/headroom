@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.SectionLabel
+import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.WindowSummary
@@ -67,57 +69,62 @@ fun ResetsScreen(
             }
             .sortedBy { (_, window) -> window.resetsAt }
     val insets = WindowInsets.safeDrawing.asPaddingValues()
-    LazyColumn(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                .testTag(RESETS_TAG),
-        contentPadding =
-            PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = insets.calculateTopPadding() + 8.dp,
-                bottom = insets.calculateBottomPadding() + bottomPadding + 16.dp,
-            ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        val width = Modifier.widthIn(max = 600.dp).fillMaxWidth()
-        item {
-            ScreenHeader(
-                title = stringResource(R.string.resets_title),
-                subtitle =
-                    pluralStringResource(
-                        R.plurals.resets_subtitle,
-                        upcoming.size,
-                        upcoming.count { it.second.alertEnabled },
-                        upcoming.size,
-                    ),
-                modifier = width,
-            )
-        }
-        if (upcoming.isEmpty()) {
+    val listState = rememberLazyListState()
+    StatusBarBlurBox(scrollState = listState, modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier =
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                    )
+                    .testTag(RESETS_TAG),
+            contentPadding =
+                PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = insets.calculateTopPadding() + 8.dp,
+                    bottom = insets.calculateBottomPadding() + bottomPadding + 16.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val width = Modifier.widthIn(max = 600.dp).fillMaxWidth()
             item {
-                Text(
-                    text = stringResource(R.string.resets_none),
-                    style = MaterialTheme.typography.bodyLarge,
+                ScreenHeader(
+                    title = stringResource(R.string.resets_title),
+                    subtitle =
+                        pluralStringResource(
+                            R.plurals.resets_subtitle,
+                            upcoming.size,
+                            upcoming.count { it.second.alertEnabled },
+                            upcoming.size,
+                        ),
                     modifier = width,
                 )
             }
-            return@LazyColumn
-        }
-        item { SectionLabel(stringResource(R.string.resets_upcoming), width) }
-        item {
-            ListCard(width) {
-                upcoming.forEachIndexed { index, (account, window) ->
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-                    UpcomingRow(account, window, state, formatter)
+            if (upcoming.isEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.resets_none),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = width,
+                    )
+                }
+                return@LazyColumn
+            }
+            item { SectionLabel(stringResource(R.string.resets_upcoming), width) }
+            item {
+                ListCard(width) {
+                    upcoming.forEachIndexed { index, (account, window) ->
+                        if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
+                        UpcomingRow(account, window, state, formatter)
+                    }
                 }
             }
+            item { SectionLabel(stringResource(R.string.resets_history), width) }
+            item { HistoryCard(state.accounts, width) }
         }
-        item { SectionLabel(stringResource(R.string.resets_history), width) }
-        item { HistoryCard(state.accounts, width) }
     }
 }
 

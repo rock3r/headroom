@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -57,6 +58,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.ui.components.ListCard
+import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 
 const val ACCOUNTS_TAG: String = "accounts"
 
@@ -135,34 +137,38 @@ internal fun StepScaffold(
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     val insets = WindowInsets.safeDrawing.asPaddingValues()
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding =
-            PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = insets.calculateTopPadding() + 4.dp,
-                bottom = insets.calculateBottomPadding() + 24.dp,
-            ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        item {
-            Row(
-                modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onNavigate) {
-                    Icon(painterResource(navigationIcon), contentDescription = navigationLabel)
+    val listState = rememberLazyListState()
+    StatusBarBlurBox(scrollState = listState, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding =
+                PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = insets.calculateTopPadding() + 4.dp,
+                    bottom = insets.calculateBottomPadding() + 24.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onNavigate) {
+                        Icon(painterResource(navigationIcon), contentDescription = navigationLabel)
+                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(start = 4.dp).semantics { heading() },
+                    )
                 }
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(start = 4.dp).semantics { heading() },
-                )
             }
+            content()
         }
-        content()
     }
 }
 

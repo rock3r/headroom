@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,6 +53,7 @@ import dev.sebastiano.headroom.designsystem.providerColors
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.asFraction
 import dev.sebastiano.headroom.ui.components.ScreenHeader
+import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlin.math.roundToInt
@@ -70,32 +72,43 @@ fun WidgetsScreen(
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val insets = WindowInsets.safeDrawing.asPaddingValues()
-    LazyColumn(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                .testTag(WIDGETS_TAG),
-        contentPadding =
-            PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = insets.calculateTopPadding() + 8.dp,
-                bottom = insets.calculateBottomPadding() + bottomPadding + 16.dp,
-            ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        val width = Modifier.widthIn(max = 600.dp).fillMaxWidth()
-        item {
-            ScreenHeader(
-                title = stringResource(R.string.widgets_title),
-                subtitle = stringResource(R.string.widgets_subtitle),
-                modifier = width,
-            )
-        }
-        items(WidgetStyle.entries) { style ->
-            WidgetCard(style, state, formatter, onAdd = { onAddWidget(style) }, modifier = width)
+    val listState = rememberLazyListState()
+    StatusBarBlurBox(scrollState = listState, modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier =
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                    )
+                    .testTag(WIDGETS_TAG),
+            contentPadding =
+                PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = insets.calculateTopPadding() + 8.dp,
+                    bottom = insets.calculateBottomPadding() + bottomPadding + 16.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val width = Modifier.widthIn(max = 600.dp).fillMaxWidth()
+            item {
+                ScreenHeader(
+                    title = stringResource(R.string.widgets_title),
+                    subtitle = stringResource(R.string.widgets_subtitle),
+                    modifier = width,
+                )
+            }
+            items(WidgetStyle.entries) { style ->
+                WidgetCard(
+                    style,
+                    state,
+                    formatter,
+                    onAdd = { onAddWidget(style) },
+                    modifier = width,
+                )
+            }
         }
     }
 }
