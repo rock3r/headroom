@@ -22,11 +22,14 @@ import kotlinx.serialization.json.doubleOrNull
  *   of the refresh token.
  * @property accessOptionsUrl The JetBrains user management endpoint that lists the account's AI
  *   access options.
+ * @property orgsUserInfoUrl The JetBrains Cloud organisation service endpoint that gives the signed
+ *   list of the account's organisations, which a workspace seat's token request needs.
  */
 internal class JetBrainsAiEndpoints(
     val aiBaseUrl: String,
     val accountTokenUrl: String,
     val accessOptionsUrl: String,
+    val orgsUserInfoUrl: String,
 ) {
     companion object {
         private const val AI_BASE_URL = "https://api.jetbrains.ai"
@@ -35,6 +38,9 @@ internal class JetBrainsAiEndpoints(
         private const val TOKEN_PATH = "/oauth2/token"
         private const val ACCESS_OPTIONS_PATH = "/user-management/api/ai-access-options"
 
+        /** The Junie CLI's `JcpSeatEnvironment.Production.orgServiceUrl` and its path. */
+        private const val ORGS_USER_INFO_PATH = "/org/orgsuserinfo"
+
         /** The production endpoints, or all of them on [baseUrlOverride] when it is not blank. */
         fun resolve(baseUrlOverride: String?): JetBrainsAiEndpoints =
             JetBrainsAiEndpoints(
@@ -42,6 +48,8 @@ internal class JetBrainsAiEndpoints(
                 accountTokenUrl = resolveBaseUrl(baseUrlOverride, ACCOUNT_BASE_URL) + TOKEN_PATH,
                 accessOptionsUrl =
                     resolveBaseUrl(baseUrlOverride, CLOUD_BASE_URL) + ACCESS_OPTIONS_PATH,
+                orgsUserInfoUrl =
+                    resolveBaseUrl(baseUrlOverride, CLOUD_BASE_URL) + ORGS_USER_INFO_PATH,
             )
     }
 }
@@ -56,9 +64,11 @@ internal class JetBrainsAiEndpoints(
  * skipped and does not stop the others.
  * - A license: the OpenID ID token and the license id obtain a JetBrains AI token, which reads the
  *   quota and its refill schedule from the `/user/v5` API.
- * - A workspace seat: the refresh token switches to the `ai-access` audience for the seat's
- *   organisation and workspace, as the IDE and the Junie CLI do, and that token reads the quota and
- *   its refill schedule from the `/quota/api` API, as the IDE does.
+ * - A workspace seat: as the Junie CLI does, the refresh token first switches to the `org-service`
+ *   audience, which reads the signed list of the account's organisations (the "orgs user info"
+ *   JWT). This happens once for all seats. Then the refresh token switches to the `ai-access`
+ *   audience with the seat's organisation, workspace and that JWT. The seat token reads the quota
+ *   and its refill schedule from the `/quota/api` API on the JetBrains AI API, as the IDE does.
  *
  * When no option gives a quota, the ID token obtains the free grazie-lite license and reads its
  * quota, as before access options existed.
@@ -109,6 +119,14 @@ internal class JetBrainsAiQuotaReader(
         if (refreshToken != null) {
             val sources = findQuotaSources(endpoints, refreshToken)
             sources.forEach { (_, source) -> rememberAll(source.ids) }
+            val orgsUserInfo =
+                if (sources.any { it.value is JetBrainsQuotaSource.Workspace }) {
+                    readOrgsUserInfo(endpoints, refreshToken).also {
+                        if (it == null) log("No orgs user info, so the workspace seats are skipped")
+                    }
+                } else {
+                    null
+                }
             val read = sources.mapNotNull { (position, source) ->
                 val tag = "${source.logName.substringBefore(' ')} $position"
                 val window =
@@ -122,7 +140,9 @@ internal class JetBrainsAiQuotaReader(
                                 source,
                             )
                         is JetBrainsQuotaSource.Workspace ->
-                            readSeatWindow(tag, endpoints, refreshToken, source)
+                            orgsUserInfo?.let {
+                                readSeatWindow(tag, endpoints, refreshToken, source, it)
+                            }
                     }
                 window?.let { source to it }
             }
@@ -193,6 +213,37 @@ internal class JetBrainsAiQuotaReader(
     private fun noSources(reason: String): List<IndexedValue<JetBrainsQuotaSource>> {
         log(reason)
         return emptyList()
+    }
+
+    /**
+     * The orgs user info JWT, which the token service needs to give a workspace seat's token, or
+     * `null` after logging why there is none. The Junie CLI
+     * (`JcpKtorSeatAuthClient.orgsUserInfoJwt`) gets it the same way: an `org-service` token reads
+     * the organisation service, and the JWT is the first JWT-shaped text in the response.
+     */
+    private suspend fun readOrgsUserInfo(
+        endpoints: JetBrainsAiEndpoints,
+        refreshToken: String,
+    ): String? {
+        val orgServiceToken =
+            switchAudience(ORG_SERVICE_SWITCH_STEP, endpoints, refreshToken, ORG_SERVICE_AUDIENCE)
+                ?: return null
+        // The response names the account's organisations and people, so only its length is logged.
+        val body =
+            sendForBody(
+                ORGS_USER_INFO_STEP,
+                QuotaHttpRequest(
+                    url = endpoints.orgsUserInfoUrl,
+                    headers =
+                        mapOf("Authorization" to bearer(orgServiceToken), "Accept" to JSON_TYPE),
+                ),
+                logBodyStart = false,
+            ) ?: return null
+        return JWT.find(body)?.value?.also { remember(it) }
+            ?: run {
+                log("$ORGS_USER_INFO_STEP: response has no JWT (${body.length} chars)")
+                null
+            }
     }
 
     /**
@@ -276,29 +327,33 @@ internal class JetBrainsAiQuotaReader(
         )
     }
 
-    /** The quota window of a workspace seat, or `null` when any step fails or it has no quota. */
+    /**
+     * The quota window of a workspace seat, or `null` when any step fails or it has no quota.
+     *
+     * The seat token request is the Junie CLI's (`JcpTokenExchangeClient.switchAudience`): the
+     * organisation, the workspace and the [orgsUserInfo] JWT. If the token service rejects it, one
+     * retry leaves out the organisation, because the IDE asks for a seat token with only the
+     * workspace. Without `orgs_user_info` the service rejects a workspace, and a token for only the
+     * organisation reads no seat quota, so neither is tried.
+     */
     private suspend fun readSeatWindow(
         tag: String,
         endpoints: JetBrainsAiEndpoints,
         refreshToken: String,
         source: JetBrainsQuotaSource.Workspace,
+        orgsUserInfo: String,
     ): QuotaWindow? {
-        // The Junie CLI sends both ids; the IDE sends only the workspace. The token service
-        // rejects a parameter it does not take, so try each form in turn.
-        val workspace = "workspace_id" to source.workspaceId
-        val org = source.orgId?.let { "org_id" to it }
-        val scopes =
-            listOfNotNull(listOfNotNull(org, workspace), listOf(workspace), org?.let(::listOf))
+        val seat = listOf("workspace_id" to source.workspaceId, "orgs_user_info" to orgsUserInfo)
+        val scopes = listOfNotNull(source.orgId?.let { listOf("org_id" to it) + seat }, seat)
+        val step = tagged(tag, SWITCH_STEP)
         val seatToken =
-            scopes.distinct().withIndex().firstNotNullOfOrNull { (attempt, scope) ->
-                val step = tagged(tag, SWITCH_STEP)
+            scopes.withIndex().firstNotNullOfOrNull { (attempt, scope) ->
                 switchAudience(
-                    if (attempt == 0) step
-                    else "$step, retry with ${scope.joinToString(" and ") { it.first }}",
+                    if (attempt == 0) step else "$step, retry without org_id",
                     endpoints,
                     refreshToken,
                     AI_ACCESS_AUDIENCE,
-                    scope.toList(),
+                    scope,
                 )
             } ?: return null
         val headers = mapOf("Authorization" to bearer(seatToken), "Accept" to JSON_TYPE)
@@ -365,21 +420,35 @@ internal class JetBrainsAiQuotaReader(
             }
     }
 
-    private fun post(url: String, headers: Map<String, String>, body: String = EMPTY_BODY) =
-        QuotaHttpRequest(url = url, method = "POST", headers = headers, body = body)
-
     /**
      * Sends [request] and returns the JSON object of a 2xx response, or `null` after logging why.
-     *
-     * A failed call logs the start of its body when [logBodyStart] is true. Otherwise it logs only
-     * the body's [redactedShape] and a [safeWord] OAuth error code, for calls whose error body
-     * could contain a token, an id or a name.
+     * It logs like [sendForBody].
      */
     private suspend fun send(
         step: String,
         request: QuotaHttpRequest,
         logBodyStart: Boolean = true,
     ): JsonObject? {
+        val body = sendForBody(step, request, logBodyStart) ?: return null
+        return parseOrNull { quotaJson.parseToJsonElement(body) as? JsonObject }
+            ?: run {
+                log("$step: response is not a JSON object")
+                null
+            }
+    }
+
+    /**
+     * Sends [request] and returns the body of a 2xx response, or `null` after logging why.
+     *
+     * A failed call logs the start of its body when [logBodyStart] is true. Otherwise it logs only
+     * the body's [redactedShape] and a [safeWord] OAuth error code, for calls whose error body
+     * could contain a token, an id or a name.
+     */
+    private suspend fun sendForBody(
+        step: String,
+        request: QuotaHttpRequest,
+        logBodyStart: Boolean,
+    ): String? {
         val response =
             try {
                 httpClient.execute(request)
@@ -398,11 +467,7 @@ internal class JetBrainsAiQuotaReader(
             return null
         }
         log("$step: HTTP ${response.statusCode}")
-        return parseOrNull { quotaJson.parseToJsonElement(response.body) as? JsonObject }
-            ?: run {
-                log("$step: response is not a JSON object")
-                null
-            }
+        return response.body
     }
 
     private fun missing(step: String, field: String): QuotaWindow? {
@@ -414,7 +479,6 @@ internal class JetBrainsAiQuotaReader(
         const val MIN_SECRET_CHARS = 6
         const val JSON_TYPE = "application/json"
         const val FORM_TYPE = "application/x-www-form-urlencoded"
-        const val EMPTY_BODY = "{}"
         const val AGENT = """{"name":"headroom","version":"1"}"""
         const val ERROR_BODY_CHARS = 200
         val HTTP_SUCCESS = 200..299
@@ -425,6 +489,14 @@ internal class JetBrainsAiQuotaReader(
 
         /** The audience of a workspace seat's token, for the seat's organisation and workspace. */
         const val AI_ACCESS_AUDIENCE = "ai-access"
+
+        /** The audience of the token that reads the orgs user info. */
+        const val ORG_SERVICE_AUDIENCE = "org-service"
+        const val ORG_SERVICE_SWITCH_STEP = "org-service switch-audience"
+        const val ORGS_USER_INFO_STEP = "orgsuserinfo"
+
+        /** The Junie CLI's `JcpOrgServiceClient.extractJwt` pattern: three base64url parts. */
+        val JWT = Regex("[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]+")
 
         const val SWITCH_STEP = "switch-audience"
         const val OPTIONS_STEP = "ai-access-options"
@@ -460,6 +532,11 @@ internal class JetBrainsAiQuotaReader(
 }
 
 private fun formEncode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8)
+
+private fun post(url: String, headers: Map<String, String>, body: String = EMPTY_BODY) =
+    QuotaHttpRequest(url = url, method = "POST", headers = headers, body = body)
+
+private const val EMPTY_BODY = "{}"
 
 /** A percentage for the log: whole numbers as they are, others with one decimal. */
 private fun formatPercent(percent: Double): String {
