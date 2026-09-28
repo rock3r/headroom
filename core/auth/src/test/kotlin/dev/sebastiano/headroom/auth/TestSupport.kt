@@ -11,14 +11,17 @@ import okhttp3.Request
 internal fun testIoDispatcher(): ExecutorCoroutineDispatcher =
     Executors.newCachedThreadPool().asCoroutineDispatcher()
 
-internal data class BrowserReply(val status: Int, val body: String)
+internal data class BrowserReply(val status: Int, val body: String, val location: String? = null)
 
 /** Plays the browser following a redirect to the loopback listener. */
 internal suspend fun browserGet(io: ExecutorCoroutineDispatcher, url: String): BrowserReply =
     withContext(io) {
-        OkHttpClient().newCall(Request.Builder().url(url).build()).execute().use {
-            BrowserReply(it.code, it.body.string())
-        }
+        OkHttpClient.Builder()
+            .followRedirects(false)
+            .build()
+            .newCall(Request.Builder().url(url).build())
+            .execute()
+            .use { BrowserReply(it.code, it.body.string(), it.header("Location")) }
     }
 
 /** The query parameters of [url] in order, decoded. */

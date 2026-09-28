@@ -147,7 +147,7 @@ class ClaudeOAuthTest {
         assertEquals("acc-uuid", tokens.providerAccountId)
         assertEquals("sam@example.com", tokens.label)
         assertEquals("org-uuid", tokens.extras[CredentialExtras.CLAUDE_ORGANIZATION_ID])
-        assertEquals(200, browser.await().status)
+        assertEquals("headroom://signed-in", browser.await().location)
     }
 
     @Test

@@ -165,6 +165,17 @@ internal constructor(
         }
 
     private suspend fun exchangeAndAnswer(callback: LoopbackCallback): TokenSet {
+        if (returnUrl != null) {
+            // Android blocks the network of an app in the background, and the browser is in
+            // front. Sending the browser back first brings the app to the front for the exchange.
+            callback.use { answer(callback, CallbackPage.redirect(returnUrl)) }
+            return try {
+                spec.exchange(callback.code, loopbackRedirectUri, pkce, state)
+            } catch (_: AuthException.Network) {
+                retryExchange(callback.code)
+            }
+        }
+        // Without an app to return to, the browser waits for the exchange and shows the result.
         // This sign-in owns the held browser connection; release it even when cancelled.
         callback.use {
             try {

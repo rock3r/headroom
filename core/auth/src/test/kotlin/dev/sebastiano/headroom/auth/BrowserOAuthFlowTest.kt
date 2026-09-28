@@ -79,8 +79,41 @@ class BrowserOAuthFlowTest {
         assertEquals("access-c1", tokens.accessToken)
         assertEquals(listOf("c1" to "http://localhost:$port/callback"), spec.exchanges)
         val reply = browser.await()
-        assertEquals(200, reply.status)
-        assertContains(reply.body, "headroom://signed-in")
+        assertEquals(302, reply.status)
+        assertEquals("headroom://signed-in", reply.location)
+    }
+
+    @Test
+    fun `with a return URL the browser goes back to the app before the exchange`() = runTest {
+        // Android blocks the network of an app in the background, and the browser is in front.
+        // Sending the browser straight back brings the app to the front for the exchange.
+        val spec = FakeSpec()
+        val gate = CompletableDeferred<Unit>()
+        val slow =
+            object : BrowserOAuthSpec by spec {
+                override suspend fun exchange(
+                    code: String,
+                    redirectUri: String,
+                    pkce: Pkce,
+                    state: String,
+                ): TokenSet {
+                    gate.await()
+                    return spec.exchange(code, redirectUri, pkce, state)
+                }
+            }
+        val signIn = BrowserOAuthFlow(slow, io).start("headroom://signed-in")
+        val browser = async {
+            browserGet(
+                io,
+                "http://127.0.0.1:${portOf(signIn)}/callback?code=c&state=${stateOf(signIn)}",
+            )
+        }
+        val tokens = async { signIn.awaitTokens() }
+
+        assertEquals("headroom://signed-in", browser.await().location)
+        assertFalse(tokens.isCompleted)
+        gate.complete(Unit)
+        assertEquals("access-c", tokens.await().accessToken)
     }
 
     @Test
@@ -118,7 +151,7 @@ class BrowserOAuthFlowTest {
     @Test
     fun `a failed exchange shows a failure page and is rethrown`() = runTest {
         val failure = AuthException.Rejected(400, "invalid_grant", "bad code")
-        val signIn = BrowserOAuthFlow(FakeSpec(failExchange = failure), io).start("headroom://x")
+        val signIn = BrowserOAuthFlow(FakeSpec(failExchange = failure), io).start(null)
         val browser = async {
             browserGet(
                 io,
@@ -131,7 +164,6 @@ class BrowserOAuthFlowTest {
         val reply = browser.await()
         assertEquals(400, reply.status)
         assertContains(reply.body, "Sign-in failed")
-        assertContains(reply.body, "headroom://x")
     }
 
     /** Fails the first [failures] exchanges as Android does for a backgrounded app. */
@@ -158,7 +190,7 @@ class BrowserOAuthFlowTest {
         // Android blocks the network of a backgrounded app, and the browser is in front
         // until the user goes back to Headroom.
         val spec = OfflineSpec(FakeSpec(), failures = 3)
-        val signIn = BrowserOAuthFlow(spec, io).start("headroom://signed-in")
+        val signIn = BrowserOAuthFlow(spec, io).start(null)
         val browser = async {
             browserGet(
                 io,
@@ -173,7 +205,6 @@ class BrowserOAuthFlowTest {
         val reply = browser.await()
         assertEquals(200, reply.status)
         assertContains(reply.body, "Go back to Headroom to finish")
-        assertContains(reply.body, "headroom://signed-in")
     }
 
     @Test

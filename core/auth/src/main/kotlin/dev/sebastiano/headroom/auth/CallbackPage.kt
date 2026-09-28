@@ -4,10 +4,28 @@ package dev.sebastiano.headroom.auth
  * The small, self-contained HTML page the loopback listener shows in the browser once sign-in
  * finishes. It links back to the app with the caller's custom scheme URL.
  */
-public class CallbackPage internal constructor(public val status: Int, public val html: String) {
+public class CallbackPage
+internal constructor(
+    public val status: Int,
+    public val html: String,
+    /** Where a redirect sends the browser, or null for a page. */
+    public val location: String? = null,
+) {
     public companion object {
         private const val OK = 200
+        private const val FOUND = 302
         private const val BAD_REQUEST = 400
+
+        /**
+         * Sends the browser straight to [url], which opens the app. The browser allows it because
+         * the redirect chain started with the user's tap on the provider's page.
+         */
+        public fun redirect(url: String): CallbackPage =
+            CallbackPage(
+                FOUND,
+                render(title = "Returning to Headroom", message = "", returnUrl = url),
+                location = url,
+            )
 
         public fun success(returnUrl: String?): CallbackPage =
             CallbackPage(

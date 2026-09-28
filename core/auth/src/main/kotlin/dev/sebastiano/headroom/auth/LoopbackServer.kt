@@ -275,7 +275,7 @@ internal constructor(
      * Sends [page] to the browser and closes the connection. Blocking; call it off the UI thread.
      */
     public fun respond(page: CallbackPage) {
-        client.answer(page.status, LoopbackServer.HTML, page.html, corsOrigin)
+        client.answer(page.status, LoopbackServer.HTML, page.html, corsOrigin, page.location)
     }
 
     /**
@@ -358,12 +358,19 @@ private fun decode(value: String): String =
         value
     }
 
-private fun Socket.answer(status: Int, contentType: String?, body: String, corsOrigin: String?) {
+private fun Socket.answer(
+    status: Int,
+    contentType: String?,
+    body: String,
+    corsOrigin: String?,
+    location: String? = null,
+) {
     try {
         val bytes = body.toByteArray()
         val head = buildString {
             append("HTTP/1.1 $status ${reasonPhrase(status)}\r\n")
             if (contentType != null) append("Content-Type: $contentType\r\n")
+            if (location != null) append("Location: $location\r\n")
             append("Content-Length: ${bytes.size}\r\n")
             append("Cache-Control: no-store\r\n")
             append("Connection: close\r\n")
@@ -389,7 +396,13 @@ private fun Socket.answer(status: Int, contentType: String?, body: String, corsO
 }
 
 private val REASON_PHRASES =
-    mapOf(200 to "OK", 204 to "No Content", 400 to "Bad Request", 404 to "Not Found")
+    mapOf(
+        200 to "OK",
+        204 to "No Content",
+        302 to "Found",
+        400 to "Bad Request",
+        404 to "Not Found",
+    )
 
 private fun reasonPhrase(status: Int): String = REASON_PHRASES[status] ?: "Error"
 
