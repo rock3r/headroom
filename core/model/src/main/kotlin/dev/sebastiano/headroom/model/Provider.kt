@@ -11,6 +11,13 @@ public enum class Provider(public val id: String, public val displayName: String
     OpenCodeGo("opencode-go", "OpenCode Go"),
     JetBrains("jetbrains", "JetBrains AI");
 
+    /**
+     * True when each window is its own allowance, like JetBrains licences and workspace seats,
+     * rather than one more limit on a shared pool. The overview lists every allowance.
+     */
+    public val windowsAreSeparateAllowances: Boolean
+        get() = this == JetBrains
+
     public companion object {
         public fun fromId(id: String): Provider? = entries.firstOrNull { it.id == id }
     }

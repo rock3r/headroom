@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.model.Pace
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -86,6 +87,17 @@ internal fun AccountState.toSummary(
         error = lastError,
         pastResets = pastResets,
         justReset = justReset,
+        allowances =
+            if (account.provider.windowsAreSeparateAllowances) {
+                snapshot
+                    ?.windows
+                    .orEmpty()
+                    .filterNot { it.isUnlimited || it.kind == WindowKind.Session }
+                    .sortedByDescending { it == primary }
+                    .map { it.toSummary(account.id, now, alerts) }
+            } else {
+                emptyList()
+            },
     )
 }
 

@@ -59,6 +59,11 @@ data class AccountSummary(
     val name: String = provider.displayName,
     /** A remaining balance, for providers that report one. */
     val balance: QuotaBalance? = null,
+    /**
+     * Every allowance, primary first, for providers whose windows are separate allowances. Empty
+     * for the others. The card lists these in place of the primary window.
+     */
+    val allowances: List<WindowSummary> = emptyList(),
 )
 
 @Immutable

@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
@@ -95,6 +96,8 @@ fun AccountCard(
                         ),
                     style = MaterialTheme.typography.titleMedium,
                 )
+            } else if (account.allowances.isNotEmpty()) {
+                AllowanceRows(account, now, formatter, track, display)
             } else if (primary == null) {
                 Text(
                     text = stringResource(R.string.account_no_data),
@@ -136,6 +139,35 @@ fun AccountCard(
 }
 
 fun accountCardTag(accountId: String): String = "account-card-$accountId"
+
+/** One row per allowance, named after it. Only the primary one can be wavy or drain. */
+@Composable
+private fun AllowanceRows(
+    account: AccountSummary,
+    now: Instant,
+    formatter: ResetFormatter,
+    trackColor: Color,
+    display: QuotaDisplay,
+) {
+    account.allowances.forEach { window ->
+        val isPrimary = window.id == account.primary?.id
+        MeterRow(
+            label = window.label,
+            window = window,
+            wavy = isPrimary && account.needsAttention,
+            trailing = window.resetsAt?.let { formatter.short(it, now) },
+            trackColor = trackColor,
+            display = display,
+            draining = isPrimary && account.justReset,
+            labelWidth = ALLOWANCE_LABEL_WIDTH,
+        )
+    }
+}
+
+private val KIND_LABEL_WIDTH = 58.dp
+
+// Allowance names such as "JetBrains Team" are longer than "Weekly".
+private val ALLOWANCE_LABEL_WIDTH = 96.dp
 
 @Composable
 private fun CardTop(
@@ -232,6 +264,7 @@ private fun MeterRow(
     display: QuotaDisplay,
     showPace: Boolean = true,
     draining: Boolean = false,
+    labelWidth: Dp = KIND_LABEL_WIDTH,
 ) {
     val progress = display.percent(window.usedPercent).asFraction()
     Row(
@@ -243,8 +276,9 @@ private fun MeterRow(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(58.dp),
+            modifier = Modifier.width(labelWidth),
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         QuotaBar(
             progress = progress,
