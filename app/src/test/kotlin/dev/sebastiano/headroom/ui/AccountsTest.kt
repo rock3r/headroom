@@ -77,7 +77,7 @@ class AccountsTest {
     @Test
     fun `device code sign-in shows the code to enter and waits`() {
         openPicker()
-        pick(Provider.Codex)
+        pick(Provider.Kimi)
         rule.onNodeWithTag(SIGN_IN_USER_CODE_TAG).assertIsDisplayed()
         rule.onNodeWithText(FakeSignInController.DEMO_USER_CODE).assertIsDisplayed()
         rule.onNodeWithText("Copy code").assertIsDisplayed()

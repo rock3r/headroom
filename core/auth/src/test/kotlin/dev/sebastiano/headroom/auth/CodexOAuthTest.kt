@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
+import java.net.ServerSocket
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -11,14 +12,18 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 
-class CodexDeviceAuthTest {
+class CodexOAuthTest {
     private val now = Instant.parse("2026-09-27T12:00:00Z")
     private val server = MockWebServer()
-    private lateinit var codex: CodexDeviceAuth
+    private val io = testIoDispatcher()
+    private val port = ServerSocket(0).use { it.localPort }
+    private lateinit var codex: CodexOAuth
 
     private val idToken =
         fakeJwt(
@@ -29,83 +34,72 @@ class CodexDeviceAuthTest {
     fun setUp() {
         server.start()
         codex =
-            CodexDeviceAuth(
+            CodexOAuth(
                 http = OkHttpAuthHttpClient(),
                 clock = Clock.fixed(now, ZoneOffset.UTC),
-                issuer = server.url("/").toString().trimEnd('/'),
+                tokenEndpoint = server.url("/oauth/token").toString(),
+                callbackPort = port,
             )
     }
 
     @AfterTest
     fun tearDown() {
         server.close()
+        io.close()
     }
 
-    private fun grant() =
-        DeviceCodeGrant("ABCD-1234", "dev-auth-1", "https://x", null, Duration.ofSeconds(5), null)
+    private fun formOf(body: String?) = queryPairs("?" + checkNotNull(body))
 
     @Test
-    fun `requesting a code posts the client id as JSON`() = runTest {
-        server.enqueue(
-            MockResponse(
-                code = 200,
-                body = """{"device_auth_id":"dev-auth-1","user_code":"ABCD-1234","interval":"7"}""",
+    fun `the default listener is the fixed Codex callback port on both loopback families`() {
+        val config = CodexOAuth(OkHttpAuthHttpClient(), Clock.systemUTC()).loopback
+        assertEquals(1455..1455, config.ports)
+        assertEquals("/auth/callback", config.path)
+        assertTrue(config.bindIpv6)
+    }
+
+    @Test
+    fun `the redirect URI uses the localhost host that OpenAI allows`() {
+        val codex = CodexOAuth(OkHttpAuthHttpClient(), Clock.systemUTC())
+        assertEquals("http://localhost:1455/auth/callback", codex.loopbackRedirectUri(1455))
+    }
+
+    @Test
+    fun `the authorize URL carries the Codex client and flow parameters`() = runTest {
+        BrowserOAuthFlow(codex, io).start(null).use { signIn ->
+            val params = queryPairs(signIn.authorizeUrl)
+            assertTrue(signIn.authorizeUrl.startsWith("https://auth.openai.com/oauth/authorize?"))
+            assertEquals(
+                listOf(
+                    "response_type",
+                    "client_id",
+                    "redirect_uri",
+                    "scope",
+                    "code_challenge",
+                    "code_challenge_method",
+                    "state",
+                    "id_token_add_organizations",
+                    "codex_cli_simplified_flow",
+                    "originator",
+                ),
+                params.map { it.first },
             )
-        )
-
-        val grant = codex.requestCode()
-
-        val request = server.takeRequest()
-        assertEquals("/api/accounts/deviceauth/usercode", request.url.encodedPath)
-        assertEquals("application/json", request.headers["Content-Type"])
-        assertEquals("""{"client_id":"app_EMoamEEZ73f0CkXaXp7hrann"}""", request.body?.utf8())
-        assertEquals("ABCD-1234", grant.userCode)
-        assertEquals("dev-auth-1", grant.deviceCode)
-        assertEquals(Duration.ofSeconds(7), grant.interval)
-        assertEquals("https://auth.openai.com/codex/device", grant.verificationUri)
-        assertNull(grant.verificationUriComplete)
-        assertEquals(Duration.ofMinutes(15), grant.expiresIn)
+            val values = params.toMap()
+            assertEquals("code", values["response_type"])
+            assertEquals("app_EMoamEEZ73f0CkXaXp7hrann", values["client_id"])
+            assertEquals("http://localhost:$port/auth/callback", values["redirect_uri"])
+            assertEquals("openid profile email offline_access", values["scope"])
+            assertEquals("S256", values["code_challenge_method"])
+            assertEquals("true", values["id_token_add_organizations"])
+            assertEquals("true", values["codex_cli_simplified_flow"])
+            assertEquals("codex_cli_rs", values["originator"])
+            assertTrue(Regex("^[0-9a-f]{32}$").matches(values.getValue("state")))
+            assertNull(signIn.manualAuthorizeUrl)
+        }
     }
 
     @Test
-    fun `the interval defaults to five seconds`() = runTest {
-        server.enqueue(
-            MockResponse(code = 200, body = """{"device_auth_id":"d","usercode":"U-1"}""")
-        )
-        val grant = codex.requestCode()
-        assertEquals("U-1", grant.userCode)
-        assertEquals(Duration.ofSeconds(5), grant.interval)
-    }
-
-    @Test
-    fun `403 while polling means the user has not approved yet`() = runTest {
-        server.enqueue(MockResponse(code = 403, body = """{"error":"pending"}"""))
-
-        assertEquals(DevicePoll.Pending, codex.poll(grant()))
-
-        val request = server.takeRequest()
-        assertEquals("/api/accounts/deviceauth/token", request.url.encodedPath)
-        assertEquals(
-            """{"device_auth_id":"dev-auth-1","user_code":"ABCD-1234"}""",
-            request.body?.utf8(),
-        )
-    }
-
-    @Test
-    fun `404 while polling means the session is gone`() = runTest {
-        server.enqueue(MockResponse(code = 404, body = ""))
-        assertFailsWith<AuthException.SignInFailed> { codex.poll(grant()) }
-    }
-
-    @Test
-    fun `an approved code is exchanged with the server's verifier`() = runTest {
-        server.enqueue(
-            MockResponse(
-                code = 200,
-                body =
-                    """{"authorization_code":"auth-code","code_challenge":"ch","code_verifier":"server-verifier"}""",
-            )
-        )
+    fun `a redirect is exchanged with a form body and yields the account id`() = runTest {
         server.enqueue(
             MockResponse(
                 code = 200,
@@ -113,24 +107,29 @@ class CodexDeviceAuthTest {
                     """{"access_token":"ca","refresh_token":"cr","id_token":"$idToken","expires_in":864000}""",
             )
         )
+        val signIn = BrowserOAuthFlow(codex, io).start(null)
+        val state = queryPairs(signIn.authorizeUrl).toMap().getValue("state")
 
-        val answer = codex.poll(grant())
+        val browser = async {
+            browserGet(io, "http://127.0.0.1:$port/auth/callback?code=auth-code&state=$state")
+        }
+        val tokens = signIn.awaitTokens()
 
-        server.takeRequest()
-        val exchange = server.takeRequest()
-        assertEquals("/oauth/token", exchange.url.encodedPath)
-        assertEquals("application/x-www-form-urlencoded", exchange.headers["Content-Type"])
+        val request = server.takeRequest()
+        assertEquals("/oauth/token", request.url.encodedPath)
+        assertEquals("application/x-www-form-urlencoded", request.headers["Content-Type"])
+        val form = formOf(request.body?.utf8())
         assertEquals(
-            listOf(
-                "grant_type" to "authorization_code",
-                "code" to "auth-code",
-                "redirect_uri" to "https://auth.openai.com/deviceauth/callback",
-                "client_id" to "app_EMoamEEZ73f0CkXaXp7hrann",
-                "code_verifier" to "server-verifier",
-            ),
-            queryPairs("?" + checkNotNull(exchange.body).utf8()),
+            listOf("grant_type", "client_id", "code", "code_verifier", "redirect_uri"),
+            form.map { it.first },
         )
-        val tokens = (answer as DevicePoll.Authorized).tokens
+        val values = form.toMap()
+        assertEquals("authorization_code", values["grant_type"])
+        assertEquals("app_EMoamEEZ73f0CkXaXp7hrann", values["client_id"])
+        assertEquals("auth-code", values["code"])
+        assertEquals("http://localhost:$port/auth/callback", values["redirect_uri"])
+        assertTrue(values.getValue("code_verifier").length >= 43)
+
         assertEquals(Provider.Codex, tokens.provider)
         assertEquals("ca", tokens.accessToken)
         assertEquals("cr", tokens.refreshToken)
@@ -138,22 +137,17 @@ class CodexDeviceAuthTest {
         assertEquals("acct-123", tokens.extras[CredentialExtras.CHATGPT_ACCOUNT_ID])
         assertEquals("acct-123", tokens.providerAccountId)
         assertEquals("sam@example.com", tokens.label)
+        assertEquals(200, browser.await().status)
     }
 
     @Test
     fun `the account id falls back to the access token claim`() = runTest {
         val access = fakeJwt("""{"https://api.openai.com/auth":{"chatgpt_account_id":"acct-9"}}""")
         server.enqueue(
-            MockResponse(
-                code = 200,
-                body = """{"authorization_code":"a","code_challenge":"c","code_verifier":"v"}""",
-            )
-        )
-        server.enqueue(
             MockResponse(code = 200, body = """{"access_token":"$access","refresh_token":"r"}""")
         )
 
-        val tokens = (codex.poll(grant()) as DevicePoll.Authorized).tokens
+        val tokens = codex.exchange("a", codex.loopbackRedirectUri(port), Pkce.generate(), "s")
 
         assertEquals("acct-9", tokens.extras[CredentialExtras.CHATGPT_ACCOUNT_ID])
         assertEquals(now.plusSeconds(3600), tokens.expiresAt)
@@ -162,16 +156,12 @@ class CodexDeviceAuthTest {
     @Test
     fun `a sign-in without a ChatGPT account id is refused`() = runTest {
         server.enqueue(
-            MockResponse(
-                code = 200,
-                body = """{"authorization_code":"a","code_challenge":"c","code_verifier":"v"}""",
-            )
-        )
-        server.enqueue(
             MockResponse(code = 200, body = """{"access_token":"plain","refresh_token":"r"}""")
         )
 
-        assertFailsWith<AuthException.InvalidResponse> { codex.poll(grant()) }
+        assertFailsWith<AuthException.InvalidResponse> {
+            codex.exchange("a", codex.loopbackRedirectUri(port), Pkce.generate(), "s")
+        }
     }
 
     @Test

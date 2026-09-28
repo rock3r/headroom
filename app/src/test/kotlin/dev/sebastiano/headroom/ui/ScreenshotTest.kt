@@ -114,8 +114,8 @@ class ScreenshotTest {
         rule.onNodeWithText("Add account").performClick()
         rule
             .onNodeWithTag(ACCOUNTS_TAG)
-            .performScrollToNode(hasTestTag(providerOptionTag(Provider.Codex)))
-        rule.onNodeWithTag(providerOptionTag(Provider.Codex)).performClick()
+            .performScrollToNode(hasTestTag(providerOptionTag(Provider.Copilot)))
+        rule.onNodeWithTag(providerOptionTag(Provider.Copilot)).performClick()
         capture("sign-in-device-code")
     }
 
