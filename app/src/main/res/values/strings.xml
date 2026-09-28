@@ -68,6 +68,10 @@
     <string name="account_no_data">No usage data yet.</string>
     <string name="detail_plan_label">%1$s · %2$s</string>
     <string name="detail_balance">Balance</string>
+    <!-- An amount used out of a window's limit, then its unit, such as "12 / 200 credits used". -->
+    <string name="detail_amount_used">%1$s / %2$s %3$s used</string>
+    <!-- An amount left out of a window's limit, then its unit, such as "188 / 200 credits left". -->
+    <string name="detail_amount_left">%1$s / %2$s %3$s left</string>
     <string name="account_balance">Balance · %1$s</string>
     <string name="detail_resets_in">Resets in %1$s</string>
     <string name="detail_resets_in_no_alert">Resets in %1$s · no alert</string>

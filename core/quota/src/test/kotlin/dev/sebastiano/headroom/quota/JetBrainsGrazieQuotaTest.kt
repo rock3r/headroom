@@ -73,28 +73,31 @@ class JetBrainsGrazieQuotaTest {
     }
 
     @Test
-    fun `shows the used share of the monthly quota next to the plan and the balance`() = runTest {
-        routes()
+    fun `shows the used share of the monthly quota and its credits instead of the balance`() =
+        runTest {
+            routes()
 
-        val snapshot = fetchSnapshot()
+            val snapshot = fetchSnapshot()
 
-        assertEquals(
-            listOf(
-                QuotaWindow(
-                    id = "ai_credits",
-                    label = "Monthly",
-                    kind = WindowKind.Monthly,
-                    usedPercent = 25.0,
-                    resetsAt = Instant.parse("2026-05-01T00:00:00Z"),
-                    length = Duration.ofHours(720),
-                )
-            ),
-            snapshot.windows,
-        )
-        assertEquals("JetBrains AI Pro", snapshot.planLabel)
-        assertEquals(QuotaBalance(20.0, "AI Credits"), snapshot.balance)
-        assertTrue(logs.any { it.startsWith("quota/get amounts: {") }, logs.toString())
-    }
+            assertEquals(
+                listOf(
+                    QuotaWindow(
+                        id = "ai_credits",
+                        label = "Monthly",
+                        kind = WindowKind.Monthly,
+                        usedPercent = 25.0,
+                        resetsAt = Instant.parse("2026-05-01T00:00:00Z"),
+                        length = Duration.ofHours(720),
+                        usedAmount = 0.000125,
+                        limitAmount = 0.0005,
+                        amountUnit = "credits",
+                    )
+                ),
+                snapshot.windows,
+            )
+            assertEquals("JetBrains AI Pro", snapshot.planLabel)
+            assertNull(snapshot.balance)
+        }
 
     @Test
     fun `trades the ID token for a license, then for a JetBrains AI token`() = runTest {

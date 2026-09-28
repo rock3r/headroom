@@ -1,0 +1,19 @@
+{
+  "current": {
+    "license": "test-workspace-license-id",
+    "current": { "amount": "5000000" },
+    "maximum": { "amount": "20000000" },
+    "until": 1777550400000,
+    "quotaID": { "quotaId": "test-workspace-quota" },
+    "tariffQuota": {
+      "current": { "amount": "5000000" },
+      "maximum": { "amount": "20000000" },
+      "available": { "amount": "15000000" }
+    },
+    "topUpQuota": {
+      "current": { "amount": "0" },
+      "maximum": { "amount": "0" },
+      "available": { "amount": "0" }
+    }
+  }
+}

@@ -44,6 +44,9 @@ internal data class WindowEntity(
     val lengthSeconds: Long?,
     val groupLabel: String?,
     val isUnlimited: Boolean,
+    val usedAmount: Double? = null,
+    val limitAmount: Double? = null,
+    val amountUnit: String? = null,
 )
 
 @Entity(

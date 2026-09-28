@@ -2,9 +2,15 @@ package dev.sebastiano.headroom.quota
 
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
+import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.WindowKind
+import java.net.URLDecoder
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.Dispatcher
@@ -16,12 +22,13 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * The JetBrains AI license comes from the account's AI access options when the sign-in has a
- * refresh token, and from the free grazie-lite license otherwise.
+ * With a refresh token, the fetcher lists the account's AI access options and reads one quota
+ * window for each enabled option: a license of the account itself, or a seat in an organisation's
+ * workspace. Without a usable option it falls back to the free grazie-lite license.
  */
 class JetBrainsAccessOptionsTest {
     private val server = MockWebServer()
-    private val logs = mutableListOf<String>()
+    private val logs = CopyOnWriteArrayList<String>()
     private val requests = CopyOnWriteArrayList<RecordedRequest>()
     private val fetcher =
         JetBrainsQuotaFetcher(OkHttpQuotaHttpClient(), FIXED_CLOCK, log = { logs += it })
@@ -45,33 +52,52 @@ class JetBrainsAccessOptionsTest {
         )
 
     /**
-     * Answers like the JetBrains services. The access exchange returns a different JetBrains AI
-     * token for each license, and the quota answer depends on that token, so a test can tell which
-     * license was read.
+     * Answers like the JetBrains services. Each license and each workspace seat gets its own token,
+     * and the quota answer depends on that token, so a test can tell which option was read.
      */
     private fun routes(
-        switchAudience: MockResponse = jsonResponse(fixture("jetbrains/switch_audience.json")),
+        userManagementSwitch: MockResponse =
+            jsonResponse(fixture("jetbrains/switch_audience.json")),
         options: MockResponse = jsonResponse(fixture("jetbrains/ai_access_options.json")),
-        optionQuota: MockResponse = jsonResponse(fixture("jetbrains/quota_get.json")),
+        seatSwitch: (workspaceId: String) -> MockResponse = { workspaceId ->
+            jsonResponse("""{"access_token":"${seatToken(workspaceId)}","expires_in":300}""")
+        },
+        licenseQuota: MockResponse = jsonResponse(fixture("jetbrains/license_quota_get.json")),
+        workspaceQuota: MockResponse = jsonResponse(fixture("jetbrains/workspace_quota_get.json")),
+        alumniQuota: MockResponse = jsonResponse(ALUMNI_QUOTA),
         liteQuota: MockResponse = jsonResponse(LITE_QUOTA),
+        refill: MockResponse = jsonResponse(fixture("jetbrains/quota_refill.json")),
     ) {
         server.dispatcher =
             object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
                     requests += request
+                    val form = request.form()
                     return when (request.target) {
                         AUTH_TEST -> jsonResponse(fixture("jetbrains/auth_test.json"))
-                        TOKEN -> switchAudience
+                        TOKEN ->
+                            when (form["audience"]) {
+                                "jcp-user-management" -> userManagementSwitch
+                                "ai-access" -> seatSwitch(form["workspace_id"].orEmpty())
+                                else -> MockResponse(code = 400)
+                            }
                         OPTIONS -> options
                         LICENSE -> jsonResponse(fixture("jetbrains/license_obtain.json"))
                         ACCESS -> accessFor(request.body?.utf8().orEmpty())
                         QUOTA ->
                             when (request.headers["Grazie-Authenticate-JWT"]) {
-                                OPTION_JWT -> optionQuota
+                                OPTION_JWT -> licenseQuota
                                 LITE_JWT -> liteQuota
                                 else -> MockResponse(code = 401)
                             }
-                        REFILL -> jsonResponse(fixture("jetbrains/quota_refill.json"))
+                        REFILL -> refill
+                        SEAT_QUOTA ->
+                            when (request.headers["Authorization"]) {
+                                bearer(seatToken(WORKSPACE_ID)) -> workspaceQuota
+                                bearer(seatToken(ALUMNI_WORKSPACE_ID)) -> alumniQuota
+                                else -> MockResponse(code = 401)
+                            }
+                        SEAT_REFILL -> refill
                         else -> MockResponse(code = 404)
                     }
                 }
@@ -93,28 +119,112 @@ class JetBrainsAccessOptionsTest {
     private fun accessLicenses() =
         requests.filter { it.target == ACCESS }.map { it.body?.utf8().orEmpty() }
 
-    private fun QuotaSnapshot.usedPercent() = windows.single().usedPercent
+    private fun seatSwitches() = requests.filter {
+        it.target == TOKEN && it.form()["audience"] == "ai-access"
+    }
+
+    private fun QuotaSnapshot.window(label: String) = windows.single { it.label == label }
 
     @Test
-    fun `reads the quota of the account's own license from its AI access options`() = runTest {
+    fun `reads one window for each enabled license and workspace option`() = runTest {
         routes()
 
         val snapshot = fetchSnapshot()
 
-        assertEquals(25.0, snapshot.usedPercent())
+        assertEquals(
+            listOf(WORKSPACE_LABEL, LICENSE_LABEL, ALUMNI_LABEL),
+            snapshot.windows.map { it.label },
+        )
+        assertEquals(25.0, snapshot.window(WORKSPACE_LABEL).usedPercent)
+        assertEquals(0.1187525, snapshot.window(LICENSE_LABEL).usedPercent, 1e-9)
+        assertEquals(0.0, snapshot.window(ALUMNI_LABEL).usedPercent)
         assertEquals(listOf("""{"licenseId":"$OPTION_LICENSE"}"""), accessLicenses())
-        assertEquals(listOf(AUTH_TEST, TOKEN, OPTIONS, ACCESS, QUOTA, REFILL), targets())
+        assertEquals(2, seatSwitches().size)
+        assertEquals(2, targets().count { it == SEAT_QUOTA })
     }
 
     @Test
-    fun `switches the refresh token's audience like the Junie CLI does`() = runTest {
+    fun `a window has the refill date and period, and credits of 100,000 units each`() = runTest {
+        routes()
+
+        val window = fetchSnapshot().window(LICENSE_LABEL)
+
+        assertEquals(WindowKind.Monthly, window.kind)
+        assertEquals(Duration.ofHours(720), window.length)
+        assertEquals(Instant.parse("2026-05-01T00:00:00Z"), window.resetsAt)
+        assertEquals(0.01187525, window.usedAmount!!, 1e-12)
+        assertEquals(10.0, window.limitAmount)
+        assertEquals("credits", window.amountUnit)
+        val workspace = fetchSnapshot().window(WORKSPACE_LABEL)
+        assertEquals(50.0, workspace.usedAmount)
+        assertEquals(200.0, workspace.limitAmount)
+    }
+
+    @Test
+    fun `the window closest to its limit comes first, so it leads the account`() = runTest {
+        routes(alumniQuota = jsonResponse(quota(current = "1800000", maximum = "2000000")))
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals(
+            listOf(ALUMNI_LABEL, WORKSPACE_LABEL, LICENSE_LABEL),
+            snapshot.windows.map { it.label },
+        )
+    }
+
+    @Test
+    fun `drops the balance when there are quota windows`() = runTest {
+        routes()
+
+        val snapshot = fetchSnapshot()
+
+        assertNull(snapshot.balance)
+        assertEquals("JetBrains AI Pro", snapshot.planLabel)
+    }
+
+    @Test
+    fun `trades the refresh token for a seat token of each workspace, like the Junie CLI`() =
+        runTest {
+            routes()
+
+            fetchSnapshot()
+
+            val switches = seatSwitches()
+            assertEquals(
+                "grant_type=switch_audience&refresh_token=$REFRESH_TOKEN&audience=ai-access" +
+                    "&client_id=junie-cli&org_id=$ORG_ID&workspace_id=$WORKSPACE_ID",
+                switches.first().body?.utf8(),
+            )
+            assertEquals(ALUMNI_WORKSPACE_ID, switches.last().form()["workspace_id"])
+            assertEquals(ALUMNI_ORG_ID, switches.last().form()["org_id"])
+            for (switch in switches) {
+                assertEquals("POST", switch.method)
+                assertEquals("application/x-www-form-urlencoded", switch.headers["Content-Type"])
+            }
+        }
+
+    @Test
+    fun `reads a seat's quota and refill with GET and the seat token`() = runTest {
         routes()
 
         fetchSnapshot()
 
-        val switch = requests.single { it.target == TOKEN }
-        assertEquals("POST", switch.method)
-        assertEquals("application/x-www-form-urlencoded", switch.headers["Content-Type"])
+        for (target in listOf(SEAT_QUOTA, SEAT_REFILL)) {
+            val request = requests.first { it.target == target }
+            assertEquals("GET", request.method)
+            assertEquals(bearer(seatToken(WORKSPACE_ID)), request.headers["Authorization"])
+            assertEquals("application/json", request.headers["Accept"])
+            assertNull(request.headers["Grazie-Authenticate-JWT"])
+        }
+    }
+
+    @Test
+    fun `switches the refresh token's audience to user management to list the options`() = runTest {
+        routes()
+
+        fetchSnapshot()
+
+        val switch = requests.first { it.target == TOKEN }
         assertEquals(
             "grant_type=switch_audience&refresh_token=$REFRESH_TOKEN" +
                 "&audience=jcp-user-management&client_id=junie-cli",
@@ -123,30 +233,115 @@ class JetBrainsAccessOptionsTest {
         val options = requests.single { it.target == OPTIONS }
         assertEquals("GET", options.method)
         assertEquals("Bearer test-jcp-token", options.headers["Authorization"])
-        assertEquals("application/json", options.headers["Accept"])
         val access = requests.single { it.target == ACCESS }
         assertEquals("Bearer $ID_TOKEN", access.headers["Authorization"])
     }
 
     @Test
-    fun `prefers a personal license, and uses another option when there is none`() = runTest {
+    fun `a failing option does not drop the others`() = runTest {
+        routes(
+            seatSwitch = { workspaceId ->
+                if (workspaceId == WORKSPACE_ID) {
+                    jsonResponse("""{"error":"access_denied"}""", code = 403)
+                } else {
+                    jsonResponse("""{"access_token":"${seatToken(workspaceId)}"}""")
+                }
+            },
+            licenseQuota = MockResponse(code = 500, body = "oops"),
+        )
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals(listOf(ALUMNI_LABEL), snapshot.windows.map { it.label })
+        assertTrue(LICENSE !in targets(), "no grazie-lite fallback: ${targets()}")
+    }
+
+    @Test
+    fun `a seat whose quota fails does not drop the others`() = runTest {
+        routes(workspaceQuota = MockResponse(code = 404, body = "no quota"))
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals(listOf(LICENSE_LABEL, ALUMNI_LABEL), snapshot.windows.map { it.label })
+    }
+
+    @Test
+    fun `window ids are stable and never contain a raw license or workspace id`() = runTest {
+        routes()
+
+        val first = fetchSnapshot().windows.map { it.id }.sorted()
+        val second = fetchSnapshot().windows.map { it.id }.sorted()
+
+        assertEquals(first, second)
+        assertEquals(3, first.toSet().size)
+        assertEquals(1, first.count { it.startsWith("jb:license:") }, first.toString())
+        assertEquals(2, first.count { it.startsWith("jb:ws:") }, first.toString())
+        for (id in first) {
+            for (raw in RAW_IDS) assertTrue(raw !in id, "$raw in $id")
+        }
+    }
+
+    @Test
+    fun `labels a workspace with its name, and with its organisation's when it has none`() =
+        runTest {
+            routes(
+                options =
+                    jsonResponse(
+                        """{"aiAccessOptions":[""" +
+                            """{"type":"workspace","aiAccessEnabled":true,""" +
+                            """"orgId":"$ORG_ID","orgName":"Example Org",""" +
+                            """"workspaceId":"$WORKSPACE_ID","workspaceName":" "}]}"""
+                    )
+            )
+
+            assertEquals(listOf("Example Org"), fetchSnapshot().windows.map { it.label })
+        }
+
+    @Test
+    fun `labels a license with its product name`() {
+        assertEquals("JetBrains AI Pro", JetBrainsQuotaSource.License("id", "AIP").label)
+        assertEquals("JetBrains AI Ultimate", JetBrainsQuotaSource.License("id", "AIU").label)
+        assertEquals("Junie", JetBrainsQuotaSource.License("id", "JUNP").label)
+        assertEquals("JetBrains AI", JetBrainsQuotaSource.License("id", null).label)
+    }
+
+    @Test
+    fun `reads no more than five options`() = runTest {
+        val workspaces =
+            (1..7).joinToString(",") { index ->
+                """{"type":"workspace","aiAccessEnabled":true,"orgId":"test-org-$index",""" +
+                    """"workspaceId":"test-ws-$index","workspaceName":"Seat $index"}"""
+            }
+        routes(
+            options = jsonResponse("""{"aiAccessOptions":[$workspaces]}"""),
+            seatSwitch = { jsonResponse("""{"access_token":"${seatToken(WORKSPACE_ID)}"}""") },
+        )
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals(5, seatSwitches().size)
+        assertEquals(5, snapshot.windows.size)
+    }
+
+    @Test
+    fun `reads an enabled workspace option that has only a license id as a license`() = runTest {
         routes(
             options =
                 jsonResponse(
                     """{"aiAccessOptions":[""" +
-                        """{"type":"workspace","aiAccessEnabled":true,"licenseId":"$OPTION_LICENSE"},""" +
-                        """{"type":"license","aiAccessEnabled":false,"licenseId":"other-id"}]}"""
+                        """{"type":"workspace","aiAccessEnabled":true,"licenseId":"$OPTION_LICENSE"}]}"""
                 )
         )
 
-        fetchSnapshot()
+        val snapshot = fetchSnapshot()
 
+        assertEquals(1, snapshot.windows.size)
         assertEquals(listOf("""{"licenseId":"$OPTION_LICENSE"}"""), accessLicenses())
-        assertTrue(logs.any { "access option (workspace)" in it }, logs.toString())
+        assertTrue(seatSwitches().isEmpty())
     }
 
     @Test
-    fun `uses the grazie-lite license when no option is enabled and has a license id`() = runTest {
+    fun `uses the grazie-lite license when no option is enabled and readable`() = runTest {
         routes(
             options =
                 jsonResponse(
@@ -159,17 +354,29 @@ class JetBrainsAccessOptionsTest {
 
         val snapshot = fetchSnapshot()
 
-        assertEquals(20.0, snapshot.usedPercent())
+        assertEquals(listOf(LITE_WINDOW), snapshot.windows)
         assertEquals(listOf("""{"licenseId":"$LITE_LICENSE"}"""), accessLicenses())
+        assertNull(snapshot.balance)
+    }
+
+    @Test
+    fun `uses the grazie-lite license when every option fails`() = runTest {
+        val failed = MockResponse(code = 500)
+        routes(licenseQuota = failed, workspaceQuota = failed, alumniQuota = failed)
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals(listOf(LITE_WINDOW), snapshot.windows)
+        assertTrue(logs.any { "trying the grazie-lite license" in it }, logs.toString())
     }
 
     @Test
     fun `uses the grazie-lite license when the audience switch fails`() = runTest {
-        routes(switchAudience = jsonResponse("""{"error":"invalid_grant"}""", code = 400))
+        routes(userManagementSwitch = jsonResponse("""{"error":"invalid_grant"}""", code = 400))
 
         val snapshot = fetchSnapshot()
 
-        assertEquals(20.0, snapshot.usedPercent())
+        assertEquals(listOf(LITE_WINDOW), snapshot.windows)
         assertEquals(listOf(AUTH_TEST, TOKEN, LICENSE, ACCESS, QUOTA, REFILL), targets())
         assertTrue(
             logs.any { "switch-audience" in it && "HTTP 400" in it && "invalid_grant" in it },
@@ -179,9 +386,9 @@ class JetBrainsAccessOptionsTest {
 
     @Test
     fun `uses the grazie-lite license when the audience switch has no access token`() = runTest {
-        routes(switchAudience = jsonResponse("""{"token_type":"Bearer"}"""))
+        routes(userManagementSwitch = jsonResponse("""{"token_type":"Bearer"}"""))
 
-        assertEquals(20.0, fetchSnapshot().usedPercent())
+        assertEquals(listOf(LITE_WINDOW), fetchSnapshot().windows)
         assertTrue(OPTIONS !in targets(), targets().toString())
     }
 
@@ -196,38 +403,25 @@ class JetBrainsAccessOptionsTest {
             requests.clear()
             routes(options = options)
 
-            assertEquals(20.0, fetchSnapshot().usedPercent())
+            assertEquals(listOf(LITE_WINDOW), fetchSnapshot().windows)
             assertEquals(listOf("""{"licenseId":"$LITE_LICENSE"}"""), accessLicenses())
         }
     }
 
     @Test
-    fun `tries the grazie-lite license when the account's license has no quota`() = runTest {
+    fun `shows the balance only when the grazie-lite license gives no quota either`() = runTest {
+        val empty = jsonResponse(quota(current = "0", maximum = "0"))
         routes(
-            optionQuota =
-                jsonResponse(
-                    """{"current":{"current":{"amount":"0.0"},"maximum":{"amount":"0.0"}}}"""
-                )
+            licenseQuota = empty,
+            workspaceQuota = empty,
+            alumniQuota = empty,
+            liteQuota = jsonResponse(quota(current = "0", maximum = "0")),
         )
-
-        val snapshot = fetchSnapshot()
-
-        assertEquals(20.0, snapshot.usedPercent())
-        assertEquals(
-            listOf("""{"licenseId":"$OPTION_LICENSE"}""", """{"licenseId":"$LITE_LICENSE"}"""),
-            accessLicenses(),
-        )
-    }
-
-    @Test
-    fun `gives up after the account's license and the grazie-lite license`() = runTest {
-        val empty = """{"current":{"current":{"amount":"0.0"},"maximum":{"amount":"0.0"}}}"""
-        routes(optionQuota = jsonResponse(empty), liteQuota = jsonResponse(empty))
 
         val snapshot = fetchSnapshot()
 
         assertEquals(emptyList(), snapshot.windows)
-        assertEquals(2, accessLicenses().size)
+        assertEquals(20.0, snapshot.balance?.amount)
         assertEquals(1, targets().count { it == LICENSE })
     }
 
@@ -235,12 +429,12 @@ class JetBrainsAccessOptionsTest {
     fun `without a refresh token, goes straight to the grazie-lite license`() = runTest {
         routes()
 
-        assertEquals(20.0, fetchSnapshot(credentials(refreshToken = null)).usedPercent())
+        assertEquals(listOf(LITE_WINDOW), fetchSnapshot(credentials(refreshToken = null)).windows)
         assertEquals(listOf(AUTH_TEST, LICENSE, ACCESS, QUOTA, REFILL), targets())
     }
 
     @Test
-    fun `logs the steps, the option types and the license used, and never a secret`() = runTest {
+    fun `logs each option's steps, amounts and a summary, and never a secret`() = runTest {
         routes()
 
         fetchSnapshot()
@@ -248,39 +442,37 @@ class JetBrainsAccessOptionsTest {
         for (step in listOf("switch-audience", "ai-access-options")) {
             assertTrue(logs.any { step in it && "HTTP 200" in it }, "$step in $logs")
         }
-        assertTrue(logs.any { "ai-access-options shape:" in it }, logs.toString())
+        for (step in
+            listOf(
+                "license 1 provide-access",
+                "license 1 quota/get",
+                "license 1 quota/refill",
+                "workspace 2 switch-audience",
+                "workspace 2 quota/get",
+                "workspace 2 quota/refill",
+                "workspace 4 quota/get",
+            )) {
+            assertTrue(logs.any { it.startsWith("$step: HTTP 200") }, "$step in $logs")
+        }
         assertTrue(
             logs.any {
-                "workspace enabled=true" in it &&
-                    "license enabled=false" in it &&
-                    "license enabled=true" in it
+                it.startsWith("license 1 quota/get amounts:") &&
+                    "1187.525" in it &&
+                    "1000000.0" in it
             },
             logs.toString(),
         )
-        assertTrue(logs.any { "new refresh token" in it }, logs.toString())
-        assertTrue(logs.any { "Using the access option (license) license" in it }, logs.toString())
-        logs.assertNoSecrets()
-    }
-
-    @Test
-    fun `logs the grazie-lite fallback and never a secret`() = runTest {
-        routes(
-            optionQuota =
-                jsonResponse(
-                    """{"current":{"current":{"amount":"0.0"},"maximum":{"amount":"0.0"}}}"""
-                )
+        assertTrue(
+            "3 quota windows: license AIP 0.1%, workspace 25%, workspace 0%" in logs,
+            logs.toString(),
         )
-
-        fetchSnapshot()
-
-        assertTrue(logs.any { "Using the grazie-lite license" in it }, logs.toString())
         logs.assertNoSecrets()
     }
 
     @Test
-    fun `logs no secret when the new steps fail`() = runTest {
+    fun `logs no secret when the steps fail`() = runTest {
         routes(
-            switchAudience =
+            userManagementSwitch =
                 jsonResponse(
                     """{"error":"invalid_grant","error_description":"$REFRESH_TOKEN is bad"}""",
                     code = 400,
@@ -289,35 +481,40 @@ class JetBrainsAccessOptionsTest {
         fetchSnapshot()
         routes(options = MockResponse(code = 403, body = """{"message":"sam@example.com"}"""))
         fetchSnapshot()
+        routes(
+            seatSwitch = {
+                jsonResponse(
+                    """{"error":"denied","error_description":"$ORG_ID $WORKSPACE_ID"}""",
+                    code = 403,
+                )
+            },
+            licenseQuota = jsonResponse("""{"message":"$OPTION_LICENSE"}""", code = 404),
+        )
+        fetchSnapshot()
 
         logs.assertNoSecrets()
     }
 
     private fun List<String>.assertNoSecrets() {
-        for (secret in
-            listOf(
-                ID_TOKEN,
-                ACCESS_TOKEN,
-                REFRESH_TOKEN,
-                "test-new-refresh-token",
-                "test-jcp-token",
-                OPTION_LICENSE,
-                LITE_LICENSE,
-                "test-workspace-license-id",
-                "test-disabled-license-id",
-                OPTION_JWT,
-                LITE_JWT,
-                "test-org-id",
-                "test-workspace-id",
-                "Sam Example",
-                "sam@example.com",
-                "Example Org",
-                "Example Team AI",
-                "Junie Pro",
-            )) {
+        for (secret in SECRETS) {
             assertTrue(none { secret in it }, "$secret leaked into $this")
         }
     }
+
+    private fun RecordedRequest.form(): Map<String, String> =
+        body
+            ?.utf8()
+            .orEmpty()
+            .split("&")
+            .mapNotNull { pair ->
+                val parts = pair.split("=", limit = 2)
+                if (parts.size == 2) {
+                    parts[0] to URLDecoder.decode(parts[1], Charsets.UTF_8)
+                } else {
+                    null
+                }
+            }
+            .toMap()
 
     private companion object {
         const val ID_TOKEN = "test-id-token"
@@ -327,8 +524,62 @@ class JetBrainsAccessOptionsTest {
         const val LITE_LICENSE = "test-license-id"
         const val OPTION_JWT = "test-option-grazie-jwt"
         const val LITE_JWT = "test-lite-grazie-jwt"
+        const val ORG_ID = "test-org-id"
+        const val WORKSPACE_ID = "test-workspace-id"
+        const val ALUMNI_ORG_ID = "test-alumni-org-id"
+        const val ALUMNI_WORKSPACE_ID = "test-alumni-workspace-id"
+
+        const val LICENSE_LABEL = "JetBrains AI Pro"
+        const val WORKSPACE_LABEL = "Example Workspace"
+        const val ALUMNI_LABEL = "Example Alumni"
+
         const val LITE_QUOTA =
             """{"current":{"current":{"amount":"10"},"maximum":{"amount":"50"}}}"""
+        val ALUMNI_QUOTA = quota(current = "0", maximum = "2000000")
+
+        /** The grazie-lite window, as the fetcher showed it before access options existed. */
+        val LITE_WINDOW =
+            QuotaWindow(
+                id = "ai_credits",
+                label = "Monthly",
+                kind = WindowKind.Monthly,
+                usedPercent = 20.0,
+                resetsAt = Instant.parse("2026-05-01T00:00:00Z"),
+                length = Duration.ofHours(720),
+                usedAmount = 0.0001,
+                limitAmount = 0.0005,
+                amountUnit = "credits",
+            )
+
+        val RAW_IDS =
+            listOf(
+                OPTION_LICENSE,
+                ORG_ID,
+                WORKSPACE_ID,
+                ALUMNI_ORG_ID,
+                ALUMNI_WORKSPACE_ID,
+                "test-disabled-license-id",
+            )
+
+        val SECRETS =
+            RAW_IDS +
+                listOf(
+                    ID_TOKEN,
+                    ACCESS_TOKEN,
+                    REFRESH_TOKEN,
+                    "test-new-refresh-token",
+                    "test-jcp-token",
+                    "test-seat-token",
+                    LITE_LICENSE,
+                    "test-workspace-license-id",
+                    OPTION_JWT,
+                    LITE_JWT,
+                    "Sam Example",
+                    "sam@example.com",
+                    "Example Org",
+                    "Example Workspace",
+                    "Example Alumni",
+                )
 
         const val AUTH_TEST = "/auth/test"
         const val TOKEN = "/oauth2/token"
@@ -337,5 +588,12 @@ class JetBrainsAccessOptionsTest {
         const val ACCESS = "/auth/jetbrains-jwt/provide-access/license/v2"
         const val QUOTA = "/user/v5/quota/get"
         const val REFILL = "/user/v5/quota/metadata/refill"
+        const val SEAT_QUOTA = "/quota/api/quota/get"
+        const val SEAT_REFILL = "/quota/api/quota/refill"
+
+        fun seatToken(workspaceId: String) = "test-seat-token-$workspaceId"
+
+        fun quota(current: String, maximum: String) =
+            """{"current":{"current":{"amount":"$current"},"maximum":{"amount":"$maximum"}}}"""
     }
 }

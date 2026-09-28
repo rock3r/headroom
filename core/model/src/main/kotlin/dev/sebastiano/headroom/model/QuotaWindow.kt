@@ -16,6 +16,12 @@ public data class QuotaWindow(
     /** Optional grouping shown above related windows, for example a model family. */
     val group: String? = null,
     val isUnlimited: Boolean = false,
+    /** How much of the window is used, in [amountUnit], for providers that report amounts. */
+    val usedAmount: Double? = null,
+    /** The window's limit, in [amountUnit], for providers that report amounts. */
+    val limitAmount: Double? = null,
+    /** The unit of [usedAmount] and [limitAmount], for example `credits`. */
+    val amountUnit: String? = null,
 ) {
     val remainingPercent: Double
         get() = (MAX_PERCENT - usedPercent).coerceIn(0.0, MAX_PERCENT)

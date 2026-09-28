@@ -1,0 +1,19 @@
+{
+  "current": {
+    "license": "test-junie-license-id",
+    "current": { "amount": "1187.525" },
+    "maximum": { "amount": "1000000.0" },
+    "until": 1777550400000,
+    "quotaID": { "quotaId": "test-quota" },
+    "tariffQuota": {
+      "current": { "amount": "1187.525" },
+      "maximum": { "amount": "1000000.0" },
+      "available": { "amount": "998812.475" }
+    },
+    "topUpQuota": {
+      "current": { "amount": "0" },
+      "maximum": { "amount": "0" },
+      "available": { "amount": "0" }
+    }
+  }
+}

@@ -18,10 +18,11 @@ import kotlinx.serialization.json.jsonObject
  * `balanceUnit`). The balance is always checked, so a changed response format is reported as a
  * parse failure.
  *
- * With an ID token, the fetcher also reads the JetBrains AI quota (see [JetBrainsAiQuotaReader])
- * and adds it as a window. The refresh token lets the reader find the account's own license. When
- * any step of that fails, the snapshot has the plan and the balance only, as it does for sign-ins
- * without an ID token. A working balance never becomes an error.
+ * With an ID token, the fetcher also reads the JetBrains AI quotas (see [JetBrainsAiQuotaReader])
+ * and adds one window for each license and workspace seat. The refresh token lets the reader find
+ * the account's licenses and seats. The windows count AI credits, so the snapshot then has no
+ * balance. When no quota can be read, the snapshot has the plan and the balance only, as it does
+ * for sign-ins without an ID token. A working balance never becomes an error.
  *
  * @param log receives diagnostic lines about the JetBrains AI quota calls. They never contain a
  *   token, a license id, a name, an email address or a header value.
@@ -57,38 +58,44 @@ public class JetBrainsQuotaFetcher(
                     it.doubleOrNull("balanceLeft") != null && it.stringOrNull("balanceUnit") != null
                 }
             } ?: return parseFailure(PROVIDER_NAME)
-        val window = readAiQuotaWindow(credentials)
+        val windows = readAiQuotaWindows(credentials)
         return QuotaResult.Success(
             QuotaSnapshot(
                 provider = provider,
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = authInfo.nonBlankStringOrNull("licenseType")?.let(::jetBrainsPlanLabel),
-                windows = listOfNotNull(window),
+                windows = windows,
                 fetchedAt = clock.instant(),
+                // The windows count credits, so the balance only shows when there are none.
                 balance =
-                    QuotaBalance(
-                        amount = authInfo.doubleOrNull("balanceLeft") ?: 0.0,
-                        unit = authInfo.stringOrNull("balanceUnit").orEmpty(),
-                    ),
+                    if (windows.isEmpty()) {
+                        QuotaBalance(
+                            amount = authInfo.doubleOrNull("balanceLeft") ?: 0.0,
+                            unit = authInfo.stringOrNull("balanceUnit").orEmpty(),
+                        )
+                    } else {
+                        null
+                    },
             )
         )
     }
 
-    private suspend fun readAiQuotaWindow(credentials: ProviderCredentials) =
+    private suspend fun readAiQuotaWindows(credentials: ProviderCredentials) =
         when (val idToken = credentials.idToken?.takeIf { it.isNotBlank() }) {
             null -> {
                 log("No ID token yet, showing the balance only until the next token refresh")
-                null
+                emptyList()
             }
             else ->
-                aiQuotaReader.readWindow(
-                    JetBrainsAiEndpoints.resolve(credentials.baseUrl),
-                    idToken,
-                    credentials.refreshToken?.takeIf { it.isNotBlank() },
-                )
-                    ?: run {
+                aiQuotaReader
+                    .readWindows(
+                        JetBrainsAiEndpoints.resolve(credentials.baseUrl),
+                        idToken,
+                        credentials.refreshToken?.takeIf { it.isNotBlank() },
+                    )
+                    .ifEmpty {
                         log("JetBrains AI quota unavailable, showing the balance only")
-                        null
+                        emptyList()
                     }
         }
 

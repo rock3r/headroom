@@ -59,6 +59,7 @@ import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.percentDescription
 import dev.sebastiano.headroom.ui.components.quotaLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
+import dev.sebastiano.headroom.ui.formatAmount
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.ChartSummary
@@ -283,6 +284,13 @@ private fun WindowList(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    amountLine(window, display)?.let { amounts ->
+                        Text(
+                            text = amounts,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 val shown = display.percent(window.usedPercent).roundToInt()
                 val description = percentDescription(shown, display)
@@ -313,6 +321,21 @@ private fun WindowList(
             }
         }
     }
+}
+
+/** "12 / 200 credits used", or what is left in left mode. Null when the window counts no amount. */
+@Composable
+private fun amountLine(window: WindowSummary, display: QuotaDisplay): String? {
+    val used = window.usedAmount ?: return null
+    val limit = window.limitAmount ?: return null
+    val unit = window.amountUnit ?: return null
+    val locale = LocalLocale.current.platformLocale
+    val (amount, format) =
+        when (display) {
+            QuotaDisplay.Used -> used to R.string.detail_amount_used
+            QuotaDisplay.Left -> (limit - used).coerceAtLeast(0.0) to R.string.detail_amount_left
+        }
+    return stringResource(format, formatAmount(amount, locale), formatAmount(limit, locale), unit)
 }
 
 @Composable
