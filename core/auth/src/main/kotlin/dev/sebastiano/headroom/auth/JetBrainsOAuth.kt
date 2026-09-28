@@ -73,7 +73,13 @@ internal class JetBrainsOAuth(
             json.long("expires_in")?.takeIf { it > 0 }
                 ?: throw AuthException.InvalidResponse("$context response has no expiry")
         val expiresAt = expiryWithSkew(clock.instant(), expiresIn, EXPIRY_MARGIN)
-        return json.toTokenSet(provider, context, expiresAt, requireRefresh)
+        val tokens = json.toTokenSet(provider, context, expiresAt, requireRefresh)
+        // The quota fetcher trades the ID token for a JetBrains AI token. A refresh without one
+        // leaves no extra, so the stored token stays.
+        val idToken = json.string("id_token")?.takeIf { it.isNotBlank() }
+        return tokens.copy(
+            extras = idToken?.let { mapOf(CredentialExtras.JETBRAINS_ID_TOKEN to it) }.orEmpty()
+        )
     }
 
     companion object {

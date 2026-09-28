@@ -109,6 +109,11 @@ class JetBrainsOAuthTest {
         assertEquals("jr", tokens.refreshToken)
         assertEquals(now.plus(Duration.ofMinutes(55)), tokens.expiresAt)
         assertEquals("sam@example.com", tokens.label)
+        assertEquals(idToken, tokens.extras[CredentialExtras.JETBRAINS_ID_TOKEN])
+        assertEquals(
+            idToken,
+            tokens.toCredential("j").extras[CredentialExtras.JETBRAINS_ID_TOKEN],
+        )
         assertEquals(200, browser.await().status)
     }
 
@@ -133,6 +138,53 @@ class JetBrainsOAuthTest {
         )
         assertEquals("new", tokens.accessToken)
         assertEquals(now.plusSeconds(300), tokens.expiresAt)
+    }
+
+    @Test
+    fun `refresh replaces the stored ID token with the new one`() = runTest {
+        val newIdToken = fakeJwt("""{"sub":"jb-user"}""")
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = """{"access_token":"new","expires_in":600,"id_token":"$newIdToken"}""",
+            )
+        )
+        val old =
+            TokenSet(
+                    Provider.JetBrains,
+                    CredentialKind.OAuth,
+                    "old",
+                    "jr",
+                    now,
+                    extras = mapOf(CredentialExtras.JETBRAINS_ID_TOKEN to "old-id-token"),
+                )
+                .toCredential("j")
+
+        val refreshed = old.refreshedWith(jetBrains.refresh(old))
+
+        assertEquals(newIdToken, refreshed.extras[CredentialExtras.JETBRAINS_ID_TOKEN])
+    }
+
+    @Test
+    fun `refresh keeps the stored ID token when the response has none`() = runTest {
+        server.enqueue(
+            MockResponse(code = 200, body = """{"access_token":"new","expires_in":600}""")
+        )
+        val old =
+            TokenSet(
+                    Provider.JetBrains,
+                    CredentialKind.OAuth,
+                    "old",
+                    "jr",
+                    now,
+                    extras = mapOf(CredentialExtras.JETBRAINS_ID_TOKEN to "old-id-token"),
+                )
+                .toCredential("j")
+
+        val refreshed = old.refreshedWith(jetBrains.refresh(old))
+
+        assertEquals("new", refreshed.accessToken)
+        assertEquals("old-id-token", refreshed.extras[CredentialExtras.JETBRAINS_ID_TOKEN])
     }
 
     @Test
