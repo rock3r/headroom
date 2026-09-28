@@ -55,7 +55,8 @@ internal constructor(
     private val themeKey: () -> Any,
 ) {
     private var still by mutableStateOf<ImageBitmap?>(null)
-    private var center by mutableStateOf(Offset.Zero)
+    // Not `center`: inside drawStill that name means the DrawScope's own centre.
+    private var origin by mutableStateOf(Offset.Zero)
     private val progress = Animatable(0f)
     private var job: Job? = null
 
@@ -80,7 +81,7 @@ internal constructor(
                 change()
                 return@launch
             }
-            this@ThemeReveal.center = center
+            origin = center
             style = if (animate) RevealStyle.Circle else RevealStyle.Fade
             progress.snapTo(0f)
             still = image
@@ -110,13 +111,13 @@ internal constructor(
                 // The circle reaches the farthest corner when the reveal ends.
                 val farthest =
                     max(
-                        max(hypot(center.x, center.y), hypot(size.width - center.x, center.y)),
+                        max(hypot(origin.x, origin.y), hypot(size.width - origin.x, origin.y)),
                         max(
-                            hypot(center.x, size.height - center.y),
-                            hypot(size.width - center.x, size.height - center.y),
+                            hypot(origin.x, size.height - origin.y),
+                            hypot(size.width - origin.x, size.height - origin.y),
                         ),
                     )
-                val hole = Path().apply { addOval(Rect(center, farthest * progress.value)) }
+                val hole = Path().apply { addOval(Rect(origin, farthest * progress.value)) }
                 clipPath(hole, ClipOp.Difference) { drawImage(image) }
             }
         }

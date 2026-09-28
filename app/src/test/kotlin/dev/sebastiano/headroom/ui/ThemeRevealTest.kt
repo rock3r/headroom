@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -72,6 +73,24 @@ class ThemeRevealTest {
     }
 
     @Test
+    fun `the new theme shows first where the user tapped`() {
+        show()
+        rule.mainClock.autoAdvance = false
+
+        rule.runOnIdle { reveal.start(center = Offset(10f, 10f), animate = true) { theme = 1 } }
+        repeat(EARLY_FRAMES) { rule.mainClock.advanceTimeByFrame() }
+        val frame = rule.onRoot().captureToImage().toPixelMap()
+
+        assertTrue(reveal.isRunning)
+        assertEquals(Color.Black, frame[10, 10], "the tapped point shows the new theme")
+        assertEquals(
+            Color.White,
+            frame[frame.width - 1, frame.height - 1],
+            "the far corner still shows the old frame",
+        )
+    }
+
+    @Test
     fun `with motion reduced the old frame fades instead`() {
         show()
         rule.mainClock.autoAdvance = false
@@ -107,5 +126,6 @@ class ThemeRevealTest {
     private companion object {
         const val REVEAL_MILLIS = 2_000L
         const val WAIT_MILLIS = 1_500L
+        const val EARLY_FRAMES = 6
     }
 }
