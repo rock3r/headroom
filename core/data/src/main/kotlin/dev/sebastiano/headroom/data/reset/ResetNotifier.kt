@@ -73,12 +73,17 @@ internal class AndroidResetNotifier(
         manager.notify(id, notification)
     }
 
+    /**
+     * A reset pops up as a heads-up notification. Android never raises the importance of a channel
+     * that exists, so the high-importance channel has a new id and the old quiet one is removed.
+     */
     private fun ensureChannel() {
+        manager.deleteNotificationChannel(OLD_CHANNEL_ID)
         val channel =
             NotificationChannel(
                     CHANNEL_ID,
                     context.getString(R.string.reset_channel_name),
-                    NotificationManager.IMPORTANCE_DEFAULT,
+                    NotificationManager.IMPORTANCE_HIGH,
                 )
                 .apply { description = context.getString(R.string.reset_channel_description) }
         manager.createNotificationChannel(channel)
@@ -95,7 +100,10 @@ internal class AndroidResetNotifier(
     }
 
     companion object {
-        const val CHANNEL_ID: String = "weekly_resets"
+        const val CHANNEL_ID: String = "reset_alerts"
+
+        /** The quiet channel resets used before they popped up. */
+        private const val OLD_CHANNEL_ID = "weekly_resets"
 
         fun notificationId(accountId: String, windowId: String): Int =
             "$accountId/$windowId".hashCode()

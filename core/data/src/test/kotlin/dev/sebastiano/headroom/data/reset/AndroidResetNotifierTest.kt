@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.data.reset
 
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -8,6 +9,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -32,6 +34,29 @@ class AndroidResetNotifierTest {
             "Weekly resets",
             manager.getNotificationChannel(AndroidResetNotifier.CHANNEL_ID).name,
         )
+    }
+
+    @Test
+    fun `a reset pops up as a heads-up notification`() {
+        AndroidResetNotifier(context, ZoneId.of("UTC")).notifyReset(grok, grok.primaryWindow!!)
+
+        val channel = manager.getNotificationChannel(AndroidResetNotifier.CHANNEL_ID)
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, channel.importance)
+    }
+
+    @Test
+    fun `the old quiet channel is removed, because a channel's importance cannot be raised`() {
+        manager.createNotificationChannel(
+            NotificationChannel(
+                "weekly_resets",
+                "Weekly resets",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            )
+        )
+
+        AndroidResetNotifier(context, ZoneId.of("UTC")).notifyReset(grok, grok.primaryWindow!!)
+
+        assertNull(manager.getNotificationChannel("weekly_resets"))
     }
 
     @Test
