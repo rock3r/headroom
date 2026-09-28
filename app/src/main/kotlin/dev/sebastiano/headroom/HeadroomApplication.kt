@@ -7,6 +7,7 @@ import androidx.work.Configuration
 import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.data.DataGraphOwner
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.widget.HeadroomWidgetHost
 import dev.sebastiano.headroom.widget.WidgetConfigStore
 import dev.sebastiano.headroom.widget.WidgetUpdater
@@ -75,6 +76,17 @@ open class HeadroomApplication :
     override fun onWidgetUpdateRequested(appWidgetIds: IntArray) {
         if (!usesDataLayer) return
         appScope.launch { updateWidgets(dataGraph.repository.current()) }
+    }
+
+    /**
+     * Draws every placed widget from the demo accounts. Only the debug build's
+     * `DemoWidgetsReceiver` calls it, to check widgets on a device without signing in.
+     */
+    internal fun drawWidgetsWithDemoData() {
+        appScope.launch {
+            val now = Instant.now()
+            widgetUpdater.updateAll(this@HeadroomApplication, DemoData.accounts(now), now)
+        }
     }
 
     private suspend fun updateWidgets(accounts: List<AccountState>) {
