@@ -29,7 +29,7 @@ class AuthMethodsTest {
         assertEquals(
             mapOf(
                 Provider.Claude to AuthMethod.Browser::class,
-                Provider.Codex to AuthMethod.DeviceCode::class,
+                Provider.Codex to AuthMethod.Browser::class,
                 Provider.Copilot to AuthMethod.DeviceCode::class,
                 Provider.Grok to AuthMethod.Browser::class,
                 Provider.Kimi to AuthMethod.DeviceCode::class,
@@ -48,6 +48,9 @@ class AuthMethodsTest {
             assertIs<AuthMethod.Browser>(methods.forProvider(Provider.Claude)).offersCodePage
         )
         assertFalse(assertIs<AuthMethod.Browser>(methods.forProvider(Provider.Grok)).offersCodePage)
+        assertFalse(
+            assertIs<AuthMethod.Browser>(methods.forProvider(Provider.Codex)).offersCodePage
+        )
         assertFalse(
             assertIs<AuthMethod.Browser>(methods.forProvider(Provider.JetBrains)).offersCodePage
         )

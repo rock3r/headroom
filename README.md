@@ -69,8 +69,8 @@ Keystore and are never backed up.
 | Provider | How you sign in |
 |---|---|
 | Claude | Browser sign-in. The page returns to the app; if it cannot, paste the code the page shows. |
-| Grok, JetBrains AI | Browser sign-in, returning to the app. |
-| ChatGPT Codex, GitHub Copilot, Kimi Code | Device code: enter a short code on the provider's page. |
+| ChatGPT Codex, Grok, JetBrains AI | Browser sign-in, returning to the app. |
+| GitHub Copilot, Kimi Code | Device code: enter a short code on the provider's page. |
 | Z.AI, OpenCode Go | API key. |
 
 ## Building

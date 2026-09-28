@@ -64,7 +64,7 @@ public class AuthMethods(
     private val claude = ClaudeOAuth(http, clock)
     private val grok = GrokOAuth(http, clock)
     private val jetBrains = JetBrainsOAuth(http, clock)
-    private val codex = CodexDeviceAuth(http, clock)
+    private val codex = CodexOAuth(http, clock)
     private val copilot = CopilotDeviceAuth(http)
     private val kimi = KimiDeviceAuth(http, clock)
 
@@ -84,7 +84,7 @@ public class AuthMethods(
             Provider.Claude -> AuthMethod.Browser(browser(claude), offersCodePage = true)
             Provider.Grok -> AuthMethod.Browser(browser(grok), offersCodePage = false)
             Provider.JetBrains -> AuthMethod.Browser(browser(jetBrains), offersCodePage = false)
-            Provider.Codex -> AuthMethod.DeviceCode(DeviceCodeFlow(codex, clock))
+            Provider.Codex -> AuthMethod.Browser(browser(codex), offersCodePage = false)
             Provider.Copilot -> AuthMethod.DeviceCode(DeviceCodeFlow(copilot, clock))
             Provider.Kimi -> AuthMethod.DeviceCode(DeviceCodeFlow(kimi, clock))
             Provider.ZAi,

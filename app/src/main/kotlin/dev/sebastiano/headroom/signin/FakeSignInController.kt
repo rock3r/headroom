@@ -57,9 +57,9 @@ class FakeSignInController(initial: SignInState = SignInState.Idle) : SignInCont
     private fun firstStep(provider: Provider): SignInState =
         when (provider) {
             Provider.Claude,
+            Provider.Codex,
             Provider.Grok,
             Provider.JetBrains -> SignInState.Browser(provider, DEMO_AUTHORIZATION_URL)
-            Provider.Codex,
             Provider.Copilot,
             Provider.Kimi -> SignInState.DeviceCode(provider, DEMO_USER_CODE, DEMO_VERIFICATION_URL)
             Provider.ZAi,

@@ -2,7 +2,6 @@ package dev.sebastiano.headroom.ui
 
 import android.content.ClipData
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.rememberTransition
@@ -39,6 +38,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.signin.SignInState
+import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
 import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
@@ -96,9 +96,7 @@ fun HeadroomApp(
             onFinish = accountsViewModel::finish,
             onRename = accountsViewModel::rename,
             onRemove = accountsViewModel::remove,
-            onOpenUrl = { url ->
-                CustomTabsIntent.Builder().build().launchUrl(context, url.toUri())
-            },
+            onOpenUrl = { url -> signInTabIntent(context).launchUrl(context, url.toUri()) },
             onCopy = { text ->
                 scope.launch {
                     clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))

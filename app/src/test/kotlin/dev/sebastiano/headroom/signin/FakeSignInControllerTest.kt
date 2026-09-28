@@ -30,8 +30,17 @@ class FakeSignInControllerTest {
     }
 
     @Test
-    fun `device code providers show a code and a verification address`() {
+    fun `Codex signs in with the browser`() {
         controller.start(Provider.Codex)
+        assertEquals(
+            Provider.Codex,
+            assertIs<SignInState.Browser>(controller.state.value).provider,
+        )
+    }
+
+    @Test
+    fun `device code providers show a code and a verification address`() {
+        controller.start(Provider.Kimi)
         val device = assertIs<SignInState.DeviceCode>(controller.state.value)
         assertEquals(FakeSignInController.DEMO_USER_CODE, device.userCode)
 

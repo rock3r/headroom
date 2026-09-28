@@ -70,7 +70,7 @@ class RealSignInControllerTest {
         override fun kindOf(provider: Provider) =
             when (provider) {
                 Provider.Claude -> SignInKind.Browser
-                Provider.Codex -> SignInKind.DeviceCode
+                Provider.Copilot -> SignInKind.DeviceCode
                 else -> SignInKind.ApiKey
             }
 
@@ -137,14 +137,14 @@ class RealSignInControllerTest {
         runTest(UnconfinedTestDispatcher()) {
             val steps = FakeSteps()
             val controller = controller(steps)
-            controller.start(Provider.Codex)
+            controller.start(Provider.Copilot)
             assertEquals(
-                SignInState.DeviceCode(Provider.Codex, "ABCD-1234", "https://example.com/device"),
+                SignInState.DeviceCode(Provider.Copilot, "ABCD-1234", "https://example.com/device"),
                 controller.state.value,
             )
-            steps.device!!.result.complete(tokens(Provider.Codex))
+            steps.device!!.result.complete(tokens(Provider.Copilot))
             assertEquals(
-                SignInState.Success(Provider.Codex, "sam@example.com"),
+                SignInState.Success(Provider.Copilot, "sam@example.com"),
                 controller.state.value,
             )
         }
