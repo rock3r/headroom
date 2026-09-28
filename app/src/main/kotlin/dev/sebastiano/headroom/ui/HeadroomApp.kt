@@ -151,6 +151,7 @@ fun HeadroomApp(
                         onSelectAccount = homeViewModel::select,
                         onAlertChange = homeViewModel::setAlert,
                         onChartWindowChange = homeViewModel::selectChartWindow,
+                        onSortChange = homeViewModel::setOverviewSort,
                         onOpenAccounts = {
                             dropPending()
                             accountsFromSettings = false

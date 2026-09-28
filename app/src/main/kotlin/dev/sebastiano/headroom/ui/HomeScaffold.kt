@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
@@ -94,6 +95,7 @@ internal fun HomeScaffold(
     onSelectAccount: (String) -> Unit,
     onAlertChange: (String, String, Boolean) -> Unit,
     onChartWindowChange: (String) -> Unit,
+    onSortChange: (OverviewSort) -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenSettings: () -> Unit,
     onAddWidget: (WidgetStyle) -> Unit,
@@ -173,6 +175,7 @@ internal fun HomeScaffold(
                             onSelectAccount = onSelectAccount,
                             onAlertChange = onAlertChange,
                             onChartWindowChange = onChartWindowChange,
+                            onSortChange = onSortChange,
                             onAllResets = { selectTab(HomeTab.Resets) },
                             onOpenAccounts = onOpenAccounts,
                             onOpenSettings = onOpenSettings,
@@ -258,6 +261,7 @@ private fun OverviewPanes(
     onSelectAccount: (String) -> Unit,
     onAlertChange: (String, String, Boolean) -> Unit,
     onChartWindowChange: (String) -> Unit,
+    onSortChange: (OverviewSort) -> Unit,
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -303,6 +307,7 @@ private fun OverviewPanes(
                         onAllResets = onAllResets,
                         onOpenAccounts = onOpenAccounts,
                         onOpenSettings = onOpenSettings,
+                        onSortChange = onSortChange,
                         settingsReveal = settingsReveal,
                         columns = if (width == LayoutWidth.Medium) 2 else 1,
                         selectedAccountId = if (twoPanes) detail?.account?.id else null,
