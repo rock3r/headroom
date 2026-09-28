@@ -13,6 +13,8 @@ internal class RenderContext(
     val colors: WidgetColors,
     val strings: WidgetStrings,
     val size: WidgetSize,
+    /** The tap targets, registered while the document is composed. */
+    val taps: WidgetTaps,
     /** Display density, to turn dp into pixels at capture time. */
     private val density: Float,
     private val fontScale: Float,

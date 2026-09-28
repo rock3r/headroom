@@ -1,8 +1,8 @@
 package dev.sebastiano.headroom.widget.render
 
+import android.app.PendingIntent
 import android.content.Context
 import android.widget.RemoteViews
-import androidx.compose.remote.creation.compose.capture.CapturedDocument
 import androidx.compose.remote.creation.compose.capture.captureSingleRemoteDocument
 import androidx.compose.remote.creation.compose.capture.createCreationDisplayInfo
 import androidx.compose.remote.creation.compose.capture.createProfile
@@ -28,7 +28,7 @@ public object WidgetRenderer {
         state: WidgetUiState,
         appWidgetId: Int,
         size: WidgetSize,
-    ): CapturedDocument = capture(context, state, appWidgetId, size, WidgetStrings(context))
+    ): WidgetDocument = capture(context, state, appWidgetId, size, WidgetStrings(context))
 
     internal suspend fun capture(
         context: Context,
@@ -36,7 +36,7 @@ public object WidgetRenderer {
         appWidgetId: Int,
         size: WidgetSize,
         strings: WidgetStrings,
-    ): CapturedDocument {
+    ): WidgetDocument {
         val colors =
             WidgetColors.dynamic(
                 context,
@@ -45,26 +45,30 @@ public object WidgetRenderer {
             )
         val density = context.resources.displayMetrics.density
         val fontScale = context.resources.configuration.fontScale
-        val render = RenderContext(appWidgetId, colors, strings, size, density, fontScale)
+        val taps = WidgetTaps(context, appWidgetId)
+        val render = RenderContext(appWidgetId, colors, strings, size, taps, density, fontScale)
         val pixels = Size(size.widthDp * density, size.heightDp * density)
-        return captureSingleRemoteDocument(
-            context = context,
-            creationDisplayInfo = createCreationDisplayInfo(context, pixels),
-            profile = createProfile(docApiLevel = DOCUMENT_API_LEVEL),
-        ) {
-            HeadroomWidget(state, render)
-        }
+        val captured =
+            captureSingleRemoteDocument(
+                context = context,
+                creationDisplayInfo = createCreationDisplayInfo(context, pixels),
+                profile = createProfile(docApiLevel = DOCUMENT_API_LEVEL),
+            ) {
+                HeadroomWidget(state, render)
+            }
+        return WidgetDocument(captured.bytes, taps.pendingIntents)
     }
 
     /**
-     * Wraps [document] in [RemoteViews] draw instructions and wires each captured pending intent to
-     * the click id the document reports for it.
+     * Wraps [document] in [RemoteViews] draw instructions. The platform player reports a tap as the
+     * id of the host action that was tapped, and `RemoteViews` sends the pending intent registered
+     * under that id, so each tap id gets its own click pending intent.
      */
-    public fun remoteViews(document: CapturedDocument): RemoteViews {
+    public fun remoteViews(document: WidgetDocument): RemoteViews {
         val instructions = RemoteViews.DrawInstructions.Builder(listOf(document.bytes)).build()
         val views = RemoteViews(instructions)
-        document.pendingIntents.forEach { id, pendingIntent ->
-            views.setOnClickPendingIntent(id, pendingIntent)
+        document.taps.forEach { (tapId, pendingIntent) ->
+            views.setOnClickPendingIntent(tapId, pendingIntent)
         }
         return views
     }
@@ -88,3 +92,14 @@ private fun HeadroomWidget(
         is WidgetUiState.LockScreen -> LockScreenWidget(state, render, modifier)
     }
 }
+
+/**
+ * A captured widget document and the pending intent behind each of its tap ids.
+ *
+ * @property taps pending intents keyed by the non-zero id that the document reports on a tap.
+ */
+public class WidgetDocument
+internal constructor(
+    public val bytes: ByteArray,
+    public val taps: Map<Int, PendingIntent>,
+)

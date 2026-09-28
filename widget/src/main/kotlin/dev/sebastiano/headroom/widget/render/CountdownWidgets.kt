@@ -49,7 +49,7 @@ internal fun CountdownWidget(
                 .fillMaxSize()
                 .clip(RemoteRoundedCornerShape(render.px(CORNER)))
                 .background(colors.countdownContainer.rc)
-                .clickable(refreshAction(render.appWidgetId))
+                .clickable(render.taps.refresh())
                 .semantics {
                     contentDescription =
                         (next?.let { strings.countdownDescription(it) }
@@ -92,8 +92,9 @@ internal fun CountdownWidget(
                     fontSize = render.sp(DETAIL),
                     fontWeight = FontWeight.SemiBold,
                     modifier =
-                        RemoteModifier.clickable(openAppAction(render.appWidgetId, next.accountId))
-                            .semantics { contentDescription = strings.openAction(next.name).rs },
+                        RemoteModifier.clickable(render.taps.openApp(next.accountId)).semantics {
+                            contentDescription = strings.openAction(next.name).rs
+                        },
                 )
             }
         }
@@ -129,7 +130,7 @@ internal fun LockScreenWidget(
                         gauge,
                         render,
                         RemoteModifier.weight(1f.rf)
-                            .clickable(openAppAction(render.appWidgetId, gauge.accountId))
+                            .clickable(render.taps.openApp(gauge.accountId))
                             .semantics {
                                 contentDescription = render.strings.gaugeDescription(gauge).rs
                             },

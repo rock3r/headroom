@@ -4,11 +4,13 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.graphics.Canvas
+import android.os.Looper
 import android.os.Parcel
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.RemoteViews
-import androidx.compose.remote.creation.compose.capture.CapturedDocument
 import androidx.core.graphics.createBitmap
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.widget.ColourMode
@@ -20,6 +22,9 @@ import dev.sebastiano.headroom.widget.WidgetStyle
 import dev.sebastiano.headroom.widget.WidgetUiState
 import dev.sebastiano.headroom.widget.WidgetWindow
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
+import dev.sebastiano.headroom.widget.testing.documentOperations
+import dev.sebastiano.headroom.widget.testing.hasNamedHostActions
+import dev.sebastiano.headroom.widget.testing.hostActionIds
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
@@ -57,7 +62,7 @@ class WidgetRendererTest {
         config: WidgetConfig,
         size: WidgetSize = WidgetSize(140f, 140f),
         host: WidgetHostCategory = WidgetHostCategory.HomeScreen,
-    ): CapturedDocument =
+    ): WidgetDocument =
         WidgetRenderer.capture(context, state(config, size, host), APP_WIDGET_ID, size, strings)
 
     @Test
@@ -237,6 +242,81 @@ class WidgetRendererTest {
     }
 
     @Test
+    fun `every tap is an id host action with a click response for that id`() = runTest {
+        val docs =
+            listOf(
+                capture(WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-claude"))),
+                capture(WidgetConfig(WidgetStyle.Rings)),
+                capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f)),
+                capture(WidgetConfig(WidgetStyle.Shape, accountIds = listOf("demo-grok"))),
+                capture(WidgetConfig(WidgetStyle.Shape)),
+                capture(WidgetConfig(WidgetStyle.Countdown)),
+                capture(
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(300f, 120f),
+                    WidgetHostCategory.Keyguard,
+                ),
+                capture(
+                    WidgetConfig(
+                        WidgetStyle.Rings,
+                        accountIds = listOf("demo-grok"),
+                        window = WidgetWindow.Session,
+                    )
+                ),
+            )
+
+        docs.forEach { doc ->
+            val operations = documentOperations(doc.bytes)
+            assertFalse(hasNamedHostActions(operations), operations)
+            assertTrue(doc.taps.keys.none { it == 0 })
+            assertEquals(doc.taps.keys, hostActionIds(operations), operations)
+        }
+    }
+
+    @Test
+    fun `tapping a widget in the platform player sends its pending intent`() = runTest {
+        val size = WidgetSize(140f, 140f)
+        val app = context as RecordingHostApplication
+
+        // The ring grid: the top-left cell opens Claude.
+        WidgetRenderer.remoteViews(capture(WidgetConfig(WidgetStyle.Rings), size))
+            .tapAt(size, xShare = 0.3f, yShare = 0.3f)
+        val opened = shadowOf(app).nextStartedActivity
+        assertNotNull(opened, "Tapping a ring should open the app")
+        assertEquals("demo-claude", opened.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID))
+
+        // The countdown card around the text refreshes.
+        WidgetRenderer.remoteViews(capture(WidgetConfig(WidgetStyle.Countdown), size))
+            .tapAt(size, xShare = 0.5f, yShare = 0.08f)
+        assertEquals(
+            WidgetIntents.ACTION_REFRESH,
+            shadowOf(app).broadcastIntents.lastOrNull()?.action,
+        )
+    }
+
+    /** Plays the views in the platform player and taps at a point given as shares of the size. */
+    private fun RemoteViews.tapAt(size: WidgetSize, xShare: Float, yShare: Float) {
+        val density = context.resources.displayMetrics.density
+        val width = (size.widthDp * density).toInt()
+        val height = (size.heightDp * density).toInt()
+        val view = apply(context, FrameLayout(context))
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        view.layout(0, 0, width, height)
+        view.draw(Canvas(createBitmap(width, height)))
+        val x = width * xShare
+        val y = height * yShare
+        val time = SystemClock.uptimeMillis()
+        view.dispatchTouchEvent(MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0))
+        view.dispatchTouchEvent(
+            MotionEvent.obtain(time, time + TAP_MS, MotionEvent.ACTION_UP, x, y, 0)
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    @Test
     fun `remote views wrap the document and survive a parcel round trip`() = runTest {
         val views = WidgetRenderer.remoteViews(capture(WidgetConfig(WidgetStyle.Rings)))
 
@@ -257,10 +337,8 @@ class WidgetRendererTest {
         data class Open(val accountId: String?) : Tap
     }
 
-    private fun CapturedDocument.taps(): List<Tap> {
-        val result = sortedMapOf<Int, Tap>()
-        pendingIntents.forEach { id, pendingIntent -> result[id] = pendingIntent.toTap() }
-        return result.values.toList()
+    private fun WidgetDocument.taps(): List<Tap> {
+        return taps.toSortedMap().values.map { it.toTap() }
     }
 
     private fun PendingIntent.toTap(): Tap {
@@ -275,19 +353,20 @@ class WidgetRendererTest {
         }
     }
 
-    private fun CapturedDocument.text(): String = String(bytes, Charsets.UTF_8)
+    private fun WidgetDocument.text(): String = String(bytes, Charsets.UTF_8)
 
-    private fun CapturedDocument.assertText(vararg expected: String) {
+    private fun WidgetDocument.assertText(vararg expected: String) {
         val text = text()
         expected.forEach { assertContains(text, it) }
     }
 
-    private fun CapturedDocument.assertNoText(unexpected: String) {
+    private fun WidgetDocument.assertNoText(unexpected: String) {
         assertFalse(text().contains(unexpected), "Did not expect \"$unexpected\" in the document")
     }
 
     private companion object {
         const val APP_WIDGET_ID = 7
         const val MIN_INK = 0.03f
+        const val TAP_MS = 50L
     }
 }

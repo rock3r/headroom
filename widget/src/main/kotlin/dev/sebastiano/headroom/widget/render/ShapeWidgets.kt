@@ -33,7 +33,7 @@ internal fun SingleShapeWidget(
     val strings = render.strings
     RemoteBox(
         modifier =
-            modifier.fillMaxSize().clickable(refreshAction(render.appWidgetId)).semantics {
+            modifier.fillMaxSize().clickable(render.taps.refresh()).semantics {
                 contentDescription =
                     (strings.gaugeDescription(gauge) + " " + strings.refreshAction()).rs
             },
@@ -48,8 +48,9 @@ internal fun SingleShapeWidget(
                 color = colors.onShapeFill,
                 fontSize = render.sp(LABEL),
                 modifier =
-                    RemoteModifier.clickable(openAppAction(render.appWidgetId, gauge.accountId))
-                        .semantics { contentDescription = strings.openAction(gauge.name).rs },
+                    RemoteModifier.clickable(render.taps.openApp(gauge.accountId)).semantics {
+                        contentDescription = strings.openAction(gauge.name).rs
+                    },
             )
             WidgetText(
                 text = strings.percent(gauge.usedPercent),

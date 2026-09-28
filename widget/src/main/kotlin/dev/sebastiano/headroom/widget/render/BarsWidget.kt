@@ -68,7 +68,7 @@ private fun BarRow(gauge: Gauge, render: RenderContext, modifier: RemoteModifier
             modifier
                 .fillMaxWidth()
                 .height(render.fixedPx(BarsLayout.ROW_DP))
-                .clickable(openAppAction(render.appWidgetId, gauge.accountId))
+                .clickable(render.taps.openApp(gauge.accountId))
                 .semantics {
                     contentDescription =
                         (strings.gaugeDescription(gauge) + " " + strings.openAction(gauge.name)).rs

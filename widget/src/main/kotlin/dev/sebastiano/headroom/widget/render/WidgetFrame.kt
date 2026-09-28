@@ -1,7 +1,5 @@
 package dev.sebastiano.headroom.widget.render
 
-import androidx.compose.remote.creation.compose.action.Action
-import androidx.compose.remote.creation.compose.action.pendingIntentAction
 import androidx.compose.remote.creation.compose.layout.RemoteAlignment
 import androidx.compose.remote.creation.compose.layout.RemoteBox
 import androidx.compose.remote.creation.compose.layout.RemoteCanvas
@@ -29,21 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import dev.sebastiano.headroom.model.Provider
-import dev.sebastiano.headroom.widget.WidgetIntents
 import dev.sebastiano.headroom.widget.style
-
-/** A refresh broadcast for this widget. The app runs a sync and then updates the widget. */
-@Composable
-internal fun refreshAction(appWidgetId: Int): Action = pendingIntentAction { context ->
-    WidgetIntents.refresh(context, appWidgetId)
-}
-
-/** Opens the app, at [accountId] when it is set. */
-@Composable
-internal fun openAppAction(appWidgetId: Int, accountId: String?): Action =
-    pendingIntentAction { context ->
-        WidgetIntents.openApp(context, appWidgetId, accountId)
-    }
 
 /** The rounded, tinted card behind most widgets. Tapping it refreshes. */
 @RemoteComposable
@@ -61,7 +45,7 @@ internal fun WidgetCard(
                 .fillMaxSize()
                 .clip(RemoteRoundedCornerShape(render.px(cornerDesign)))
                 .background(render.colors.background.rc)
-                .clickable(refreshAction(render.appWidgetId))
+                .clickable(render.taps.refresh())
                 .semantics { contentDescription = render.strings.refreshAction().rs },
         contentAlignment = contentAlignment,
         content = content,
@@ -133,7 +117,7 @@ internal fun EmptyWidget(
                 .fillMaxSize()
                 .clip(RemoteRoundedCornerShape(render.px(CARD_CORNER)))
                 .background(render.colors.background.rc)
-                .clickable(openAppAction(render.appWidgetId, accountId = null))
+                .clickable(render.taps.openApp(null))
                 .padding(render.px(EMPTY_PADDING)),
         contentAlignment = RemoteAlignment.Center,
     ) {

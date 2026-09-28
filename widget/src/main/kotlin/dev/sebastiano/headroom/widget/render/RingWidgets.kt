@@ -114,8 +114,9 @@ internal fun SingleRingWidget(
                     color = colors.onSurfaceVariant,
                     fontSize = render.sp(LABEL),
                     modifier =
-                        RemoteModifier.clickable(openAppAction(render.appWidgetId, gauge.accountId))
-                            .semantics { contentDescription = strings.openAction(gauge.name).rs },
+                        RemoteModifier.clickable(render.taps.openApp(gauge.accountId)).semantics {
+                            contentDescription = strings.openAction(gauge.name).rs
+                        },
                 )
                 val bigPx = render.textPx(BIG)
                 val labelPx = render.textPx(LABEL)
@@ -185,7 +186,7 @@ internal fun GaugeGrid(
                         gauge,
                         RemoteModifier.weight(1f.rf)
                             .fillMaxHeight()
-                            .clickable(openAppAction(render.appWidgetId, gauge.accountId))
+                            .clickable(render.taps.openApp(gauge.accountId))
                             .semantics {
                                 contentDescription =
                                     (render.strings.gaugeDescription(gauge) +
