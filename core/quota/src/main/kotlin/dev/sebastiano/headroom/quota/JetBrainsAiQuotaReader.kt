@@ -171,6 +171,8 @@ internal class JetBrainsAiQuotaReader(
         val quota =
             send(QUOTA_STEP, post("$aiBaseUrl$QUOTA_PATH", aiHeaders))?.objectOrNull("current")
                 ?: return missing(QUOTA_STEP, "current")
+        // Amounts only: text such as the quota id is hidden. It shows how the fields relate.
+        log("$QUOTA_STEP amounts: ${redactedShape(quota)}")
         val used = parseCredit(quota["current"]) ?: return missing(QUOTA_STEP, "current amount")
         val maximum =
             parseCredit(quota["maximum"])?.takeIf { it > 0 }

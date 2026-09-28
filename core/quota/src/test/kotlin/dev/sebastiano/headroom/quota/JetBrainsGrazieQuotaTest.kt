@@ -93,6 +93,7 @@ class JetBrainsGrazieQuotaTest {
         )
         assertEquals("JetBrains AI Pro", snapshot.planLabel)
         assertEquals(QuotaBalance(20.0, "AI Credits"), snapshot.balance)
+        assertTrue(logs.any { it.startsWith("quota/get amounts: {") }, logs.toString())
     }
 
     @Test
