@@ -1,41 +1,41 @@
 package dev.sebastiano.headroom.ui.resets
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
@@ -49,20 +49,25 @@ import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.WindowSummary
-import kotlin.math.roundToInt
 
 const val RESETS_TAG: String = "resets"
 
+fun resetRowTag(accountId: String, windowId: String): String = "reset-row-$accountId-$windowId"
+
+fun resetAlertTag(accountId: String, windowId: String): String = "reset-alert-$accountId-$windowId"
+
 /**
- * Upcoming resets with their alert state, and how full each window was when it last reset: how much
- * was used, or how much was left, as the state's display says.
+ * Upcoming resets with their alert switches, and how full each window was when it reset: how much
+ * was used, or how much was left, as the state's display says. Tapping a reset opens its account.
  */
 @Composable
 fun ResetsScreen(
     state: HomeUiState,
     formatter: ResetFormatter,
+    onOpenAccount: (String) -> Unit,
+    onAlertChange: (accountId: String, windowId: String, enabled: Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
+    bottomPadding: Dp = 0.dp,
 ) {
     val upcoming =
         state.accounts
@@ -72,6 +77,7 @@ fun ResetsScreen(
                     .map { account to it }
             }
             .sortedBy { (_, window) -> window.resetsAt }
+    val sharedNames = state.accounts.groupingBy { it.name }.eachCount().filterValues { it > 1 }.keys
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     val listState = rememberLazyListState()
     StatusBarBlurBox(scrollState = listState, modifier = modifier.fillMaxSize()) {
@@ -122,7 +128,15 @@ fun ResetsScreen(
                 ListCard(width) {
                     upcoming.forEachIndexed { index, (account, window) ->
                         if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-                        UpcomingRow(account, window, state, formatter)
+                        UpcomingRow(
+                            account = account,
+                            window = window,
+                            title = windowTitle(account, window, sharedNames),
+                            state = state,
+                            formatter = formatter,
+                            onOpen = { onOpenAccount(account.id) },
+                            onAlertChange = { onAlertChange(account.id, window.id, it) },
+                        )
                     }
                 }
             }
@@ -137,34 +151,85 @@ fun ResetsScreen(
                     width,
                 )
             }
-            item { HistoryCard(state.accountsInYourOrder, state.display, width) }
+            item {
+                ResetHistoryCard(
+                    windows = historyWindows(state.accountsInYourOrder, sharedNames),
+                    display = state.display,
+                    modifier = width,
+                )
+            }
         }
     }
+}
+
+/**
+ * The windows the history chart shows: every window that can alert, or the main window of an
+ * account that has none.
+ */
+@Composable
+private fun historyWindows(
+    accounts: List<AccountSummary>,
+    sharedNames: Set<String>,
+): List<HistoryWindow> = accounts.flatMap { account ->
+    account.windows
+        .filter { it.canAlert }
+        .ifEmpty { listOfNotNull(account.primary) }
+        .map { window ->
+            HistoryWindow(
+                key = "${account.id}/${window.id}",
+                title = windowTitle(account, window, sharedNames),
+                past = window.pastResets,
+                current = window.usedPercent,
+            )
+        }
+}
+
+/**
+ * "Account · window". When another account has the same name, the account's label (such as its
+ * email address) tells the two apart.
+ */
+@Composable
+@ReadOnlyComposable
+private fun windowTitle(
+    account: AccountSummary,
+    window: WindowSummary,
+    sharedNames: Set<String>,
+): String {
+    val name =
+        if (account.name in sharedNames && account.label != account.name) {
+            stringResource(R.string.resets_account_with_label, account.name, account.label)
+        } else {
+            account.name
+        }
+    return stringResource(R.string.resets_row_title, name, window.label)
 }
 
 @Composable
 private fun UpcomingRow(
     account: AccountSummary,
     window: WindowSummary,
+    title: String,
     state: HomeUiState,
     formatter: ResetFormatter,
+    onOpen: () -> Unit,
+    onAlertChange: (Boolean) -> Unit,
 ) {
     val at = window.resetsAt ?: return
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+        modifier =
+            Modifier.fillMaxWidth()
+                .testTag(resetRowTag(account.id, window.id))
+                .clickable(
+                    onClickLabel = stringResource(R.string.resets_open_details),
+                    onClick = onOpen,
+                )
+                .heightIn(min = 64.dp)
+                .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ProviderAvatar(provider = account.provider, size = 30.dp)
         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            Text(
-                text =
-                    stringResource(
-                        R.string.resets_row_title,
-                        account.name,
-                        window.label,
-                    ),
-                style = MaterialTheme.typography.titleSmall,
-            )
+            Text(text = title, style = MaterialTheme.typography.titleSmall)
             Text(
                 text =
                     stringResource(
@@ -176,115 +241,48 @@ private fun UpcomingRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Icon(
-            painter =
-                painterResource(
-                    if (window.alertEnabled) HeadroomIcons.NotificationsActiveFilled
-                    else HeadroomIcons.NotificationsOff
-                ),
-            contentDescription =
-                stringResource(
-                    if (window.alertEnabled) R.string.resets_bell_on else R.string.resets_bell_off
-                ),
-            tint =
-                if (window.alertEnabled) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun HistoryCard(
-    accounts: List<AccountSummary>,
-    display: QuotaDisplay,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            accounts.forEach { account ->
-                val current = account.primary?.usedPercent ?: return@forEach
-                HistoryRow(account, current, display)
-            }
-            Text(
-                text =
-                    stringResource(
-                        when (display) {
-                            QuotaDisplay.Used -> R.string.resets_history_note
-                            QuotaDisplay.Left -> R.string.resets_history_note_left
-                        }
-                    ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // The list only holds windows that can alert. Any other window gets no switch at all: a
+        // switch that can never be turned on only raises the question why.
+        if (window.canAlert) {
+            AlertToggle(
+                checked = window.alertEnabled,
+                description = stringResource(R.string.resets_alert_toggle, title),
+                onCheckedChange = onAlertChange,
+                modifier = Modifier.testTag(resetAlertTag(account.id, window.id)),
             )
         }
     }
 }
 
+/** The bell: a toggle button that fills and changes shape when the alert is on. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun HistoryRow(account: AccountSummary, current: Double, display: QuotaDisplay) {
-    val used = account.pastResets + current
-    val description =
-        stringResource(
-            when (display) {
-                QuotaDisplay.Used -> R.string.resets_history_description
-                QuotaDisplay.Left -> R.string.resets_history_description_left
-            },
-            account.name,
-            account.pastResets.joinToString { "${display.percent(it).roundToInt()}%" },
-            display.percent(current).roundToInt(),
-        )
-    Row(
-        modifier =
-            Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = description },
-        verticalAlignment = Alignment.Bottom,
+private fun AlertToggle(
+    checked: Boolean,
+    description: String,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilledTonalIconToggleButton(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        shapes = IconButtonDefaults.toggleableShapes(),
+        colors =
+            IconButtonDefaults.filledTonalIconToggleButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+        modifier = modifier.semantics { contentDescription = description },
     ) {
-        Text(
-            text = account.name,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.width(96.dp),
-            maxLines = 1,
+        Icon(
+            painter =
+                painterResource(
+                    if (checked) HeadroomIcons.NotificationsActiveFilled
+                    else HeadroomIcons.NotificationsOff
+                ),
+            contentDescription = null,
         )
-        Row(
-            modifier = Modifier.weight(1f).height(BarAreaHeight),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            used.forEachIndexed { index, usedPercent ->
-                val isCurrent = index == used.lastIndex
-                val hitLimit = !isCurrent && usedPercent >= FULL
-                val value = display.percent(usedPercent)
-                val color =
-                    when {
-                        hitLimit -> MaterialTheme.colorScheme.error
-                        isCurrent -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.primary.copy(alpha = PAST_ALPHA)
-                    }
-                Box(
-                    Modifier.weight(1f)
-                        .fillMaxHeight((value / FULL).toFloat().coerceIn(MIN_BAR, 1f))
-                        .background(
-                            color,
-                            RoundedCornerShape(
-                                topStart = 4.dp,
-                                topEnd = 4.dp,
-                                bottomStart = 2.dp,
-                                bottomEnd = 2.dp,
-                            ),
-                        )
-                )
-            }
-        }
     }
 }
-
-private const val FULL = 100.0
-private const val PAST_ALPHA = 0.45f
-private const val MIN_BAR = 0.08f
-private val BarAreaHeight = 36.dp

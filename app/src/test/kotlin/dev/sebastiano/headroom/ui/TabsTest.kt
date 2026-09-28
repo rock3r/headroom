@@ -76,12 +76,12 @@ class TabsTest {
             .onNodeWithTag(RESETS_TAG)
             .performScrollToNode(
                 androidx.compose.ui.test.hasContentDescription(
-                    "Claude: 82%, 95%, 100%, 88%, 100% at past resets, 71% now"
+                    "Claude · Weekly · all models: 82%, 95%, 100%, 88%, 100% at past resets, 71% now"
                 )
             )
         rule
             .onNodeWithContentDescription(
-                "Claude: 82%, 95%, 100%, 88%, 100% at past resets, 71% now"
+                "Claude · Weekly · all models: 82%, 95%, 100%, 88%, 100% at past resets, 71% now"
             )
             .assertIsDisplayed()
     }

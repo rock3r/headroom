@@ -15,11 +15,14 @@ import java.time.temporal.ChronoUnit
 /** Alert switches keyed by account id and window id. */
 internal typealias AlertSwitches = Map<Pair<String, String>, Boolean>
 
+/** Used percent at each past reset, oldest first, keyed by account id and window id. */
+internal typealias ResetHistories = Map<Pair<String, String>, List<Double>>
+
 internal fun homeUiState(
     accounts: List<AccountState>,
     now: Instant,
     alerts: AlertSwitches,
-    pastResets: Map<String, List<Double>>,
+    pastResets: ResetHistories,
     isDemo: Boolean,
     isRefreshing: Boolean,
     justReset: Set<String> = emptySet(),
@@ -44,7 +47,7 @@ internal fun homeUiState(
                 it.toSummary(
                     now = now,
                     alerts = alerts,
-                    pastResets = pastResets[it.account.id].orEmpty(),
+                    pastResets = pastResets,
                     justReset = it.account.id in justReset,
                 )
             },
@@ -59,10 +62,13 @@ internal fun homeUiState(
 internal fun AccountState.toSummary(
     now: Instant,
     alerts: AlertSwitches,
-    pastResets: List<Double>,
+    pastResets: ResetHistories,
     justReset: Boolean = false,
 ): AccountSummary {
     val primary = primaryWindow
+    val summary = { window: QuotaWindow ->
+        window.toSummary(account.id, now, alerts, pastResets[account.id to window.id].orEmpty())
+    }
     return AccountSummary(
         id = account.id,
         provider = account.provider,
@@ -70,22 +76,22 @@ internal fun AccountState.toSummary(
         label = account.label,
         plan = snapshot?.planLabel,
         balance = snapshot?.balance,
-        primary = primary?.toSummary(account.id, now, alerts),
-        session = sessionWindow?.toSummary(account.id, now, alerts),
+        primary = primary?.let(summary),
+        session = sessionWindow?.let(summary),
         windows =
             snapshot
                 ?.windows
                 .orEmpty()
                 .filterNot { it.isUnlimited }
                 .sortedBy { it.kind.ordinal }
-                .map { it.toSummary(account.id, now, alerts) },
+                .map(summary),
         pace =
             primary?.let {
                 if (justReset) PaceChipState.JustReset else PaceChipState.from(it, now)
             },
         needsAttention = primary?.let { Pace.needsAttention(it, now) } ?: false,
         error = lastError,
-        pastResets = pastResets,
+        pastResets = primary?.let { pastResets[account.id to it.id] }.orEmpty(),
         justReset = justReset,
         allowances =
             if (account.provider.windowsAreSeparateAllowances) {
@@ -94,14 +100,19 @@ internal fun AccountState.toSummary(
                     .orEmpty()
                     .filterNot { it.isUnlimited || it.kind == WindowKind.Session }
                     .sortedByDescending { it == primary }
-                    .map { it.toSummary(account.id, now, alerts) }
+                    .map(summary)
             } else {
                 emptyList()
             },
     )
 }
 
-private fun QuotaWindow.toSummary(accountId: String, now: Instant, alerts: AlertSwitches) =
+private fun QuotaWindow.toSummary(
+    accountId: String,
+    now: Instant,
+    alerts: AlertSwitches,
+    pastResets: List<Double>,
+) =
     WindowSummary(
         id = id,
         label = label,
@@ -114,6 +125,7 @@ private fun QuotaWindow.toSummary(accountId: String, now: Instant, alerts: Alert
         usedAmount = usedAmount,
         limitAmount = limitAmount,
         amountUnit = amountUnit,
+        pastResets = pastResets,
     )
 
 private fun AlertSwitches.isOn(accountId: String, window: QuotaWindow) =

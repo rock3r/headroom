@@ -74,9 +74,10 @@ class DeepLinkTest {
         activity.newIntent(widgetTap("demo-grok"))
         rule.waitForIdle()
 
-        // The pane scaffold was not on screen when the navigator moved to the detail. It must
-        // still end up showing the detail the navigator recorded.
+        // The pane scaffold was not on screen when the account was opened. It must still end up
+        // showing that account's detail.
         rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
+        rule.onNodeWithText("SuperGrok · sam").assertIsDisplayed()
         rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertDoesNotExist()
     }
 
