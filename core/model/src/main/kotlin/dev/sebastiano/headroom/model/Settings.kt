@@ -78,6 +78,19 @@ public enum class ThemePalette {
     Bubblegum,
 }
 
+/**
+ * How the overview orders the account cards. [YourOrder] keeps the order the accounts come in from
+ * the repository. The quota sorts compare how much of the primary window is used, and the reset
+ * sorts compare when the primary window resets. Accounts without that value always go last.
+ */
+public enum class OverviewSort {
+    YourOrder,
+    MostUsedFirst,
+    LeastUsedFirst,
+    SoonestResetFirst,
+    LatestResetFirst,
+}
+
 /** The user's app settings. The defaults are how the app behaved before it had settings. */
 public data class AppSettings(
     val quotaDisplay: QuotaDisplay = QuotaDisplay.Used,
@@ -85,6 +98,7 @@ public data class AppSettings(
     val theme: ThemeMode = ThemeMode.System,
     val motion: MotionPreference = MotionPreference.System,
     val palette: ThemePalette = ThemePalette.Wallpaper,
+    val overviewSort: OverviewSort = OverviewSort.YourOrder,
 )
 
 /** Reads and stores the [AppSettings]. */
@@ -100,6 +114,8 @@ public interface SettingsRepository {
     public suspend fun setMotion(motion: MotionPreference)
 
     public suspend fun setPalette(palette: ThemePalette)
+
+    public suspend fun setOverviewSort(sort: OverviewSort)
 }
 
 /** Settings kept in memory, for demo builds, previews and tests without the data layer. */
@@ -126,5 +142,9 @@ public class InMemorySettingsRepository(initial: AppSettings = AppSettings()) : 
 
     override suspend fun setPalette(palette: ThemePalette) {
         state.update { it.copy(palette = palette) }
+    }
+
+    override suspend fun setOverviewSort(sort: OverviewSort) {
+        state.update { it.copy(overviewSort = sort) }
     }
 }

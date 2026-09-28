@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.MotionPreference
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.model.ThemeMode
@@ -41,6 +42,7 @@ class DataStoreSettingsRepositoryTest {
         settings.setTheme(ThemeMode.Light)
         settings.setMotion(MotionPreference.Reduced)
         settings.setPalette(ThemePalette.Grape)
+        settings.setOverviewSort(OverviewSort.MostUsedFirst)
         assertEquals(
             AppSettings(
                 QuotaDisplay.Left,
@@ -48,6 +50,7 @@ class DataStoreSettingsRepositoryTest {
                 theme = ThemeMode.Light,
                 motion = MotionPreference.Reduced,
                 palette = ThemePalette.Grape,
+                overviewSort = OverviewSort.MostUsedFirst,
             ),
             DataStoreSettingsRepository(store).settings.first(),
         )
@@ -62,6 +65,7 @@ class DataStoreSettingsRepositoryTest {
             it[stringPreferencesKey("theme")] = "Sepia"
             it[stringPreferencesKey("motion")] = "Wobbly"
             it[stringPreferencesKey("palette")] = "Plaid"
+            it[stringPreferencesKey("overview_sort")] = "Alphabetical"
         }
         assertEquals(AppSettings(), DataStoreSettingsRepository(store).settings.first())
     }

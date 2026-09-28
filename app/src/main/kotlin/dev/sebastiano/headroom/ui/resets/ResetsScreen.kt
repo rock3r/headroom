@@ -137,7 +137,7 @@ fun ResetsScreen(
                     width,
                 )
             }
-            item { HistoryCard(state.accounts, state.display, width) }
+            item { HistoryCard(state.accountsInYourOrder, state.display, width) }
         }
     }
 }

@@ -39,6 +39,14 @@
     <string name="overview_alert_off">Alert off</string>
     <string name="overview_all_resets">All resets</string>
     <string name="overview_this_week">This week</string>
+    <string name="overview_sort_action">Sort accounts</string>
+    <string name="overview_sort_your_order">Your order</string>
+    <string name="overview_sort_most_used">Most used first</string>
+    <string name="overview_sort_least_used">Least used first</string>
+    <string name="overview_sort_least_left">Least left first</string>
+    <string name="overview_sort_most_left">Most left first</string>
+    <string name="overview_sort_soonest_reset">Soonest reset first</string>
+    <string name="overview_sort_latest_reset">Latest reset first</string>
     <string name="overview_empty">No accounts yet. Add one to see how much you have left.</string>
 
     <!-- Account card and detail -->

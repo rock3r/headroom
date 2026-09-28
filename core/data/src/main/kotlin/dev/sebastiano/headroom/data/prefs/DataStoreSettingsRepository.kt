@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.MotionPreference
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.model.SyncFrequency
@@ -33,6 +34,8 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
                     theme = prefs[THEME].toEnum<ThemeMode>() ?: defaults.theme,
                     motion = prefs[MOTION].toEnum<MotionPreference>() ?: defaults.motion,
                     palette = prefs[PALETTE].toEnum<ThemePalette>() ?: defaults.palette,
+                    overviewSort =
+                        prefs[OVERVIEW_SORT].toEnum<OverviewSort>() ?: defaults.overviewSort,
                 )
             }
             .distinctUntilChanged()
@@ -57,6 +60,10 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         store.edit { it[PALETTE] = palette.name }
     }
 
+    override suspend fun setOverviewSort(sort: OverviewSort) {
+        store.edit { it[OVERVIEW_SORT] = sort.name }
+    }
+
     private inline fun <reified T : Enum<T>> String?.toEnum(): T? =
         enumValues<T>().firstOrNull { it.name == this }
 
@@ -66,5 +73,6 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         val THEME = stringPreferencesKey("theme")
         val MOTION = stringPreferencesKey("motion")
         val PALETTE = stringPreferencesKey("palette")
+        val OVERVIEW_SORT = stringPreferencesKey("overview_sort")
     }
 }

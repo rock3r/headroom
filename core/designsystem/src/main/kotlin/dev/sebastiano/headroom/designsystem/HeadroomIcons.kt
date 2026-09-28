@@ -6,6 +6,7 @@ import androidx.annotation.DrawableRes
 object HeadroomIcons {
     @DrawableRes val Add: Int = R.drawable.ic_add
     @DrawableRes val ArrowBack: Int = R.drawable.ic_arrow_back
+    @DrawableRes val ArrowDropDown: Int = R.drawable.ic_arrow_drop_down
     @DrawableRes val Check: Int = R.drawable.ic_check
     @DrawableRes val ChevronRight: Int = R.drawable.ic_chevron_right
     @DrawableRes val Close: Int = R.drawable.ic_close
@@ -24,6 +25,7 @@ object HeadroomIcons {
     @DrawableRes val OpenInNew: Int = R.drawable.ic_open_in_new
     @DrawableRes val PersonAdd: Int = R.drawable.ic_person_add
     @DrawableRes val SettingsFilled: Int = R.drawable.ic_settings_filled
+    @DrawableRes val Sort: Int = R.drawable.ic_sort
     @DrawableRes val Sync: Int = R.drawable.ic_sync
     @DrawableRes val Widgets: Int = R.drawable.ic_widgets
     @DrawableRes val WidgetsFilled: Int = R.drawable.ic_widgets_filled

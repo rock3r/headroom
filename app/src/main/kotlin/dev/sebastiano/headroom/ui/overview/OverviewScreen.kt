@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui.overview
 
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,13 +32,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.designsystem.HeadroomMotion
+import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SettingsButton
@@ -67,6 +75,7 @@ fun OverviewScreen(
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenSettings: () -> Unit,
+    onSortChange: (OverviewSort) -> Unit,
     modifier: Modifier = Modifier,
     columns: Int = 1,
     selectedAccountId: String? = null,
@@ -95,6 +104,7 @@ fun OverviewScreen(
         },
     ) {
         val gridState = rememberLazyGridState()
+        val placement = cardPlacementSpec(state.sortLoaded)
         StatusBarBlurBox(scrollState = gridState, modifier = Modifier.fillMaxSize()) {
             LazyVerticalGrid(
                 state = gridState,
@@ -139,13 +149,20 @@ fun OverviewScreen(
                         )
                     }
                 } else {
-                    fullWidth("section") {
-                        SectionLabel(stringResource(R.string.overview_this_week))
-                    }
+                    fullWidth("section") { SectionHeader(state, onSortChange) }
                     itemsIndexed(state.accounts, key = { _, account -> account.id }) {
                         index,
                         account ->
-                        StaggeredEntrance(index = index, play = playEntrance) {
+                        StaggeredEntrance(
+                            index = index,
+                            play = playEntrance,
+                            modifier =
+                                Modifier.animateItem(
+                                    fadeInSpec = null,
+                                    placementSpec = placement,
+                                    fadeOutSpec = null,
+                                ),
+                        ) {
                             AccountCard(
                                 account = account,
                                 now = state.now,
@@ -159,6 +176,38 @@ fun OverviewScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * How a card moves to its new place when the order changes: the container spring, as for every
+ * card. Null means the cards snap: when motion is reduced, and until the stored sort is known, so
+ * opening the app never plays a reorder from the repository's order into the stored one. The effect
+ * turns the motion on only after the frame that first has the stored sort is laid out.
+ */
+@Composable
+private fun cardPlacementSpec(sortLoaded: Boolean): FiniteAnimationSpec<IntOffset>? {
+    var settled by remember { mutableStateOf(sortLoaded) }
+    SideEffect { if (sortLoaded) settled = true }
+    return if (settled && animationsEnabled()) HeadroomMotion.containerSpec() else null
+}
+
+/** "This week", with the sort control at the end when there is more than one card to sort. */
+@Composable
+private fun SectionHeader(state: HomeUiState, onSortChange: (OverviewSort) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        SectionLabel(stringResource(R.string.overview_this_week))
+        if (state.accounts.size > 1) {
+            OverviewSortControl(
+                sort = state.overviewSort,
+                display = state.display,
+                onSortChange = onSortChange,
+            )
         }
     }
 }

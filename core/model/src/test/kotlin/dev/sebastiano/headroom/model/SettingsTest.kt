@@ -47,6 +47,11 @@ class SettingsTest {
     }
 
     @Test
+    fun `the overview keeps your own account order until the user picks a sort`() {
+        assertEquals(OverviewSort.YourOrder, AppSettings().overviewSort)
+    }
+
+    @Test
     fun `there are eight fixed palettes besides the wallpaper`() {
         assertEquals(8, ThemePalette.entries.count { it != ThemePalette.Wallpaper })
     }
@@ -60,6 +65,7 @@ class SettingsTest {
             repository.setTheme(ThemeMode.Dark)
             repository.setMotion(MotionPreference.Reduced)
             repository.setPalette(ThemePalette.Lagoon)
+            repository.setOverviewSort(OverviewSort.SoonestResetFirst)
             assertEquals(
                 AppSettings(
                     QuotaDisplay.Left,
@@ -67,6 +73,7 @@ class SettingsTest {
                     theme = ThemeMode.Dark,
                     motion = MotionPreference.Reduced,
                     palette = ThemePalette.Lagoon,
+                    overviewSort = OverviewSort.SoonestResetFirst,
                 ),
                 repository.settings.value,
             )

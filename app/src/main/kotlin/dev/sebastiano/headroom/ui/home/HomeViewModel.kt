@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
@@ -49,6 +50,10 @@ class HomeViewModel(
     private val savedStateHandle: SavedStateHandle,
     /** Whether the screens show how much of each limit is used or how much is left. */
     quotaDisplay: Flow<QuotaDisplay> = flowOf(QuotaDisplay.Used),
+    /** How the overview orders the account cards. */
+    overviewSort: Flow<OverviewSort> = flowOf(OverviewSort.YourOrder),
+    /** Stores a new overview sort; [overviewSort] then emits it. */
+    private val saveOverviewSort: suspend (OverviewSort) -> Unit = {},
 ) : ViewModel() {
     private val refreshing = MutableStateFlow(false)
     /** Saved, so the detail pane shows the same account after the process is recreated. */
@@ -96,14 +101,17 @@ class HomeViewModel(
     private val accountsWithResets: Flow<Pair<List<AccountState>, Set<String>>> =
         repository.accounts.map { it to resetTracker.update(it) }
 
+    private val choices: Flow<Pair<QuotaDisplay, OverviewSort>> =
+        combine(quotaDisplay, overviewSort) { display, sort -> display to sort }
+
     private val environment =
-        combine(isDemo, accountsLoaded, refreshing, ticks, quotaDisplay) {
+        combine(isDemo, accountsLoaded, refreshing, ticks, choices) {
             demo,
             loaded,
             busy,
             now,
-            display ->
-            Environment(demo, loaded, busy, now, display)
+            (display, sort) ->
+            Environment(demo, loaded, busy, now, display, sort)
         }
 
     val state: StateFlow<HomeUiState> =
@@ -122,7 +130,14 @@ class HomeViewModel(
                         isRefreshing = env.isRefreshing,
                         justReset = justReset,
                     )
-                    .copy(display = env.display)
+                    .let { home ->
+                        home.copy(
+                            display = env.display,
+                            accounts = home.accounts.sortedFor(env.sort),
+                            overviewSort = env.sort,
+                            accountsInYourOrder = home.accounts,
+                        )
+                    }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), initialState())
 
@@ -180,6 +195,17 @@ class HomeViewModel(
         savedStateHandle[SELECTED_ACCOUNT_KEY] = accountId
     }
 
+    /**
+     * Orders the overview's cards by [sort]. Without a selection the detail shows the top card, so
+     * the account it shows now is selected first: sorting must not swap the detail for another.
+     */
+    fun setOverviewSort(sort: OverviewSort) {
+        if (selectedId.value == null) {
+            state.value.accounts.firstOrNull()?.let { select(it.id) }
+        }
+        viewModelScope.launch { saveOverviewSort(sort) }
+    }
+
     fun refresh() {
         if (refreshing.value) return
         refreshing.value = true
@@ -198,14 +224,15 @@ class HomeViewModel(
 
     private fun initialState(): HomeUiState =
         homeUiState(
-            accounts = repository.accounts.value,
-            now = clock(),
-            alerts = emptyMap(),
-            pastResets = emptyMap(),
-            isDemo = isDemo.value,
-            isRefreshing = false,
-            accountsLoaded = accountsLoaded.value,
-        )
+                accounts = repository.accounts.value,
+                now = clock(),
+                alerts = emptyMap(),
+                pastResets = emptyMap(),
+                isDemo = isDemo.value,
+                isRefreshing = false,
+                accountsLoaded = accountsLoaded.value,
+            )
+            .copy(sortLoaded = false)
 
     /** Weekly and monthly windows with a known start can be drawn against even pace. */
     private val QuotaWindow.isChartable: Boolean
@@ -221,6 +248,7 @@ class HomeViewModel(
         val isRefreshing: Boolean,
         val now: Instant,
         val display: QuotaDisplay,
+        val sort: OverviewSort,
     )
 
     private data class DetailSelection(

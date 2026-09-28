@@ -70,7 +70,7 @@ class AppGraph(
     val removeAccount: suspend (accountId: String) -> Unit = {},
     /** How often countdowns re-read the clock. Null turns it off, for tests with a fixed clock. */
     val tickInterval: Duration? = Duration.ofMinutes(1),
-    /** Used or left, and how often to sync in the background. */
+    /** Used or left, how often to sync in the background, and how the overview sorts accounts. */
     val settings: SettingsRepository = InMemorySettingsRepository(),
     /** The version name the settings screen shows. */
     val appVersion: String = "",
@@ -87,6 +87,8 @@ class AppGraph(
                 tickInterval = tickInterval,
                 savedStateHandle = createSavedStateHandle(),
                 quotaDisplay = settings.settings.map { it.quotaDisplay }.distinctUntilChanged(),
+                overviewSort = settings.settings.map { it.overviewSort }.distinctUntilChanged(),
+                saveOverviewSort = settings::setOverviewSort,
             )
         }
     }

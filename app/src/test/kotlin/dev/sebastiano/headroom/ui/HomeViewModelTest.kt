@@ -6,6 +6,8 @@ import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
 import dev.sebastiano.headroom.designsystem.PaceChipState
 import dev.sebastiano.headroom.model.FakeQuotaRepository
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.WindowKind
@@ -20,6 +22,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -72,6 +75,70 @@ class HomeViewModelTest {
 
             assertEquals(QuotaDisplay.Left, withDisplay.state.value.display)
             assertEquals(QuotaDisplay.Left, withDisplay.detail.value?.display)
+        }
+
+    @Test
+    fun `changing the sort reorders the overview's accounts and stores the choice`() =
+        runTest(main.dispatcher) {
+            val settings = InMemorySettingsRepository()
+            val sorted = sortingViewModel(settings)
+            backgroundScope.launch { sorted.state.collect {} }
+            runCurrent()
+            assertEquals(OverviewSort.YourOrder, sorted.state.value.overviewSort)
+
+            sorted.setOverviewSort(OverviewSort.MostUsedFirst)
+            runCurrent()
+
+            val state = sorted.state.value
+            assertEquals(OverviewSort.MostUsedFirst, state.overviewSort)
+            assertEquals(OverviewSort.MostUsedFirst, settings.settings.value.overviewSort)
+            assertEquals(
+                listOf("demo-grok", "demo-claude", "demo-copilot", "demo-codex"),
+                state.accounts.map { it.id },
+            )
+            // The resets history and the settings keep the repository's order.
+            assertEquals(
+                listOf("demo-claude", "demo-codex", "demo-grok", "demo-copilot"),
+                state.accountsInYourOrder.map { it.id },
+            )
+        }
+
+    @Test
+    fun `a stored sort applies once it is read, and the state says when that is`() =
+        runTest(main.dispatcher) {
+            val settings =
+                InMemorySettingsRepository(
+                    dev.sebastiano.headroom.model.AppSettings(
+                        overviewSort = OverviewSort.LatestResetFirst
+                    )
+                )
+            val sorted = sortingViewModel(settings)
+            assertFalse(sorted.state.value.sortLoaded)
+
+            backgroundScope.launch { sorted.state.collect {} }
+            runCurrent()
+
+            assertTrue(sorted.state.value.sortLoaded)
+            assertEquals(
+                listOf("demo-codex", "demo-copilot", "demo-claude", "demo-grok"),
+                sorted.state.value.accounts.map { it.id },
+            )
+        }
+
+    @Test
+    fun `sorting keeps the detail on the account it shows`() =
+        runTest(main.dispatcher) {
+            val sorted = sortingViewModel(InMemorySettingsRepository())
+            backgroundScope.launch { sorted.state.collect {} }
+            backgroundScope.launch { sorted.detail.collect {} }
+            runCurrent()
+            assertEquals("demo-claude", sorted.detail.value?.account?.id)
+
+            sorted.setOverviewSort(OverviewSort.MostUsedFirst)
+            runCurrent()
+
+            assertEquals("demo-grok", sorted.state.value.accounts.first().id)
+            assertEquals("demo-claude", sorted.detail.value?.account?.id)
         }
 
     @Test
@@ -290,6 +357,20 @@ class HomeViewModelTest {
             resetHistory = DemoResetHistory,
             tickInterval = null,
             savedStateHandle = saved,
+        )
+
+    private fun sortingViewModel(settings: InMemorySettingsRepository) =
+        HomeViewModel(
+            repository = repository,
+            alertPreferences = InMemoryAlertPreferences(),
+            clock = { now },
+            isDemo = MutableStateFlow(true),
+            accountsLoaded = MutableStateFlow(true),
+            resetHistory = DemoResetHistory,
+            tickInterval = null,
+            savedStateHandle = SavedStateHandle(),
+            overviewSort = settings.settings.map { it.overviewSort },
+            saveOverviewSort = settings::setOverviewSort,
         )
 
     private fun <T> List<T>.distinctConsecutive() = filterIndexed { index, value ->

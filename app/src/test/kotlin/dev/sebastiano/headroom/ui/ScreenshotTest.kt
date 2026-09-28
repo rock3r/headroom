@@ -25,6 +25,7 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SettingsRepository
@@ -37,6 +38,7 @@ import dev.sebastiano.headroom.ui.accounts.accountRowTag
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
 import dev.sebastiano.headroom.ui.overview.NEXT_RESET_CARD_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
+import dev.sebastiano.headroom.ui.overview.OVERVIEW_SORT_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.settings.REDUCE_MOTION_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
@@ -115,6 +117,20 @@ class ScreenshotTest {
     fun overviewDark() {
         launch(dark = true)
         capture("overview-dark")
+    }
+
+    @Test
+    fun overviewSortMenu() {
+        launch(
+            settings =
+                InMemorySettingsRepository(AppSettings(overviewSort = OverviewSort.MostUsedFirst))
+        )
+        // With the clock paused, the scroll never goes idle once the blur runs, so let it run.
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).performScrollToNode(hasTestTag(OVERVIEW_SORT_TAG))
+        rule.onNodeWithTag(OVERVIEW_SORT_TAG).performClick()
+        rule.mainClock.autoAdvance = false
+        capture("overview-sort-menu")
     }
 
     @Test
