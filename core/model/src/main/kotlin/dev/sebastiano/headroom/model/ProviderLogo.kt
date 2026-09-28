@@ -42,11 +42,11 @@ private const val MODELS_DEV_VIEWPORT = 40f
 private const val SMALL_VIEWPORT = 24f
 
 /**
- * The JetBrains artwork fills its whole 24 unit viewport. The models.dev logos leave about 4.5 of
- * their 40 units empty on each side, so their artwork spans about 78% of the box. A square looks
- * bigger than a round shape of the same width, so the JetBrains artwork gets about 73% of its box.
+ * The JetBrains mark is a solid tile that fills its whole 24 unit viewport, with the underscore cut
+ * out. It carries far more ink than the line logos from models.dev, so it gets about 60% of its box
+ * to look the same weight next to them.
  */
-private const val JETBRAINS_INSET = 4.5f
+private const val JETBRAINS_INSET = 7.5f
 
 private const val ANTHROPIC =
     """M26.9568 9.88184H22.1265L30.7753 31.7848H35.4917L26.9568 9.88184ZM13.028 9.88184L4.4917 31.7848H9.32203L11.2305 27.1793H20.2166L22.0126 31.6724H26.8444L18.0832 9.88184H13.028ZM12.5783 23.1361L15.4987 15.3853L18.5315 23.1361H12.5783Z"""
@@ -70,4 +70,4 @@ private const val OPENCODE =
     """M8.40005 17.4H19.2001V21H4.80005V13.8H8.40005V17.4ZM15.6001 10.2V13.8H8.40005V10.2H15.6001ZM19.2001 10.2H15.6001V6.6H4.80005V3H19.2001V10.2Z"""
 
 private const val JETBRAINS =
-    """M2.345 23.997A2.347 2.347 0 0 1 0 21.652V10.988C0 9.665.535 8.37 1.473 7.433l5.965-5.961A5.01 5.01 0 0 1 10.989 0h10.666A2.347 2.347 0 0 1 24 2.345v10.664a5.056 5.056 0 0 1-1.473 3.554l-5.965 5.965A5.017 5.017 0 0 1 13.007 24v-.003H2.345Zm8.969-6.854H5.486v1.371h5.828v-1.371ZM3.963 6.514h13.523v13.519l4.257-4.257a3.936 3.936 0 0 0 1.146-2.767V2.345c0-.678-.552-1.234-1.234-1.234H10.989a3.897 3.897 0 0 0-2.767 1.145L3.963 6.514Zm-.192.192L2.256 8.22a3.944 3.944 0 0 0-1.145 2.768v10.664c0 .678.552 1.234 1.234 1.234h10.666a3.9 3.9 0 0 0 2.767-1.146l1.512-1.511H3.771V6.706Z"""
+    """M2.345 23.997A2.347 2.347 0 0 1 0 21.652V10.988C0 9.665.535 8.37 1.473 7.433l5.965-5.961A5.01 5.01 0 0 1 10.989 0h10.666A2.347 2.347 0 0 1 24 2.345v10.664a5.056 5.056 0 0 1-1.473 3.554l-5.965 5.965A5.017 5.017 0 0 1 13.007 24v-.003H2.345Zm8.969-6.854H5.486v1.371h5.828v-1.371Z"""

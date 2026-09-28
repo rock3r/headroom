@@ -134,5 +134,6 @@ More detail: [docs/TESTING.md](docs/TESTING.md), [docs/STATIC-ANALYSIS.md](docs/
 ## Credits
 
 Most provider logos come from [models.dev](https://models.dev)
-([sst/models.dev](https://github.com/sst/models.dev), MIT licence). All logos are trademarks of
+([sst/models.dev](https://github.com/sst/models.dev), MIT licence). The JetBrains mark is
+adapted from [Simple Icons](https://simpleicons.org) (CC0). All logos are trademarks of
 their owners. Headroom uses them only to show which provider an account belongs to.

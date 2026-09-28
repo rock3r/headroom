@@ -28,11 +28,11 @@ class ProviderLogoTest {
 
     @Test
     fun `logos that fill their viewport get an inset so they match the others`() {
-        // The JetBrains artwork fills its whole 24 unit box. The models.dev logos leave about 4.5
-        // of their 40 units empty on each side, so the JetBrains logo needs a margin to match.
+        // The JetBrains mark is a solid tile that fills its whole 24 unit box. It is much heavier
+        // than the line logos from models.dev, so it needs a wide margin to look the same weight.
         val jetBrains = Provider.JetBrains.logo
         val share = jetBrains.viewportSize / jetBrains.boxSize
-        assertTrue(share in 0.65f..0.8f, "JetBrains fills $share of its box")
+        assertTrue(share in 0.55f..0.68f, "JetBrains fills $share of its box")
         Provider.entries
             .filter { it != Provider.JetBrains }
             .forEach { assertEquals(0f, it.logo.inset, "$it should not need an inset") }
