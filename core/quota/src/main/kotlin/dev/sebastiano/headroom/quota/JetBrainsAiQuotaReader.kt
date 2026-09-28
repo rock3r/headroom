@@ -5,6 +5,7 @@ import dev.sebastiano.headroom.model.WindowKind
 import java.io.IOException
 import java.time.Duration
 import java.time.Instant
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -53,7 +54,10 @@ internal class JetBrainsAiQuotaReader(
         val used = parseCredit(quota["current"]) ?: return missing(QUOTA_STEP, "current amount")
         val maximum =
             parseCredit(quota["maximum"])?.takeIf { it > 0 }
-                ?: return missing(QUOTA_STEP, "positive maximum")
+                ?: run {
+                    log("$QUOTA_STEP shape: ${redactedShape(quota)}")
+                    return missing(QUOTA_STEP, "positive maximum")
+                }
         val refill =
             post(REFILL_STEP, "$baseUrl$REFILL_PATH", aiHeaders, EMPTY_BODY)
                 ?.objectOrNull("current") ?: return missing(REFILL_STEP, "current")
@@ -148,6 +152,25 @@ internal fun parseCredit(element: JsonElement?): Double? {
     val amount = if (element is JsonObject) element["amount"] else element
     return (amount as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() }
 }
+
+/**
+ * The JSON with every text value replaced by its length, except numbers written as text. It shows
+ * the shape of an unexpected response in the log without leaking ids or names.
+ */
+internal fun redactedShape(element: JsonElement): String =
+    when (element) {
+        is JsonObject ->
+            element.entries.joinToString(", ", "{", "}") { (key, value) ->
+                "$key: ${redactedShape(value)}"
+            }
+        is JsonArray -> element.joinToString(", ", "[", "]") { redactedShape(it) }
+        is JsonPrimitive ->
+            when {
+                !element.isString -> element.content
+                element.content.toDoubleOrNull() != null -> "\"${element.content}\""
+                else -> "<text, ${element.content.length} chars>"
+            }
+    }
 
 private val WEEKLY_PERIODS = Duration.ofDays(6)..Duration.ofDays(8)
 private val MONTHLY_PERIODS = Duration.ofDays(28)..Duration.ofDays(31)
