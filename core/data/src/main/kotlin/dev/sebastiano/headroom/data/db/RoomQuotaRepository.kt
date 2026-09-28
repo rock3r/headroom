@@ -30,6 +30,7 @@ import kotlinx.coroutines.sync.withLock
  */
 internal class RoomQuotaRepository(
     private val dao: QuotaDao,
+    private val order: AccountOrderDao,
     private val fetch: suspend (Account) -> QuotaResult,
     private val clock: () -> Instant,
     scope: CoroutineScope,
@@ -45,7 +46,7 @@ internal class RoomQuotaRepository(
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     suspend fun addAccount(account: Account) {
-        dao.insertAccount(
+        order.insertAccountLast(
             AccountEntity(
                 id = account.id,
                 provider = account.provider.id,
@@ -60,6 +61,11 @@ internal class RoomQuotaRepository(
     /** Names the account. A blank [nickname] removes the name, so the provider's name shows. */
     suspend fun renameAccount(accountId: String, nickname: String?) {
         dao.setNickname(accountId, nickname?.trim()?.ifEmpty { null })
+    }
+
+    /** Stores the order the user put the accounts in, in one transaction. */
+    suspend fun reorderAccounts(orderedIds: List<String>) {
+        order.reorderAccounts(orderedIds)
     }
 
     suspend fun removeAccount(accountId: String) {
