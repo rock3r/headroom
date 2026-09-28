@@ -134,6 +134,65 @@ class BrowserOAuthFlowTest {
         assertContains(reply.body, "headroom://x")
     }
 
+    /** Fails the first [failures] exchanges as Android does for a backgrounded app. */
+    private class OfflineSpec(
+        private val spec: FakeSpec,
+        private val failures: Int,
+    ) : BrowserOAuthSpec by spec {
+        var attempts = 0
+
+        override suspend fun exchange(
+            code: String,
+            redirectUri: String,
+            pkce: Pkce,
+            state: String,
+        ): TokenSet {
+            attempts++
+            if (attempts <= failures) throw AuthException.Network("offline")
+            return spec.exchange(code, redirectUri, pkce, state)
+        }
+    }
+
+    @Test
+    fun `an exchange without network sends the user back to the app and retries there`() = runTest {
+        // Android blocks the network of a backgrounded app, and the browser is in front
+        // until the user goes back to Headroom.
+        val spec = OfflineSpec(FakeSpec(), failures = 3)
+        val signIn = BrowserOAuthFlow(spec, io).start("headroom://signed-in")
+        val browser = async {
+            browserGet(
+                io,
+                "http://127.0.0.1:${portOf(signIn)}/callback?code=c&state=${stateOf(signIn)}",
+            )
+        }
+
+        val tokens = signIn.awaitTokens()
+
+        assertEquals("access-c", tokens.accessToken)
+        assertEquals(4, spec.attempts)
+        val reply = browser.await()
+        assertEquals(200, reply.status)
+        assertContains(reply.body, "Go back to Headroom to finish")
+        assertContains(reply.body, "headroom://signed-in")
+    }
+
+    @Test
+    fun `an exchange that never reaches the network gives up in the end`() = runTest {
+        val spec = OfflineSpec(FakeSpec(), failures = Int.MAX_VALUE)
+        val signIn = BrowserOAuthFlow(spec, io).start(null)
+        val browser = async {
+            browserGet(
+                io,
+                "http://127.0.0.1:${portOf(signIn)}/callback?code=c&state=${stateOf(signIn)}",
+            )
+        }
+
+        assertFailsWith<AuthException.Network> { signIn.awaitTokens() }
+
+        assertTrue(spec.attempts > 1)
+        assertEquals(200, browser.await().status)
+    }
+
     @Test
     fun `a pasted code is exchanged with the manual redirect URI and frees the port`() = runTest {
         val spec = FakeSpec()

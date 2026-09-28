@@ -19,6 +19,17 @@ public class CallbackPage internal constructor(public val status: Int, public va
                 ),
             )
 
+        /** The browser has the code, but the app must finish the sign-in in the foreground. */
+        public fun returnToApp(returnUrl: String?): CallbackPage =
+            CallbackPage(
+                OK,
+                render(
+                    title = "Almost done",
+                    message = "Go back to Headroom to finish signing in.",
+                    returnUrl = returnUrl,
+                ),
+            )
+
         public fun failure(message: String, returnUrl: String?): CallbackPage =
             CallbackPage(
                 BAD_REQUEST,

@@ -4,10 +4,12 @@ import dev.sebastiano.headroom.model.Provider
 import java.net.URI
 import java.net.URISyntaxException
 import java.security.SecureRandom
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 
@@ -162,19 +164,37 @@ internal constructor(
             close()
         }
 
-    private suspend fun exchangeAndAnswer(callback: LoopbackCallback): TokenSet =
+    private suspend fun exchangeAndAnswer(callback: LoopbackCallback): TokenSet {
         // This sign-in owns the held browser connection; release it even when cancelled.
         callback.use {
-            val tokens =
-                try {
-                    spec.exchange(callback.code, loopbackRedirectUri, pkce, state)
-                } catch (failure: AuthException) {
-                    answer(callback, CallbackPage.failure(failure.userMessage(), returnUrl))
-                    throw failure
-                }
-            answer(callback, CallbackPage.success(returnUrl))
-            tokens
+            try {
+                val tokens = spec.exchange(callback.code, loopbackRedirectUri, pkce, state)
+                answer(callback, CallbackPage.success(returnUrl))
+                return tokens
+            } catch (_: AuthException.Network) {
+                // Android blocks the network of an app in the background, and the browser is in
+                // front. Send the user back; the exchange works once the app is in front again.
+                answer(callback, CallbackPage.returnToApp(returnUrl))
+            } catch (failure: AuthException) {
+                answer(callback, CallbackPage.failure(failure.userMessage(), returnUrl))
+                throw failure
+            }
         }
+        return retryExchange(callback.code)
+    }
+
+    private suspend fun retryExchange(code: String): TokenSet {
+        var last: AuthException.Network? = null
+        repeat(OFFLINE_RETRIES) {
+            delay(OFFLINE_RETRY_DELAY)
+            try {
+                return spec.exchange(code, loopbackRedirectUri, pkce, state)
+            } catch (offline: AuthException.Network) {
+                last = offline
+            }
+        }
+        throw checkNotNull(last)
+    }
 
     private suspend fun answer(callback: LoopbackCallback, page: CallbackPage) {
         withContext(ioDispatcher) { callback.respond(page) }
@@ -195,6 +215,10 @@ internal constructor(
 
     private companion object {
         val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]", "::1")
+
+        /** Retries cover about 10 minutes, as long as providers keep a code valid. */
+        val OFFLINE_RETRY_DELAY = 2.seconds
+        const val OFFLINE_RETRIES = 300
     }
 }
 
