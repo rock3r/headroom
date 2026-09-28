@@ -3,6 +3,8 @@ package dev.sebastiano.headroom.ui
 import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
@@ -19,6 +21,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
@@ -143,7 +146,7 @@ class ScreenshotTest {
         // With the clock paused, the scroll never goes idle once the blur runs, so let it run.
         rule.mainClock.autoAdvance = true
         rule.onNodeWithTag(OVERVIEW_LIST_TAG).performScrollToNode(hasTestTag(OVERVIEW_SORT_TAG))
-        rule.onNodeWithTag(OVERVIEW_SORT_TAG).performClick()
+        rule.onNodeWithTag(OVERVIEW_SORT_TAG).clickWithoutPress()
         rule.mainClock.autoAdvance = false
         capture("overview-sort-menu")
     }
@@ -210,14 +213,14 @@ class ScreenshotTest {
     @Test
     fun resets() {
         launch()
-        rule.onNodeWithContentDescription("Resets").performClick()
+        rule.onNodeWithContentDescription("Resets").clickWithoutPress()
         capture("resets")
     }
 
     @Test
     fun resetsHistoryDark() {
         launch(dark = true)
-        rule.onNodeWithContentDescription("Resets").performClick()
+        rule.onNodeWithContentDescription("Resets").clickWithoutPress()
         rule.mainClock.autoAdvance = true
         rule.onNodeWithTag(RESETS_TAG).performScrollToIndex(RESETS_HISTORY_INDEX)
         rule.mainClock.autoAdvance = false
@@ -227,7 +230,7 @@ class ScreenshotTest {
     @Test
     fun resetsHistoryLeft() {
         launch(settings = InMemorySettingsRepository(AppSettings(quotaDisplay = QuotaDisplay.Left)))
-        rule.onNodeWithContentDescription("Resets").performClick()
+        rule.onNodeWithContentDescription("Resets").clickWithoutPress()
         rule.mainClock.autoAdvance = true
         rule.onNodeWithTag(RESETS_TAG).performScrollToIndex(RESETS_HISTORY_INDEX)
         rule.mainClock.autoAdvance = false
@@ -238,7 +241,7 @@ class ScreenshotTest {
     @Config(qualifiers = MEDIUM)
     fun resetsMedium() {
         launch()
-        rule.onNodeWithText("Resets").performClick()
+        rule.onNodeWithText("Resets").clickWithoutPress()
         capture("resets-medium")
     }
 
@@ -246,28 +249,28 @@ class ScreenshotTest {
     @Config(qualifiers = EXPANDED)
     fun resetsExpandedDark() {
         launch(dark = true)
-        rule.onNodeWithText("Resets").performClick()
+        rule.onNodeWithText("Resets").clickWithoutPress()
         capture("resets-expanded-dark")
     }
 
     @Test
     fun stats() {
         launch()
-        rule.onNodeWithContentDescription("Stats").performClick()
+        rule.onNodeWithContentDescription("Stats").clickWithoutPress()
         capture("stats")
     }
 
     @Test
     fun statsDark() {
         launch(dark = true)
-        rule.onNodeWithContentDescription("Stats").performClick()
+        rule.onNodeWithContentDescription("Stats").clickWithoutPress()
         capture("stats-dark")
     }
 
     @Test
     fun statsScrolled() {
         launch()
-        rule.onNodeWithContentDescription("Stats").performClick()
+        rule.onNodeWithContentDescription("Stats").clickWithoutPress()
         settle()
         rule.onNodeWithTag(STATS_TAG).performScrollToIndex(LAST_STATS_INDEX)
         capture("stats-scrolled")
@@ -277,7 +280,7 @@ class ScreenshotTest {
     @Config(qualifiers = EXPANDED)
     fun statsExpanded() {
         launch()
-        rule.onNodeWithText("Stats").performClick()
+        rule.onNodeWithText("Stats").clickWithoutPress()
         capture("stats-expanded")
     }
 
@@ -345,6 +348,11 @@ class ScreenshotTest {
         launch()
         settle()
         rule.onNodeWithContentDescription("Settings").performClick()
+        // The reveal starts a few frames after the tap, once Settings is composed; time it from
+        // there. Its soft start keeps the circle under the button for the first frames.
+        rule.mainClock.advanceTimeUntil {
+            rule.onAllNodesWithText("Settings").fetchSemanticsNodes().isNotEmpty()
+        }
         captureMidway("settings-opening", REVEAL_MIDWAY_MILLIS)
     }
 
@@ -531,8 +539,11 @@ private const val SETTLE_STEPS = 40
 private const val LAST_STATS_INDEX = 7
 private const val STEP_MILLIS = 50L
 private const val FRAME_MILLIS = 16L
-/** Part-way through the reveal into Settings, while the circle is still growing. */
-private const val REVEAL_MIDWAY_MILLIS = 64L
+/**
+ * Part-way through the reveal into Settings, counted from its start: the circle covers about half
+ * the screen and is still growing.
+ */
+private const val REVEAL_MIDWAY_MILLIS = 192L
 /** Part-way through the shimmer, while its band crosses the middle of the screen. */
 private const val SHIMMER_MIDWAY_MILLIS = 640L
 /** Part-way through a confetti burst, while the pieces are high and spread out. */
@@ -546,6 +557,15 @@ private const val BACK_STEPS = 10
 private const val REORDER_LONG_PRESS_MILLIS = 1_000L
 private const val REORDER_ROWS = 0.7f
 private const val REORDER_STEPS = 8
+
+/**
+ * Clicks through the node's click action, without a press. A tap leaves a ripple on a control that
+ * stays on screen, and the platform draws that ripple on the looper's clock, not the test clock: it
+ * fades by a different amount on every run, so the screenshot would never match its recording.
+ */
+private fun SemanticsNodeInteraction.clickWithoutPress() {
+    performSemanticsAction(SemanticsActions.OnClick)
+}
 
 private fun backEvent(progress: Float) =
     BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)
