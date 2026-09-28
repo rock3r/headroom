@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.ui.resets
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -89,7 +90,7 @@ private fun HistoryRow(window: HistoryWindow, display: QuotaDisplay, wide: Boole
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(end = 16.dp),
             )
-            Plot(window, display, TextAlign.End, Modifier.width(WidePlotWidth))
+            Plot(window, display, Modifier.width(WidePlotWidth))
             NowValue(now)
         }
     } else {
@@ -104,7 +105,7 @@ private fun HistoryRow(window: HistoryWindow, display: QuotaDisplay, wide: Boole
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                Plot(window, display, TextAlign.Start, Modifier.weight(1f))
+                Plot(window, display, Modifier.weight(1f))
                 NowValue(now)
             }
         }
@@ -135,29 +136,31 @@ private fun historyDescription(window: HistoryWindow, display: QuotaDisplay, now
         )
     }
 
-/** The columns, or a short note when the window has not reset since the app started recording. */
+/**
+ * The columns. The running window always gets its column, so a window that has not reset since the
+ * app started recording still shows how far it is, next to a short note.
+ */
 @Composable
-private fun Plot(
-    window: HistoryWindow,
-    display: QuotaDisplay,
-    emptyAlign: TextAlign,
-    modifier: Modifier = Modifier,
-) {
-    if (window.past.isEmpty()) {
-        Text(
-            text = stringResource(R.string.resets_history_empty),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = emptyAlign,
-            modifier = modifier.padding(bottom = 2.dp),
-        )
-    } else {
+private fun Plot(window: HistoryWindow, display: QuotaDisplay, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.height(PlotHeight)) {
         ResetColumns(
             past = window.past,
             current = window.current,
             display = display,
-            modifier = modifier.height(PlotHeight),
+            modifier = Modifier.matchParentSize(),
         )
+        if (window.past.isEmpty()) {
+            Text(
+                text = stringResource(R.string.resets_history_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier.align(Alignment.BottomStart)
+                        .padding(end = ColumnPitch + GuideOverhang, bottom = 2.dp),
+            )
+        }
     }
 }
 
