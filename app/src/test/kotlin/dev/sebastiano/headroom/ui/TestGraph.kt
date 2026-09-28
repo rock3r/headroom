@@ -10,9 +10,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import dev.sebastiano.headroom.AppGraph
+import dev.sebastiano.headroom.appdata.DemoAwareUsageHistory
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
 import dev.sebastiano.headroom.appdata.DemoResetHistory
+import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
+import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
 import dev.sebastiano.headroom.designsystem.IndicatorStyle
 import dev.sebastiano.headroom.designsystem.IndicatorStyleKey
 import dev.sebastiano.headroom.model.AccountState
@@ -27,6 +30,7 @@ import dev.sebastiano.headroom.widgets.WidgetPinner
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 
@@ -57,6 +61,7 @@ fun testGraph(
     demo: FakeQuotaRepository = FakeQuotaRepository({ FIXED_NOW }),
     real: QuotaRepository = FakeQuotaRepository({ FIXED_NOW }, initial = realAccounts),
     settings: SettingsRepository = InMemorySettingsRepository(),
+    statsDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
@@ -79,6 +84,13 @@ fun testGraph(
         tickInterval = null,
         settings = settings,
         appVersion = TEST_APP_VERSION,
+        usageHistory =
+            DemoAwareUsageHistory(
+                isDemo = repository.isDemo,
+                real = RepositoryUsageHistory(real),
+                demo = DemoUsageHistory(DemoResetHistory, clock, ZoneOffset.UTC),
+            ),
+        statsDispatcher = statsDispatcher,
     )
 }
 

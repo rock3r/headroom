@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.ui.stats
 
 import dev.sebastiano.headroom.appdata.ResetPeaks
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
@@ -152,4 +153,33 @@ internal fun runs(timeline: List<Boolean>): List<Pair<Boolean, Int>> {
         }
     }
     return runs
+}
+
+/** A playful name for when most of the quota goes. */
+enum class Persona {
+    EarlyBird,
+    NineToFive,
+    EveningHacker,
+    NightOwl,
+    WeekendWarrior,
+}
+
+/** At least this share of the use on Saturdays and Sundays makes a weekend warrior. */
+private const val WEEKEND_SHARE = 0.4
+private val EARLY_HOURS = 5..8
+private val WORK_HOURS = 9..17
+private val EVENING_HOURS = 18..21
+
+/** The persona of [map]: the weekend if it takes a big share, else the busiest hour of the day. */
+internal fun persona(map: BurnHeatmap): Persona {
+    val weekend = map.dayTotal(DayOfWeek.SATURDAY) + map.dayTotal(DayOfWeek.SUNDAY)
+    if (map.total > 0.0 && weekend / map.total >= WEEKEND_SHARE) return Persona.WeekendWarrior
+    val hour =
+        (0 until BurnHeatmap.HOURS).maxBy { hour -> DayOfWeek.entries.sumOf { map.at(it, hour) } }
+    return when (hour) {
+        in EARLY_HOURS -> Persona.EarlyBird
+        in WORK_HOURS -> Persona.NineToFive
+        in EVENING_HOURS -> Persona.EveningHacker
+        else -> Persona.NightOwl
+    }
 }

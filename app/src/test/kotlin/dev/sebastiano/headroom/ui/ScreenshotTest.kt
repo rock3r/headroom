@@ -44,6 +44,9 @@ import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.resets.RESETS_TAG
 import dev.sebastiano.headroom.ui.settings.REDUCE_MOTION_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
+import dev.sebastiano.headroom.ui.settings.addWidgetTag
+import dev.sebastiano.headroom.ui.stats.STATS_TAG
+import dev.sebastiano.headroom.widgets.WidgetStyle
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -238,10 +241,46 @@ class ScreenshotTest {
     }
 
     @Test
-    fun widgets() {
+    fun stats() {
         launch()
-        rule.onNodeWithContentDescription("Widgets").performClick()
-        capture("widgets")
+        rule.onNodeWithContentDescription("Stats").performClick()
+        capture("stats")
+    }
+
+    @Test
+    fun statsDark() {
+        launch(dark = true)
+        rule.onNodeWithContentDescription("Stats").performClick()
+        capture("stats-dark")
+    }
+
+    @Test
+    fun statsScrolled() {
+        launch()
+        rule.onNodeWithContentDescription("Stats").performClick()
+        settle()
+        rule.onNodeWithTag(STATS_TAG).performScrollToIndex(LAST_STATS_INDEX)
+        capture("stats-scrolled")
+    }
+
+    @Test
+    @Config(qualifiers = EXPANDED)
+    fun statsExpanded() {
+        launch()
+        rule.onNodeWithText("Stats").performClick()
+        capture("stats-expanded")
+    }
+
+    @Test
+    fun settingsWidgets() {
+        launch()
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasTestTag(addWidgetTag(WidgetStyle.Countdown)))
+        rule.mainClock.autoAdvance = false
+        capture("settings-widgets")
     }
 
     @Test
@@ -443,6 +482,8 @@ private const val GROK_INDEX = 6
 /** Header, upcoming label, upcoming list, history label, then the history chart. */
 private const val RESETS_HISTORY_INDEX = 4
 private const val SETTLE_STEPS = 40
+/** The last card on the Stats tab: the header, six cards, then the note. */
+private const val LAST_STATS_INDEX = 7
 private const val STEP_MILLIS = 50L
 private const val FRAME_MILLIS = 16L
 /** Part-way through the reveal into Settings, while the circle is still growing. */

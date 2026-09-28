@@ -8,11 +8,15 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.sebastiano.headroom.appdata.DemoAwareResetHistory
+import dev.sebastiano.headroom.appdata.DemoAwareUsageHistory
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
 import dev.sebastiano.headroom.appdata.DemoResetHistory
+import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.HistoryResetHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
+import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
 import dev.sebastiano.headroom.appdata.ResetHistory
+import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
@@ -26,6 +30,7 @@ import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
+import dev.sebastiano.headroom.ui.stats.StatsViewModel
 import dev.sebastiano.headroom.widget.HeadroomWidgetProvider
 import dev.sebastiano.headroom.widgets.AppWidgetManagerPinner
 import dev.sebastiano.headroom.widgets.WidgetPinner
@@ -33,6 +38,7 @@ import dev.sebastiano.headroom.widgets.WidgetStyle
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +57,7 @@ import kotlinx.coroutines.flow.map
  * - [signInController]: the auth layer's controller replaces [FakeSignInController].
  * - [widgetPinner]: the widget module supplies the `AppWidgetProvider` for each style.
  * - [resetHistory]: the data layer answers it from the Room history.
+ * - [usageHistory]: the Room history of each window, or demo history in demo mode, for the stats.
  * - [settings]: the data layer's DataStore settings, or settings in memory without it.
  */
 class AppGraph(
@@ -76,6 +83,10 @@ class AppGraph(
     val settings: SettingsRepository = InMemorySettingsRepository(),
     /** The version name the settings screen shows. */
     val appVersion: String = "",
+    /** The usage history the Stats tab is computed from. */
+    val usageHistory: UsageHistory = RepositoryUsageHistory(quotaRepository),
+    /** Where the stats are computed: off the main thread, as they read weeks of history. */
+    val statsDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     val homeViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
@@ -91,6 +102,19 @@ class AppGraph(
                 quotaDisplay = settings.settings.map { it.quotaDisplay }.distinctUntilChanged(),
                 overviewSort = settings.settings.map { it.overviewSort }.distinctUntilChanged(),
                 saveOverviewSort = settings::setOverviewSort,
+            )
+        }
+    }
+
+    val statsViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
+        initializer {
+            StatsViewModel(
+                repository = quotaRepository,
+                history = usageHistory,
+                isDemo = isDemo,
+                clock = clock,
+                zone = zone,
+                computeDispatcher = statsDispatcher,
             )
         }
     }
@@ -180,6 +204,12 @@ class AppGraph(
                 reorderAccounts = { ids -> data?.repository?.reorderAccounts(ids) },
                 settings = data?.settings ?: InMemorySettingsRepository(),
                 appVersion = versionName(context),
+                usageHistory =
+                    DemoAwareUsageHistory(
+                        isDemo = repository.isDemo,
+                        real = RepositoryUsageHistory(realAccounts),
+                        demo = DemoUsageHistory(DemoResetHistory, clock, zone),
+                    ),
             )
         }
 

@@ -73,8 +73,6 @@ import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.overview.OverviewScreen
 import dev.sebastiano.headroom.ui.resets.ResetsScreen
-import dev.sebastiano.headroom.ui.widgets.WidgetsScreen
-import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlinx.coroutines.launch
 
 const val TOOLBAR_TAG: String = "floating-toolbar"
@@ -99,7 +97,8 @@ internal fun HomeScaffold(
     onSortChange: (OverviewSort) -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenSettings: () -> Unit,
-    onAddWidget: (WidgetStyle) -> Unit,
+    /** The Stats tab, given the space to leave at the bottom for the floating toolbar. */
+    stats: @Composable (bottomPadding: androidx.compose.ui.unit.Dp) -> Unit,
     modifier: Modifier = Modifier,
     openAccountRequest: OpenAccountRequest? = null,
     onConsumeOpenAccount: () -> Unit = {},
@@ -187,8 +186,7 @@ internal fun HomeScaffold(
                             onAlertChange = onAlertChange,
                             bottomPadding = bottomPadding,
                         )
-                    HomeTab.Widgets ->
-                        WidgetsScreen(home, formatter, onAddWidget, bottomPadding = bottomPadding)
+                    HomeTab.Stats -> stats(bottomPadding)
                 }
             }
             ToolbarSlot(

@@ -268,4 +268,43 @@ class StatsMathsTest {
         )
         assertEquals(emptyList<Pair<Boolean, Int>>(), runs(emptyList()))
     }
+
+    private fun mapWith(vararg cells: Pair<Pair<DayOfWeek, Int>, Double>): BurnHeatmap {
+        val values = MutableList(BurnHeatmap.DAYS * BurnHeatmap.HOURS) { 0.0 }
+        cells.forEach { (at, value) ->
+            values[(at.first.value - 1) * BurnHeatmap.HOURS + at.second] = value
+        }
+        return BurnHeatmap(values)
+    }
+
+    @Test
+    fun `the persona follows the busiest hour of the day`() {
+        assertEquals(Persona.EarlyBird, persona(mapWith((DayOfWeek.MONDAY to 7) to 5.0)))
+        assertEquals(Persona.NineToFive, persona(mapWith((DayOfWeek.TUESDAY to 14) to 5.0)))
+        assertEquals(Persona.EveningHacker, persona(mapWith((DayOfWeek.FRIDAY to 20) to 5.0)))
+        assertEquals(Persona.NightOwl, persona(mapWith((DayOfWeek.MONDAY to 2) to 5.0)))
+        assertEquals(Persona.NightOwl, persona(mapWith((DayOfWeek.MONDAY to 23) to 5.0)))
+    }
+
+    @Test
+    fun `the hours add up across the days of the week`() {
+        val map =
+            mapWith(
+                (DayOfWeek.MONDAY to 10) to 3.0,
+                (DayOfWeek.MONDAY to 21) to 4.0,
+                (DayOfWeek.TUESDAY to 10) to 3.0,
+            )
+        assertEquals(Persona.NineToFive, persona(map))
+    }
+
+    @Test
+    fun `mostly weekend use makes a weekend warrior`() {
+        val map =
+            mapWith(
+                (DayOfWeek.SATURDAY to 10) to 3.0,
+                (DayOfWeek.SUNDAY to 11) to 2.0,
+                (DayOfWeek.MONDAY to 10) to 6.0,
+            )
+        assertEquals(Persona.WeekendWarrior, persona(map))
+    }
 }

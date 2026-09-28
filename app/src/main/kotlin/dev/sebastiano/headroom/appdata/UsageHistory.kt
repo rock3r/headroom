@@ -137,6 +137,6 @@ private const val MORNING = 1.0
 private const val AFTERNOON = 1.4
 private const val EVENING_WEIGHT = 0.35
 private const val WEEKEND_DAY = 0.25
-private const val NIGHT = 0.02
+private const val NIGHT = 0.0
 private const val DAY_WOBBLE = 0.4
 private const val DAY_WOBBLE_FREQUENCY = 2.3

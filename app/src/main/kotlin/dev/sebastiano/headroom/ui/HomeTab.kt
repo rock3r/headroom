@@ -13,5 +13,5 @@ enum class HomeTab(
 ) {
     Overview(R.string.tab_overview, HeadroomIcons.Dashboard, HeadroomIcons.DashboardFilled),
     Resets(R.string.tab_resets, HeadroomIcons.Monitoring, HeadroomIcons.MonitoringFilled),
-    Widgets(R.string.tab_widgets, HeadroomIcons.Widgets, HeadroomIcons.WidgetsFilled),
+    Stats(R.string.tab_stats, HeadroomIcons.PieChart, HeadroomIcons.PieChartFilled),
 }

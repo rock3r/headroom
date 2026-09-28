@@ -27,8 +27,7 @@ import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.resets.RESETS_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
-import dev.sebastiano.headroom.ui.widgets.WIDGETS_TAG
-import dev.sebastiano.headroom.widgets.WidgetStyle
+import dev.sebastiano.headroom.ui.stats.STATS_TAG
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -96,19 +95,17 @@ class StatusBarBlurTest {
     }
 
     @Test
-    fun `the resets and widgets tabs blur the status bar once scrolled`() {
+    fun `the resets and stats tabs blur the status bar once scrolled`() {
         launch()
         rule.onNodeWithContentDescription("Resets").performClick()
         blur.assertCountEquals(0)
         rule.onNodeWithTag(RESETS_TAG).performScrollToIndex(LAST_RESETS_INDEX)
         blur.assertCountEquals(1)
 
-        rule.onNodeWithContentDescription("Widgets").performClick()
+        rule.onNodeWithContentDescription("Stats").performClick()
         rule.waitForIdle()
         blur.assertCountEquals(0)
-        rule
-            .onNodeWithTag(WIDGETS_TAG)
-            .performScrollToIndex(WidgetStyle.entries.size) // The header, then one card per style.
+        rule.onNodeWithTag(STATS_TAG).performScrollToIndex(LAST_STATS_INDEX)
         blur.assertCountEquals(1)
     }
 
@@ -163,3 +160,5 @@ private fun backEvent(progress: Float) =
 
 /** Header, upcoming label, upcoming card, history label, history card. */
 private const val LAST_RESETS_INDEX = 4
+/** The header and six stat cards. */
+private const val LAST_STATS_INDEX = 6

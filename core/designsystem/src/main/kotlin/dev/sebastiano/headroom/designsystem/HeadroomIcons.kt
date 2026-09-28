@@ -25,9 +25,9 @@ object HeadroomIcons {
     @DrawableRes val NotificationsOff: Int = R.drawable.ic_notifications_off
     @DrawableRes val OpenInNew: Int = R.drawable.ic_open_in_new
     @DrawableRes val PersonAdd: Int = R.drawable.ic_person_add
+    @DrawableRes val PieChart: Int = R.drawable.ic_pie_chart
+    @DrawableRes val PieChartFilled: Int = R.drawable.ic_pie_chart_filled
     @DrawableRes val SettingsFilled: Int = R.drawable.ic_settings_filled
     @DrawableRes val Sort: Int = R.drawable.ic_sort
     @DrawableRes val Sync: Int = R.drawable.ic_sync
-    @DrawableRes val Widgets: Int = R.drawable.ic_widgets
-    @DrawableRes val WidgetsFilled: Int = R.drawable.ic_widgets_filled
 }

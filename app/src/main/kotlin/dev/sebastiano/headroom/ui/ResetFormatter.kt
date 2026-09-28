@@ -4,6 +4,8 @@ import dev.sebastiano.headroom.model.Countdown
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -18,6 +20,8 @@ class ResetFormatter(private val zone: ZoneId, locale: Locale, is24Hour: Boolean
     private val weekdayTime = DateTimeFormatter.ofPattern("EEE $time", locale).withZone(zone)
     private val dayMonth = DateTimeFormatter.ofPattern("d MMM", locale).withZone(zone)
     private val full = DateTimeFormatter.ofPattern("EEE d MMM, $time", locale).withZone(zone)
+    private val weekdayDate = DateTimeFormatter.ofPattern("EEE d MMM", locale)
+    private val timeOfDay = DateTimeFormatter.ofPattern(time, locale)
 
     fun short(at: Instant, now: Instant): String =
         if (Duration.between(now, at) > NEAR) dayMonth.format(at) else weekdayTime.format(at)
@@ -25,6 +29,14 @@ class ResetFormatter(private val zone: ZoneId, locale: Locale, is24Hour: Boolean
     fun long(at: Instant): String = full.format(at)
 
     fun countdown(now: Instant, at: Instant): String = Countdown.format(Duration.between(now, at))
+
+    /** The local day of [at], with its weekday: "Wed 30 Sep". */
+    fun day(at: Instant): String = day(at.atZone(zone).toLocalDate())
+
+    fun day(date: LocalDate): String = weekdayDate.format(date)
+
+    /** The start of an hour of the day, in the user's clock style: "14:00" or "2:00 PM". */
+    fun hour(hour: Int): String = timeOfDay.format(LocalTime.of(hour, 0))
 
     /** The local day of the week of [at], for chart labels. */
     fun dayOfWeek(at: Instant): DayOfWeek = at.atZone(zone).dayOfWeek

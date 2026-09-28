@@ -31,7 +31,10 @@ import dev.sebastiano.headroom.ui.settings.LICENCES_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
+import dev.sebastiano.headroom.ui.settings.addWidgetTag
 import dev.sebastiano.headroom.ui.settings.syncFrequencyTag
+import dev.sebastiano.headroom.widgets.WidgetPinner
+import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlin.test.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -46,13 +49,22 @@ class SettingsTest {
 
     private val settings = InMemorySettingsRepository()
 
+    private val pinned = mutableListOf<WidgetStyle>()
+    private var pinWorks = true
+    private val pinner = WidgetPinner { style ->
+        pinned += style
+        pinWorks
+    }
+
     private val dispatcher
         get() = rule.activity.onBackPressedDispatcher
 
     private fun openSettings() {
         rule.setContent {
             HeadroomTheme(dynamicColor = false) {
-                HeadroomApp(graph = testGraph(rule.activity, settings = settings))
+                HeadroomApp(
+                    graph = testGraph(rule.activity, settings = settings, widgetPinner = pinner)
+                )
             }
         }
         rule.onNodeWithContentDescription("Settings").performClick()
@@ -190,6 +202,35 @@ class SettingsTest {
         val version = "Version $TEST_APP_VERSION"
         rule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasText(version))
         rule.onNodeWithText(version).assertIsDisplayed()
+    }
+
+    @Test
+    fun `settings lists every widget style, and adding one asks the pinner for it`() {
+        openSettings()
+        WidgetStyle.entries.forEach { style ->
+            rule
+                .onNodeWithTag(SETTINGS_LIST_TAG)
+                .performScrollToNode(hasTestTag(addWidgetTag(style)))
+            rule.onNodeWithTag(addWidgetTag(style)).assertIsDisplayed()
+        }
+        rule
+            .onNodeWithContentDescription("Add the Bars · 4×1 to 4×3 widget to the home screen")
+            .performClick()
+        assertEquals(listOf(WidgetStyle.Bars), pinned)
+    }
+
+    @Test
+    fun `when the launcher cannot pin a widget, settings says so`() {
+        pinWorks = false
+        openSettings()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasTestTag(addWidgetTag(WidgetStyle.Rings)))
+        rule.onNodeWithTag(addWidgetTag(WidgetStyle.Rings)).performClick()
+        assertEquals(listOf(WidgetStyle.Rings), pinned)
+        rule
+            .onNodeWithText("Your launcher cannot add widgets from apps", substring = true)
+            .assertIsDisplayed()
     }
 
     private fun gesture(progress: Float) =

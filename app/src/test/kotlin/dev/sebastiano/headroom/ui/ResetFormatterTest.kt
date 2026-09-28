@@ -32,6 +32,15 @@ class ResetFormatterTest {
     }
 
     @Test
+    fun `days and hours for the stats follow the clock style`() {
+        val twelve = ResetFormatter(ZoneOffset.UTC, Locale.US, is24Hour = false)
+        assertEquals("Wed 30 Sep", formatter.day(Instant.parse("2026-09-30T23:00:00Z")))
+        assertEquals("Wed 30 Sep", formatter.day(java.time.LocalDate.parse("2026-09-30")))
+        assertEquals("14:00", formatter.hour(14))
+        assertEquals("2:00 PM", twelve.hour(14))
+    }
+
+    @Test
     fun `the countdown uses the model format`() {
         assertEquals("2d 18h", formatter.countdown(now, Instant.parse("2026-09-30T07:00:00Z")))
         assertEquals("1h 12m", formatter.countdown(now, Instant.parse("2026-09-27T13:44:00Z")))
