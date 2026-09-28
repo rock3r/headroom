@@ -18,9 +18,11 @@ import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
 import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
 import dev.sebastiano.headroom.designsystem.IndicatorStyle
 import dev.sebastiano.headroom.designsystem.IndicatorStyleKey
+import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.signin.FakeSignInController
@@ -33,6 +35,8 @@ import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /** Opens the accounts screen the way a user does: from the overview, through Settings. */
 fun ComposeTestRule.openAccounts() {
@@ -62,6 +66,7 @@ fun testGraph(
     real: QuotaRepository = FakeQuotaRepository({ FIXED_NOW }, initial = realAccounts),
     settings: SettingsRepository = InMemorySettingsRepository(),
     statsDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
+    resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
@@ -91,7 +96,30 @@ fun testGraph(
                 demo = DemoUsageHistory(DemoResetHistory, clock, ZoneOffset.UTC),
             ),
         statsDispatcher = statsDispatcher,
+        resetIsland = resetIsland,
     )
+}
+
+/** A reset island whose service state a test can change, and that records what was shown. */
+class FakeResetIslandAccess(ready: Boolean = false, enabledInSettings: Boolean = false) :
+    ResetIslandAccess {
+    val readyState = MutableStateFlow(ready)
+    val enabledState = MutableStateFlow(enabledInSettings)
+    var refreshes = 0
+    val demos = mutableListOf<Pair<Provider, String>>()
+
+    override val ready: StateFlow<Boolean> = readyState
+    override val enabledInSettings: StateFlow<Boolean> = enabledState
+
+    override fun refresh() {
+        refreshes++
+    }
+
+    override fun showDemo(provider: Provider, message: String): Boolean {
+        if (!readyState.value) return false
+        demos += provider to message
+        return true
+    }
 }
 
 /** The version the settings screen shows in tests and screenshots. */

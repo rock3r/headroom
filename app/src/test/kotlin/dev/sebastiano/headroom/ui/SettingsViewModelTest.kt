@@ -102,6 +102,19 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun `the reset island is off until the user turns it on, and then it is stored`() =
+        runTest(main.dispatcher) {
+            observe()
+            assertFalse(viewModel.state.value.resetIsland)
+
+            viewModel.setResetIsland(true)
+            runCurrent()
+
+            assertTrue(repository.settings.value.resetIsland)
+            assertTrue(viewModel.state.value.resetIsland)
+        }
+
+    @Test
     fun `choosing a frequency stores it`() =
         runTest(main.dispatcher) {
             observe()

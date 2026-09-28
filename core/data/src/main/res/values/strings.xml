@@ -6,6 +6,10 @@
     <string name="reset_title_monthly">%1$s monthly limit has reset</string>
     <string name="reset_body_with_next">You have your full limit again. Next reset %1$s.</string>
     <string name="reset_body">You have your full limit again.</string>
+    <string name="reset_quiet_channel_name">Weekly resets shown on the island</string>
+    <string name="reset_quiet_channel_description">The reset island already showed these resets, so they arrive in the shade without a pop-up.</string>
+    <string name="reset_island_weekly">%1$s weekly limit reset</string>
+    <string name="reset_island_monthly">%1$s monthly limit reset</string>
     <string name="reset_action_open">Open</string>
     <string name="reset_action_mute">Mute %1$s</string>
 </resources>

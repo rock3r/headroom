@@ -30,6 +30,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -41,10 +45,12 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.island.resetIslandStatus
 import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
@@ -87,6 +93,19 @@ data class SettingsActions(
     val onAddWidget: (WidgetStyle) -> Unit = {},
     val onRefreshShimmerChange: (Boolean) -> Unit = {},
     val onResetConfettiChange: (Boolean) -> Unit = {},
+    val onResetIslandChange: (Boolean) -> Unit = {},
+    /** Shows the reset island now, with this provider's logo and these words. */
+    val onTryResetIsland: (Provider, String) -> Unit = { _, _ -> },
+    /** Reads the accessibility settings again. Runs whenever the user comes back to the app. */
+    val onRefreshResetIsland: () -> Unit = {},
+)
+
+/** What the reset island's row and its set-up need to know about the accessibility service. */
+data class ResetIslandUi(
+    /** True while the service that draws the island is connected. */
+    val ready: Boolean = false,
+    /** True when accessibility settings list the service as turned on. */
+    val enabledInSettings: Boolean = false,
 )
 
 /**
@@ -103,7 +122,15 @@ fun SettingsScreen(
     actions: SettingsActions,
     modifier: Modifier = Modifier,
     reveal: PageReveal? = null,
+    resetIsland: ResetIslandUi = ResetIslandUi(),
 ) {
+    // The set-up opens when the island is switched on without the service. A return from
+    // accessibility settings reads the state again.
+    var showIslandSetup by rememberSaveable { mutableStateOf(false) }
+    LifecycleResumeEffect(actions.onRefreshResetIsland) {
+        actions.onRefreshResetIsland()
+        onPauseOrDispose {}
+    }
     // Everything below the header arrives with the reveal: see revealContentEntrance.
     val entrance = Modifier.revealContentEntrance(reveal)
     // The delights do not play with reduced motion: the in-app switch, or animations off on the
@@ -125,8 +152,16 @@ fun SettingsScreen(
                 DelightsList(
                     refreshShimmer = state.refreshShimmer,
                     resetConfetti = state.resetConfetti,
+                    resetIsland = state.resetIsland,
+                    islandStatus = resetIslandStatus(state.resetIsland, resetIsland.ready),
+                    canTryIsland = resetIsland.ready,
                     onRefreshShimmerChange = actions.onRefreshShimmerChange,
                     onResetConfettiChange = actions.onResetConfettiChange,
+                    onResetIslandChange = { on ->
+                        actions.onResetIslandChange(on)
+                        if (on && !resetIsland.ready) showIslandSetup = true
+                    },
+                    onTryResetIsland = actions.onTryResetIsland,
                     modifier = width,
                 )
             }
@@ -171,6 +206,13 @@ fun SettingsScreen(
                     modifier = width.padding(top = 8.dp),
                 )
             }
+        }
+        if (showIslandSetup) {
+            ResetIslandSetup(
+                island = resetIsland,
+                onTry = actions.onTryResetIsland,
+                onDismiss = { showIslandSetup = false },
+            )
         }
     }
 }

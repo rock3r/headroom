@@ -43,6 +43,24 @@
             </intent-filter>
         </activity>
 
+        <!--
+            The reset island's window owner. Only accessibility overlays draw above the status bar and
+            on the lock screen. The service asks for no events and no window content: see
+            res/xml/reset_island_service.xml. Android only lets the user turn it on in Settings.
+        -->
+        <service
+            android:name=".island.ResetIslandService"
+            android:exported="true"
+            android:label="@string/reset_island_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/reset_island_service" />
+        </service>
+
         <!-- HeadroomApplication provides WorkManager's configuration, with the data layer's worker factory. -->
         <provider
             android:name="androidx.startup.InitializationProvider"

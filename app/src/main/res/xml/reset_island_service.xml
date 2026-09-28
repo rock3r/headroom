@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The smallest accessibility service that can own an overlay window. It asks for no events, no
+  window content and no key access, so it cannot read the screen or other apps. It exists only
+  because an accessibility overlay is the one window that can draw above the status bar, the shade
+  and the lock screen.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/reset_island_service_description" />

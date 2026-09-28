@@ -37,3 +37,20 @@ themselves.
 
 `FakeQuotaRepository` in `:core:model` serves the demo accounts. The app uses it when no
 account is signed in, and the UI tests, end-to-end tests and README screenshots use it too.
+
+## Reset island (experimental)
+
+When a quota resets while Headroom is in the background, an opt-in black pill grows out of the
+camera cutout, shows the provider logo and one line, and shrinks back. It lives in `:app`, in the
+`island` package, because it needs the app's UI and an Android service.
+
+- `ResetIsland` in `:core:data` is the seam. `AndroidResetNotifier` offers each reset to it before
+  it posts the notification. When the island shows the reset, the notification goes to a quiet
+  channel, so the user gets no pop-up as well. `:core:data` never depends on `:app`.
+- `AppResetIsland` in `:app` implements the seam. `IslandConditions.blockedBy()` is the pure
+  decision: setting off, service not connected, screen off, landscape, Headroom in the foreground,
+  or Do Not Disturb.
+- `IslandHub` is the in-process signal. `ResetIslandService`, an accessibility service with no
+  events and no window content, reports that it is connected and collects the hub's requests.
+  Only an accessibility overlay draws above the status bar, the shade and the lock screen.
+- `islandGeometry()` is the pure mapping from the camera cutout and the screen size to the pill.

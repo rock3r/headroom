@@ -58,6 +58,11 @@ class SettingsTest {
     }
 
     @Test
+    fun `the reset island is off until the user turns it on`() {
+        assertEquals(false, AppSettings().resetIsland)
+    }
+
+    @Test
     fun `there are eight fixed palettes besides the wallpaper`() {
         assertEquals(8, ThemePalette.entries.count { it != ThemePalette.Wallpaper })
     }
@@ -74,6 +79,7 @@ class SettingsTest {
             repository.setOverviewSort(OverviewSort.SoonestResetFirst)
             repository.setRefreshShimmer(false)
             repository.setResetConfetti(false)
+            repository.setResetIsland(true)
             assertEquals(
                 AppSettings(
                     QuotaDisplay.Left,
@@ -84,6 +90,7 @@ class SettingsTest {
                     overviewSort = OverviewSort.SoonestResetFirst,
                     refreshShimmer = false,
                     resetConfetti = false,
+                    resetIsland = true,
                 ),
                 repository.settings.value,
             )

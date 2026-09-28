@@ -39,6 +39,7 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
                         prefs[OVERVIEW_SORT].toEnum<OverviewSort>() ?: defaults.overviewSort,
                     refreshShimmer = prefs.switch(REFRESH_SHIMMER) ?: defaults.refreshShimmer,
                     resetConfetti = prefs.switch(RESET_CONFETTI) ?: defaults.resetConfetti,
+                    resetIsland = prefs.switch(RESET_ISLAND) ?: defaults.resetIsland,
                 )
             }
             .distinctUntilChanged()
@@ -75,6 +76,10 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         store.edit { it[RESET_CONFETTI] = enabled }
     }
 
+    override suspend fun setResetIsland(enabled: Boolean) {
+        store.edit { it[RESET_ISLAND] = enabled }
+    }
+
     /** The switch under [key], or null when it is missing or not a boolean. */
     private fun Preferences.switch(key: Preferences.Key<Boolean>): Boolean? =
         asMap()[key] as? Boolean
@@ -91,5 +96,6 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         val OVERVIEW_SORT = stringPreferencesKey("overview_sort")
         val REFRESH_SHIMMER = booleanPreferencesKey("refresh_shimmer")
         val RESET_CONFETTI = booleanPreferencesKey("reset_confetti")
+        val RESET_ISLAND = booleanPreferencesKey("reset_island")
     }
 }

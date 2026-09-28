@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -18,7 +19,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.island.ResetIslandStatus
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.ui.delights.LocalDelights
 import dev.sebastiano.headroom.ui.delights.delightAnchor
 
@@ -26,13 +30,24 @@ const val REFRESH_SHIMMER_TAG: String = "refresh-shimmer"
 
 const val RESET_CONFETTI_TAG: String = "reset-confetti"
 
-/** The two delights, each with its switch: the refresh shimmer and the reset confetti. */
+const val RESET_ISLAND_TAG: String = "reset-island"
+
+/**
+ * The delights, each with its switch: the refresh shimmer, the reset confetti and the experimental
+ * reset island. The island's row also shows its [islandStatus], and its Try button needs
+ * [canTryIsland], which is true when the accessibility service is connected.
+ */
 @Composable
 internal fun DelightsList(
     refreshShimmer: Boolean,
     resetConfetti: Boolean,
+    resetIsland: Boolean,
+    islandStatus: ResetIslandStatus,
+    canTryIsland: Boolean,
     onRefreshShimmerChange: (Boolean) -> Unit,
     onResetConfettiChange: (Boolean) -> Unit,
+    onResetIslandChange: (Boolean) -> Unit,
+    onTryResetIsland: (Provider, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -69,7 +84,39 @@ internal fun DelightsList(
             tryModifier = Modifier.delightAnchor(TRY_CONFETTI_ANCHOR),
             modifier = Modifier.testTag(RESET_CONFETTI_TAG),
         )
+        val demoMessage = stringResource(R.string.reset_island_demo_message)
+        DelightRow(
+            title = R.string.settings_reset_island,
+            body = R.string.settings_reset_island_body,
+            checked = resetIsland,
+            onChange = onResetIslandChange,
+            index = 2,
+            tryLabel = R.string.settings_try_reset_island,
+            canTry = canTryIsland,
+            onTry = { onTryResetIsland(Provider.Claude, demoMessage) },
+            status = islandStatus,
+            modifier = Modifier.testTag(RESET_ISLAND_TAG),
+        )
     }
+}
+
+@Composable
+private fun IslandStatusLine(status: ResetIslandStatus, modifier: Modifier = Modifier) {
+    val (text, colour) =
+        when (status) {
+            ResetIslandStatus.Off ->
+                R.string.settings_reset_island_off to MaterialTheme.colorScheme.onSurfaceVariant
+            ResetIslandStatus.NeedsAccess ->
+                R.string.settings_reset_island_needs_access to MaterialTheme.colorScheme.error
+            ResetIslandStatus.Ready ->
+                R.string.settings_reset_island_ready to MaterialTheme.colorScheme.primary
+        }
+    Text(
+        text = stringResource(text),
+        style = MaterialTheme.typography.labelLarge,
+        color = colour,
+        modifier = modifier,
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -85,6 +132,7 @@ private fun DelightRow(
     onTry: () -> Unit,
     modifier: Modifier = Modifier,
     tryModifier: Modifier = Modifier,
+    status: ResetIslandStatus? = null,
 ) {
     SegmentedListItem(
         checked = checked,
@@ -94,7 +142,12 @@ private fun DelightRow(
             ListItemDefaults.segmentedColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer
             ),
-        supportingContent = { Text(stringResource(body)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(body))
+                if (status != null) IslandStatusLine(status, Modifier.padding(top = 4.dp))
+            }
+        },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Plays the delight once, so it can be seen without waiting for a refresh or a
@@ -116,7 +169,7 @@ private fun DelightRow(
     }
 }
 
-private const val DELIGHTS = 2
+private const val DELIGHTS = 3
 
 /** Where the confetti of the "Try" button bursts from: the button itself. */
 private const val TRY_CONFETTI_ANCHOR = "try-confetti"
