@@ -43,6 +43,8 @@ class DataStoreSettingsRepositoryTest {
         settings.setMotion(MotionPreference.Reduced)
         settings.setPalette(ThemePalette.Grape)
         settings.setOverviewSort(OverviewSort.MostUsedFirst)
+        settings.setRefreshShimmer(false)
+        settings.setResetConfetti(false)
         assertEquals(
             AppSettings(
                 QuotaDisplay.Left,
@@ -51,9 +53,20 @@ class DataStoreSettingsRepositoryTest {
                 motion = MotionPreference.Reduced,
                 palette = ThemePalette.Grape,
                 overviewSort = OverviewSort.MostUsedFirst,
+                refreshShimmer = false,
+                resetConfetti = false,
             ),
             DataStoreSettingsRepository(store).settings.first(),
         )
+    }
+
+    @Test
+    fun `a delight turned off and on again reads as on`() = runTest {
+        val store = store()
+        val settings = DataStoreSettingsRepository(store)
+        settings.setResetConfetti(false)
+        settings.setResetConfetti(true)
+        assertEquals(true, DataStoreSettingsRepository(store).settings.first().resetConfetti)
     }
 
     @Test
@@ -66,6 +79,8 @@ class DataStoreSettingsRepositoryTest {
             it[stringPreferencesKey("motion")] = "Wobbly"
             it[stringPreferencesKey("palette")] = "Plaid"
             it[stringPreferencesKey("overview_sort")] = "Alphabetical"
+            it[stringPreferencesKey("refresh_shimmer")] = "Sometimes"
+            it[stringPreferencesKey("reset_confetti")] = "Maybe"
         }
         assertEquals(AppSettings(), DataStoreSettingsRepository(store).settings.first())
     }

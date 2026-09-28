@@ -91,7 +91,10 @@ public enum class OverviewSort {
     LatestResetFirst,
 }
 
-/** The user's app settings. The defaults are how the app behaved before it had settings. */
+/**
+ * The user's app settings. The defaults are how the app behaved before it had settings, except the
+ * delights, which are on until the user turns them off.
+ */
 public data class AppSettings(
     val quotaDisplay: QuotaDisplay = QuotaDisplay.Used,
     val syncFrequency: SyncFrequency = SyncFrequency.Minutes15,
@@ -99,6 +102,10 @@ public data class AppSettings(
     val motion: MotionPreference = MotionPreference.System,
     val palette: ThemePalette = ThemePalette.Wallpaper,
     val overviewSort: OverviewSort = OverviewSort.YourOrder,
+    /** A soft sheen sweeps over the app once when a refresh brings new data. */
+    val refreshShimmer: Boolean = true,
+    /** Confetti bursts from an account when its quota resets while the app is open. */
+    val resetConfetti: Boolean = true,
 )
 
 /** Reads and stores the [AppSettings]. */
@@ -116,6 +123,10 @@ public interface SettingsRepository {
     public suspend fun setPalette(palette: ThemePalette)
 
     public suspend fun setOverviewSort(sort: OverviewSort)
+
+    public suspend fun setRefreshShimmer(enabled: Boolean)
+
+    public suspend fun setResetConfetti(enabled: Boolean)
 }
 
 /** Settings kept in memory, for demo builds, previews and tests without the data layer. */
@@ -146,5 +157,13 @@ public class InMemorySettingsRepository(initial: AppSettings = AppSettings()) : 
 
     override suspend fun setOverviewSort(sort: OverviewSort) {
         state.update { it.copy(overviewSort = sort) }
+    }
+
+    override suspend fun setRefreshShimmer(enabled: Boolean) {
+        state.update { it.copy(refreshShimmer = enabled) }
+    }
+
+    override suspend fun setResetConfetti(enabled: Boolean) {
+        state.update { it.copy(resetConfetti = enabled) }
     }
 }

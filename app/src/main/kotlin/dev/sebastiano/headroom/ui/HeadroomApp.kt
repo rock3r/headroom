@@ -50,6 +50,7 @@ import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
+import dev.sebastiano.headroom.ui.delights.HomeDelights
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.settings.LicencesScreen
 import dev.sebastiano.headroom.ui.settings.SettingsAccounts
@@ -184,6 +185,7 @@ fun HeadroomApp(
         }
         AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
+    HomeDelights(home = home, onBurstFinish = homeViewModel::onResetBurstShown)
 }
 
 private const val ENTER_SCALE = 0.96f
@@ -282,6 +284,8 @@ private fun settingsActions(
         onMotionChange = viewModel::setMotion,
         onPaletteChange = viewModel::setPalette,
         onAddWidget = onAddWidget,
+        onRefreshShimmerChange = viewModel::setRefreshShimmer,
+        onResetConfettiChange = viewModel::setResetConfetti,
     )
 
 /** These actions, with copying to the clipboard and opening links in a browser tab wired up. */

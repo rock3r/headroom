@@ -5,6 +5,7 @@ import dev.sebastiano.headroom.MainDispatcherRule
 import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
 import dev.sebastiano.headroom.designsystem.PaceChipState
+import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.OverviewSort
@@ -12,6 +13,7 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.HomeViewModel
+import dev.sebastiano.headroom.ui.home.ResetBurst
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.roundToInt
@@ -341,6 +343,50 @@ class HomeViewModelTest {
             assertTrue(grok.justReset)
             assertEquals(PaceChipState.JustReset, grok.pace)
             assertFalse(viewModel.state.value.accounts.first().justReset)
+        }
+
+    @Test
+    fun `a weekly reset while the app is open asks for one confetti burst, until it is shown`() =
+        runTest(main.dispatcher) {
+            observe()
+            assertEquals(emptyList(), viewModel.state.value.resetBursts)
+
+            repository.set(repository.accounts.value.withGrokReset())
+            runCurrent()
+            assertEquals(
+                listOf(ResetBurst("demo-grok", fromNextReset = true)),
+                viewModel.state.value.resetBursts,
+            )
+
+            viewModel.onResetBurstShown("demo-grok")
+            runCurrent()
+            assertEquals(emptyList(), viewModel.state.value.resetBursts)
+            assertTrue(viewModel.state.value.accounts.first { it.id == "demo-grok" }.justReset)
+        }
+
+    @Test
+    fun `a reset found on a cold start, from data stored before the app opened, has no confetti`() =
+        runTest(main.dispatcher) {
+            val stored = FakeQuotaRepository({ now }, DemoData.accounts(now.minusSeconds(3_600)))
+            val coldStart =
+                HomeViewModel(
+                    repository = stored,
+                    alertPreferences = InMemoryAlertPreferences(),
+                    clock = { now },
+                    isDemo = MutableStateFlow(false),
+                    accountsLoaded = MutableStateFlow(true),
+                    resetHistory = DemoResetHistory,
+                    tickInterval = null,
+                    savedStateHandle = SavedStateHandle(),
+                )
+            backgroundScope.launch { coldStart.state.collect {} }
+            runCurrent()
+
+            stored.set(DemoData.accounts(now).withGrokReset())
+            runCurrent()
+
+            assertTrue(coldStart.state.value.accounts.first { it.id == "demo-grok" }.justReset)
+            assertEquals(emptyList(), coldStart.state.value.resetBursts)
         }
 
     @Test

@@ -25,6 +25,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
@@ -37,12 +38,16 @@ import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.accounts.accountRowTag
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
+import dev.sebastiano.headroom.ui.delights.Delights
+import dev.sebastiano.headroom.ui.delights.DelightsHost
+import dev.sebastiano.headroom.ui.delights.LocalDelights
 import dev.sebastiano.headroom.ui.overview.NEXT_RESET_CARD_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_SORT_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.resets.RESETS_TAG
 import dev.sebastiano.headroom.ui.settings.REDUCE_MOTION_TAG
+import dev.sebastiano.headroom.ui.settings.RESET_CONFETTI_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.addWidgetTag
 import dev.sebastiano.headroom.ui.stats.STATS_TAG
@@ -65,6 +70,10 @@ import org.robolectric.annotation.GraphicsMode
 class ScreenshotTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
+    /** The demo accounts, which a test can change while the app shows them. */
+    private val demo = FakeQuotaRepository({ FIXED_NOW })
+    private var delights: Delights? = null
+
     private fun launch(
         dark: Boolean = false,
         signIn: SignInController = FakeSignInController(),
@@ -76,15 +85,19 @@ class ScreenshotTest {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             HeadroomTheme(darkTheme = dark, dynamicColor = false, palette = palette) {
-                HeadroomApp(
-                    graph =
-                        testGraph(
-                            rule.activity,
-                            realAccounts = realAccounts,
-                            signInController = signIn,
-                            settings = settings,
-                        )
-                )
+                DelightsHost(refreshShimmer = true, resetConfetti = true) {
+                    delights = LocalDelights.current
+                    HeadroomApp(
+                        graph =
+                            testGraph(
+                                rule.activity,
+                                realAccounts = realAccounts,
+                                signInController = signIn,
+                                demo = demo,
+                                settings = settings,
+                            )
+                    )
+                }
             }
         }
     }
@@ -385,6 +398,41 @@ class ScreenshotTest {
     }
 
     @Test
+    fun settingsDelights() {
+        launch()
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasTestTag(RESET_CONFETTI_TAG))
+        rule.mainClock.autoAdvance = false
+        capture("settings-delights")
+    }
+
+    @Test
+    fun refreshShimmer() {
+        launch()
+        settle()
+        rule.runOnIdle { requireNotNull(delights).playShimmer() }
+        captureMidway("refresh-shimmer", SHIMMER_MIDWAY_MILLIS)
+    }
+
+    @Test
+    fun refreshShimmerDark() {
+        launch(dark = true)
+        settle()
+        rule.runOnIdle { requireNotNull(delights).playShimmer() }
+        captureMidway("refresh-shimmer-dark", SHIMMER_MIDWAY_MILLIS)
+    }
+
+    @Test
+    fun resetConfetti() {
+        launch()
+        settle()
+        // Grok's weekly limit resets while the app is open; the next reset card counted down to it.
+        rule.runOnIdle { demo.set(demo.accounts.value.withGrokReset()) }
+        captureMidway("reset-confetti", CONFETTI_MIDWAY_MILLIS)
+    }
+
+    @Test
     fun overviewLagoon() {
         launch(palette = ThemePalette.Lagoon)
         capture("overview-lagoon")
@@ -488,6 +536,10 @@ private const val STEP_MILLIS = 50L
 private const val FRAME_MILLIS = 16L
 /** Part-way through the reveal into Settings, while the circle is still growing. */
 private const val REVEAL_MIDWAY_MILLIS = 64L
+/** Part-way through the shimmer, while its band crosses the middle of the screen. */
+private const val SHIMMER_MIDWAY_MILLIS = 336L
+/** Part-way through a confetti burst, while the pieces are high and spread out. */
+private const val CONFETTI_MIDWAY_MILLIS = 400L
 /** A quarter of the way through the next reset card's ripple, while its rings are strong. */
 private const val RIPPLE_MIDWAY_MILLIS = 208L
 private const val BACK_PROGRESS = 0.5f

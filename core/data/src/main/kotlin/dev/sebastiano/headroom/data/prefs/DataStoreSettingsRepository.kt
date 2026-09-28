@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.data.prefs
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.sebastiano.headroom.model.AppSettings
@@ -17,8 +18,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /**
- * The app settings in DataStore, stored by enum name. A value the app does not know, for example
- * one written by a newer version, reads as the default.
+ * The app settings in DataStore: choices by enum name, switches as booleans. A value the app does
+ * not know, for example one written by a newer version, reads as the default.
  */
 internal class DataStoreSettingsRepository(private val store: DataStore<Preferences>) :
     SettingsRepository {
@@ -36,6 +37,8 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
                     palette = prefs[PALETTE].toEnum<ThemePalette>() ?: defaults.palette,
                     overviewSort =
                         prefs[OVERVIEW_SORT].toEnum<OverviewSort>() ?: defaults.overviewSort,
+                    refreshShimmer = prefs.switch(REFRESH_SHIMMER) ?: defaults.refreshShimmer,
+                    resetConfetti = prefs.switch(RESET_CONFETTI) ?: defaults.resetConfetti,
                 )
             }
             .distinctUntilChanged()
@@ -64,6 +67,18 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         store.edit { it[OVERVIEW_SORT] = sort.name }
     }
 
+    override suspend fun setRefreshShimmer(enabled: Boolean) {
+        store.edit { it[REFRESH_SHIMMER] = enabled }
+    }
+
+    override suspend fun setResetConfetti(enabled: Boolean) {
+        store.edit { it[RESET_CONFETTI] = enabled }
+    }
+
+    /** The switch under [key], or null when it is missing or not a boolean. */
+    private fun Preferences.switch(key: Preferences.Key<Boolean>): Boolean? =
+        asMap()[key] as? Boolean
+
     private inline fun <reified T : Enum<T>> String?.toEnum(): T? =
         enumValues<T>().firstOrNull { it.name == this }
 
@@ -74,5 +89,7 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         val MOTION = stringPreferencesKey("motion")
         val PALETTE = stringPreferencesKey("palette")
         val OVERVIEW_SORT = stringPreferencesKey("overview_sort")
+        val REFRESH_SHIMMER = booleanPreferencesKey("refresh_shimmer")
+        val RESET_CONFETTI = booleanPreferencesKey("reset_confetti")
     }
 }

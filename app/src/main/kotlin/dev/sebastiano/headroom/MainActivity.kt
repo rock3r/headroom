@@ -18,6 +18,7 @@ import dev.sebastiano.headroom.ui.AppearanceTheme
 import dev.sebastiano.headroom.ui.HeadroomApp
 import dev.sebastiano.headroom.ui.OpenAccountRequest
 import dev.sebastiano.headroom.ui.ThemeRevealHost
+import dev.sebastiano.headroom.ui.delights.DelightsHost
 import dev.sebastiano.headroom.widget.WidgetIntents
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,11 +49,17 @@ class MainActivity : ComponentActivity() {
                 // A new theme or palette is uncovered from where the user picked it.
                 ThemeRevealHost(themeKey = current.theme to current.palette) {
                     AppearanceTheme(current) {
-                        HeadroomApp(
-                            graph = graph,
-                            openAccountRequest = request,
-                            onConsumeOpenAccount = { openAccount.value = null },
-                        )
+                        // The delights draw over the whole app, in the chosen theme's colours.
+                        DelightsHost(
+                            refreshShimmer = current.refreshShimmer,
+                            resetConfetti = current.resetConfetti,
+                        ) {
+                            HeadroomApp(
+                                graph = graph,
+                                openAccountRequest = request,
+                                onConsumeOpenAccount = { openAccount.value = null },
+                            )
+                        }
                     }
                 }
             }

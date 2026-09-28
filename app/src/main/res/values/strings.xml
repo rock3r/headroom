@@ -236,6 +236,12 @@
     <string name="palette_bubblegum">Bubblegum</string>
     <string name="settings_reduce_motion">Reduce motion</string>
     <string name="settings_reduce_motion_body">Short fades instead of moving transitions, and no looping animations. Always on when animations are off on your device.</string>
+    <string name="settings_delights">Delights</string>
+    <string name="settings_refresh_shimmer">Refresh shimmer</string>
+    <string name="settings_refresh_shimmer_body">A soft sheen sweeps across the screen when new numbers arrive.</string>
+    <string name="settings_reset_confetti">Reset confetti</string>
+    <string name="settings_reset_confetti_body">Confetti bursts from an account when its limit resets while the app is open.</string>
+    <string name="settings_delights_reduced">Neither plays while motion is reduced.</string>
     <string name="settings_sync">Background updates</string>
     <string name="settings_sync_minutes_15">Every 15 minutes</string>
     <string name="settings_sync_minutes_30">Every 30 minutes</string>

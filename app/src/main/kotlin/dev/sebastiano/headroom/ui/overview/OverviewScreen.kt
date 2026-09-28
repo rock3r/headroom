@@ -53,6 +53,8 @@ import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
+import dev.sebastiano.headroom.ui.delights.NEXT_RESET_ANCHOR
+import dev.sebastiano.headroom.ui.delights.delightAnchor
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import java.time.Duration
 import java.time.Instant
@@ -137,6 +139,7 @@ fun OverviewScreen(
                             formatter = formatter,
                             onAlertChange = onNextResetAlertChange,
                             onAllResets = onAllResets,
+                            modifier = Modifier.delightAnchor(NEXT_RESET_ANCHOR),
                         )
                     }
                 }
@@ -168,6 +171,7 @@ fun OverviewScreen(
                                 now = state.now,
                                 formatter = formatter,
                                 onClick = { onOpenAccount(account.id) },
+                                modifier = Modifier.delightAnchor(account.id),
                                 selected = account.id == selectedAccountId,
                                 sharedElements = sharedElements,
                                 display = state.display,

@@ -12,6 +12,8 @@ import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -80,6 +82,23 @@ class SettingsViewModelTest {
             assertEquals(ThemeMode.Dark, state.theme)
             assertEquals(MotionPreference.Reduced, state.motion)
             assertEquals(ThemePalette.Tangerine, state.palette)
+        }
+
+    @Test
+    fun `the delights are on until the user turns them off`() =
+        runTest(main.dispatcher) {
+            observe()
+            assertTrue(viewModel.state.value.refreshShimmer)
+            assertTrue(viewModel.state.value.resetConfetti)
+
+            viewModel.setRefreshShimmer(false)
+            viewModel.setResetConfetti(false)
+            runCurrent()
+
+            assertFalse(repository.settings.value.refreshShimmer)
+            assertFalse(repository.settings.value.resetConfetti)
+            assertFalse(viewModel.state.value.refreshShimmer)
+            assertFalse(viewModel.state.value.resetConfetti)
         }
 
     @Test

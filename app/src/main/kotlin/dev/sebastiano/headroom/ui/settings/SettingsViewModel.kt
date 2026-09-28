@@ -26,6 +26,8 @@ data class SettingsUiState(
     val theme: ThemeMode = ThemeMode.System,
     val motion: MotionPreference = MotionPreference.System,
     val palette: ThemePalette = ThemePalette.Wallpaper,
+    val refreshShimmer: Boolean = true,
+    val resetConfetti: Boolean = true,
 )
 
 /** Reads the settings from the [settings] repository and stores the user's choices in it. */
@@ -60,8 +62,25 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
         viewModelScope.launch { settings.setPalette(palette) }
     }
 
+    fun setRefreshShimmer(enabled: Boolean) {
+        viewModelScope.launch { settings.setRefreshShimmer(enabled) }
+    }
+
+    fun setResetConfetti(enabled: Boolean) {
+        viewModelScope.launch { settings.setResetConfetti(enabled) }
+    }
+
     private fun AppSettings.toUiState(appVersion: String) =
-        SettingsUiState(quotaDisplay, syncFrequency, appVersion, theme, motion, palette)
+        SettingsUiState(
+            quotaDisplay,
+            syncFrequency,
+            appVersion,
+            theme,
+            motion,
+            palette,
+            refreshShimmer,
+            resetConfetti,
+        )
 
     private companion object {
         const val STOP_TIMEOUT = 5_000L
