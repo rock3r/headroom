@@ -79,7 +79,7 @@ import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.overview.OverviewScreen
 import dev.sebastiano.headroom.ui.resets.ResetsScreen
-import kotlin.math.ceil
+import kotlin.math.floor
 import kotlinx.coroutines.launch
 
 const val TOOLBAR_TAG: String = "floating-toolbar"
@@ -600,10 +600,11 @@ private fun rememberedTurn(refreshing: Boolean): Animatable<Float, AnimationVect
     LaunchedEffect(refreshing, animate) {
         if (refreshing && animate) {
             while (true) {
-                angle.animateTo(angle.value + FULL_TURN, tween(TURN_MILLIS, easing = LinearEasing))
+                // Anticlockwise, the way the icon's arrows point.
+                angle.animateTo(angle.value - FULL_TURN, tween(TURN_MILLIS, easing = LinearEasing))
             }
         } else {
-            val settled = ceil(angle.value / FULL_TURN) * FULL_TURN
+            val settled = floor(angle.value / FULL_TURN) * FULL_TURN
             if (animate) angle.animateTo(settled, settle)
             angle.snapTo(0f)
         }
