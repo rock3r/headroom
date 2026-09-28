@@ -1,7 +1,6 @@
 package dev.sebastiano.headroom.ui.delights
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -82,7 +81,8 @@ class Delights internal constructor(private val scope: CoroutineScope) {
         shimmerJob = scope.launch {
             try {
                 shimmer.snapTo(0f)
-                shimmer.animateTo(1f, tween(SHIMMER_MILLIS, easing = FastOutSlowInEasing))
+                // The shader eases the sweep itself, so time moves evenly here.
+                shimmer.animateTo(1f, tween(SHIMMER_MILLIS, easing = LinearEasing))
             } finally {
                 if (run == shimmerRuns) isShimmering = false
             }
@@ -155,7 +155,7 @@ class Delights internal constructor(private val scope: CoroutineScope) {
     }
 
     private companion object {
-        const val SHIMMER_MILLIS = 1_100
+        const val SHIMMER_MILLIS = 1_700
     }
 }
 
