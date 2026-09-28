@@ -123,14 +123,14 @@
     <string name="accounts_demo_note">You are looking at demo accounts. Add your own to replace them.</string>
     <string name="accounts_pick_provider">Choose a provider</string>
     <string name="accounts_row_plan">%1$s · %2$s</string>
-    <string name="accounts_rename">Rename</string>
-    <string name="accounts_rename_title">Rename account</string>
+    <string name="accounts_edit">Edit</string>
+    <string name="accounts_edit_title">Edit %1$s</string>
     <string name="accounts_rename_label">Name</string>
     <string name="accounts_rename_hint">Leave it empty to use the provider name.</string>
     <string name="accounts_rename_save">Save</string>
     <string name="accounts_remove">Remove account</string>
     <string name="accounts_remove_title">Remove %1$s?</string>
-    <string name="accounts_remove_body">Headroom signs %1$s out and forgets its usage history. You can add it again later.</string>
+    <string name="accounts_remove_body">Headroom signs it out and forgets its usage history.</string>
     <string name="accounts_remove_confirm">Remove</string>
     <string name="signin_title">Sign in to %1$s</string>
     <string name="signin_cancel">Cancel sign-in</string>
