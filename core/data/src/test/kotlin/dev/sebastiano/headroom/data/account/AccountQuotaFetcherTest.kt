@@ -19,6 +19,7 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlinx.coroutines.test.runTest
 
 class AccountQuotaFetcherTest {
@@ -81,6 +82,39 @@ class AccountQuotaFetcherTest {
         )
         fetcherFor(codex).fetch(Account("c1", Provider.Codex, "sam"))
         assertEquals("chatgpt-42", codex.seen.single().accountId)
+    }
+
+    @Test
+    fun `JetBrains sends the ID token, and other providers never do`() = runTest {
+        val jetBrains = RecordingFetcher(Provider.JetBrains)
+        val claude = RecordingFetcher(Provider.Claude)
+        saveCredential(
+            "j1",
+            Provider.JetBrains,
+            extras = mapOf(CredentialExtras.JETBRAINS_ID_TOKEN to "id-token-j1"),
+        )
+        saveCredential(
+            "a1",
+            Provider.Claude,
+            extras = mapOf(CredentialExtras.JETBRAINS_ID_TOKEN to "stray"),
+        )
+        val fetcher = fetcherFor(jetBrains, claude)
+
+        fetcher.fetch(Account("j1", Provider.JetBrains, "sam"))
+        fetcher.fetch(Account("a1", Provider.Claude, "sam"))
+
+        assertEquals("id-token-j1", jetBrains.seen.single().idToken)
+        assertNull(claude.seen.single().idToken)
+    }
+
+    @Test
+    fun `a JetBrains sign-in from before ID tokens were kept sends none`() = runTest {
+        val jetBrains = RecordingFetcher(Provider.JetBrains)
+        saveCredential("j1", Provider.JetBrains)
+
+        fetcherFor(jetBrains).fetch(Account("j1", Provider.JetBrains, "sam"))
+
+        assertNull(jetBrains.seen.single().idToken)
     }
 
     @Test

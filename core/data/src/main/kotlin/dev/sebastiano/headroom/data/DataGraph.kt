@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.data
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
@@ -63,7 +64,8 @@ public class DataGraph(
     public val tokenStore: TokenStore = EncryptedTokenStore(context, TinkCredentialCipher(context)),
     /** How each provider signs in and refreshes its tokens. */
     public val authMethods: AuthMethods = AuthMethods(),
-    quotaFetchers: QuotaFetchers = QuotaFetchers.create(),
+    quotaFetchers: QuotaFetchers =
+        QuotaFetchers.create(jetBrainsLog = { Log.i(JETBRAINS_LOG_TAG, it) }),
 ) {
     private val appContext = context.applicationContext
 
@@ -165,5 +167,8 @@ public class DataGraph(
 
     private companion object {
         const val RESCHEDULE_DEBOUNCE_MS = 500L
+
+        /** `adb logcat -s HeadroomJetBrains` shows the JetBrains AI quota calls. */
+        const val JETBRAINS_LOG_TAG = "HeadroomJetBrains"
     }
 }

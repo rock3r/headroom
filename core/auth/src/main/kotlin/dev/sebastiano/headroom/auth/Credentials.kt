@@ -19,6 +19,12 @@ public object CredentialExtras {
 
     /** Claude organization UUID from the token response. */
     public const val CLAUDE_ORGANIZATION_ID: String = "claude_organization_id"
+
+    /**
+     * The OpenID `id_token` of a JetBrains sign-in. It is the bearer that obtains the JetBrains AI
+     * (Grazie) token, which the quota endpoints need. Each refresh replaces it.
+     */
+    public const val JETBRAINS_ID_TOKEN: String = "jetbrains_id_token"
 }
 
 /** What a sign-in returns, before the app picks an account id for it. */
@@ -77,6 +83,13 @@ public data class StoredCredential(
     /** The ChatGPT account id Codex requests need, when this is a Codex credential. */
     val chatGptAccountId: String?
         get() = extras[CredentialExtras.CHATGPT_ACCOUNT_ID]
+
+    /**
+     * The OpenID ID token of a JetBrains credential. Null for sign-ins made before Headroom kept
+     * it; the next refresh fills it in.
+     */
+    val jetBrainsIdToken: String?
+        get() = extras[CredentialExtras.JETBRAINS_ID_TOKEN]
 
     /**
      * The long-lived GitHub token of a Copilot credential. [accessToken] is the short-lived Copilot

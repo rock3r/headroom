@@ -4,6 +4,8 @@ import dev.sebastiano.headroom.model.Provider
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 
 class QuotaFetchersTest {
@@ -15,6 +17,19 @@ class QuotaFetchersTest {
         for (provider in Provider.entries) {
             assertEquals(provider, fetchers[provider].provider)
         }
+    }
+
+    @Test
+    fun `the JetBrains fetcher writes its diagnostics to the given log`() = runTest {
+        val lines = mutableListOf<String>()
+        val client = FakeQuotaHttpClient {
+            QuotaHttpResponse(200, body = fixture("jetbrains/auth_test.json"))
+        }
+        val fetchers = QuotaFetchers.create(client, FIXED_CLOCK, jetBrainsLog = { lines += it })
+
+        fetchers[Provider.JetBrains].fetch(ProviderCredentials(accessToken = "token"))
+
+        assertTrue(lines.isNotEmpty())
     }
 
     @Test

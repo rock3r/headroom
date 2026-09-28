@@ -46,6 +46,8 @@ public class AccountQuotaFetcher(
                 if (provider == Provider.Copilot) gitHubToken ?: accessToken else accessToken,
             // Codex sends the ChatGPT account id as a header.
             accountId = if (provider == Provider.Codex) chatGptAccountId else providerAccountId,
+            // JetBrains trades the ID token for a JetBrains AI token to read the quota.
+            idToken = if (provider == Provider.JetBrains) jetBrainsIdToken else null,
         )
 
     private fun AuthException.toErrorKind(): QuotaErrorKind =

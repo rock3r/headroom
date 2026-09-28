@@ -6,6 +6,7 @@ import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 
@@ -81,8 +82,22 @@ class FetchSupportTest {
 
     @Test
     fun `credentials never print the secret`() {
-        val credentials = ProviderCredentials(accessToken = "secret-token", accountId = "acct-1")
+        val credentials =
+            ProviderCredentials(
+                accessToken = "secret-token",
+                accountId = "acct-1",
+                idToken = "secret-id-token",
+            )
 
         assertFalse("secret-token" in credentials.toString())
+        assertFalse("secret-id-token" in credentials.toString())
+    }
+
+    @Test
+    fun `credentials with different ID tokens are different`() {
+        assertNotEquals(
+            ProviderCredentials(accessToken = "a", idToken = "one"),
+            ProviderCredentials(accessToken = "a", idToken = "two"),
+        )
     }
 }

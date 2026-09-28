@@ -1,0 +1,19 @@
+{
+  "current": {
+    "license": "test-license-id",
+    "current": { "amount": "12.5" },
+    "maximum": { "amount": "50" },
+    "until": 1777550400000,
+    "quotaID": { "quotaId": "test-quota" },
+    "tariffQuota": {
+      "current": { "amount": "12.5" },
+      "maximum": { "amount": "50" },
+      "available": { "amount": "37.5" }
+    },
+    "topUpQuota": {
+      "current": { "amount": "0" },
+      "maximum": { "amount": "0" },
+      "available": { "amount": "0" }
+    }
+  }
+}

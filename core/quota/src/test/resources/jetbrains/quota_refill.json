@@ -1,0 +1,10 @@
+{
+  "current": {
+    "tariff": {
+      "amount": { "amount": "50" },
+      "period": { "millis": 2592000000 }
+    },
+    "next": 1777593600000,
+    "last": 1775001600000
+  }
+}
