@@ -1,0 +1,40 @@
+{
+  "aiAccessOptions": [
+    {
+      "type": "workspace",
+      "aiAccessEnabled": true,
+      "name": "Example Team AI",
+      "licenseId": "test-workspace-license-id",
+      "licensedTo": "Example Org",
+      "validThrough": null,
+      "orgId": "test-org-id",
+      "orgName": "Example Org",
+      "workspaceId": "test-workspace-id",
+      "workspaceName": "Example Workspace"
+    },
+    {
+      "type": "license",
+      "aiAccessEnabled": false,
+      "name": "Expired AI Pro",
+      "licenseId": "test-disabled-license-id",
+      "licensedTo": "Sam Example",
+      "validThrough": "2025-01-01",
+      "orgId": null,
+      "orgName": null,
+      "workspaceId": null,
+      "workspaceName": null
+    },
+    {
+      "type": "license",
+      "aiAccessEnabled": true,
+      "name": "Junie Pro",
+      "licenseId": "test-junie-license-id",
+      "licensedTo": "sam@example.com",
+      "validThrough": "2027-01-01",
+      "orgId": null,
+      "orgName": null,
+      "workspaceId": null,
+      "workspaceName": null
+    }
+  ]
+}

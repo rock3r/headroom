@@ -19,4 +19,27 @@ class RedactedShapeTest {
             redactedShape(json),
         )
     }
+
+    @Test
+    fun `without numbers, hides numbers too but keeps booleans and null`() {
+        val json =
+            Json.parseToJsonElement(
+                """{"licenseId":"12345","orgId":678,"aiAccessEnabled":true,"orgName":null}"""
+            )
+
+        assertEquals(
+            """{licenseId: <number, 5 chars>, orgId: <number, 3 chars>, """ +
+                """aiAccessEnabled: true, orgName: null}""",
+            redactedShape(json, keepNumbers = false),
+        )
+    }
+
+    @Test
+    fun `a safe word is a short single word, and anything else shows only its length`() {
+        assertEquals("license", safeWord("license"))
+        assertEquals("invalid_grant", safeWord("invalid_grant"))
+        assertEquals("<text, 11 chars>", safeWord("Sam Example"))
+        assertEquals("<text, 15 chars>", safeWord("sam@example.com"))
+        assertEquals("<text, 0 chars>", safeWord(""))
+    }
 }

@@ -1,0 +1,6 @@
+{
+  "access_token": "test-jcp-token",
+  "expires_in": 300,
+  "token_type": "Bearer",
+  "refresh_token": "test-new-refresh-token"
+}

@@ -11,18 +11,20 @@ import kotlinx.serialization.json.jsonObject
  * Reads the JetBrains AI subscription.
  *
  * Credentials: the JetBrains Account OAuth access token (sent as `Authorization: Bearer`) and, when
- * the sign-in kept one, the OpenID ID token in [ProviderCredentials.idToken].
+ * the sign-in kept one, the OpenID ID token in [ProviderCredentials.idToken] and the refresh token
+ * in [ProviderCredentials.refreshToken].
  *
  * The AI service's token check endpoint gives the plan and the remaining balance (`balanceLeft` in
  * `balanceUnit`). The balance is always checked, so a changed response format is reported as a
  * parse failure.
  *
  * With an ID token, the fetcher also reads the JetBrains AI quota (see [JetBrainsAiQuotaReader])
- * and adds it as a window. When any step of that fails, the snapshot has the plan and the balance
- * only, as it does for sign-ins without an ID token. A working balance never becomes an error.
+ * and adds it as a window. The refresh token lets the reader find the account's own license. When
+ * any step of that fails, the snapshot has the plan and the balance only, as it does for sign-ins
+ * without an ID token. A working balance never becomes an error.
  *
  * @param log receives diagnostic lines about the JetBrains AI quota calls. They never contain a
- *   token, the license id or a header value.
+ *   token, a license id, a name, an email address or a header value.
  */
 public class JetBrainsQuotaFetcher(
     private val httpClient: QuotaHttpClient,
@@ -80,8 +82,9 @@ public class JetBrainsQuotaFetcher(
             }
             else ->
                 aiQuotaReader.readWindow(
-                    resolveBaseUrl(credentials.baseUrl, DEFAULT_AI_BASE_URL),
+                    JetBrainsAiEndpoints.resolve(credentials.baseUrl),
                     idToken,
+                    credentials.refreshToken?.takeIf { it.isNotBlank() },
                 )
                     ?: run {
                         log("JetBrains AI quota unavailable, showing the balance only")
@@ -92,7 +95,6 @@ public class JetBrainsQuotaFetcher(
     private companion object {
         const val PROVIDER_NAME = "JetBrains AI"
         const val DEFAULT_BASE_URL = "https://ingrazzio-cloud-prod.labs.jb.gg"
-        const val DEFAULT_AI_BASE_URL = "https://api.jetbrains.ai"
         const val AUTH_TEST_PATH = "/auth/test"
     }
 }
