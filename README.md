@@ -130,3 +130,9 @@ More detail: [docs/TESTING.md](docs/TESTING.md), [docs/STATIC-ANALYSIS.md](docs/
   launcher. Lock screen widgets and the tap-to-flip ring are untested on hardware.
 - While a browser sign-in is open, Android may stop the app in the background, which cancels the
   sign-in. If that happens, start the sign-in again.
+
+## Credits
+
+Most provider logos come from [models.dev](https://models.dev)
+([sst/models.dev](https://github.com/sst/models.dev), MIT licence). All logos are trademarks of
+their owners. Headroom uses them only to show which provider an account belongs to.
