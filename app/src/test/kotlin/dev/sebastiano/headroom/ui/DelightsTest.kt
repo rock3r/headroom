@@ -169,7 +169,7 @@ class DelightsTest {
     private companion object {
         const val ANCHOR = "card"
         val COLOURS = listOf(Color.Red, Color.Blue)
-        const val SHIMMER_DONE_MILLIS = 1_100L
+        const val SHIMMER_DONE_MILLIS = 1_300L
         const val CONFETTI_DONE_MILLIS = 2_300L
     }
 }

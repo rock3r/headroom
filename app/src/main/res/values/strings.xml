@@ -239,6 +239,9 @@
     <string name="settings_delights">Delights</string>
     <string name="settings_refresh_shimmer">Refresh shimmer</string>
     <string name="settings_refresh_shimmer_body">A soft sheen sweeps across the screen when new numbers arrive.</string>
+    <string name="settings_try_delight">Try</string>
+    <string name="settings_try_refresh_shimmer">Try the refresh shimmer</string>
+    <string name="settings_try_reset_confetti">Try the reset confetti</string>
     <string name="settings_reset_confetti">Reset confetti</string>
     <string name="settings_reset_confetti_body">Confetti bursts from an account when its limit resets while the app is open.</string>
     <string name="settings_delights_reduced">Neither plays while motion is reduced.</string>

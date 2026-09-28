@@ -126,6 +126,14 @@ class Delights internal constructor(private val scope: CoroutineScope) {
         burstFrom(anchors, colors)
     }
 
+    /** True when the shimmer would play: it is switched on and motion is not reduced. */
+    val canShimmer: Boolean
+        get() = shimmerOn
+
+    /** True when confetti would burst: it is switched on and motion is not reduced. */
+    val canBurst: Boolean
+        get() = confettiOn
+
     /** True while the node marked with [Modifier.delightAnchor] and [key] is on screen. */
     fun hasAnchor(key: Any): Boolean = key in anchors
 
@@ -147,7 +155,7 @@ class Delights internal constructor(private val scope: CoroutineScope) {
     }
 
     private companion object {
-        const val SHIMMER_MILLIS = 900
+        const val SHIMMER_MILLIS = 1_100
     }
 }
 
