@@ -264,7 +264,7 @@ private fun WidgetPreview(style: WidgetStyle, state: HomeUiState, formatter: Res
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        text = next.provider.displayName,
+                        text = next.name,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }

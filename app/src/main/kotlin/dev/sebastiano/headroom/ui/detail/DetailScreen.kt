@@ -151,7 +151,7 @@ private fun DetailTopBar(
         )
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
-                text = account.provider.displayName,
+                text = account.name,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.semantics { heading() },
             )

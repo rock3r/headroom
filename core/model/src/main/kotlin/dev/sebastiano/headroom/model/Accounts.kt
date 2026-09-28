@@ -8,9 +8,15 @@ import kotlinx.coroutines.flow.StateFlow
 public data class Account(
     val id: String,
     val provider: Provider,
-    /** What the user sees, for example an email address or a login. */
+    /** What the provider calls the account, for example an email address or a login. */
     val label: String,
-)
+    /** The name the user gave the account, or null when they did not name it. */
+    val nickname: String? = null,
+) {
+    /** The name to show: the user's name for the account, or the provider's name. */
+    val name: String
+        get() = nickname ?: provider.displayName
+}
 
 /** The latest known state of one account, as shown in the UI and the widgets. */
 public data class AccountState(

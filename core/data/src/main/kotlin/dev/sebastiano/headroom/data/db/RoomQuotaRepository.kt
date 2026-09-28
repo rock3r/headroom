@@ -57,6 +57,11 @@ internal class RoomQuotaRepository(
         )
     }
 
+    /** Names the account. A blank [nickname] removes the name, so the provider's name shows. */
+    suspend fun renameAccount(accountId: String, nickname: String?) {
+        dao.setNickname(accountId, nickname?.trim()?.ifEmpty { null })
+    }
+
     suspend fun removeAccount(accountId: String) {
         dao.deleteAccount(accountId)
     }

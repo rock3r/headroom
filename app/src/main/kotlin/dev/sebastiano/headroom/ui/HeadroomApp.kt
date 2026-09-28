@@ -94,6 +94,7 @@ fun HeadroomApp(
             onSubmitApiKey = accountsViewModel::submitApiKey,
             onRetry = accountsViewModel::retry,
             onFinish = accountsViewModel::finish,
+            onRename = accountsViewModel::rename,
             onOpenUrl = { url ->
                 CustomTabsIntent.Builder().build().launchUrl(context, url.toUri())
             },

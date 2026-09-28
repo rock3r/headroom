@@ -161,7 +161,7 @@ private fun NextResetText(next: NextResetSummary, now: Instant, formatter: Reset
                 text =
                     stringResource(
                         R.string.overview_next_reset_when,
-                        shown.provider.displayName,
+                        shown.name,
                         formatter.long(shown.resetsAt),
                     ),
                 style = MaterialTheme.typography.bodyMedium,

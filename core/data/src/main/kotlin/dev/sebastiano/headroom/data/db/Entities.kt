@@ -17,6 +17,7 @@ internal data class AccountEntity(
     val lastError: String?,
     val balanceAmount: Double? = null,
     val balanceUnit: String? = null,
+    val nickname: String? = null,
 )
 
 @Entity(

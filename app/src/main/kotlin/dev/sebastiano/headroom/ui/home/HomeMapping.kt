@@ -33,6 +33,7 @@ internal fun homeUiState(
                 kind = next.window.kind,
                 resetsAt = requireNotNull(next.window.resetsAt),
                 alertEnabled = alerts.isOn(next.account.id, next.window),
+                name = next.account.name,
             )
         }
     return HomeUiState(
@@ -64,6 +65,7 @@ internal fun AccountState.toSummary(
     return AccountSummary(
         id = account.id,
         provider = account.provider,
+        name = account.name,
         label = account.label,
         plan = snapshot?.planLabel,
         primary = primary?.toSummary(account.id, now, alerts),

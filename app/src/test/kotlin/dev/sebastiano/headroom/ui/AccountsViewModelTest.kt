@@ -47,6 +47,24 @@ class AccountsViewModelTest {
         }
 
     @Test
+    fun `renaming an account passes the new name to storage`() =
+        runTest(main.dispatcher) {
+            val renames = mutableListOf<Pair<String, String?>>()
+            val named =
+                AccountsViewModel(
+                    repository = FakeQuotaRepository({ now }),
+                    signInController = signIn,
+                    isDemo = MutableStateFlow(false),
+                    renameAccount = { id, name -> renames += id to name },
+                )
+
+            named.rename("demo-claude", "Work")
+            runCurrent()
+
+            assertEquals(listOf<Pair<String, String?>>("demo-claude" to "Work"), renames)
+        }
+
+    @Test
     fun `adding an account goes through the provider picker to sign-in`() =
         runTest(main.dispatcher) {
             observe()

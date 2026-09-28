@@ -25,6 +25,9 @@ internal interface QuotaDao {
 
     @Query("DELETE FROM accounts WHERE id = :id") suspend fun deleteAccount(id: String)
 
+    @Query("UPDATE accounts SET nickname = :nickname WHERE id = :id")
+    suspend fun setNickname(id: String, nickname: String?)
+
     @Query("DELETE FROM windows WHERE accountId = :accountId")
     suspend fun deleteWindows(accountId: String)
 

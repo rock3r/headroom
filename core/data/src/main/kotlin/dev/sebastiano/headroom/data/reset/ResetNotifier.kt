@@ -27,7 +27,7 @@ internal class AndroidResetNotifier(
 
     override fun notifyReset(account: AccountState, window: QuotaWindow) {
         ensureChannel()
-        val name = account.account.provider.displayName
+        val name = account.account.name
         val titleRes =
             if (window.kind == WindowKind.Monthly) R.string.reset_title_monthly
             else R.string.reset_title_weekly

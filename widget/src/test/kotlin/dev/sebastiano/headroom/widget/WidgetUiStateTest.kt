@@ -329,6 +329,25 @@ class WidgetUiStateTest {
     }
 
     @Test
+    fun `gauges use the name the user gave an account`() {
+        val named =
+            demo.first().copy(account = Account("claude-2", Provider.Claude, "work", "Work"))
+        val bars =
+            assertIs<WidgetUiState.Bars>(
+                map(
+                    WidgetConfig(
+                        WidgetStyle.Bars,
+                        accountIds = listOf("demo-claude", "claude-2", "demo-codex"),
+                    ),
+                    demo + named,
+                    size = WidgetSize(280f, 400f),
+                )
+            )
+
+        assertEquals(listOf("sam@example.com", "Work", "Codex"), bars.gauges.map { it.name })
+    }
+
+    @Test
     fun `used percent is rounded and clamped`() {
         val over =
             demo.first().let { state ->

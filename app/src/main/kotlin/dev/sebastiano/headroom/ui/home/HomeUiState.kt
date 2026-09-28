@@ -40,6 +40,8 @@ data class AccountSummary(
     val pastResets: List<Double>,
     /** The weekly window reset while the app was open. The card says so for the session. */
     val justReset: Boolean = false,
+    /** The name the user gave the account, or the provider's name. */
+    val name: String = provider.displayName,
 )
 
 @Immutable
@@ -63,6 +65,8 @@ data class NextResetSummary(
     val kind: WindowKind,
     val resetsAt: Instant,
     val alertEnabled: Boolean,
+    /** The name the user gave the account, or the provider's name. */
+    val name: String = provider.displayName,
 )
 
 /** The detail screen: one account plus the chart of its primary window. */

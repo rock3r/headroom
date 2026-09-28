@@ -42,6 +42,7 @@ class CredentialStateTest {
             onFinish = {},
             onOpenUrl = {},
             onCopy = {},
+            onRename = { _, _ -> },
         )
 
     private fun restoreWith(state: SignInState, fieldTag: String) {

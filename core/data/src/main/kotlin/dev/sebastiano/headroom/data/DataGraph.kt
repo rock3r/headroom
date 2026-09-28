@@ -41,6 +41,9 @@ public interface AccountsRepository : QuotaRepository {
     public suspend fun addAccount(account: Account)
 
     public suspend fun removeAccount(accountId: String)
+
+    /** Names the account. A blank or null [nickname] removes the name. */
+    public suspend fun renameAccount(accountId: String, nickname: String?)
 }
 
 /** Implemented by the Application, so receivers and workers can reach the [DataGraph]. */
@@ -65,7 +68,9 @@ public class DataGraph(
     private val appContext = context.applicationContext
 
     private val database =
-        Room.databaseBuilder(appContext, HeadroomDatabase::class.java, "headroom.db").build()
+        Room.databaseBuilder(appContext, HeadroomDatabase::class.java, "headroom.db")
+            .addMigrations(HeadroomDatabase.MIGRATION_1_2)
+            .build()
 
     private val alertStore =
         PreferenceDataStoreFactory.create(scope = scope) {
@@ -84,6 +89,9 @@ public class DataGraph(
 
             override suspend fun removeAccount(accountId: String) =
                 roomRepository.removeAccount(accountId)
+
+            override suspend fun renameAccount(accountId: String, nickname: String?) =
+                roomRepository.renameAccount(accountId, nickname)
         }
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)

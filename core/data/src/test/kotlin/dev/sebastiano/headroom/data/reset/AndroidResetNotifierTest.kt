@@ -35,6 +35,16 @@ class AndroidResetNotifierTest {
     }
 
     @Test
+    fun `a named account is called by its name`() {
+        val named = grok.copy(account = grok.account.copy(nickname = "Side project"))
+
+        AndroidResetNotifier(context, ZoneId.of("UTC")).notifyReset(named, named.primaryWindow!!)
+
+        val posted = shadowOf(manager).allNotifications.single()
+        assertEquals("Side project weekly limit has reset", shadowOf(posted).contentTitle)
+    }
+
+    @Test
     fun `the same window replaces its previous notification`() {
         val notifier = AndroidResetNotifier(context, ZoneId.of("UTC"))
         notifier.notifyReset(grok, grok.primaryWindow!!)

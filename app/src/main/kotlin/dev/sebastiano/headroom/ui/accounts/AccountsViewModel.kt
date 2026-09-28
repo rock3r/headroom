@@ -14,10 +14,21 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /** One row of the accounts list. */
 @Immutable
-data class AccountRow(val id: String, val provider: Provider, val label: String, val plan: String?)
+data class AccountRow(
+    val id: String,
+    val provider: Provider,
+    val label: String,
+    val plan: String?,
+    /** The name the user gave the account, if any. */
+    val nickname: String? = null,
+) {
+    val name: String
+        get() = nickname ?: provider.displayName
+}
 
 /** Where the accounts screen is: the list, the provider picker, or a sign-in step. */
 @Immutable
@@ -41,6 +52,8 @@ class AccountsViewModel(
     repository: QuotaRepository,
     private val signInController: SignInController,
     isDemo: Flow<Boolean>,
+    /** Stores the name the user gives an account. A blank name removes it. */
+    private val renameAccount: suspend (accountId: String, name: String?) -> Unit = { _, _ -> },
 ) : ViewModel() {
     private val picking = MutableStateFlow(false)
 
@@ -61,6 +74,10 @@ class AccountsViewModel(
                     step = step(picking.value, signInController.state.value),
                 ),
             )
+
+    fun rename(accountId: String, name: String) {
+        viewModelScope.launch { renameAccount(accountId, name) }
+    }
 
     fun addAccount() {
         picking.value = true
@@ -99,7 +116,13 @@ class AccountsViewModel(
         }
 
     private fun AccountState.toRow() =
-        AccountRow(account.id, account.provider, account.label, snapshot?.planLabel)
+        AccountRow(
+            account.id,
+            account.provider,
+            account.label,
+            snapshot?.planLabel,
+            account.nickname,
+        )
 
     private companion object {
         const val STOP_TIMEOUT = 5_000L

@@ -139,7 +139,7 @@ private fun UpcomingRow(
                 text =
                     stringResource(
                         R.string.resets_row_title,
-                        account.provider.displayName,
+                        account.name,
                         window.label,
                     ),
                 style = MaterialTheme.typography.titleSmall,
@@ -202,7 +202,7 @@ private fun HistoryRow(account: AccountSummary, current: Double) {
     val description =
         stringResource(
             R.string.resets_history_description,
-            account.provider.displayName,
+            account.name,
             account.pastResets.joinToString { "${it.roundToInt()}%" },
             current.roundToInt(),
         )
@@ -212,7 +212,7 @@ private fun HistoryRow(account: AccountSummary, current: Double) {
         verticalAlignment = Alignment.Bottom,
     ) {
         Text(
-            text = account.provider.displayName,
+            text = account.name,
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.width(96.dp),
             maxLines = 1,

@@ -31,6 +31,8 @@ class SignInManagerTest {
             state.value = state.value.filterNot { it.account.id == accountId }
         }
 
+        override suspend fun renameAccount(accountId: String, nickname: String?) = Unit
+
         override suspend fun refresh(accountId: String?) {
             refreshed += accountId
         }

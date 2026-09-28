@@ -117,6 +117,33 @@ class RoomQuotaRepositoryTest {
         }
 
     @Test
+    fun `renaming an account keeps the name, and a blank name clears it`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            repo.addAccount(claude.account)
+
+            repo.renameAccount(claude.account.id, "  Work  ")
+            assertEquals(
+                "Work",
+                repo.accounts
+                    .first { it.singleOrNull()?.account?.nickname != null }
+                    .single()
+                    .account
+                    .name,
+            )
+
+            repo.renameAccount(claude.account.id, " ")
+            assertEquals(
+                "Claude",
+                repo.accounts
+                    .first { it.singleOrNull()?.account?.nickname == null }
+                    .single()
+                    .account
+                    .name,
+            )
+        }
+
+    @Test
     fun `removing an account deletes its windows and history`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)

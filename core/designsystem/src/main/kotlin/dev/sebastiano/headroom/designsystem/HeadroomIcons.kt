@@ -9,6 +9,7 @@ object HeadroomIcons {
     @DrawableRes val Check: Int = R.drawable.ic_check
     @DrawableRes val ChevronRight: Int = R.drawable.ic_chevron_right
     @DrawableRes val Close: Int = R.drawable.ic_close
+    @DrawableRes val Edit: Int = R.drawable.ic_edit
     @DrawableRes val ContentCopy: Int = R.drawable.ic_content_copy
     @DrawableRes val Dashboard: Int = R.drawable.ic_dashboard
     @DrawableRes val DashboardFilled: Int = R.drawable.ic_dashboard_filled

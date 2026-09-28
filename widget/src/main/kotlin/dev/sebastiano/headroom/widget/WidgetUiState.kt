@@ -186,15 +186,19 @@ public sealed interface WidgetUiState {
                 WidgetWindow.Session -> EmptyReason.NoSessionLimit
             }
 
-        /** Provider names, or account labels where one provider appears more than once. */
+        /**
+         * The names the user gave the accounts. Unnamed accounts show the provider's name, or the
+         * account label where one provider appears more than once.
+         */
         private fun displayNames(selected: List<AccountState>): Map<String, String> {
             val repeated =
                 selected.groupingBy { it.account.provider }.eachCount().filterValues { it > 1 }.keys
             return selected.associate { state ->
                 val account = state.account
                 val name =
-                    if (account.provider in repeated) account.label
-                    else account.provider.style.shortName
+                    account.nickname
+                        ?: if (account.provider in repeated) account.label
+                        else account.provider.style.shortName
                 account.id to name
             }
         }

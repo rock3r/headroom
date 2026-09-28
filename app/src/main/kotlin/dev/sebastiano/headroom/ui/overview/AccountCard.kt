@@ -132,7 +132,7 @@ private fun CardTop(account: AccountSummary, sharedElements: SharedElements?) {
         ProviderAvatar(provider = account.provider, modifier = avatar)
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
-                text = account.provider.displayName,
+                text = account.name,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

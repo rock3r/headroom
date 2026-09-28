@@ -13,7 +13,7 @@ import java.time.Instant
 
 internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
     val provider = Provider.fromId(account.provider) ?: return null
-    val domainAccount = Account(account.id, provider, account.label)
+    val domainAccount = Account(account.id, provider, account.label, account.nickname)
     val fetchedAt = account.fetchedAtEpochMs?.let(Instant::ofEpochMilli)
     val snapshot = fetchedAt?.let {
         QuotaSnapshot(
