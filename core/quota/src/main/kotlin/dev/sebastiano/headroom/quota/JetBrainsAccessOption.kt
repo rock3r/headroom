@@ -59,6 +59,9 @@ internal sealed class JetBrainsQuotaSource(
     val label: String,
     val logName: String,
 ) {
+    /** The ids this source carries; they must never reach the log. */
+    abstract val ids: List<String>
+
     class License(val licenseId: String, code: String?) :
         JetBrainsQuotaSource(
             windowId = "jb:license:${shortHash(licenseId)}",
@@ -66,14 +69,18 @@ internal sealed class JetBrainsQuotaSource(
             logName =
                 listOfNotNull(LICENSE_TYPE, code?.takeIf { PRODUCT_CODE.matches(it) })
                     .joinToString(" "),
-        )
+        ) {
+        override val ids: List<String> = listOf(licenseId)
+    }
 
     class Workspace(val workspaceId: String, val orgId: String?, name: String) :
         JetBrainsQuotaSource(
             windowId = "jb:ws:${shortHash(workspaceId)}",
             label = name,
             logName = WORKSPACE_TYPE,
-        )
+        ) {
+        override val ids: List<String> = listOfNotNull(workspaceId, orgId)
+    }
 }
 
 /**

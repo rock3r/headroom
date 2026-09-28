@@ -73,14 +73,33 @@ internal class JetBrainsAiEndpoints(
  */
 internal class JetBrainsAiQuotaReader(
     private val httpClient: QuotaHttpClient,
-    private val log: (String) -> Unit,
+    private val sink: (String) -> Unit,
 ) {
+    /**
+     * Every token and id this reader has seen. They are masked out of every log line, as a safety
+     * net on top of logging only shapes and codes: a server message could still repeat one.
+     */
+    private val secrets = mutableSetOf<String>()
+
+    private fun remember(vararg values: String?) {
+        rememberAll(values.filterNotNull())
+    }
+
+    private fun rememberAll(values: List<String>) {
+        values.filter { it.length >= MIN_SECRET_CHARS }.forEach(secrets::add)
+    }
+
+    private fun log(line: String) {
+        sink(secrets.fold(line) { masked, secret -> masked.replace(secret, "<secret>") })
+    }
+
     /** The quota windows, the one closest to its limit first. Empty when no license gives one. */
     suspend fun readWindows(
         endpoints: JetBrainsAiEndpoints,
         idToken: String,
         refreshToken: String?,
     ): List<QuotaWindow> {
+        remember(idToken, refreshToken)
         val identityHeaders =
             mapOf(
                 "Authorization" to bearer(idToken),
@@ -89,6 +108,7 @@ internal class JetBrainsAiQuotaReader(
             )
         if (refreshToken != null) {
             val sources = findQuotaSources(endpoints, refreshToken)
+            sources.forEach { (_, source) -> rememberAll(source.ids) }
             val read = sources.mapNotNull { (position, source) ->
                 val tag = "${source.logName.substringBefore(' ')} $position"
                 val window =
@@ -209,7 +229,8 @@ internal class JetBrainsAiQuotaReader(
         if ("refresh_token" in switched) {
             log("$step: response has a new refresh token, which is not stored")
         }
-        return switched.nonBlankStringOrNull("access_token")
+        remember(switched.nonBlankStringOrNull("refresh_token"))
+        return switched.nonBlankStringOrNull("access_token")?.also { remember(it) }
             ?: run {
                 log("$step: response has no access_token")
                 null
@@ -262,17 +283,24 @@ internal class JetBrainsAiQuotaReader(
         refreshToken: String,
         source: JetBrainsQuotaSource.Workspace,
     ): QuotaWindow? {
+        // The Junie CLI sends both ids; the IDE sends only the workspace. The token service
+        // rejects a parameter it does not take, so try each form in turn.
+        val workspace = "workspace_id" to source.workspaceId
+        val org = source.orgId?.let { "org_id" to it }
+        val scopes =
+            listOfNotNull(listOfNotNull(org, workspace), listOf(workspace), org?.let(::listOf))
         val seatToken =
-            switchAudience(
-                tagged(tag, SWITCH_STEP),
-                endpoints,
-                refreshToken,
-                AI_ACCESS_AUDIENCE,
-                listOfNotNull(
-                    source.orgId?.let { "org_id" to it },
-                    "workspace_id" to source.workspaceId,
-                ),
-            ) ?: return null
+            scopes.distinct().withIndex().firstNotNullOfOrNull { (attempt, scope) ->
+                val step = tagged(tag, SWITCH_STEP)
+                switchAudience(
+                    if (attempt == 0) step
+                    else "$step, retry with ${scope.joinToString(" and ") { it.first }}",
+                    endpoints,
+                    refreshToken,
+                    AI_ACCESS_AUDIENCE,
+                    scope.toList(),
+                )
+            } ?: return null
         val headers = mapOf("Authorization" to bearer(seatToken), "Accept" to JSON_TYPE)
         fun get(path: String) =
             QuotaHttpRequest(url = "${endpoints.aiBaseUrl}$path", headers = headers)
@@ -383,6 +411,7 @@ internal class JetBrainsAiQuotaReader(
     }
 
     private companion object {
+        const val MIN_SECRET_CHARS = 6
         const val JSON_TYPE = "application/json"
         const val FORM_TYPE = "application/x-www-form-urlencoded"
         const val EMPTY_BODY = "{}"
@@ -447,9 +476,27 @@ private fun redactedErrorBody(body: String): String {
         parseOrNull { quotaJson.parseToJsonElement(body) }
             ?: return "body is not JSON (${body.length} chars)"
     val error = (json as? JsonObject)?.stringOrNull("error")?.let(::safeWord)
+    val description = (json as? JsonObject)?.stringOrNull("error_description")?.let(::maskIds)
     val shape = "body shape: ${redactedShape(json, keepNumbers = false)}"
-    return if (error == null) shape else "error $error, $shape"
+    return listOfNotNull(error?.let { "error $it" }, description?.let { "\"$it\"" }, shape)
+        .joinToString(", ")
 }
+
+/**
+ * An OAuth error description with anything that looks like an id, an email or a token hidden, and
+ * cut short. These are the service's own messages, which say which parameter it did not like.
+ */
+internal fun maskIds(text: String): String =
+    text
+        .replace(EMAIL, "<email>")
+        .replace(UUID, "<id>")
+        .replace(LONG_TOKEN, "<id>")
+        .take(DESCRIPTION_CHARS)
+
+private val EMAIL = Regex("[^\\s@,;:]+@[^\\s@,;:]+")
+private val UUID = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}")
+private val LONG_TOKEN = Regex("[A-Za-z0-9_\\-.]{20,}")
+private const val DESCRIPTION_CHARS = 120
 
 /**
  * An amount of AI credits. The service sends `{"amount": "12.5"}`, with the amount as a decimal

@@ -59,6 +59,7 @@ class JetBrainsAccessOptionsTest {
         userManagementSwitch: MockResponse =
             jsonResponse(fixture("jetbrains/switch_audience.json")),
         options: MockResponse = jsonResponse(fixture("jetbrains/ai_access_options.json")),
+        seatAccepts: (form: Map<String, String>) -> Boolean = { true },
         seatSwitch: (workspaceId: String) -> MockResponse = { workspaceId ->
             jsonResponse("""{"access_token":"${seatToken(workspaceId)}","expires_in":300}""")
         },
@@ -78,7 +79,10 @@ class JetBrainsAccessOptionsTest {
                         TOKEN ->
                             when (form["audience"]) {
                                 "jcp-user-management" -> userManagementSwitch
-                                "ai-access" -> seatSwitch(form["workspace_id"].orEmpty())
+                                "ai-access" ->
+                                    if (seatAccepts(form))
+                                        seatSwitch(form["workspace_id"].orEmpty())
+                                    else INVALID_REQUEST
                                 else -> MockResponse(code = 400)
                             }
                         OPTIONS -> options
@@ -202,6 +206,30 @@ class JetBrainsAccessOptionsTest {
                 assertEquals("application/x-www-form-urlencoded", switch.headers["Content-Type"])
             }
         }
+
+    @Test
+    fun `retries a rejected seat token with only the workspace, then only the organisation`() =
+        runTest {
+            // The token service answers invalid_request when it does not take a parameter.
+            routes(seatAccepts = { form -> "org_id" !in form })
+
+            val snapshot = fetchSnapshot()
+
+            assertEquals(3, snapshot.windows.size)
+            val first = seatSwitches().filter { it.form()["workspace_id"] == WORKSPACE_ID }
+            assertEquals(listOf(true, false), first.map { "org_id" in it.form() })
+            assertTrue(logs.any { "invalid_request" in it }, logs.toString())
+        }
+
+    @Test
+    fun `a seat whose every token request is rejected is skipped`() = runTest {
+        routes(seatAccepts = { false })
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals(1, snapshot.windows.size)
+        assertEquals(6, seatSwitches().size)
+    }
 
     @Test
     fun `reads a seat's quota and refill with GET and the seat token`() = runTest {
@@ -517,6 +545,11 @@ class JetBrainsAccessOptionsTest {
             .toMap()
 
     private companion object {
+        val INVALID_REQUEST =
+            jsonResponse(
+                """{"error":"invalid_request","error_description":"Unexpected parameter"}""",
+                code = 400,
+            )
         const val ID_TOKEN = "test-id-token"
         const val ACCESS_TOKEN = "test-access-token"
         const val REFRESH_TOKEN = "test-refresh-token"

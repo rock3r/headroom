@@ -42,4 +42,15 @@ class RedactedShapeTest {
         assertEquals("<text, 15 chars>", safeWord("sam@example.com"))
         assertEquals("<text, 0 chars>", safeWord(""))
     }
+
+    @Test
+    fun `error descriptions keep their words and lose ids, emails and tokens`() {
+        assertEquals(
+            "Unknown org_id <id> for <email>, token <id>",
+            maskIds(
+                "Unknown org_id 0b7f3c1e-8d2a-4c5b-9e6f-123456789abc for sam@example.com, " +
+                    "token abcdefghijklmnopqrstuvwxyz0123"
+            ),
+        )
+    }
 }
