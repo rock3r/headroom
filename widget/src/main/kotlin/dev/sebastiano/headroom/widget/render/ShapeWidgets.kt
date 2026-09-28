@@ -53,7 +53,7 @@ internal fun SingleShapeWidget(
                     },
             )
             WidgetText(
-                text = strings.percent(gauge.usedPercent),
+                text = strings.percent(gauge.shownPercent),
                 color = colors.onShapeFill,
                 fontSize = render.sp(BIG),
                 fontWeight = FontWeight.Black,
@@ -94,7 +94,7 @@ private fun SmallShape(
         }
         RemoteColumn(horizontalAlignment = RemoteAlignment.CenterHorizontally) {
             WidgetText(
-                text = gauge.usedPercent.toString(),
+                text = gauge.shownPercent.toString(),
                 color = colors.onShapeFill,
                 fontSize = render.sp(SMALL_NUMBER),
                 fontWeight = FontWeight.ExtraBold,

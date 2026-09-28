@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.util.SizeF
 import android.widget.RemoteViews
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -51,6 +52,20 @@ class WidgetUpdaterTest {
         assertIs<WidgetUiState.Bars>(rendered.getValue(3).first)
         assertIs<WidgetUiState.ShapeGrid>(rendered.getValue(4).first)
         assertIs<WidgetUiState.Countdown>(rendered.getValue(5).first)
+    }
+
+    @Test
+    fun `draws every widget in the display mode it is given`() = runTest {
+        gateway.ids[RingsWidgetProvider::class.java] = intArrayOf(1)
+        gateway.ids[BarsWidgetProvider::class.java] = intArrayOf(3)
+        store.set(1, WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-claude")))
+
+        updater.updateAll(context, accounts, now, QuotaDisplay.Left)
+
+        val ring = assertIs<WidgetUiState.SingleRing>(rendered.getValue(1).first)
+        assertEquals(29, ring.gauge.shownPercent)
+        val bars = assertIs<WidgetUiState.Bars>(rendered.getValue(3).first)
+        assertTrue(bars.gauges.all { it.display == QuotaDisplay.Left })
     }
 
     @Test

@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.FrameLayout
 import androidx.core.graphics.createBitmap
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.widget.WidgetConfig
 import dev.sebastiano.headroom.widget.WidgetHostCategory
 import dev.sebastiano.headroom.widget.WidgetSize
@@ -53,7 +54,8 @@ class WidgetGalleryRecorder {
         shots.forEach { shot ->
             val accounts =
                 if (shot.manyAccounts) DemoData.manyAccounts(now) else DemoData.accounts(now)
-            val state = WidgetUiState.from(accounts, shot.config, now, shot.size, shot.host)
+            val state =
+                WidgetUiState.from(accounts, shot.config, now, shot.size, shot.host, shot.display)
             val document = WidgetRenderer.capture(context, state, APP_WIDGET_ID, shot.size, strings)
             val widget = WidgetRenderer.remoteViews(document).draw(shot.size)
             File(dir, "${shot.name}.png").outputStream().use {
@@ -105,6 +107,8 @@ class WidgetGalleryRecorder {
         val host: WidgetHostCategory = WidgetHostCategory.HomeScreen,
         /** Shows an account for every provider instead of the four demo accounts. */
         val manyAccounts: Boolean = false,
+        /** Shows how much is left instead of how much is used. */
+        val display: QuotaDisplay = QuotaDisplay.Used,
     )
 
     private companion object {
@@ -124,6 +128,12 @@ class WidgetGalleryRecorder {
                 ),
                 Shot("widget-rings-grid", WidgetConfig(WidgetStyle.Rings), WidgetSize(160f, 160f)),
                 Shot("widget-bars", WidgetConfig(WidgetStyle.Bars), WidgetSize(320f, 140f)),
+                Shot(
+                    "widget-bars-left",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(320f, 140f),
+                    display = QuotaDisplay.Left,
+                ),
                 Shot(
                     "widget-bars-tall",
                     WidgetConfig(WidgetStyle.Bars),

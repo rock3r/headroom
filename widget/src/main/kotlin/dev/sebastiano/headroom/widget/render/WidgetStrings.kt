@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.widget.render
 import android.content.Context
 import android.text.format.DateFormat
 import dev.sebastiano.headroom.model.Countdown
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.widget.EmptyReason
 import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.GaugeWindow
@@ -54,10 +55,16 @@ internal class WidgetStrings(
     fun gaugeDescription(gauge: Gauge): String {
         val usage =
             context.getString(
-                if (gauge.needsAttention) R.string.widget_cd_gauge_attention
-                else R.string.widget_cd_gauge,
+                when (gauge.display) {
+                    QuotaDisplay.Used ->
+                        if (gauge.needsAttention) R.string.widget_cd_gauge_attention
+                        else R.string.widget_cd_gauge
+                    QuotaDisplay.Left ->
+                        if (gauge.needsAttention) R.string.widget_cd_gauge_left_attention
+                        else R.string.widget_cd_gauge_left
+                },
                 gauge.name,
-                percent(gauge.usedPercent),
+                percent(gauge.shownPercent),
                 windowWord(gauge.window),
             )
         val reset = gauge.reset ?: return usage

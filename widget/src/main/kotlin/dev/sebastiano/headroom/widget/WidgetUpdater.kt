@@ -9,6 +9,7 @@ import android.util.SizeF
 import android.widget.RemoteViews
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.widget.render.WidgetRenderer
 import java.time.Instant
 
@@ -26,8 +27,16 @@ internal constructor(
 ) {
     public constructor(configStore: WidgetConfigStore) : this(configStore, ::SystemAppWidgetGateway)
 
-    /** Redraws every placed widget of every style from [accounts] as they are at [now]. */
-    public suspend fun updateAll(context: Context, accounts: List<AccountState>, now: Instant) {
+    /**
+     * Redraws every placed widget of every style from [accounts] as they are at [now], showing how
+     * much is used or how much is left as [display] says.
+     */
+    public suspend fun updateAll(
+        context: Context,
+        accounts: List<AccountState>,
+        now: Instant,
+        display: QuotaDisplay = QuotaDisplay.Used,
+    ) {
         val widgets = gateway(context)
         WidgetStyle.entries.forEach { style ->
             widgets.appWidgetIds(HeadroomWidgetProvider.classFor(style)).forEach { appWidgetId ->
@@ -39,7 +48,14 @@ internal constructor(
                     }
                 val layouts = sizes.associateWith { size ->
                     val state =
-                        WidgetUiState.from(accounts, config, now, size, options.hostCategory())
+                        WidgetUiState.from(
+                            accounts,
+                            config,
+                            now,
+                            size,
+                            options.hostCategory(),
+                            display,
+                        )
                     render(context, state, appWidgetId, size)
                 }
                 widgets.update(appWidgetId, layouts)

@@ -4,6 +4,7 @@ import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import java.time.Duration
 import java.time.Instant
@@ -383,5 +384,39 @@ class WidgetUiStateTest {
         val state = map(WidgetConfig(WidgetStyle.Rings, colourMode = ColourMode.Mono))
 
         assertEquals(ColourMode.Mono, state.colourMode)
+    }
+
+    @Test
+    fun `left mode shows what is left of each window, with the pace tick turned around`() {
+        val config = WidgetConfig(WidgetStyle.Bars, accountIds = listOf("demo-claude"))
+
+        val state =
+            WidgetUiState.from(
+                demo,
+                config,
+                now,
+                twoByTwo,
+                WidgetHostCategory.HomeScreen,
+                QuotaDisplay.Left,
+            )
+        val gauge = assertIs<WidgetUiState.Bars>(state).gauges.single()
+
+        assertEquals(QuotaDisplay.Left, gauge.display)
+        assertEquals(71, gauge.usedPercent)
+        assertEquals(29, gauge.shownPercent)
+        assertEquals(40, gauge.shownPacePercent)
+        // The shape still follows how full the window is.
+        assertEquals(UsageShape.Flower, gauge.shape)
+    }
+
+    @Test
+    fun `used mode shows the used percentage and the pace tick as they are`() {
+        val config = WidgetConfig(WidgetStyle.Bars, accountIds = listOf("demo-claude"))
+
+        val gauge = assertIs<WidgetUiState.Bars>(map(config)).gauges.single()
+
+        assertEquals(QuotaDisplay.Used, gauge.display)
+        assertEquals(71, gauge.shownPercent)
+        assertEquals(60, gauge.shownPacePercent)
     }
 }
