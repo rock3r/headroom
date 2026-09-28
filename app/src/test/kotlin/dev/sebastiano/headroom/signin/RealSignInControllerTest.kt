@@ -137,14 +137,14 @@ class RealSignInControllerTest {
             val steps = FakeSteps()
             val gate = CompletableDeferred<Unit>()
             val controller = controller(steps, gate = gate)
-            controller.start(Provider.Codex)
+            controller.start(Provider.Copilot)
 
-            steps.device!!.result.complete(tokens(Provider.Codex))
-            assertEquals(SignInState.Finishing(Provider.Codex), controller.state.value)
+            steps.device!!.result.complete(tokens(Provider.Copilot))
+            assertEquals(SignInState.Finishing(Provider.Copilot), controller.state.value)
 
             gate.complete(Unit)
             assertEquals(
-                SignInState.Success(Provider.Codex, "sam@example.com"),
+                SignInState.Success(Provider.Copilot, "sam@example.com"),
                 controller.state.value,
             )
         }
