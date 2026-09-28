@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.ui.home
 
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.designsystem.PaceChipState
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaDisplay
@@ -14,6 +15,7 @@ import java.time.Instant
 @Immutable
 data class HomeUiState(
     val now: Instant,
+    /** The accounts in the overview's order: see [overviewSort]. */
     val accounts: List<AccountSummary>,
     val isDemo: Boolean,
     val isRefreshing: Boolean,
@@ -25,6 +27,15 @@ data class HomeUiState(
     val accountsLoaded: Boolean = true,
     /** Whether percentages, rings and bars show how much is used or how much is left. */
     val display: QuotaDisplay = QuotaDisplay.Used,
+    /** How the overview orders [accounts]. */
+    val overviewSort: OverviewSort = OverviewSort.YourOrder,
+    /**
+     * False until the stored [overviewSort] has been read. Until then [accounts] may be in the
+     * repository's order, and the overview must not animate the cards into the stored order.
+     */
+    val sortLoaded: Boolean = true,
+    /** The accounts in the repository's order, for the screens that do not follow the sort. */
+    val accountsInYourOrder: List<AccountSummary> = accounts,
 )
 
 @Immutable

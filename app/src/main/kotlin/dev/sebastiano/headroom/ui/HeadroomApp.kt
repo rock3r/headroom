@@ -129,7 +129,11 @@ fun HeadroomApp(
                 Page.Settings ->
                     SettingsScreen(
                         state = settings,
-                        accounts = SettingsAccounts(home.accounts.map { it.provider }, home.isDemo),
+                        accounts =
+                            SettingsAccounts(
+                                home.accountsInYourOrder.map { it.provider },
+                                home.isDemo,
+                            ),
                         actions =
                             settingsActions(settingsViewModel) { next ->
                                 if (next == Page.Accounts) accountsFromSettings = true
