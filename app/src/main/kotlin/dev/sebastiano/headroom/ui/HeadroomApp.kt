@@ -76,33 +76,25 @@ fun HeadroomApp(
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
     // A widget tap leaves the accounts screen, unless the user is in the middle of signing in.
     val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
-    val decision = openAccountRequest?.let { request ->
+    // A request is acted on once, even if the host is slow to clear it: a request left behind
+    // must never keep the accounts screen from opening.
+    var handledRequest by remember { mutableStateOf<Long?>(null) }
+    val pending = openAccountRequest?.takeIf { it.serial != handledRequest }
+    val decision = pending?.let { request ->
         decideOpenAccount(request.accountId, home.accounts.map { it.id }, home.accountsLoaded)
     }
     // Unknown accounts are dropped once loading is done; a pending request never blocks the UI.
     SideEffect { if (decision == OpenAccountDecision.Ignore) onConsumeOpenAccount() }
-    val openNow = openAccountRequest.takeIf { decision == OpenAccountDecision.Open && !signingIn }
+    val openNow = pending.takeIf { decision == OpenAccountDecision.Open && !signingIn }
     val showAccounts = accountsOpen && openNow == null
 
     val accountsActions =
-        AccountsActions(
-            onClose = { accountsOpen = false },
-            onAddAccount = accountsViewModel::addAccount,
-            onPickProvider = accountsViewModel::pickProvider,
-            onBack = accountsViewModel::back,
-            onSubmitCode = accountsViewModel::submitCode,
-            onSubmitApiKey = accountsViewModel::submitApiKey,
-            onRetry = accountsViewModel::retry,
-            onFinish = accountsViewModel::finish,
-            onRename = accountsViewModel::rename,
-            onRemove = accountsViewModel::remove,
-            onOpenUrl = { url -> signInTabIntent(context).launchUrl(context, url.toUri()) },
-            onCopy = { text ->
+        accountsActions(accountsViewModel, onClose = { accountsOpen = false }) { text ->
                 scope.launch {
                     clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))
                 }
-            },
-        )
+            }
+            .copy(onOpenUrl = { url -> signInTabIntent(context).launchUrl(context, url.toUri()) })
 
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
@@ -140,11 +132,19 @@ fun HeadroomApp(
                     onSelectAccount = homeViewModel::select,
                     onAlertChange = homeViewModel::setAlert,
                     onChartWindowChange = homeViewModel::selectChartWindow,
-                    onOpenAccounts = { accountsOpen = true },
+                    onOpenAccounts = {
+                        // The user's tap wins over an account a widget asked for earlier.
+                        pending?.let {
+                            handledRequest = it.serial
+                            onConsumeOpenAccount()
+                        }
+                        accountsOpen = true
+                    },
                     playEntrance = !entrancePlayed,
                     onEntranceStart = { entrancePlayed = true },
                     openAccountRequest = openNow,
                     onConsumeOpenAccount = {
+                        handledRequest = openNow?.serial
                         accountsOpen = false
                         onConsumeOpenAccount()
                     },
@@ -173,3 +173,24 @@ private fun SignInState.isWaitingForUser() =
         this is SignInState.DeviceCode ||
         this is SignInState.ApiKey ||
         this is SignInState.Finishing
+
+/** The accounts screen's callbacks, wired to [viewModel]. Opening a URL is set by the caller. */
+private fun accountsActions(
+    viewModel: AccountsViewModel,
+    onClose: () -> Unit,
+    onCopy: (String) -> Unit,
+) =
+    AccountsActions(
+        onClose = onClose,
+        onAddAccount = viewModel::addAccount,
+        onPickProvider = viewModel::pickProvider,
+        onBack = viewModel::back,
+        onSubmitCode = viewModel::submitCode,
+        onSubmitApiKey = viewModel::submitApiKey,
+        onRetry = viewModel::retry,
+        onFinish = viewModel::finish,
+        onRename = viewModel::rename,
+        onRemove = viewModel::remove,
+        onOpenUrl = {},
+        onCopy = onCopy,
+    )
