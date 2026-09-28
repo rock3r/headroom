@@ -14,7 +14,9 @@ import androidx.compose.remote.creation.compose.modifier.fillMaxSize
 import androidx.compose.remote.creation.compose.modifier.fillMaxWidth
 import androidx.compose.remote.creation.compose.modifier.height
 import androidx.compose.remote.creation.compose.modifier.padding
+import androidx.compose.remote.creation.compose.modifier.rememberRemoteScrollState
 import androidx.compose.remote.creation.compose.modifier.semantics
+import androidx.compose.remote.creation.compose.modifier.verticalScroll
 import androidx.compose.remote.creation.compose.modifier.width
 import androidx.compose.remote.creation.compose.state.asRemoteTextUnit
 import androidx.compose.remote.creation.compose.state.rc
@@ -24,15 +26,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
-import dev.sebastiano.headroom.widget.BarsLayout
 import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.WidgetUiState
 
 /**
- * One row per account: avatar, name, a flat bar with a pace tick, and the percentage. The row count
- * comes from the widget height, see [BarsLayout]. Rows share the height, so a taller widget gets
- * bigger rows, and rows tall enough also show when the window resets. Tapping a row opens that
- * account.
+ * One row per account: avatar, name, a flat bar with a pace tick, and the percentage. Rows share
+ * the widget height, so a taller widget gets bigger rows, and rows tall enough also show when the
+ * window resets. When the rows do not fit, the list scrolls, or on a player that cannot scroll the
+ * last row says how many accounts are left out. See [BarsMetrics].
+ *
+ * Tapping a row opens that account, tapping the "+N more" row opens the app, and tapping the card
+ * around the rows refreshes.
  */
 @RemoteComposable
 @Composable
@@ -41,11 +45,16 @@ internal fun BarsWidget(
     render: RenderContext,
     modifier: RemoteModifier = RemoteModifier,
 ) {
-    val metrics = BarsMetrics.of(render.size, state.gauges.size)
+    val metrics = BarsMetrics.of(render.size, state.gauges.size, render.playerScrolls)
+    val scrollState = rememberRemoteScrollState()
     WidgetCard(render, modifier) {
         RemoteColumn(
             modifier =
                 RemoteModifier.fillMaxSize()
+                    .then(
+                        if (metrics.scrolls) RemoteModifier.verticalScroll(scrollState)
+                        else RemoteModifier
+                    )
                     .padding(
                         horizontal = render.fixedPx(HORIZONTAL_PADDING * metrics.textScale),
                         vertical = render.fixedPx(BarsMetrics.PADDING_DP),
@@ -53,12 +62,46 @@ internal fun BarsWidget(
             verticalArrangement =
                 RemoteArrangement.spacedBy(
                     render.fixedPx(BarsMetrics.GAP_DP),
-                    RemoteAlignment.CenterVertically,
+                    if (metrics.scrolls) RemoteAlignment.Top else RemoteAlignment.CenterVertically,
                 ),
             horizontalAlignment = RemoteAlignment.Start,
         ) {
-            state.gauges.forEach { gauge -> BarRow(gauge, render, metrics) }
+            state.gauges.take(metrics.shownRows).forEach { gauge -> BarRow(gauge, render, metrics) }
+            if (metrics.hiddenRows > 0) MoreRow(metrics.hiddenRows, render, metrics)
         }
+    }
+}
+
+/** Stands for the accounts that do not fit. Tapping it opens the app, which lists them all. */
+@RemoteComposable
+@Composable
+private fun MoreRow(
+    count: Int,
+    render: RenderContext,
+    metrics: BarsMetrics,
+    modifier: RemoteModifier = RemoteModifier,
+) {
+    val scale = metrics.textScale
+    val text = render.strings.moreAccounts(count)
+    RemoteRow(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(render.fixedPx(metrics.rowDp))
+                .clickable(render.taps.openApp(null))
+                .semantics { contentDescription = text.description.rs },
+        verticalAlignment = RemoteAlignment.CenterVertically,
+    ) {
+        // Lines up with the account names above.
+        WidgetText(
+            text = text.label,
+            color = render.colors.onSurfaceVariant,
+            fontSize = (NAME_SP * scale).sp.asRemoteTextUnit(),
+            modifier =
+                RemoteModifier.padding(start = render.fixedPx((AVATAR_DP + ROW_SPACING) * scale)),
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Start,
+        )
     }
 }
 

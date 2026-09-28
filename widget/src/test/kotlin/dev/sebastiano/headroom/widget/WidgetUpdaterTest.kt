@@ -77,7 +77,11 @@ class WidgetUpdaterTest {
         updater.updateAll(context, accounts, now)
 
         assertEquals(WidgetSize(300f, 110f), rendered.getValue(3).second)
-        assertEquals(3, assertIs<WidgetUiState.Bars>(rendered.getValue(3).first).gauges.size)
+        // Bars keep every account; the renderer decides what fits the size.
+        assertEquals(
+            accounts.size,
+            assertIs<WidgetUiState.Bars>(rendered.getValue(3).first).gauges.size,
+        )
         // Without options, the style's default size.
         assertEquals(
             HeadroomWidgetProvider.defaultSize(WidgetStyle.Bars),

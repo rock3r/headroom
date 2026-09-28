@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app pushes every update, so the system never polls (updatePeriodMillis is 0). -->
+<!-- The app pushes every update, so the system never polls (updatePeriodMillis is 0).
+     There is no maximum size: the rows grow with the widget, and a list that does not fit
+     scrolls, or ends in a "+N more" row where the player cannot scroll. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_bars_description"
     android:initialLayout="@layout/widget_preview_bars"
-    android:maxResizeHeight="180dp"
-    android:maxResizeWidth="520dp"
     android:minHeight="40dp"
     android:minResizeHeight="40dp"
     android:minResizeWidth="180dp"

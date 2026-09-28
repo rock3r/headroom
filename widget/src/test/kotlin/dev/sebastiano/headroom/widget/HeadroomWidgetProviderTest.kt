@@ -110,6 +110,17 @@ class HeadroomWidgetProviderTest {
         }
     }
 
+    @Test
+    fun `the bars widget can grow as large as the launcher allows`() {
+        val attributes = providerAttributes(R.xml.widget_bars_info)
+
+        assertNull(attributes["maxResizeWidth"])
+        assertNull(attributes["maxResizeHeight"])
+        assertEquals("0x3", attributes["resizeMode"])
+        assertNotNull(attributes["minResizeWidth"])
+        assertNotNull(attributes["minResizeHeight"])
+    }
+
     private fun providerAttributes(xml: Int): Map<String, String> {
         val parser = app.resources.getXml(xml)
         while (parser.next() != XmlPullParser.START_TAG) Unit

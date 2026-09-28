@@ -101,6 +101,19 @@ internal class WidgetStrings(
             }
         )
 
+    /** The "+N more" row of the Bars widget, and what a screen reader says for it. */
+    fun moreAccounts(count: Int): LabelAndDescription =
+        LabelAndDescription(
+            label =
+                context.resources.getQuantityString(R.plurals.widget_more_accounts, count, count),
+            description =
+                context.resources.getQuantityString(
+                    R.plurals.widget_cd_more_accounts,
+                    count,
+                    count,
+                ),
+        )
+
     fun refreshAction(): String = context.getString(R.string.widget_cd_refresh)
 
     fun openAction(name: String): String = context.getString(R.string.widget_cd_open, name)
@@ -108,3 +121,6 @@ internal class WidgetStrings(
     fun flipAction(window: GaugeWindow): String =
         context.getString(R.string.widget_cd_flip, windowWord(window))
 }
+
+/** Text shown on a widget and the longer text a screen reader says for it. */
+internal data class LabelAndDescription(val label: String, val description: String)

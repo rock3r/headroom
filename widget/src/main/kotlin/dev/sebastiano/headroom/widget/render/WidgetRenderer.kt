@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.widget.render
 
 import android.app.PendingIntent
 import android.content.Context
+import android.os.Build
 import android.widget.RemoteViews
 import androidx.compose.remote.creation.compose.capture.captureSingleRemoteDocument
 import androidx.compose.remote.creation.compose.capture.createCreationDisplayInfo
@@ -21,6 +22,15 @@ public object WidgetRenderer {
      * The capture fails if a composable uses anything newer, which the tests catch.
      */
     private const val DOCUMENT_API_LEVEL = 6
+
+    /**
+     * Android 17 (API 37) is the first platform widget player that scrolls a list and still sends
+     * taps to the right row. The Android 16 player scrolls, but after a scroll it offsets taps by
+     * the scroll distance, so rows open the wrong account, and it turns the end of every drag into
+     * a tap. The Bars widget scrolls only from this version on. Both players were checked under
+     * Robolectric.
+     */
+    private const val FIRST_SCROLLING_SDK = 37
 
     /** Captures the document for one widget. */
     public suspend fun capture(
@@ -46,7 +56,18 @@ public object WidgetRenderer {
         val density = context.resources.displayMetrics.density
         val fontScale = context.resources.configuration.fontScale
         val taps = WidgetTaps(context, appWidgetId)
-        val render = RenderContext(appWidgetId, colors, strings, size, taps, density, fontScale)
+        val playerScrolls = Build.VERSION.SDK_INT >= FIRST_SCROLLING_SDK
+        val render =
+            RenderContext(
+                appWidgetId,
+                colors,
+                strings,
+                size,
+                taps,
+                playerScrolls,
+                density,
+                fontScale,
+            )
         val pixels = Size(size.widthDp * density, size.heightDp * density)
         val captured =
             captureSingleRemoteDocument(
