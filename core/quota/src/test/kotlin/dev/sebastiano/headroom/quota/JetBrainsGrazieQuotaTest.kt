@@ -163,6 +163,29 @@ class JetBrainsGrazieQuotaTest {
     }
 
     @Test
+    fun `a refill without a period that ends on the last instant of a month is monthly`() =
+        runTest {
+            // Workspace seats have no refill period. They reset at 23:59:59.999 UTC on the last
+            // day of the month, here 30 September.
+            routes(refill = jsonResponse("""{"current":{"next":1790812799999}}"""))
+
+            val window = fetchSnapshot().windows.single()
+
+            assertEquals(WindowKind.Monthly, window.kind)
+            assertEquals(Duration.ofDays(30), window.length)
+        }
+
+    @Test
+    fun `a refill without a period that ends mid month stays Other`() = runTest {
+        routes(refill = jsonResponse("""{"current":{"next":1790683200000}}"""))
+
+        val window = fetchSnapshot().windows.single()
+
+        assertEquals(WindowKind.Other, window.kind)
+        assertNull(window.length)
+    }
+
+    @Test
     fun `labels a weekly window Weekly`() = runTest {
         routes(
             refill =

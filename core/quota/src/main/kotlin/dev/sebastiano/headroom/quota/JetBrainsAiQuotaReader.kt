@@ -6,6 +6,8 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneOffset
 import java.util.Locale
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -388,22 +390,21 @@ internal class JetBrainsAiQuotaReader(
         val refillStep = tagged(tag, REFILL_STEP)
         val schedule =
             refill(refillStep)?.objectOrNull("current") ?: return missing(refillStep, "current")
+        val resetsAt =
+            (schedule.longOrNull("next") ?: current.longOrNull("until"))?.let(Instant::ofEpochMilli)
         val period =
             schedule
                 .objectOrNull("tariff")
                 ?.objectOrNull("period")
                 ?.longOrNull("millis")
                 ?.takeIf { it > 0 }
-                ?.let(Duration::ofMillis)
+                ?.let(Duration::ofMillis) ?: resetsAt?.let(::calendarMonthEndingAt)
         val kind = jetBrainsWindowKind(period)
         return quotaWindow(
                 id = source?.windowId ?: LITE_WINDOW_ID,
                 label = source?.label ?: LITE_WINDOW_LABELS[kind] ?: LITE_DEFAULT_LABEL,
                 usedPercent = (used / maximum * MAX_PERCENT).coerceIn(MIN_PERCENT, MAX_PERCENT),
-                resetsAt =
-                    (schedule.longOrNull("next") ?: current.longOrNull("until"))?.let(
-                        Instant::ofEpochMilli
-                    ),
+                resetsAt = resetsAt,
                 length = period,
                 kind = kind,
             )
@@ -616,6 +617,16 @@ private fun redactedPrimitive(element: JsonPrimitive, keepNumbers: Boolean): Str
 
 private val WEEKLY_PERIODS = Duration.ofDays(6)..Duration.ofDays(8)
 private val MONTHLY_PERIODS = Duration.ofDays(28)..Duration.ofDays(31)
+
+/**
+ * The length of the calendar month (in UTC) that ends at [resetsAt], or null when [resetsAt] is not
+ * the last millisecond of a month. Workspace seats have no refill period but reset this way.
+ */
+internal fun calendarMonthEndingAt(resetsAt: Instant): Duration? {
+    val end = resetsAt.plusMillis(1).atZone(ZoneOffset.UTC)
+    if (end.dayOfMonth != 1 || end.toLocalTime() != LocalTime.MIDNIGHT) return null
+    return Duration.between(end.minusMonths(1), end)
+}
 
 /**
  * About 7 days is weekly and about 30 days (720 hours) monthly. Anything else is
