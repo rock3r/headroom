@@ -204,8 +204,7 @@ private fun ResetColumns(
         val dash = 3.dp.toPx()
         val pitch = ColumnPitch.toPx()
         val width = ColumnWidth.toPx()
-        // The running window's outline stays inside the canvas.
-        val end = size.width - RunningStroke.toPx() / 2
+        val end = size.width
         val fits = max(1, ((end - width) / pitch).toInt() + 1)
         val values = (past + current).takeLast(fits)
         // The 100% line, light and dashed, and the baseline, under the columns only.
@@ -257,27 +256,36 @@ private fun DrawScope.drawColumn(
 ) {
     if (size.height <= 0f) return
     val color = if (hitLimit) colors.limit else colors.past
-    val radius = CornerRadius(min(ColumnCorner.toPx(), min(size.width / 2, size.height)))
-    val path =
-        Path().apply {
-            addRoundRect(
-                RoundRect(
-                    left = topLeft.x,
-                    top = topLeft.y,
-                    right = topLeft.x + size.width,
-                    bottom = topLeft.y + size.height,
-                    topLeftCornerRadius = radius,
-                    topRightCornerRadius = radius,
-                    bottomRightCornerRadius = CornerRadius.Zero,
-                    bottomLeftCornerRadius = CornerRadius.Zero,
-                )
-            )
-        }
     if (running) {
+        // A stroke is centred on its path, so the path sits half a stroke inside the column. Its
+        // outer edge then lines up with the filled columns' sides and the baseline.
+        val stroke = RunningStroke.toPx()
+        val path = columnPath(topLeft, size, inset = stroke / 2)
         drawPath(path, color.copy(alpha = RUNNING_FILL_ALPHA))
-        drawPath(path, color, style = Stroke(width = RunningStroke.toPx()))
+        drawPath(path, color, style = Stroke(width = stroke))
     } else {
-        drawPath(path, color)
+        drawPath(columnPath(topLeft, size, inset = 0f), color)
+    }
+}
+
+/** A column with rounded top corners, [inset] inside the rectangle at [topLeft] and [size]. */
+private fun DrawScope.columnPath(topLeft: Offset, size: Size, inset: Float): Path {
+    val width = size.width - inset * 2
+    val height = size.height - inset * 2
+    val radius = CornerRadius(max(0f, min(ColumnCorner.toPx() - inset, min(width / 2, height))))
+    return Path().apply {
+        addRoundRect(
+            RoundRect(
+                left = topLeft.x + inset,
+                top = topLeft.y + inset,
+                right = topLeft.x + size.width - inset,
+                bottom = topLeft.y + size.height - inset,
+                topLeftCornerRadius = radius,
+                topRightCornerRadius = radius,
+                bottomRightCornerRadius = CornerRadius.Zero,
+                bottomLeftCornerRadius = CornerRadius.Zero,
+            )
+        )
     }
 }
 
