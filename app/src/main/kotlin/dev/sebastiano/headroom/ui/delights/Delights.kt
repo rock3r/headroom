@@ -155,7 +155,7 @@ class Delights internal constructor(private val scope: CoroutineScope) {
     }
 
     private companion object {
-        const val SHIMMER_MILLIS = 1_700
+        const val SHIMMER_MILLIS = 2_400
     }
 }
 

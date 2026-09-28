@@ -16,12 +16,12 @@ import androidx.compose.ui.graphics.toArgb
 /**
  * The refresh shimmer: a sheen of light sweeps across the screen and leaves a trail of sparkles.
  * - The front eases in and out, bends and wavers a little, and turns slightly as it travels. It
- *   travels during the first 70% of the time.
+ *   travels during the first half of the time.
  * - The front is a thin, faint core in the `shine` colour, with a whisper of `tint` ahead of it, of
  *   `accent` behind it, and a soft glow. Every colour is washed toward white, so it only hints.
  * - Some cells of a jittered grid hold a four-pointed star. A star lights up when the front reaches
- *   it, then twinkles and fades as the front moves on. For the last 30% of the time only the trail
- *   is left, fading out.
+ *   it, drifts on the push the front gave it, slowing down, and twinkles as it shrinks and fades.
+ *   After the front has gone, the last stars linger.
  *
  * Uniforms: `size` in pixels, `progress` from 0 to 1, `strength` the highest opacity, `density` in
  * pixels per dp, `whiten` how far the colours are washed toward white, and the colours `shine` (the
@@ -55,6 +55,12 @@ float ease(float t) {
     return 1.0 - u * u * u * 0.5;
 }
 
+// The inverse of ease(): the time at which the eased value reaches y, for y from 0 to 1.
+float easeInverse(float y) {
+    if (y < 0.5) return pow(y * 0.25, 1.0 / 3.0);
+    return 1.0 - pow(2.0 - 2.0 * y, 1.0 / 3.0) * 0.5;
+}
+
 // A four-pointed star of radius r: a small round core with two thin crossed rays.
 float star(float2 p, float r) {
     float2 q = abs(p) / r;
@@ -69,8 +75,10 @@ float bent(float2 p, float2 sweep, float2 normal, float reach) {
 }
 
 half4 main(float2 coord) {
-    float travel = ease(clamp(progress / 0.7, 0.0, 1.0));
-    float fade = smoothstep(0.0, 0.06, progress) * (1.0 - smoothstep(0.7, 1.0, progress));
+    // The front travels for the first half of the time; the stars it leaves linger after it.
+    const float TRAVEL = 0.5;
+    float travel = ease(clamp(progress / TRAVEL, 0.0, 1.0));
+    float fade = smoothstep(0.0, 0.04, progress) * (1.0 - smoothstep(0.8, 1.0, progress));
 
     // The sweep turns a little as it travels.
     float angle = mix(0.42, 0.62, travel);
@@ -86,31 +94,43 @@ half4 main(float2 coord) {
     // would not show.
     float3 softTint = mix(float3(tint.rgb), float3(1.0), whiten);
     float3 softAccent = mix(float3(accent.rgb), float3(1.0), whiten);
-    float core = bell(d / 0.009) * 0.55;
-    float ahead = bell((d - 0.022) / 0.014) * 0.12;
-    float behind = bell((d + 0.022) / 0.014) * 0.12;
-    float glow = bell(d / 0.07) * 0.05;
+    float core = bell(d / 0.01) * 0.75;
+    float ahead = bell((d - 0.024) / 0.015) * 0.18;
+    float behind = bell((d + 0.024) / 0.015) * 0.18;
+    float glow = bell(d / 0.07) * 0.07;
     float3 glowColour = mix(softTint, softAccent, across);
     float3 rgb = float3(shine.rgb) * core + softTint * ahead + softAccent * behind
         + glowColour * glow;
     float weight = core + ahead + behind + glow;
 
-    float cellSize = 22.0 * density;
+    // Each star is born when the front reaches it. The birth time is worked out along the sweep at
+    // its middle angle, which is close enough for a sparkle.
+    float2 midSweep = float2(cos(0.52), sin(0.52));
+    float midReach = abs(size.x * midSweep.x) + abs(size.y * midSweep.y);
+    float cellSize = 26.0 * density;
     float2 base = floor(coord / cellSize);
     for (int i = -1; i <= 1; i++) {
         for (int j = -1; j <= 1; j++) {
             float2 cell = base + float2(float(i), float(j));
             float h = hash(cell);
             float2 jitter = float2(hash(cell + 1.7), hash(cell + 4.1)) - 0.5;
-            float2 centre = (cell + 0.5 + jitter * 0.8) * cellSize;
-            float passed = front - bent(centre, sweep, normal, reach);
-            if (h > 0.76 && passed > -0.005) {
-                float life = exp(-max(passed, 0.0) / (0.05 + 0.13 * hash(cell + 9.3)));
+            float2 home = (cell + 0.5 + jitter * 0.6) * cellSize;
+            float reached = clamp((dot(home, midSweep) / midReach + 0.25) / 1.5, 0.0, 1.0);
+            float age = progress - TRAVEL * easeInverse(reached);
+            if (h > 0.72 && age > 0.0) {
+                // The front pushes the star along, and it slows down as it fades.
+                float spread = (hash(cell + 3.3) - 0.5) * 1.4;
+                float2 heading = float2(cos(0.52 + spread), sin(0.52 + spread));
+                float drift = (0.25 + 0.3 * hash(cell + 6.1)) * cellSize;
+                float2 position = home + heading * drift * (1.0 - exp(-age * 9.0));
+                // About half a second to a second of life, time being 2.4 s in all.
+                float life = exp(-age / (0.1 + 0.1 * hash(cell + 9.3)))
+                    * smoothstep(0.0, 0.012, age);
                 float twinkle =
-                    0.55 + 0.45 * sin(progress * (30.0 + 25.0 * hash(cell + 2.9)) + h * 40.0);
-                float radius = (1.4 + 2.4 * hash(cell + 7.7)) * density;
-                float lit = star(coord - centre, radius) * life * twinkle * 0.8;
-                // Most stars shine in the shine colour; some take the tint or the accent.
+                    0.6 + 0.4 * sin(progress * (40.0 + 30.0 * hash(cell + 2.9)) + h * 40.0);
+                float radius = (1.8 + 2.6 * hash(cell + 7.7)) * density * (0.6 + 0.4 * life);
+                float lit = star(coord - position, radius) * life * twinkle;
+                // Most stars shine in the sparkle colour; some take the tint or the accent.
                 float pick = hash(cell + 5.3);
                 float3 colour = pick < 0.7 ? float3(sparkle.rgb) : (pick < 0.85 ? softTint : softAccent);
                 rgb += colour * lit;
@@ -156,11 +176,11 @@ internal fun RefreshShimmer(progress: () -> Float, modifier: Modifier = Modifier
 
 private const val DARK_SURFACE_LUMINANCE = 0.5f
 /** The highest opacity, reached only in the thin core and the stars: bright, but brief. */
-private const val LIGHT_STRENGTH = 0.55f
-private const val DARK_STRENGTH = 0.5f
+private const val LIGHT_STRENGTH = 0.8f
+private const val DARK_STRENGTH = 0.7f
 /** On a light theme the shine is the primary colour, lightened this much toward white. */
-private const val LIGHT_SHINE_WHITENESS = 0.6f
-private const val LIGHT_SPARKLE_WHITENESS = 0.25f
+private const val LIGHT_SHINE_WHITENESS = 0.5f
+private const val LIGHT_SPARKLE_WHITENESS = 0f
 /** How far the tint and the accent are washed toward white. */
 private const val DARK_WHITEN = 0.65f
-private const val LIGHT_WHITEN = 0.2f
+private const val LIGHT_WHITEN = 0.1f

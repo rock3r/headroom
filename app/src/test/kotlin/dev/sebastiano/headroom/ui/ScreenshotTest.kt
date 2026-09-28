@@ -537,7 +537,7 @@ private const val FRAME_MILLIS = 16L
 /** Part-way through the reveal into Settings, while the circle is still growing. */
 private const val REVEAL_MIDWAY_MILLIS = 64L
 /** Part-way through the shimmer, while its band crosses the middle of the screen. */
-private const val SHIMMER_MIDWAY_MILLIS = 560L
+private const val SHIMMER_MIDWAY_MILLIS = 640L
 /** Part-way through a confetti burst, while the pieces are high and spread out. */
 private const val CONFETTI_MIDWAY_MILLIS = 400L
 /** A quarter of the way through the next reset card's ripple, while its rings are strong. */
