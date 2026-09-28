@@ -108,6 +108,21 @@ class AccountQuotaFetcherTest {
     }
 
     @Test
+    fun `JetBrains sends the refresh token, and other providers never do`() = runTest {
+        val jetBrains = RecordingFetcher(Provider.JetBrains)
+        val claude = RecordingFetcher(Provider.Claude)
+        saveCredential("j1", Provider.JetBrains, refreshToken = "refresh-j1")
+        saveCredential("a1", Provider.Claude, refreshToken = "refresh-a1")
+        val fetcher = fetcherFor(jetBrains, claude)
+
+        fetcher.fetch(Account("j1", Provider.JetBrains, "sam"))
+        fetcher.fetch(Account("a1", Provider.Claude, "sam"))
+
+        assertEquals("refresh-j1", jetBrains.seen.single().refreshToken)
+        assertNull(claude.seen.single().refreshToken)
+    }
+
+    @Test
     fun `a JetBrains sign-in from before ID tokens were kept sends none`() = runTest {
         val jetBrains = RecordingFetcher(Provider.JetBrains)
         saveCredential("j1", Provider.JetBrains)

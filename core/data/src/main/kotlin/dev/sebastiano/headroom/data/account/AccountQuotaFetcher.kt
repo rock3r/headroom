@@ -48,6 +48,8 @@ public class AccountQuotaFetcher(
             accountId = if (provider == Provider.Codex) chatGptAccountId else providerAccountId,
             // JetBrains trades the ID token for a JetBrains AI token to read the quota.
             idToken = if (provider == Provider.JetBrains) jetBrainsIdToken else null,
+            // JetBrains switches the refresh token's audience to list the account's AI licenses.
+            refreshToken = if (provider == Provider.JetBrains) refreshToken else null,
         )
 
     private fun AuthException.toErrorKind(): QuotaErrorKind =
