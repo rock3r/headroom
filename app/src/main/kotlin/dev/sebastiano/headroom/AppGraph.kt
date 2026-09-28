@@ -60,6 +60,8 @@ class AppGraph(
     val resetHistory: ResetHistory,
     /** Stores the name the user gives an account. Does nothing without the data layer. */
     val renameAccount: suspend (accountId: String, name: String?) -> Unit = { _, _ -> },
+    /** Signs an account out and forgets it. Does nothing without the data layer. */
+    val removeAccount: suspend (accountId: String) -> Unit = {},
     /** How often countdowns re-read the clock. Null turns it off, for tests with a fixed clock. */
     val tickInterval: Duration? = Duration.ofMinutes(1),
 ) {
@@ -85,6 +87,7 @@ class AppGraph(
                 signInController = signInController,
                 isDemo = isDemo,
                 renameAccount = renameAccount,
+                removeAccount = removeAccount,
             )
         }
     }
@@ -153,6 +156,7 @@ class AppGraph(
                     ),
                 tickInterval = tickInterval,
                 renameAccount = { id, name -> data?.repository?.renameAccount(id, name) },
+                removeAccount = { id -> data?.signInManager?.signOut(id) },
             )
         }
 

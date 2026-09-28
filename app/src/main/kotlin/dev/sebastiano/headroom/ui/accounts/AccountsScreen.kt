@@ -77,6 +77,7 @@ data class AccountsActions(
     val onOpenUrl: (String) -> Unit,
     val onCopy: (String) -> Unit,
     val onRename: (accountId: String, name: String) -> Unit,
+    val onRemove: (accountId: String) -> Unit,
 )
 
 /**
@@ -100,6 +101,10 @@ fun AccountsScreen(
             account = account,
             onSave = { name ->
                 actions.onRename(account.id, name)
+                renaming = null
+            },
+            onRemove = {
+                actions.onRemove(account.id)
                 renaming = null
             },
             onDismiss = { renaming = null },
@@ -259,31 +264,73 @@ private fun AccountRow.details(): String {
 }
 
 @Composable
-private fun RenameDialog(account: AccountRow, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+private fun RenameDialog(
+    account: AccountRow,
+    onSave: (String) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var confirmingRemove by rememberSaveable { mutableStateOf(false) }
+    if (confirmingRemove) {
+        RemoveDialog(account, onRemove = onRemove, onDismiss = { confirmingRemove = false })
+        return
+    }
     var text by rememberSaveable { mutableStateOf(account.nickname.orEmpty()) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.accounts_rename_title)) },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text(stringResource(R.string.accounts_rename_label)) },
-                placeholder = { Text(account.provider.displayName) },
-                supportingText = { Text(stringResource(R.string.accounts_rename_hint)) },
-                singleLine = true,
-                keyboardOptions =
-                    KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Words,
-                        imeAction = ImeAction.Done,
-                    ),
-                keyboardActions = KeyboardActions(onDone = { onSave(text) }),
-                modifier = Modifier.fillMaxWidth().testTag(ACCOUNT_NAME_FIELD_TAG),
-            )
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(stringResource(R.string.accounts_rename_label)) },
+                    placeholder = { Text(account.provider.displayName) },
+                    supportingText = { Text(stringResource(R.string.accounts_rename_hint)) },
+                    singleLine = true,
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            imeAction = ImeAction.Done,
+                        ),
+                    keyboardActions = KeyboardActions(onDone = { onSave(text) }),
+                    modifier = Modifier.fillMaxWidth().testTag(ACCOUNT_NAME_FIELD_TAG),
+                )
+                TextButton(
+                    onClick = { confirmingRemove = true },
+                    colors =
+                        ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                ) {
+                    Text(stringResource(R.string.accounts_remove))
+                }
+            }
         },
         confirmButton = {
             TextButton(onClick = { onSave(text) }) {
                 Text(stringResource(R.string.accounts_rename_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun RemoveDialog(account: AccountRow, onRemove: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.accounts_remove_title, account.name)) },
+        text = { Text(stringResource(R.string.accounts_remove_body, account.label)) },
+        confirmButton = {
+            TextButton(
+                onClick = onRemove,
+                colors =
+                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) {
+                Text(stringResource(R.string.accounts_remove_confirm))
             }
         },
         dismissButton = {

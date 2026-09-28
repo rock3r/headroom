@@ -28,6 +28,7 @@ class AccountRenameTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
     private val renames = mutableListOf<Pair<String, String>>()
+    private val removals = mutableListOf<String>()
     private val actions =
         AccountsActions(
             onClose = {},
@@ -41,6 +42,7 @@ class AccountRenameTest {
             onOpenUrl = {},
             onCopy = {},
             onRename = { id, name -> renames += id to name },
+            onRemove = { id -> removals += id },
         )
 
     private fun show(isDemo: Boolean) {
@@ -68,6 +70,20 @@ class AccountRenameTest {
 
         assertEquals(listOf("a2" to "Side project"), renames)
         rule.onNodeWithText("Rename account").assertDoesNotExist()
+    }
+
+    @Test
+    fun `an account can be removed after confirming`() {
+        show(isDemo = false)
+
+        rule.onNodeWithText("Work").performClick()
+        rule.onNodeWithText("Remove account").performClick()
+        rule.onNodeWithText("Remove Work?").assertIsDisplayed()
+        assertEquals(emptyList(), removals)
+        rule.onNodeWithText("Remove").performClick()
+
+        assertEquals(listOf("a2"), removals)
+        rule.onNodeWithText("Remove Work?").assertDoesNotExist()
     }
 
     @Test

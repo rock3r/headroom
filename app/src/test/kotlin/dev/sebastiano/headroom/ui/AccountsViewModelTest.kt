@@ -65,6 +65,24 @@ class AccountsViewModelTest {
         }
 
     @Test
+    fun `removing an account signs it out`() =
+        runTest(main.dispatcher) {
+            val removed = mutableListOf<String>()
+            val viewModel =
+                AccountsViewModel(
+                    repository = FakeQuotaRepository({ now }),
+                    signInController = signIn,
+                    isDemo = MutableStateFlow(false),
+                    removeAccount = { id -> removed += id },
+                )
+
+            viewModel.remove("demo-claude")
+            runCurrent()
+
+            assertEquals(listOf("demo-claude"), removed)
+        }
+
+    @Test
     fun `adding an account goes through the provider picker to sign-in`() =
         runTest(main.dispatcher) {
             observe()

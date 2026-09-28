@@ -54,6 +54,8 @@ class AccountsViewModel(
     isDemo: Flow<Boolean>,
     /** Stores the name the user gives an account. A blank name removes it. */
     private val renameAccount: suspend (accountId: String, name: String?) -> Unit = { _, _ -> },
+    /** Signs the account out and forgets it, with its history. */
+    private val removeAccount: suspend (accountId: String) -> Unit = {},
 ) : ViewModel() {
     private val picking = MutableStateFlow(false)
 
@@ -77,6 +79,10 @@ class AccountsViewModel(
 
     fun rename(accountId: String, name: String) {
         viewModelScope.launch { renameAccount(accountId, name) }
+    }
+
+    fun remove(accountId: String) {
+        viewModelScope.launch { removeAccount(accountId) }
     }
 
     fun addAccount() {

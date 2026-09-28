@@ -95,6 +95,7 @@ fun HeadroomApp(
             onRetry = accountsViewModel::retry,
             onFinish = accountsViewModel::finish,
             onRename = accountsViewModel::rename,
+            onRemove = accountsViewModel::remove,
             onOpenUrl = { url ->
                 CustomTabsIntent.Builder().build().launchUrl(context, url.toUri())
             },
