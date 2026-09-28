@@ -14,12 +14,21 @@ internal fun testIoDispatcher(): ExecutorCoroutineDispatcher =
 internal data class BrowserReply(val status: Int, val body: String, val location: String? = null)
 
 /** Plays the browser following a redirect to the loopback listener. */
-internal suspend fun browserGet(io: ExecutorCoroutineDispatcher, url: String): BrowserReply =
+internal suspend fun browserGet(
+    io: ExecutorCoroutineDispatcher,
+    url: String,
+    headers: Map<String, String> = emptyMap(),
+): BrowserReply =
     withContext(io) {
         OkHttpClient.Builder()
             .followRedirects(false)
             .build()
-            .newCall(Request.Builder().url(url).build())
+            .newCall(
+                Request.Builder()
+                    .url(url)
+                    .apply { headers.forEach { (name, value) -> header(name, value) } }
+                    .build()
+            )
             .execute()
             .use { BrowserReply(it.code, it.body.string(), it.header("Location")) }
     }

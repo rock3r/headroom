@@ -56,12 +56,19 @@ internal constructor(
      *   shows after sign-in links to it.
      * @throws AuthException.SignInFailed when no local port is free.
      */
-    public suspend fun start(returnUrl: String?): BrowserSignIn =
+    public suspend fun start(
+        returnUrl: String?,
+        /**
+         * Brings the app to the front when the browser cannot be sent back to it: when the
+         * provider's page calls the callback with `fetch` instead of loading it.
+         */
+        bringAppToFront: () -> Unit = {},
+    ): BrowserSignIn =
         withContext(ioDispatcher) {
             val pkce = Pkce.generate(random)
             val state = spec.newState(random)
             val server = LoopbackServer.start(spec.loopback, state, returnUrl, ioDispatcher)
-            BrowserSignIn(spec, pkce, state, server, returnUrl, ioDispatcher)
+            BrowserSignIn(spec, pkce, state, server, returnUrl, ioDispatcher, bringAppToFront)
         }
 }
 
@@ -74,6 +81,7 @@ internal constructor(
     private val server: LoopbackServer,
     private val returnUrl: String?,
     private val ioDispatcher: CoroutineDispatcher,
+    private val bringAppToFront: () -> Unit = {},
 ) : AutoCloseable {
     private val pasted = CompletableDeferred<Pasted>()
     private val loopbackRedirectUri = spec.loopbackRedirectUri(server.port)
@@ -168,7 +176,14 @@ internal constructor(
         if (returnUrl != null) {
             // Android blocks the network of an app in the background, and the browser is in
             // front. Sending the browser back first brings the app to the front for the exchange.
-            callback.use { answer(callback, CallbackPage.redirect(returnUrl)) }
+            // A provider page that called the callback with fetch stays put, and a redirect would
+            // fail its fetch, so it gets a plain answer and the app comes forward by itself.
+            if (callback.isNavigation) {
+                callback.use { answer(callback, CallbackPage.redirect(returnUrl)) }
+            } else {
+                callback.use { answer(callback, CallbackPage.returnToApp(returnUrl)) }
+                bringAppToFront()
+            }
             return try {
                 spec.exchange(callback.code, loopbackRedirectUri, pkce, state)
             } catch (_: AuthException.Network) {

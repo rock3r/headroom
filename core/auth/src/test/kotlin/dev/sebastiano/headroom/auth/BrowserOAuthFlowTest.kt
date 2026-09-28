@@ -34,7 +34,7 @@ class BrowserOAuthFlowTest {
         val exchanges = mutableListOf<Pair<String, String>>()
         val exchangeGate = CompletableDeferred<Unit>().apply { complete(Unit) }
         override val provider = Provider.Claude
-        override val loopback = LoopbackConfig()
+        override val loopback = LoopbackConfig(allowedOrigins = setOf(PROVIDER_ORIGIN))
 
         override fun loopbackRedirectUri(port: Int) = "http://localhost:$port/callback"
 
@@ -115,6 +115,32 @@ class BrowserOAuthFlowTest {
         gate.complete(Unit)
         assertEquals("access-c", tokens.await().accessToken)
     }
+
+    @Test
+    fun `a callback fetched by the provider's page is answered and the app comes to the front`() =
+        runTest {
+            // Some providers (xAI) call the listener with fetch and stay on their page. A redirect
+            // would fail that fetch, and the page would show a code to paste instead.
+            val spec = FakeSpec()
+            var broughtToFront = 0
+            val signIn =
+                BrowserOAuthFlow(spec, io).start("headroom://signed-in") { broughtToFront++ }
+            val browser = async {
+                browserGet(
+                    io,
+                    "http://127.0.0.1:${portOf(signIn)}/callback?code=c&state=${stateOf(signIn)}",
+                    headers = mapOf("Origin" to PROVIDER_ORIGIN, "Sec-Fetch-Mode" to "cors"),
+                )
+            }
+
+            val tokens = signIn.awaitTokens()
+
+            assertEquals("access-c", tokens.accessToken)
+            val reply = browser.await()
+            assertEquals(200, reply.status)
+            assertNull(reply.location)
+            assertEquals(1, broughtToFront)
+        }
 
     @Test
     fun `the browser waits until the exchange is done`() = runTest {
@@ -340,5 +366,9 @@ class BrowserOAuthFlowTest {
             assertEquals("bare", it.code)
             assertNull(it.state)
         }
+    }
+
+    private companion object {
+        const val PROVIDER_ORIGIN = "https://auth.example.com"
     }
 }

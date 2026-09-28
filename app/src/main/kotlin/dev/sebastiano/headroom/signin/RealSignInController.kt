@@ -191,6 +191,8 @@ class AuthSignInSteps(
     private val methods: AuthMethods,
     /** Where the success page's "Return to Headroom" link points. */
     private val returnUrl: String = RETURN_URL,
+    /** Brings the app back in front of the browser when a redirect cannot. */
+    private val bringAppToFront: () -> Unit = {},
 ) : SignInSteps {
     override fun kindOf(provider: Provider): SignInKind =
         when (methods.forProvider(provider)) {
@@ -201,7 +203,7 @@ class AuthSignInSteps(
 
     override suspend fun startBrowser(provider: Provider): BrowserSession {
         val method = methods.forProvider(provider) as AuthMethod.Browser
-        return BrowserAdapter(method.flow.start(returnUrl))
+        return BrowserAdapter(method.flow.start(returnUrl, bringAppToFront))
     }
 
     override suspend fun startDeviceCode(provider: Provider): DeviceSession {

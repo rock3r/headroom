@@ -2,6 +2,7 @@ package dev.sebastiano.headroom
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
@@ -116,7 +117,16 @@ class AppGraph(
                 if (data == null) {
                     FakeSignInController()
                 } else {
-                    RealSignInController(AuthSignInSteps(data.authMethods), scope) { tokens ->
+                    val steps =
+                        AuthSignInSteps(data.authMethods) {
+                            // The app's task is under the browser tab, so this start is allowed;
+                            // MainActivity is singleTask, so it clears the tab above it.
+                            context.startActivity(
+                                Intent(context, MainActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
+                    RealSignInController(steps, scope) { tokens ->
                         data.signInManager.complete(tokens)
                     }
                 }

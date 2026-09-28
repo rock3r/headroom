@@ -188,7 +188,12 @@ private constructor(
             client.answer(page.status, HTML, page.html, corsOrigin)
             throw AuthException.SignInFailed(failure.exception)
         }
-        return LoopbackCallback(checkNotNull(code), params, client, corsOrigin)
+        // Browsers mark page loads `navigate` and script calls `cors`. Without the header, only a
+        // script call sends an Origin on a GET.
+        val navigation =
+            request.headers["sec-fetch-mode"]?.let { it == "navigate" }
+                ?: (request.headers["origin"] == null)
+        return LoopbackCallback(checkNotNull(code), params, client, corsOrigin, navigation)
     }
 
     private class FailureReason(val page: String, val exception: String)
@@ -270,6 +275,11 @@ internal constructor(
     public val params: Map<String, String>,
     private val client: Socket,
     private val corsOrigin: String?,
+    /**
+     * True when the browser loaded the callback as a page, so a redirect moves it on. False when
+     * the provider's page called it with `fetch` and stays where it is.
+     */
+    public val isNavigation: Boolean = true,
 ) : AutoCloseable {
     /**
      * Sends [page] to the browser and closes the connection. Blocking; call it off the UI thread.
