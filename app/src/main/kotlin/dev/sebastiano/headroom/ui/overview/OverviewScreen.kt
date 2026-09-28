@@ -18,10 +18,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -120,7 +118,7 @@ fun OverviewScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                fullWidth("header") { OverviewHeader(state, onOpenAccounts, onOpenSettings) }
+                fullWidth("header") { OverviewHeader(state, onOpenSettings) }
                 if (state.isDemo) {
                     fullWidth("demo") { DemoBanner(onAddAccount = onOpenAccounts) }
                 }
@@ -176,11 +174,7 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.fullWidth(
 }
 
 @Composable
-private fun OverviewHeader(
-    state: HomeUiState,
-    onOpenAccounts: () -> Unit,
-    onOpenSettings: () -> Unit,
-) {
+private fun OverviewHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
     val accounts =
         pluralStringResource(R.plurals.overview_accounts, state.accounts.size, state.accounts.size)
     ScreenHeader(
@@ -198,15 +192,6 @@ private fun OverviewHeader(
             modifier = Modifier.semantics { contentDescription = settingsLabel },
         ) {
             Icon(painter = painterResource(HeadroomIcons.SettingsFilled), contentDescription = null)
-        }
-        val accountsLabel = stringResource(R.string.action_accounts)
-        FilledTonalIconButton(
-            onClick = onOpenAccounts,
-            modifier = Modifier.semantics { contentDescription = accountsLabel },
-            shape = CircleShape,
-        ) {
-            val initial = state.accounts.firstOrNull()?.label?.firstOrNull()?.uppercaseChar() ?: '+'
-            Text(text = initial.toString(), style = MaterialTheme.typography.titleMedium)
         }
     }
 }

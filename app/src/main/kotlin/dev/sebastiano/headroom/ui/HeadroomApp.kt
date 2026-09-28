@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
@@ -44,10 +46,13 @@ import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
+import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.settings.LicencesScreen
+import dev.sebastiano.headroom.ui.settings.SettingsAccounts
 import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
+import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
@@ -72,12 +77,12 @@ fun HeadroomApp(
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
     val formatter = rememberResetFormatter(graph.zone)
-    val context = LocalContext.current
-    val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val widgetUnavailable = stringResource(R.string.widget_add_unavailable)
     var page by rememberSaveable { mutableStateOf(Page.Home) }
+    // Accounts open from Settings, or from the demo banner's shortcut; back returns there.
+    var accountsFromSettings by rememberSaveable { mutableStateOf(false) }
     // The cards' entrance plays on the first open only, not on returning to the overview.
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
     // A widget tap leaves the page on top, unless the user is in the middle of signing in.
@@ -93,21 +98,27 @@ fun HeadroomApp(
     SideEffect { if (decision == OpenAccountDecision.Ignore) onConsumeOpenAccount() }
     val openNow = pending.takeIf { decision == OpenAccountDecision.Open && !signingIn }
     val shown = if (openNow == null) page else Page.Home
+    // The user's tap wins over an account a widget asked for earlier.
+    val dropPending = {
+        pending?.let {
+            handledRequest = it.serial
+            onConsumeOpenAccount()
+        }
+    }
 
     val accountsActions =
-        accountsActions(accountsViewModel, onClose = { page = Page.Home }) { text ->
-                scope.launch {
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))
-                }
+        accountsActions(accountsViewModel) {
+                page = if (accountsFromSettings) Page.Settings else Page.Home
             }
-            .copy(onOpenUrl = { url -> signInTabIntent(context).launchUrl(context, url.toUri()) })
+            .withDeviceActions()
 
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Box(modifier = modifier.fillMaxSize()) {
         // Inside a sign-in, the accounts screen handles back itself, one step at a time.
         val back =
-            shown.back.takeIf { shown != Page.Accounts || accounts.step == AccountsStep.List }
+            (if (shown == Page.Accounts && accountsFromSettings) Page.Settings else shown.back)
+                .takeIf { shown != Page.Accounts || accounts.step == AccountsStep.List }
         val pageTransition = rememberPageTransition(shown, back) { page = it }
         rememberTransition(pageTransition, label = "page").AnimatedContent(
             transitionSpec = {
@@ -118,15 +129,15 @@ fun HeadroomApp(
             when (current) {
                 Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
                 Page.Settings ->
-                    SettingsScreen(
-                        state = settings,
-                        actions =
-                            SettingsActions(
-                                onBack = { page = Page.Home },
-                                onQuotaDisplayChange = settingsViewModel::setQuotaDisplay,
-                                onSyncFrequencyChange = settingsViewModel::setSyncFrequency,
-                                onOpenLicences = { page = Page.Licences },
-                            ),
+                    SettingsPage(
+                        settings = settings,
+                        home = home,
+                        onQuotaDisplayChange = settingsViewModel::setQuotaDisplay,
+                        onSyncFrequencyChange = settingsViewModel::setSyncFrequency,
+                        onNavigate = { next ->
+                            if (next == Page.Accounts) accountsFromSettings = true
+                            page = next
+                        },
                     )
                 Page.Licences -> LicencesScreen(onBack = { page = Page.Settings })
                 Page.Home ->
@@ -139,14 +150,14 @@ fun HeadroomApp(
                         onAlertChange = homeViewModel::setAlert,
                         onChartWindowChange = homeViewModel::selectChartWindow,
                         onOpenAccounts = {
-                            // The user's tap wins over an account a widget asked for earlier.
-                            pending?.let {
-                                handledRequest = it.serial
-                                onConsumeOpenAccount()
-                            }
+                            dropPending()
+                            accountsFromSettings = false
                             page = Page.Accounts
                         },
-                        onOpenSettings = { page = Page.Settings },
+                        onOpenSettings = {
+                            dropPending()
+                            page = Page.Settings
+                        },
                         playEntrance = !entrancePlayed,
                         onEntranceStart = { entrancePlayed = true },
                         openAccountRequest = openNow,
@@ -163,17 +174,57 @@ fun HeadroomApp(
                     )
             }
         }
-        SnackbarHost(
-            hostState = snackbar,
-            modifier =
-                Modifier.align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 88.dp),
-        )
+        AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
 }
 
 private const val ENTER_SCALE = 0.96f
+
+/** Snackbars sit above the floating toolbar. */
+@Composable
+private fun AppSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modifier) {
+    SnackbarHost(
+        hostState = state,
+        modifier = modifier.navigationBarsPadding().padding(bottom = 88.dp),
+    )
+}
+
+/** The settings page; [onNavigate] goes back home or on to the accounts or licences page. */
+@Composable
+private fun SettingsPage(
+    settings: SettingsUiState,
+    home: HomeUiState,
+    onQuotaDisplayChange: (QuotaDisplay) -> Unit,
+    onSyncFrequencyChange: (SyncFrequency) -> Unit,
+    onNavigate: (Page) -> Unit,
+) {
+    SettingsScreen(
+        state = settings,
+        accounts = SettingsAccounts(home.accounts.map { it.provider }, home.isDemo),
+        actions =
+            SettingsActions(
+                onBack = { onNavigate(Page.Home) },
+                onQuotaDisplayChange = onQuotaDisplayChange,
+                onSyncFrequencyChange = onSyncFrequencyChange,
+                onOpenLicences = { onNavigate(Page.Licences) },
+                onOpenAccounts = { onNavigate(Page.Accounts) },
+            ),
+    )
+}
+
+/** These actions, with copying to the clipboard and opening links in a browser tab wired up. */
+@Composable
+private fun AccountsActions.withDeviceActions(): AccountsActions {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    return copy(
+        onCopy = { text ->
+            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text))) }
+        },
+        onOpenUrl = { url -> signInTabIntent(context).launchUrl(context, url.toUri()) },
+    )
+}
 
 /**
  * The transition between the pages, seekable so the predictive back gesture scrubs the page on top
@@ -226,12 +277,8 @@ private fun SignInState.isWaitingForUser() =
         this is SignInState.ApiKey ||
         this is SignInState.Finishing
 
-/** The accounts screen's callbacks, wired to [viewModel]. Opening a URL is set by the caller. */
-private fun accountsActions(
-    viewModel: AccountsViewModel,
-    onClose: () -> Unit,
-    onCopy: (String) -> Unit,
-) =
+/** The accounts screen's callbacks, wired to [viewModel]. Device actions are set by the caller. */
+private fun accountsActions(viewModel: AccountsViewModel, onClose: () -> Unit) =
     AccountsActions(
         onClose = onClose,
         onAddAccount = viewModel::addAccount,
@@ -244,5 +291,5 @@ private fun accountsActions(
         onRename = viewModel::rename,
         onRemove = viewModel::remove,
         onOpenUrl = {},
-        onCopy = onCopy,
+        onCopy = {},
     )

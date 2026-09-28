@@ -5,6 +5,10 @@ import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
 import dev.sebastiano.headroom.appdata.DemoResetHistory
@@ -18,12 +22,23 @@ import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
+import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+
+/** Opens the accounts screen the way a user does: from the overview, through Settings. */
+fun ComposeTestRule.openAccounts() {
+    onNodeWithContentDescription("Settings").performClick()
+    // Screenshot tests pause the clock; let the settings page arrive before tapping in it.
+    if (!mainClock.autoAdvance) mainClock.advanceTimeBy(PAGE_SETTLE_MILLIS)
+    onNodeWithTag(SETTINGS_ACCOUNTS_TAG).performClick()
+}
+
+private const val PAGE_SETTLE_MILLIS = 1_000L
 
 /** The instant every UI test and screenshot runs at. */
 val FIXED_NOW: Instant = Instant.parse("2026-09-27T12:32:00Z")

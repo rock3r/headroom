@@ -7,10 +7,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ComposeUiTestConfig
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.signin.FakeSignInController
@@ -44,7 +42,7 @@ class SignInFinishingTest {
                 )
             }
         }
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
     }
 
     @Test
@@ -83,7 +81,7 @@ class SignInFinishingReducedMotionTest {
                 HeadroomApp(graph = testGraph(rule.activity, signInController = signIn))
             }
         }
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithTag(SIGN_IN_FINISHING_TAG).assertIsDisplayed()
         rule.onNodeWithText("Getting your Grok limits…").assertIsDisplayed()
     }

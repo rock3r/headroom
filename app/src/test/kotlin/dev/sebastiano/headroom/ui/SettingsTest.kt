@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -20,10 +21,12 @@ import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.settings.LICENCES_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.LICENCES_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
 import dev.sebastiano.headroom.ui.settings.syncFrequencyTag
@@ -114,7 +117,8 @@ class SettingsTest {
     @Test
     fun `the licences open from settings and back returns to settings`() {
         openSettings()
-        rule.onNodeWithText("Open-source licences").performScrollTo().performClick()
+        rule.onNode(hasScrollAction()).performScrollToNode(hasText("Open-source licences"))
+        rule.onNodeWithText("Open-source licences").performClick()
         rule.onNodeWithTag(LICENCES_TAG).assertIsDisplayed()
         // The list comes from the licence data the build bundles into the app.
         val material3 = "Compose Material3 Components"
@@ -131,6 +135,33 @@ class SettingsTest {
 
         rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
         rule.onNodeWithTag(LICENCES_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `accounts live in settings, and back from them returns to settings`() {
+        openSettings()
+        rule.onNodeWithContentDescription("Accounts").assertDoesNotExist()
+        rule.onNodeWithTag(SETTINGS_ACCOUNTS_TAG).assertIsDisplayed()
+
+        rule.onNodeWithTag(SETTINGS_ACCOUNTS_TAG).performClick()
+        rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Back").performClick()
+
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `the demo banner still adds an account in one tap, and back returns home`() {
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                HeadroomApp(graph = testGraph(rule.activity, settings = settings))
+            }
+        }
+        rule.onNodeWithText("Add account").performClick()
+        rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
+        rule.onNodeWithContentDescription("Back").performClick()
+
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
     }
 
     @Test

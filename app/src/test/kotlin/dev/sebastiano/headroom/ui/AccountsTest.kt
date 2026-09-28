@@ -19,7 +19,7 @@ import dev.sebastiano.headroom.ui.accounts.SIGN_IN_CODE_FIELD_TAG
 import dev.sebastiano.headroom.ui.accounts.SIGN_IN_KEY_FIELD_TAG
 import dev.sebastiano.headroom.ui.accounts.SIGN_IN_USER_CODE_TAG
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
-import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,7 +39,7 @@ class AccountsTest {
                 HeadroomApp(graph = testGraph(rule.activity, signInController = signIn))
             }
         }
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
         rule
             .onNodeWithText("You are looking at demo accounts", substring = true)
@@ -115,6 +115,6 @@ class AccountsTest {
         rule.onNodeWithContentDescription("Back").performClick()
         rule.onNodeWithText("Add account").assertIsDisplayed()
         rule.onNodeWithContentDescription("Back").performClick()
-        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
     }
 }

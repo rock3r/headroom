@@ -26,6 +26,7 @@ import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.resets.RESETS_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
 import dev.sebastiano.headroom.ui.widgets.WIDGETS_TAG
 import dev.sebastiano.headroom.widgets.WidgetStyle
 import org.junit.Rule
@@ -114,7 +115,7 @@ class StatusBarBlurTest {
     @Test
     fun `the accounts list and the provider picker blur the status bar once scrolled`() {
         launch()
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         blur.assertCountEquals(0)
         accountsList.performScrollToNode(hasText("Add account"))
         blur.assertCountEquals(1)
@@ -129,7 +130,7 @@ class StatusBarBlurTest {
     @Test
     fun `the predictive back gesture works over a scrolled accounts list`() {
         launch()
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         accountsList.performScrollToNode(hasText("Add account"))
         blur.assertCountEquals(1)
 
@@ -139,10 +140,10 @@ class StatusBarBlurTest {
             dispatcher.dispatchOnBackProgressed(backEvent(0.5f))
         }
         rule.waitForIdle()
-        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertExists()
+        rule.onNodeWithTag(SETTINGS_TAG).assertExists()
         rule.runOnUiThread { dispatcher.onBackPressed() }
         rule.onNodeWithTag(ACCOUNTS_TAG).assertDoesNotExist()
-        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
     }
 
     @Test

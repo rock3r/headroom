@@ -33,19 +33,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.designsystem.ProviderAvatar
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 
 const val SETTINGS_TAG: String = "settings"
+
+const val SETTINGS_ACCOUNTS_TAG: String = "settings-accounts"
+
+/** What the accounts row shows: the providers of the accounts, in order, and demo mode. */
+data class SettingsAccounts(val providers: List<Provider>, val isDemo: Boolean)
+
 const val SETTINGS_LIST_TAG: String = "settings-list"
 
 fun syncFrequencyTag(frequency: SyncFrequency): String = "sync-frequency-${frequency.name}"
@@ -56,6 +66,7 @@ data class SettingsActions(
     val onQuotaDisplayChange: (QuotaDisplay) -> Unit,
     val onSyncFrequencyChange: (SyncFrequency) -> Unit,
     val onOpenLicences: () -> Unit,
+    val onOpenAccounts: () -> Unit,
 )
 
 /**
@@ -65,12 +76,15 @@ data class SettingsActions(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
+    accounts: SettingsAccounts,
     actions: SettingsActions,
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxSize().testTag(SETTINGS_TAG)) {
         PageScaffold(title = stringResource(R.string.settings_title), onBack = actions.onBack) {
             val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth()
+            item { SectionLabel(stringResource(R.string.settings_accounts), width) }
+            item { AccountsRow(accounts, actions.onOpenAccounts, width) }
             item { SectionLabel(stringResource(R.string.settings_display), width) }
             item { QuotaDisplayPicker(state.quotaDisplay, actions.onQuotaDisplayChange, width) }
             item { SectionLabel(stringResource(R.string.settings_sync), width) }
@@ -230,6 +244,57 @@ private fun SyncFrequencyList(
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AccountsRow(
+    accounts: SettingsAccounts,
+    onOpenAccounts: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val count = accounts.providers.size
+    SegmentedListItem(
+        onClick = onOpenAccounts,
+        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+        colors =
+            ListItemDefaults.segmentedColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+        leadingContent =
+            if (accounts.isDemo || count == 0) null
+            else {
+                { AvatarStack(accounts.providers) }
+            },
+        supportingContent = {
+            Text(
+                if (accounts.isDemo || count == 0) stringResource(R.string.settings_accounts_none)
+                else pluralStringResource(R.plurals.settings_accounts_count, count, count)
+            )
+        },
+        trailingContent = {
+            Icon(painter = painterResource(HeadroomIcons.ChevronRight), contentDescription = null)
+        },
+        modifier = modifier.testTag(SETTINGS_ACCOUNTS_TAG),
+    ) {
+        Text(stringResource(R.string.settings_accounts_row))
+    }
+}
+
+/** Up to four provider avatars, overlapping, so the row reads as "these accounts" at a glance. */
+@Composable
+private fun AvatarStack(providers: List<Provider>, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.clearAndSetSemantics {},
+        horizontalArrangement = Arrangement.spacedBy((-AVATAR_OVERLAP).dp),
+    ) {
+        providers.distinct().take(MAX_STACKED_AVATARS).forEach { provider ->
+            ProviderAvatar(provider, size = AVATAR_SIZE.dp)
+        }
+    }
+}
+
+private const val MAX_STACKED_AVATARS = 4
+private const val AVATAR_SIZE = 28
+private const val AVATAR_OVERLAP = 8
+
 @Composable
 private fun LicencesRow(onOpenLicences: () -> Unit, modifier: Modifier = Modifier) {
     SegmentedListItem(

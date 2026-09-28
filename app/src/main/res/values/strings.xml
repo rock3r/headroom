@@ -10,7 +10,6 @@
     <string name="action_refreshing">Refreshing</string>
     <string name="action_back">Back</string>
     <string name="action_cancel">Cancel</string>
-    <string name="action_accounts">Accounts</string>
     <string name="action_settings">Settings</string>
 
     <!-- Overview -->
@@ -151,6 +150,13 @@
     <string name="settings_sync_on_open">Only when I open the app</string>
     <string name="settings_sync_note">Reset alerts arrive on time whatever you choose here.</string>
     <string name="settings_about">About</string>
+    <string name="settings_accounts">Accounts</string>
+    <string name="settings_accounts_row">Your accounts</string>
+    <string name="settings_accounts_none">Add your subscriptions to see your own limits</string>
+    <plurals name="settings_accounts_count">
+        <item quantity="one">%1$d account</item>
+        <item quantity="other">%1$d accounts</item>
+    </plurals>
     <string name="settings_licences">Open-source licences</string>
     <string name="settings_licences_body">The libraries Headroom is built with</string>
     <string name="settings_version">Version %1$s</string>

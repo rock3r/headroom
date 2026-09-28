@@ -35,7 +35,7 @@ class AccountsButtonTest {
         rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
         rule.onNodeWithContentDescription("Back").performClick()
 
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
 
         rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
     }

@@ -2,7 +2,9 @@ package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -149,7 +151,7 @@ class ScreenshotTest {
     @Test
     fun accounts() {
         launch()
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         capture("accounts")
     }
 
@@ -164,7 +166,7 @@ class ScreenshotTest {
             }
         launch(realAccounts = accounts)
         rule.mainClock.autoAdvance = true
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithTag(accountRowTag("demo-codex")).performClick()
         rule.mainClock.autoAdvance = false
         capture("accounts-editing")
@@ -183,7 +185,8 @@ class ScreenshotTest {
         // Two steps in a row, and the licence list loads off the main thread: let the clock run.
         rule.mainClock.autoAdvance = true
         rule.onNodeWithContentDescription("Settings").performClick()
-        rule.onNodeWithText("Open-source licences").performScrollTo().performClick()
+        rule.onNode(hasScrollAction()).performScrollToNode(hasText("Open-source licences"))
+        rule.onNodeWithText("Open-source licences").performClick()
         rule.waitUntil(LOAD_TIMEOUT_MILLIS) {
             rule.onAllNodesWithText("Activity").fetchSemanticsNodes().isNotEmpty()
         }
@@ -202,7 +205,7 @@ class ScreenshotTest {
         launch()
         // Several steps in a row: let the clock run between them.
         rule.mainClock.autoAdvance = true
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithText("Add account").performClick()
         rule
             .onNodeWithTag(ACCOUNTS_TAG)
@@ -216,7 +219,7 @@ class ScreenshotTest {
         launch()
         // Several steps in a row: let the clock run between them.
         rule.mainClock.autoAdvance = true
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithText("Add account").performClick()
         rule.onNodeWithTag(providerOptionTag(Provider.Claude)).performClick()
         capture("sign-in-browser")
@@ -226,14 +229,14 @@ class ScreenshotTest {
     fun signInFinishing() {
         // The clock stays with capture(), so the stream of shapes is drawn part-way through.
         launch(signIn = FakeSignInController(SignInState.Finishing(Provider.Claude)))
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         capture("sign-in-finishing")
     }
 
     @Test
     fun signInFinishingDark() {
         launch(dark = true, signIn = FakeSignInController(SignInState.Finishing(Provider.Grok)))
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         capture("sign-in-finishing-dark")
     }
 

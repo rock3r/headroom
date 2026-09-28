@@ -11,7 +11,6 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -28,7 +27,7 @@ import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsUiState
 import dev.sebastiano.headroom.ui.accounts.accountRowTag
-import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
 import kotlin.test.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -182,7 +181,7 @@ class AccountRenameTest {
                 )
             }
         }
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithTag(accountRowTag("demo-codex")).performClick()
         field().assertIsDisplayed()
 
@@ -193,7 +192,7 @@ class AccountRenameTest {
 
         rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
         rule.waitForIdle()
-        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
     }
 
     @Test

@@ -4,7 +4,6 @@ import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -68,7 +67,7 @@ class DeepLinkTest {
     @Test
     fun `a widget tap from the accounts screen closes it and opens the account`() {
         val activity = launch(widgetTap(null))
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
 
         activity.newIntent(widgetTap("demo-claude"))
@@ -87,7 +86,7 @@ class DeepLinkTest {
     fun `an unknown account in demo mode does not block the accounts screen`() {
         launch(widgetTap("removed-account"))
         rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
     }
 
@@ -102,7 +101,7 @@ class DeepLinkTest {
     @Test
     fun `the sign-in return link leaves a finished sign-in on screen`() {
         val activity = launch(widgetTap(null))
-        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.openAccounts()
         rule.onNodeWithText("Add account").performClick()
         rule
             .onNodeWithTag(ACCOUNTS_TAG)
