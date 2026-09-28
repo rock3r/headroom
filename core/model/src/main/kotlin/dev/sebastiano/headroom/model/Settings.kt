@@ -93,7 +93,8 @@ public enum class OverviewSort {
 
 /**
  * The user's app settings. The defaults are how the app behaved before it had settings, except the
- * delights, which are on until the user turns them off.
+ * delights, which are on until the user turns them off. The reset island is experimental and needs
+ * accessibility access, so it is the one delight that stays off until the user turns it on.
  */
 public data class AppSettings(
     val quotaDisplay: QuotaDisplay = QuotaDisplay.Used,
@@ -106,6 +107,11 @@ public data class AppSettings(
     val refreshShimmer: Boolean = true,
     /** Confetti bursts from an account when its quota resets while the app is open. */
     val resetConfetti: Boolean = true,
+    /**
+     * A black pill grows out of the camera cutout when a quota resets while the app is in the
+     * background. Experimental, and off by default.
+     */
+    val resetIsland: Boolean = false,
 )
 
 /** Reads and stores the [AppSettings]. */
@@ -127,6 +133,8 @@ public interface SettingsRepository {
     public suspend fun setRefreshShimmer(enabled: Boolean)
 
     public suspend fun setResetConfetti(enabled: Boolean)
+
+    public suspend fun setResetIsland(enabled: Boolean)
 }
 
 /** Settings kept in memory, for demo builds, previews and tests without the data layer. */
@@ -165,5 +173,9 @@ public class InMemorySettingsRepository(initial: AppSettings = AppSettings()) : 
 
     override suspend fun setResetConfetti(enabled: Boolean) {
         state.update { it.copy(resetConfetti = enabled) }
+    }
+
+    override suspend fun setResetIsland(enabled: Boolean) {
+        state.update { it.copy(resetIsland = enabled) }
     }
 }

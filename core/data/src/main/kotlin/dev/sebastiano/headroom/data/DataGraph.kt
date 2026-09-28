@@ -23,6 +23,7 @@ import dev.sebastiano.headroom.data.reset.ResetAlarm
 import dev.sebastiano.headroom.data.reset.ResetAlarmPlanner
 import dev.sebastiano.headroom.data.reset.ResetCheckWorker
 import dev.sebastiano.headroom.data.reset.ResetChecker
+import dev.sebastiano.headroom.data.reset.ResetIsland
 import dev.sebastiano.headroom.data.reset.SharedPreferencesResetLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
 import dev.sebastiano.headroom.data.sync.SyncWorker
@@ -73,6 +74,8 @@ public class DataGraph(
     public val authMethods: AuthMethods = AuthMethods(),
     quotaFetchers: QuotaFetchers =
         QuotaFetchers.create(jetBrainsLog = { Log.i(JETBRAINS_LOG_TAG, it) }),
+    /** Shows a reset on the screen, when the app allows it. The default never shows. */
+    resetIsland: ResetIsland = ResetIsland.None,
 ) {
     private val appContext = context.applicationContext
 
@@ -146,7 +149,7 @@ public class DataGraph(
             resetChecker =
                 ResetChecker(
                     repository = repository,
-                    notifier = AndroidResetNotifier(appContext),
+                    notifier = AndroidResetNotifier(appContext, island = resetIsland),
                     ledger = SharedPreferencesResetLedger(appContext),
                     isEnabled = { accountId, window ->
                         alertPreferences.isEnabled(accountId, window).first()
