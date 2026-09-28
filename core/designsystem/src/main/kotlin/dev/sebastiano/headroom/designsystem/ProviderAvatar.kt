@@ -57,8 +57,9 @@ fun ProviderAvatar(
 /** How much of the avatar the logo's box takes. The logos keep their own margin inside it. */
 private const val LOGO_SHARE = 0.6f
 
+/** The Material shape of [provider]'s avatar, normalised to the unit square. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun providerShape(provider: Provider): RoundedPolygon =
+fun providerShape(provider: Provider): RoundedPolygon =
     when (provider) {
         Provider.Claude -> MaterialShapes.Cookie12Sided
         Provider.Codex -> MaterialShapes.Clover4Leaf

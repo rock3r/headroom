@@ -35,11 +35,11 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
-import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.signin.SignInState
 
@@ -55,6 +55,7 @@ internal fun SignInFlow(state: SignInState, actions: AccountsActions) {
             is SignInState.Browser -> state.provider
             is SignInState.DeviceCode -> state.provider
             is SignInState.ApiKey -> state.provider
+            is SignInState.Finishing -> state.provider
             is SignInState.Success -> state.provider
             is SignInState.Failed -> state.provider
             SignInState.Idle -> return
@@ -65,7 +66,7 @@ internal fun SignInFlow(state: SignInState, actions: AccountsActions) {
         navigationLabel = stringResource(R.string.signin_cancel),
         onNavigate = actions.onBack,
     ) {
-        item { ProviderAvatar(provider, size = 72.dp, modifier = Modifier.padding(8.dp)) }
+        item { SignInHeader(provider, finishing = state is SignInState.Finishing) }
         item {
             Column(
                 modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
@@ -75,6 +76,7 @@ internal fun SignInFlow(state: SignInState, actions: AccountsActions) {
                     is SignInState.Browser -> BrowserStep(state, actions)
                     is SignInState.DeviceCode -> DeviceCodeStep(state, actions)
                     is SignInState.ApiKey -> ApiKeyStep(state, actions)
+                    is SignInState.Finishing -> FinishingStep(state)
                     is SignInState.Success -> SuccessStep(state, actions)
                     is SignInState.Failed -> FailedStep(state, actions)
                     SignInState.Idle -> Unit
@@ -197,14 +199,32 @@ private fun ApiKeyStep(state: SignInState.ApiKey, actions: AccountsActions) {
                 },
             modifier = Modifier.fillMaxWidth().testTag(SIGN_IN_KEY_FIELD_TAG),
         )
-        Button(
-            onClick = { actions.onSubmitApiKey(key) },
-            enabled = !state.saving,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        Button(onClick = { actions.onSubmitApiKey(key) }, modifier = Modifier.fillMaxWidth()) {
             ButtonIcon(HeadroomIcons.Key)
             Text(stringResource(R.string.signin_key_submit))
         }
+    }
+}
+
+/** Nothing is left for the user to do: the header shows the work, and this says what it is. */
+@Composable
+private fun FinishingStep(state: SignInState.Finishing) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.signin_finishing_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        Text(
+            text = stringResource(R.string.signin_finishing_body, state.provider.displayName),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

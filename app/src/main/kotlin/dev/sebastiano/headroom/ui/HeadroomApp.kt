@@ -170,4 +170,7 @@ fun HeadroomApp(
 private const val ENTER_SCALE = 0.96f
 
 private fun SignInState.isWaitingForUser() =
-    this is SignInState.Browser || this is SignInState.DeviceCode || this is SignInState.ApiKey
+    this is SignInState.Browser ||
+        this is SignInState.DeviceCode ||
+        this is SignInState.ApiKey ||
+        this is SignInState.Finishing
