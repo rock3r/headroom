@@ -25,6 +25,7 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SettingsRepository
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.signin.SignInState
@@ -33,6 +34,8 @@ import dev.sebastiano.headroom.ui.accounts.accountRowTag
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
+import dev.sebastiano.headroom.ui.settings.REDUCE_MOTION_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,11 +59,12 @@ class ScreenshotTest {
         signIn: SignInController = FakeSignInController(),
         realAccounts: List<AccountState> = emptyList(),
         settings: SettingsRepository = InMemorySettingsRepository(),
+        palette: ThemePalette = ThemePalette.Wallpaper,
     ) {
         // Frames are driven by capture(), so that animations are drawn while they run.
         rule.mainClock.autoAdvance = false
         rule.setContent {
-            HeadroomTheme(darkTheme = dark, dynamicColor = false) {
+            HeadroomTheme(darkTheme = dark, dynamicColor = false, palette = palette) {
                 HeadroomApp(
                     graph =
                         testGraph(
@@ -231,6 +235,44 @@ class ScreenshotTest {
         }
         rule.mainClock.autoAdvance = false
         capture("licences")
+    }
+
+    @Test
+    fun settingsAppearance() {
+        val palette = ThemePalette.Lagoon
+        launch(
+            settings = InMemorySettingsRepository(AppSettings(palette = palette)),
+            palette = palette,
+        )
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasTestTag(REDUCE_MOTION_TAG))
+        rule.mainClock.autoAdvance = false
+        capture("settings-appearance")
+    }
+
+    @Test
+    fun overviewLagoon() {
+        launch(palette = ThemePalette.Lagoon)
+        capture("overview-lagoon")
+    }
+
+    @Test
+    fun overviewTangerineDark() {
+        launch(dark = true, palette = ThemePalette.Tangerine)
+        capture("overview-tangerine-dark")
+    }
+
+    @Test
+    fun overviewBubblegum() {
+        launch(palette = ThemePalette.Bubblegum)
+        capture("overview-bubblegum")
+    }
+
+    @Test
+    fun overviewGrapeDark() {
+        launch(dark = true, palette = ThemePalette.Grape)
+        capture("overview-grape-dark")
     }
 
     @Test

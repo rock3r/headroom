@@ -44,10 +44,47 @@ private const val HALF_HOUR_MINUTES = 30L
 private const val THREE_HOURS = 3L
 private const val SIX_HOURS = 6L
 
+/** Light or dark. [System] follows the device's dark theme setting. */
+public enum class ThemeMode {
+    System,
+    Light,
+    Dark,
+}
+
+/**
+ * How much the app moves. [System] follows the device: when the user removes animations there,
+ * nothing moves. [Reduced] keeps motion to short crossfades even when the device animates, and
+ * stops decorative and endless animations. There is no option for more motion than the device
+ * allows, because an app must not animate when the user has turned animations off.
+ */
+public enum class MotionPreference {
+    System,
+    Reduced,
+}
+
+/**
+ * Where the app's colours come from. [Wallpaper] is the device's dynamic palette; the others are
+ * fixed palettes, each built from one bright seed colour, in order round the colour wheel.
+ */
+public enum class ThemePalette {
+    Wallpaper,
+    Coral,
+    Tangerine,
+    Lemon,
+    Lime,
+    Lagoon,
+    Sky,
+    Grape,
+    Bubblegum,
+}
+
 /** The user's app settings. The defaults are how the app behaved before it had settings. */
 public data class AppSettings(
     val quotaDisplay: QuotaDisplay = QuotaDisplay.Used,
     val syncFrequency: SyncFrequency = SyncFrequency.Minutes15,
+    val theme: ThemeMode = ThemeMode.System,
+    val motion: MotionPreference = MotionPreference.System,
+    val palette: ThemePalette = ThemePalette.Wallpaper,
 )
 
 /** Reads and stores the [AppSettings]. */
@@ -57,6 +94,12 @@ public interface SettingsRepository {
     public suspend fun setQuotaDisplay(display: QuotaDisplay)
 
     public suspend fun setSyncFrequency(frequency: SyncFrequency)
+
+    public suspend fun setTheme(theme: ThemeMode)
+
+    public suspend fun setMotion(motion: MotionPreference)
+
+    public suspend fun setPalette(palette: ThemePalette)
 }
 
 /** Settings kept in memory, for demo builds, previews and tests without the data layer. */
@@ -71,5 +114,17 @@ public class InMemorySettingsRepository(initial: AppSettings = AppSettings()) : 
 
     override suspend fun setSyncFrequency(frequency: SyncFrequency) {
         state.update { it.copy(syncFrequency = frequency) }
+    }
+
+    override suspend fun setTheme(theme: ThemeMode) {
+        state.update { it.copy(theme = theme) }
+    }
+
+    override suspend fun setMotion(motion: MotionPreference) {
+        state.update { it.copy(motion = motion) }
+    }
+
+    override suspend fun setPalette(palette: ThemePalette) {
+        state.update { it.copy(palette = palette) }
     }
 }

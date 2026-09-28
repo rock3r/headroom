@@ -4,8 +4,11 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dev.sebastiano.headroom.model.AppSettings
+import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.model.ThemeMode
+import dev.sebastiano.headroom.model.ThemePalette
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,8 +38,17 @@ class DataStoreSettingsRepositoryTest {
         val settings = DataStoreSettingsRepository(store)
         settings.setQuotaDisplay(QuotaDisplay.Left)
         settings.setSyncFrequency(SyncFrequency.OnOpen)
+        settings.setTheme(ThemeMode.Light)
+        settings.setMotion(MotionPreference.Reduced)
+        settings.setPalette(ThemePalette.Grape)
         assertEquals(
-            AppSettings(QuotaDisplay.Left, SyncFrequency.OnOpen),
+            AppSettings(
+                QuotaDisplay.Left,
+                SyncFrequency.OnOpen,
+                theme = ThemeMode.Light,
+                motion = MotionPreference.Reduced,
+                palette = ThemePalette.Grape,
+            ),
             DataStoreSettingsRepository(store).settings.first(),
         )
     }
@@ -47,6 +59,9 @@ class DataStoreSettingsRepositoryTest {
         store.edit {
             it[stringPreferencesKey("quota_display")] = "Sideways"
             it[stringPreferencesKey("sync_frequency")] = "Hourly"
+            it[stringPreferencesKey("theme")] = "Sepia"
+            it[stringPreferencesKey("motion")] = "Wobbly"
+            it[stringPreferencesKey("palette")] = "Plaid"
         }
         assertEquals(AppSettings(), DataStoreSettingsRepository(store).settings.first())
     }

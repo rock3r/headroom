@@ -5,42 +5,45 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import dev.sebastiano.headroom.model.ThemePalette
 
 /**
- * The Headroom theme: Material 3 Expressive with the wallpaper's dynamic colours. Pass
- * [dynamicColor] = false for a fixed cobalt palette, which previews and screenshots use so they
- * look the same on every machine.
+ * The Headroom theme: Material 3 Expressive with the wallpaper's dynamic colours, or with one of
+ * the fixed [palette]s. With the wallpaper palette, pass [dynamicColor] = false for a fixed cobalt
+ * palette, which previews and screenshots use so they look the same on every machine. With
+ * [reduceMotion], [animationsEnabled] is false everywhere below, as if animations were off.
  */
 @Composable
 fun HeadroomTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
+    palette: ThemePalette = ThemePalette.Wallpaper,
+    reduceMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val colorScheme =
-        when {
-            dynamicColor && darkTheme -> dynamicDarkColorScheme(context)
-            dynamicColor -> dynamicLightColorScheme(context)
-            darkTheme -> CobaltDark
-            else -> CobaltLight
+        remember(context, palette, darkTheme, dynamicColor) {
+            headroomColorScheme(context, palette, darkTheme, dynamicColor)
         }
-    MaterialExpressiveTheme(
-        colorScheme = colorScheme,
-        motionScheme = MotionScheme.expressive(),
-        typography = HeadroomTypography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
+        MaterialExpressiveTheme(
+            colorScheme = colorScheme,
+            motionScheme = MotionScheme.expressive(),
+            typography = HeadroomTypography,
+            content = content,
+        )
+    }
 }
 
 /** Cobalt, the fallback palette, derived from one hue like a dynamic scheme would be. */
-private val CobaltLight: ColorScheme =
+internal val CobaltLight: ColorScheme =
     lightColorScheme(
         primary = Color(0xFF305EB7),
         onPrimary = Color(0xFFFAFCFF),
@@ -79,7 +82,7 @@ private val CobaltLight: ColorScheme =
         surfaceDim = Color(0xFFDADEE6),
     )
 
-private val CobaltDark: ColorScheme =
+internal val CobaltDark: ColorScheme =
     darkColorScheme(
         primary = Color(0xFFA4C5FF),
         onPrimary = Color(0xFF0F2A5F),

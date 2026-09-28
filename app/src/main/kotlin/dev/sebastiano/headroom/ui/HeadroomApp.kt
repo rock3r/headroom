@@ -43,8 +43,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.animationsEnabled
-import dev.sebastiano.headroom.model.QuotaDisplay
-import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
@@ -52,13 +50,11 @@ import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
-import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.settings.LicencesScreen
 import dev.sebastiano.headroom.ui.settings.SettingsAccounts
 import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
-import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
@@ -131,16 +127,15 @@ fun HeadroomApp(
             when (current) {
                 Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
                 Page.Settings ->
-                    SettingsPage(
-                        settings = settings,
-                        home = home,
+                    SettingsScreen(
+                        state = settings,
+                        accounts = SettingsAccounts(home.accounts.map { it.provider }, home.isDemo),
+                        actions =
+                            settingsActions(settingsViewModel) { next ->
+                                if (next == Page.Accounts) accountsFromSettings = true
+                                page = next
+                            },
                         reveal = reveal,
-                        onQuotaDisplayChange = settingsViewModel::setQuotaDisplay,
-                        onSyncFrequencyChange = settingsViewModel::setSyncFrequency,
-                        onNavigate = { next ->
-                            if (next == Page.Accounts) accountsFromSettings = true
-                            page = next
-                        },
                     )
                 Page.Licences -> LicencesScreen(onBack = { page = Page.Settings })
                 Page.Home ->
@@ -244,30 +239,18 @@ private fun AppSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modif
     )
 }
 
-/** The settings page; [onNavigate] goes back home or on to the accounts or licences page. */
-@Composable
-private fun SettingsPage(
-    settings: SettingsUiState,
-    home: HomeUiState,
-    reveal: PageReveal,
-    onQuotaDisplayChange: (QuotaDisplay) -> Unit,
-    onSyncFrequencyChange: (SyncFrequency) -> Unit,
-    onNavigate: (Page) -> Unit,
-) {
-    SettingsScreen(
-        state = settings,
-        accounts = SettingsAccounts(home.accounts.map { it.provider }, home.isDemo),
-        actions =
-            SettingsActions(
-                onClose = { onNavigate(Page.Home) },
-                onQuotaDisplayChange = onQuotaDisplayChange,
-                onSyncFrequencyChange = onSyncFrequencyChange,
-                onOpenLicences = { onNavigate(Page.Licences) },
-                onOpenAccounts = { onNavigate(Page.Accounts) },
-            ),
-        reveal = reveal,
+/** The settings screen's callbacks, wired to [viewModel]; [onNavigate] goes to another page. */
+private fun settingsActions(viewModel: SettingsViewModel, onNavigate: (Page) -> Unit) =
+    SettingsActions(
+        onClose = { onNavigate(Page.Home) },
+        onQuotaDisplayChange = viewModel::setQuotaDisplay,
+        onSyncFrequencyChange = viewModel::setSyncFrequency,
+        onOpenLicences = { onNavigate(Page.Licences) },
+        onOpenAccounts = { onNavigate(Page.Accounts) },
+        onThemeChange = viewModel::setTheme,
+        onMotionChange = viewModel::setMotion,
+        onPaletteChange = viewModel::setPalette,
     )
-}
 
 /** These actions, with copying to the clipboard and opening links in a browser tab wired up. */
 @Composable

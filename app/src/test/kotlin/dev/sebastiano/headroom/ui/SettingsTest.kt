@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -121,6 +122,9 @@ class SettingsTest {
     @Test
     fun `choosing a frequency stores it and selects its row`() {
         openSettings()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasTestTag(syncFrequencyTag(SyncFrequency.Minutes15)))
         rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Minutes15)).assertIsSelected()
 
         rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Hours3)).performScrollTo().performClick()

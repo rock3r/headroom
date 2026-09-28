@@ -44,9 +44,12 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
+import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.model.ThemeMode
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.ui.CloseSettingsButton
 import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.SettingsTitle
@@ -72,12 +75,16 @@ data class SettingsActions(
     val onSyncFrequencyChange: (SyncFrequency) -> Unit,
     val onOpenLicences: () -> Unit,
     val onOpenAccounts: () -> Unit,
+    val onThemeChange: (ThemeMode) -> Unit = {},
+    val onMotionChange: (MotionPreference) -> Unit = {},
+    val onPaletteChange: (ThemePalette) -> Unit = {},
 )
 
 /**
- * The app settings: used or left, how often to sync in the background, the open-source licences and
- * the app version. It closes with the close button in its header, which the overview's settings
- * button turns into. The caller handles back, with the predictive back gesture.
+ * The app settings: the accounts, used or left, the appearance (light or dark, the colours and
+ * reduced motion), how often to sync in the background, the open-source licences and the app
+ * version. It closes with the close button in its header, which the overview's settings button
+ * turns into. The caller handles back, with the predictive back gesture.
  */
 @Composable
 fun SettingsScreen(
@@ -94,6 +101,10 @@ fun SettingsScreen(
             item { AccountsRow(accounts, actions.onOpenAccounts, width) }
             item { SectionLabel(stringResource(R.string.settings_display), width) }
             item { QuotaDisplayPicker(state.quotaDisplay, actions.onQuotaDisplayChange, width) }
+            item { SectionLabel(stringResource(R.string.settings_appearance), width) }
+            item { ThemePicker(state.theme, actions.onThemeChange, width) }
+            item { PalettePicker(state.palette, actions.onPaletteChange, width) }
+            item { ReduceMotionRow(state.motion, actions.onMotionChange, width) }
             item { SectionLabel(stringResource(R.string.settings_sync), width) }
             item { SyncFrequencyList(state.syncFrequency, actions.onSyncFrequencyChange, width) }
             item {
