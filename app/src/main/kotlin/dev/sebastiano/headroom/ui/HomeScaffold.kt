@@ -6,6 +6,11 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -17,7 +22,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +32,6 @@ import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
@@ -57,15 +60,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.ui.detail.DetailScreen
@@ -73,6 +79,7 @@ import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.overview.OverviewScreen
 import dev.sebastiano.headroom.ui.resets.ResetsScreen
+import kotlin.math.ceil
 import kotlinx.coroutines.launch
 
 const val TOOLBAR_TAG: String = "floating-toolbar"
@@ -535,35 +542,77 @@ private fun HomeToolbar(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit, inToolbar: Boolean) {
+internal fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit, inToolbar: Boolean) {
     val label =
         stringResource(if (refreshing) R.string.action_refreshing else R.string.action_refresh)
-    val modifier = Modifier.testTag(REFRESH_TAG).semantics { contentDescription = label }
-    val content: @Composable () -> Unit = {
-        if (refreshing) {
-            LoadingIndicator(modifier = Modifier.size(32.dp))
-        } else {
-            Icon(painter = painterResource(HeadroomIcons.Sync), contentDescription = null)
+    // The pull-to-refresh indicator shows the progress, so the button does not repeat it: it
+    // turns its icon and cannot be pressed again until the refresh ends.
+    val modifier =
+        Modifier.testTag(REFRESH_TAG).semantics {
+            contentDescription = label
+            if (refreshing) disabled()
         }
+    val onClick = { if (!refreshing) onRefresh() }
+    val container by
+        animateColorAsState(
+            targetValue =
+                if (refreshing) MaterialTheme.colorScheme.surfaceContainerHighest
+                else MaterialTheme.colorScheme.primaryContainer,
+            animationSpec = HeadroomMotion.effectsSpec(),
+            label = "refresh container",
+        )
+    val turn = rememberedTurn(refreshing)
+    val content: @Composable () -> Unit = {
+        Icon(
+            painter = painterResource(HeadroomIcons.Sync),
+            contentDescription = null,
+            modifier = Modifier.graphicsLayer { rotationZ = turn.value },
+        )
     }
     if (inToolbar) {
         FloatingToolbarDefaults.VibrantFloatingActionButton(
-            onClick = onRefresh,
+            onClick = onClick,
             modifier = modifier,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = container,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             content = content,
         )
     } else {
         FloatingActionButton(
-            onClick = onRefresh,
+            onClick = onClick,
             modifier = modifier,
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = container,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             content = content,
         )
     }
 }
+
+/**
+ * The refresh icon's angle: it turns while [refreshing], then finishes its turn and settles. It
+ * stays still with motion reduced.
+ */
+@Composable
+private fun rememberedTurn(refreshing: Boolean): Animatable<Float, AnimationVector1D> {
+    val angle = remember { Animatable(0f) }
+    val animate = animationsEnabled()
+    val settle = HeadroomMotion.containerSpec<Float>()
+    LaunchedEffect(refreshing, animate) {
+        if (refreshing && animate) {
+            while (true) {
+                angle.animateTo(angle.value + FULL_TURN, tween(TURN_MILLIS, easing = LinearEasing))
+            }
+        } else {
+            val settled = ceil(angle.value / FULL_TURN) * FULL_TURN
+            if (animate) angle.animateTo(settled, settle)
+            angle.snapTo(0f)
+        }
+    }
+    return angle
+}
+
+private const val FULL_TURN = 360f
+private const val TURN_MILLIS = 900
 
 private val CardShape = RoundedCornerShape(24.dp)
 private val ToolbarClearance = 96.dp
