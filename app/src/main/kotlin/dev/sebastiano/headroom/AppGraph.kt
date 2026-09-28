@@ -18,6 +18,7 @@ import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
+import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
@@ -59,6 +60,7 @@ import kotlinx.coroutines.flow.map
  * - [resetHistory]: the data layer answers it from the Room history.
  * - [usageHistory]: the Room history of each window, or demo history in demo mode, for the stats.
  * - [settings]: the data layer's DataStore settings, or settings in memory without it.
+ * - [resetIsland]: whether the reset island's accessibility service is ready, and a way to show it.
  */
 class AppGraph(
     val quotaRepository: QuotaRepository,
@@ -87,6 +89,8 @@ class AppGraph(
     val usageHistory: UsageHistory = RepositoryUsageHistory(quotaRepository),
     /** Where the stats are computed: off the main thread, as they read weeks of history. */
     val statsDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** The reset island: its accessibility service's state, and the Try button. */
+    val resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
 ) {
     val homeViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
@@ -150,6 +154,7 @@ class AppGraph(
             demoLatency: Duration = Duration.ofMillis(DEMO_LATENCY_MILLIS),
             tickInterval: Duration? = Duration.ofMinutes(1),
             data: DataGraph? = null,
+            resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
         ): AppGraph {
             val realAccounts: QuotaRepository =
                 data?.repository ?: FakeQuotaRepository(clock, initial = emptyList())
@@ -210,6 +215,7 @@ class AppGraph(
                         real = RepositoryUsageHistory(realAccounts),
                         demo = DemoUsageHistory(DemoResetHistory, clock, zone),
                     ),
+                resetIsland = resetIsland,
             )
         }
 

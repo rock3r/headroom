@@ -43,6 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
@@ -53,6 +54,7 @@ import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.delights.HomeDelights
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.settings.LicencesScreen
+import dev.sebastiano.headroom.ui.settings.ResetIslandUi
 import dev.sebastiano.headroom.ui.settings.SettingsAccounts
 import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
@@ -84,6 +86,7 @@ fun HeadroomApp(
     val detail by homeViewModel.detail.collectAsStateWithLifecycle()
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
+    val resetIsland = graph.resetIsland.collectUi()
     val formatter = rememberResetFormatter(graph.zone)
     val snackbar = remember { SnackbarHostState() }
     val addWidget = rememberWidgetAdder(graph.widgetPinner, snackbar)
@@ -140,11 +143,13 @@ fun HeadroomApp(
                                 home.isDemo,
                             ),
                         actions =
-                            settingsActions(settingsViewModel, addWidget) { next ->
+                            settingsActions(settingsViewModel, addWidget, graph.resetIsland) { next
+                                ->
                                 if (next == Page.Accounts) accountsFromSettings = true
                                 page = next
                             },
                         reveal = reveal,
+                        resetIsland = resetIsland,
                     )
                 Page.Licences -> LicencesScreen(onBack = { page = Page.Settings })
                 Page.Home ->
@@ -189,6 +194,14 @@ fun HeadroomApp(
 }
 
 private const val ENTER_SCALE = 0.96f
+
+/** The reset island's service state, as the settings screen shows it. */
+@Composable
+private fun ResetIslandAccess.collectUi(): ResetIslandUi {
+    val ready by ready.collectAsStateWithLifecycle()
+    val enabled by enabledInSettings.collectAsStateWithLifecycle()
+    return ResetIslandUi(ready, enabled)
+}
 
 /** Asks [pinner] for a widget, and says so in [snackbar] when the launcher cannot add it. */
 @Composable
@@ -272,6 +285,7 @@ private fun AppSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modif
 private fun settingsActions(
     viewModel: SettingsViewModel,
     onAddWidget: (WidgetStyle) -> Unit,
+    resetIsland: ResetIslandAccess,
     onNavigate: (Page) -> Unit,
 ) =
     SettingsActions(
@@ -286,6 +300,9 @@ private fun settingsActions(
         onAddWidget = onAddWidget,
         onRefreshShimmerChange = viewModel::setRefreshShimmer,
         onResetConfettiChange = viewModel::setResetConfetti,
+        onResetIslandChange = viewModel::setResetIsland,
+        onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
+        onRefreshResetIsland = resetIsland::refresh,
     )
 
 /** These actions, with copying to the clipboard and opening links in a browser tab wired up. */

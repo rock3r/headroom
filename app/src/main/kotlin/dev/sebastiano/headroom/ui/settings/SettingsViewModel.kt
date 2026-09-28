@@ -28,6 +28,7 @@ data class SettingsUiState(
     val palette: ThemePalette = ThemePalette.Wallpaper,
     val refreshShimmer: Boolean = true,
     val resetConfetti: Boolean = true,
+    val resetIsland: Boolean = false,
 )
 
 /** Reads the settings from the [settings] repository and stores the user's choices in it. */
@@ -70,6 +71,10 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
         viewModelScope.launch { settings.setResetConfetti(enabled) }
     }
 
+    fun setResetIsland(enabled: Boolean) {
+        viewModelScope.launch { settings.setResetIsland(enabled) }
+    }
+
     private fun AppSettings.toUiState(appVersion: String) =
         SettingsUiState(
             quotaDisplay,
@@ -80,6 +85,7 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
             palette,
             refreshShimmer,
             resetConfetti,
+            resetIsland,
         )
 
     private companion object {
