@@ -102,9 +102,9 @@ internal fun CountdownWidget(
 }
 
 /**
- * The lock screen layout: a row of small rings with the glyph inside, the percentage and name
- * below, and the next reset underneath. It is readable without unlocking and uses light marks on a
- * dark, translucent card whatever the style.
+ * The lock screen layout: a row of small rings with the provider logo inside, the percentage and
+ * name below, and the next reset underneath. It is readable without unlocking and uses light marks
+ * on a dark, translucent card whatever the style.
  */
 @RemoteComposable
 @Composable
@@ -170,12 +170,7 @@ private fun LockScreenGauge(
                     track = colors.track.rc,
                 )
             }
-            WidgetText(
-                gauge.glyph,
-                colors.onSurface,
-                render.sp(LOCK_GLYPH),
-                fontWeight = FontWeight.ExtraBold,
-            )
+            ProviderLogoIcon(gauge.provider, render.pxValue(LOCK_LOGO), colors.onSurface)
         }
         WidgetText(
             text = render.strings.percent(gauge.usedPercent),
@@ -202,7 +197,7 @@ private const val DETAIL = 11f
 private const val LOCK_CORNER = 24f
 private const val LOCK_PADDING = 10f
 private const val LOCK_RING = 44f
-private const val LOCK_GLYPH = 11f
+private const val LOCK_LOGO = 22f
 private const val LOCK_NUMBER = 15f
 private const val LOCK_NAME = 10f
 private const val LOCK_FOOTER = 11.5f

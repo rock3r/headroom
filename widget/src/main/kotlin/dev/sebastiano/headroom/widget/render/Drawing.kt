@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PaintingStyle
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import dev.sebastiano.headroom.model.ProviderLogo
 import dev.sebastiano.headroom.widget.PolarShape
 import kotlin.math.cos
 import kotlin.math.max
@@ -155,6 +156,14 @@ internal fun RemoteDrawScope.drawPolarShape(
         close()
     }
     drawOutline(outline, fillPaint(color))
+}
+
+/**
+ * Fills [logo] in a square [sidePx] pixels wide at the top left of the drawing area. The square
+ * includes the logo's own margin.
+ */
+internal fun RemoteDrawScope.drawLogo(logo: ProviderLogo, sidePx: Float, color: RemoteColor) {
+    drawOutline(RemoteOutline.Generic { addLogo(logo, sidePx) }, fillPaint(color))
 }
 
 /** A paint for canvas text. */

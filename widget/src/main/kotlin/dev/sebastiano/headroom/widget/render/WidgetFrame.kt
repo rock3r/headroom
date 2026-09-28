@@ -17,8 +17,8 @@ import androidx.compose.remote.creation.compose.modifier.semantics
 import androidx.compose.remote.creation.compose.modifier.width
 import androidx.compose.remote.creation.compose.shapes.RemoteRoundedCornerShape
 import androidx.compose.remote.creation.compose.state.RemoteTextUnit
-import androidx.compose.remote.creation.compose.state.asRemoteTextUnit
 import androidx.compose.remote.creation.compose.state.rc
+import androidx.compose.remote.creation.compose.state.rf
 import androidx.compose.remote.creation.compose.state.rs
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.logo
 import dev.sebastiano.headroom.widget.style
 
 /** The rounded, tinted card behind most widgets. Tapping it refreshes. */
@@ -75,7 +76,7 @@ internal fun WidgetText(
     )
 }
 
-/** A provider avatar: its shape in its hue, with its glyph on top. */
+/** A provider avatar: its shape in its hue, with its logo on top. */
 @RemoteComposable
 @Composable
 internal fun ProviderAvatar(
@@ -93,13 +94,28 @@ internal fun ProviderAvatar(
         RemoteCanvas(RemoteModifier.fillMaxSize()) {
             drawPolarShape(style.avatar, render.colors.avatar(provider).rc)
         }
-        WidgetText(
-            text = style.glyph,
+        ProviderLogoIcon(
+            provider = provider,
+            sidePx = render.fixedPxValue(sizeDp) * AVATAR_LOGO_SHARE,
             color = render.colors.onAvatar,
-            fontSize =
-                (sizeDp * if (style.glyph.length > 1) GLYPH_WIDE else GLYPH).sp.asRemoteTextUnit(),
-            fontWeight = FontWeight.ExtraBold,
         )
+    }
+}
+
+/**
+ * A provider's logo in a single [color], in a square [sidePx] pixels wide. The square includes the
+ * logo's own margin, so every logo looks about the same size in it.
+ */
+@RemoteComposable
+@Composable
+internal fun ProviderLogoIcon(
+    provider: Provider,
+    sidePx: Float,
+    color: Color,
+    modifier: RemoteModifier = RemoteModifier,
+) {
+    RemoteBox(modifier = modifier.width(sidePx.rf).height(sidePx.rf)) {
+        RemoteCanvas(RemoteModifier.fillMaxSize()) { drawLogo(provider.logo, sidePx, color.rc) }
     }
 }
 
@@ -134,5 +150,5 @@ internal fun EmptyWidget(
 internal const val CARD_CORNER = 26f
 private const val EMPTY_PADDING = 16f
 private const val EMPTY_TEXT = 12.5f
-private const val GLYPH = 0.4f
-private const val GLYPH_WIDE = 0.3f
+/** How much of an avatar the logo's square takes, as in the app. */
+private const val AVATAR_LOGO_SHARE = 0.6f

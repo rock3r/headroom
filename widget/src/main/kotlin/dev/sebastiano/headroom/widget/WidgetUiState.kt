@@ -55,7 +55,6 @@ public sealed interface ResetLabel {
 public data class Gauge(
     val accountId: String,
     val name: String,
-    val glyph: String,
     val provider: Provider,
     /** Share of the window used, from 0 to 100. */
     val usedPercent: Int,
@@ -232,11 +231,9 @@ public sealed interface WidgetUiState {
         ): Gauge {
             val used = window.usedPercent.roundToInt().coerceIn(0, PERCENT)
             val isSession = window.kind == WindowKind.Session
-            val style = state.account.provider.style
             return Gauge(
                 accountId = state.account.id,
                 name = name,
-                glyph = style.glyph,
                 provider = state.account.provider,
                 usedPercent = used,
                 window = GaugeWindow.of(window.kind),

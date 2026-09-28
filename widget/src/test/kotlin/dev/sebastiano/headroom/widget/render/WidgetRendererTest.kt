@@ -13,6 +13,8 @@ import android.widget.FrameLayout
 import android.widget.RemoteViews
 import androidx.core.graphics.createBitmap
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.logo
 import dev.sebastiano.headroom.widget.ColourMode
 import dev.sebastiano.headroom.widget.WidgetConfig
 import dev.sebastiano.headroom.widget.WidgetHostCategory
@@ -25,6 +27,8 @@ import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import dev.sebastiano.headroom.widget.testing.documentOperations
 import dev.sebastiano.headroom.widget.testing.hasNamedHostActions
 import dev.sebastiano.headroom.widget.testing.hostActionIds
+import dev.sebastiano.headroom.widget.testing.logoCommands
+import dev.sebastiano.headroom.widget.testing.pathCommands
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
@@ -98,7 +102,7 @@ class WidgetRendererTest {
     fun `bars show a row per account with name and percentage`() = runTest {
         val doc = capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 110f))
 
-        doc.assertText("Claude", "Codex", "Grok", "71%", "34%", "88%", "C", "O", "X")
+        doc.assertText("Claude", "Codex", "Grok", "71%", "34%", "88%")
         doc.assertNoText("Copilot")
         assertEquals(
             listOf(Tap.Refresh) +
@@ -128,11 +132,20 @@ class WidgetRendererTest {
     }
 
     @Test
-    fun `shape grid shows a number and a glyph per account`() = runTest {
+    fun `shape grid shows a number and a logo per account`() = runTest {
         val doc = capture(WidgetConfig(WidgetStyle.Shape, colourMode = ColourMode.PerAccount))
 
-        doc.assertText("71", "34", "88", "58", "GH")
+        doc.assertText("71", "34", "88", "58")
+        doc.assertDrawsLogos(Provider.Claude, Provider.Codex, Provider.Grok, Provider.Copilot)
+        doc.assertNoText("GH")
         assertEquals(5, doc.taps().size)
+    }
+
+    @Test
+    fun `bar avatars draw the provider logos, not letters`() = runTest {
+        val doc = capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 110f))
+
+        doc.assertDrawsLogos(Provider.Claude, Provider.Codex, Provider.Grok)
     }
 
     @Test
@@ -156,6 +169,7 @@ class WidgetRendererTest {
         doc.assertText("71%", "34%", "88%", "Claude", "Codex", "Grok")
         doc.assertText("Next weekly reset: Grok, Mon 03:28")
         doc.assertNoText("Copilot")
+        doc.assertDrawsLogos(Provider.Claude, Provider.Codex, Provider.Grok)
     }
 
     @Test
@@ -362,6 +376,18 @@ class WidgetRendererTest {
 
     private fun WidgetDocument.assertNoText(unexpected: String) {
         assertFalse(text().contains(unexpected), "Did not expect \"$unexpected\" in the document")
+    }
+
+    /**
+     * Checks that the document draws each provider's logo: a path with the same commands, in the
+     * same order, as the logo's path data. Letters would be text, not paths.
+     */
+    private fun WidgetDocument.assertDrawsLogos(vararg providers: Provider) {
+        val drawn = pathCommands(documentOperations(bytes))
+        providers.forEach { provider ->
+            val expected = logoCommands(provider.logo.pathData)
+            assertTrue(expected in drawn, "No path for the $provider logo ($expected) in $drawn")
+        }
     }
 
     private companion object {

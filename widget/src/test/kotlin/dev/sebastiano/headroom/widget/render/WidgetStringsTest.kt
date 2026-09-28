@@ -32,7 +32,6 @@ class WidgetStringsTest {
         Gauge(
             accountId = "a",
             name = "Claude",
-            glyph = "C",
             provider = Provider.Claude,
             usedPercent = 71,
             window = GaugeWindow.Weekly,

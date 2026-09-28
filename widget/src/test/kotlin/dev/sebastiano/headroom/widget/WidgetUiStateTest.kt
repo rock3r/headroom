@@ -307,7 +307,7 @@ class WidgetUiStateTest {
     }
 
     @Test
-    fun `gauges carry provider names and glyphs, with labels when a provider repeats`() {
+    fun `gauges carry provider names, with labels when a provider repeats`() {
         val second = demo.first().copy(account = Account("claude-2", Provider.Claude, "work"))
         val bars =
             assertIs<WidgetUiState.Bars>(
@@ -322,7 +322,10 @@ class WidgetUiStateTest {
             )
 
         assertEquals(listOf("sam@example.com", "work", "Codex"), bars.gauges.map { it.name })
-        assertEquals(listOf("C", "C", "O"), bars.gauges.map { it.glyph })
+        assertEquals(
+            listOf(Provider.Claude, Provider.Claude, Provider.Codex),
+            bars.gauges.map { it.provider },
+        )
     }
 
     @Test

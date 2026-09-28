@@ -65,7 +65,7 @@ internal fun SingleShapeWidget(
     }
 }
 
-/** Two to four accounts as a grid of small shapes, each with its number and glyph. */
+/** Two to four accounts as a grid of small shapes, each with its number and provider logo. */
 @RemoteComposable
 @Composable
 internal fun ShapeGridWidget(
@@ -99,7 +99,7 @@ private fun SmallShape(
                 fontSize = render.sp(SMALL_NUMBER),
                 fontWeight = FontWeight.ExtraBold,
             )
-            WidgetText(gauge.glyph, colors.onShapeFill, render.sp(SMALL_GLYPH))
+            ProviderLogoIcon(gauge.provider, render.pxValue(SMALL_LOGO), colors.onShapeFill)
         }
     }
 }
@@ -107,4 +107,4 @@ private fun SmallShape(
 private const val LABEL = 10f
 private const val BIG = 28f
 private const val SMALL_NUMBER = 15f
-private const val SMALL_GLYPH = 8.5f
+private const val SMALL_LOGO = 13f

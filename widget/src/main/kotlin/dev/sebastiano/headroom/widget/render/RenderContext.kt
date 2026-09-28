@@ -35,10 +35,16 @@ internal class RenderContext(
      * A design length in pixels, scaled with the widget. Sizes are written in pixels because the
      * Android 16 widget player does not understand dp sizes (`EXACT_DP`): they collapse to zero.
      */
-    fun px(design: Float): RemoteFloat = (design * unit * density).rf
+    fun px(design: Float): RemoteFloat = pxValue(design).rf
+
+    /** [px] as a plain number, for geometry worked out at capture time. */
+    fun pxValue(design: Float): Float = design * unit * density
 
     /** A fixed length in pixels, not scaled with the widget. */
-    fun fixedPx(dp: Float): RemoteFloat = (dp * density).rf
+    fun fixedPx(dp: Float): RemoteFloat = fixedPxValue(dp).rf
+
+    /** [fixedPx] as a plain number, for geometry worked out at capture time. */
+    fun fixedPxValue(dp: Float): Float = dp * density
 
     private companion object {
         const val DESIGN_WIDGET_DP = 148f
