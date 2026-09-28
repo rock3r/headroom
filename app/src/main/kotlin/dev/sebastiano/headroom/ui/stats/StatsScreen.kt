@@ -28,7 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -182,16 +184,20 @@ internal fun ChartNote(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * A chart's entrance, from 0 to 1, keyed on the data it draws. Values read as data never overshoot,
- * so it uses [HeadroomMotion.dataSpec]; with motion reduced it starts at 1.
+ * A chart's entrance, from 0 to 1, keyed on the data it draws. It plays once per [key]: the grid
+ * keeps saveable state for cards scrolled off screen, so a card that comes back is already drawn.
+ * Values read as data never overshoot, so it uses [HeadroomMotion.dataSpec]; with motion reduced it
+ * starts at 1.
  */
 @Composable
 internal fun rememberEntrance(key: Any?): Animatable<Float, *> {
     val animate = animationsEnabled()
-    val entrance = remember(key) { Animatable(if (animate) 0f else 1f) }
+    val played = rememberSaveable(key) { mutableStateOf(false) }
+    val entrance = remember(key) { Animatable(if (animate && !played.value) 0f else 1f) }
     val spec = HeadroomMotion.dataSpec<Float>()
     LaunchedEffect(entrance, animate) {
-        if (animate) entrance.animateTo(1f, spec) else entrance.snapTo(1f)
+        if (animate && !played.value) entrance.animateTo(1f, spec) else entrance.snapTo(1f)
+        played.value = true
     }
     return entrance
 }
