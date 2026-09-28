@@ -7,6 +7,7 @@ import android.util.SizeF
 import android.widget.RemoteViews
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -31,9 +32,11 @@ class WidgetUpdaterTest {
     private val gateway = FakeGateway()
     private val rendered = mutableMapOf<Int, Pair<WidgetUiState, WidgetSize>>()
     private val renderedSizes = mutableMapOf<Int, MutableList<WidgetSize>>()
+    private val renderedPalettes = mutableMapOf<Int, ThemePalette>()
     private val updater =
-        WidgetUpdater(store, { gateway }) { _, state, appWidgetId, size ->
+        WidgetUpdater(store, { gateway }) { _, state, appWidgetId, size, palette ->
             rendered[appWidgetId] = state to size
+            renderedPalettes[appWidgetId] = palette
             renderedSizes.getOrPut(appWidgetId) { mutableListOf() } += size
             RemoteViews(context.packageName, android.R.layout.simple_list_item_1)
         }
@@ -66,6 +69,25 @@ class WidgetUpdaterTest {
         assertEquals(29, ring.gauge.shownPercent)
         val bars = assertIs<WidgetUiState.Bars>(rendered.getValue(3).first)
         assertTrue(bars.gauges.all { it.display == QuotaDisplay.Left })
+    }
+
+    @Test
+    fun `draws every widget in the app's palette`() = runTest {
+        gateway.ids[RingsWidgetProvider::class.java] = intArrayOf(1)
+        gateway.ids[CountdownWidgetProvider::class.java] = intArrayOf(5)
+
+        updater.updateAll(context, accounts, now, palette = ThemePalette.Grape)
+
+        assertEquals(mapOf(1 to ThemePalette.Grape, 5 to ThemePalette.Grape), renderedPalettes)
+    }
+
+    @Test
+    fun `without a palette widgets use the wallpaper colours`() = runTest {
+        gateway.ids[RingsWidgetProvider::class.java] = intArrayOf(1)
+
+        updater.updateAll(context, accounts, now)
+
+        assertEquals(ThemePalette.Wallpaper, renderedPalettes.getValue(1))
     }
 
     @Test

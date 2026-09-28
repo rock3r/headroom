@@ -9,6 +9,7 @@ import dev.sebastiano.headroom.data.DataGraphOwner
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.widget.HeadroomWidgetHost
 import dev.sebastiano.headroom.widget.WidgetConfigStore
 import dev.sebastiano.headroom.widget.WidgetUpdater
@@ -62,14 +63,14 @@ open class HeadroomApplication :
         super.onCreate()
         if (!usesDataLayer) return
         dataGraph.start()
-        // Widgets redraw whenever the stored data or the used or left setting changes; they never
-        // fetch on their own.
+        // Widgets redraw whenever the stored data, the used or left setting or the colour palette
+        // changes; they never fetch on their own.
         appScope.launch {
-            combine(dataGraph.repository.accounts, quotaDisplay()) { accounts, display ->
-                    accounts to display
+            combine(dataGraph.repository.accounts, widgetLook()) { accounts, look ->
+                    accounts to look
                 }
                 .debounce(WIDGET_UPDATE_DEBOUNCE_MS)
-                .collect { (accounts, display) -> updateWidgets(accounts, display) }
+                .collect { (accounts, look) -> updateWidgets(accounts, look) }
         }
     }
 
@@ -77,17 +78,20 @@ open class HeadroomApplication :
         if (!usesDataLayer) return
         appScope.launch {
             dataGraph.repository.refresh()
-            updateWidgets(dataGraph.repository.current(), quotaDisplay().first())
+            updateWidgets(dataGraph.repository.current(), widgetLook().first())
         }
     }
 
     override fun onWidgetUpdateRequested(appWidgetIds: IntArray) {
         if (!usesDataLayer) return
-        appScope.launch { updateWidgets(dataGraph.repository.current(), quotaDisplay().first()) }
+        appScope.launch { updateWidgets(dataGraph.repository.current(), widgetLook().first()) }
     }
 
-    private fun quotaDisplay() =
-        dataGraph.settings.settings.map { it.quotaDisplay }.distinctUntilChanged()
+    /** The settings the widgets show: used or left, and the colour palette. */
+    private fun widgetLook() =
+        dataGraph.settings.settings
+            .map { WidgetLook(it.quotaDisplay, it.palette) }
+            .distinctUntilChanged()
 
     /**
      * Draws every placed widget from the demo accounts. Only the debug build's
@@ -100,9 +104,11 @@ open class HeadroomApplication :
         }
     }
 
-    private suspend fun updateWidgets(accounts: List<AccountState>, display: QuotaDisplay) {
-        widgetUpdater.updateAll(this, accounts, Instant.now(), display)
+    private suspend fun updateWidgets(accounts: List<AccountState>, look: WidgetLook) {
+        widgetUpdater.updateAll(this, accounts, Instant.now(), look.display, look.palette)
     }
+
+    private data class WidgetLook(val display: QuotaDisplay, val palette: ThemePalette)
 
     private companion object {
         /** The process-wide scope; the dispatcher is a parameter so tests could replace it. */

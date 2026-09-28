@@ -3,8 +3,11 @@ package dev.sebastiano.headroom.ui
 import dev.sebastiano.headroom.MainDispatcherRule
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.model.ThemeMode
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import kotlin.test.Test
@@ -49,6 +52,34 @@ class SettingsViewModelTest {
             runCurrent()
             assertEquals(QuotaDisplay.Left, repository.settings.value.quotaDisplay)
             assertEquals(QuotaDisplay.Left, viewModel.state.value.quotaDisplay)
+        }
+
+    @Test
+    fun `it shows the stored appearance`() =
+        runTest(main.dispatcher) {
+            observe()
+            val state = viewModel.state.value
+            assertEquals(ThemeMode.System, state.theme)
+            assertEquals(MotionPreference.System, state.motion)
+            assertEquals(ThemePalette.Wallpaper, state.palette)
+        }
+
+    @Test
+    fun `choosing a theme, motion and palette stores them`() =
+        runTest(main.dispatcher) {
+            observe()
+            viewModel.setTheme(ThemeMode.Dark)
+            viewModel.setMotion(MotionPreference.Reduced)
+            viewModel.setPalette(ThemePalette.Tangerine)
+            runCurrent()
+            val stored = repository.settings.value
+            assertEquals(ThemeMode.Dark, stored.theme)
+            assertEquals(MotionPreference.Reduced, stored.motion)
+            assertEquals(ThemePalette.Tangerine, stored.palette)
+            val state = viewModel.state.value
+            assertEquals(ThemeMode.Dark, state.theme)
+            assertEquals(MotionPreference.Reduced, state.motion)
+            assertEquals(ThemePalette.Tangerine, state.palette)
         }
 
     @Test

@@ -11,6 +11,7 @@ import androidx.compose.remote.creation.compose.layout.RemoteComposable
 import androidx.compose.remote.creation.compose.modifier.RemoteModifier
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Size
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.widget.WidgetSize
 import dev.sebastiano.headroom.widget.WidgetUiState
 
@@ -32,13 +33,14 @@ public object WidgetRenderer {
      */
     private const val FIRST_SCROLLING_SDK = 37
 
-    /** Captures the document for one widget. */
+    /** Captures the document for one widget, in the colours of [palette]. */
     public suspend fun capture(
         context: Context,
         state: WidgetUiState,
         appWidgetId: Int,
         size: WidgetSize,
-    ): WidgetDocument = capture(context, state, appWidgetId, size, WidgetStrings(context))
+        palette: ThemePalette = ThemePalette.Wallpaper,
+    ): WidgetDocument = capture(context, state, appWidgetId, size, WidgetStrings(context), palette)
 
     internal suspend fun capture(
         context: Context,
@@ -46,10 +48,12 @@ public object WidgetRenderer {
         appWidgetId: Int,
         size: WidgetSize,
         strings: WidgetStrings,
+        palette: ThemePalette = ThemePalette.Wallpaper,
     ): WidgetDocument {
         val colors =
-            WidgetColors.dynamic(
+            WidgetColors.forPalette(
                 context,
+                palette,
                 state.colourMode,
                 forceDark = state is WidgetUiState.LockScreen,
             )

@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui
 
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
@@ -24,6 +25,7 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SettingsRepository
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.signin.SignInState
@@ -32,6 +34,8 @@ import dev.sebastiano.headroom.ui.accounts.accountRowTag
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
+import dev.sebastiano.headroom.ui.settings.REDUCE_MOTION_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,11 +59,12 @@ class ScreenshotTest {
         signIn: SignInController = FakeSignInController(),
         realAccounts: List<AccountState> = emptyList(),
         settings: SettingsRepository = InMemorySettingsRepository(),
+        palette: ThemePalette = ThemePalette.Wallpaper,
     ) {
         // Frames are driven by capture(), so that animations are drawn while they run.
         rule.mainClock.autoAdvance = false
         rule.setContent {
-            HeadroomTheme(darkTheme = dark, dynamicColor = false) {
+            HeadroomTheme(darkTheme = dark, dynamicColor = false, palette = palette) {
                 HeadroomApp(
                     graph =
                         testGraph(
@@ -74,10 +79,23 @@ class ScreenshotTest {
     }
 
     private fun capture(name: String) {
+        settle()
+        rule.onRoot().captureRoboImage(screenshot(name))
+    }
+
+    private fun settle() {
         // Robolectric only draws when asked. The wavy ring builds its wave while its sweep-in
         // animation is drawn, so draw every step until transitions and sweeps have settled.
         repeat(SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(STEP_MILLIS)
+            rule.onRoot().captureToImage()
+        }
+    }
+
+    /** Draws [millis] of a transition that is still running, then captures it. */
+    private fun captureMidway(name: String, millis: Long) {
+        repeat((millis / FRAME_MILLIS).toInt()) {
+            rule.mainClock.advanceTimeBy(FRAME_MILLIS)
             rule.onRoot().captureToImage()
         }
         rule.onRoot().captureRoboImage(screenshot(name))
@@ -180,6 +198,31 @@ class ScreenshotTest {
     }
 
     @Test
+    fun settingsOpening() {
+        launch()
+        settle()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        captureMidway("settings-opening", REVEAL_MIDWAY_MILLIS)
+    }
+
+    @Test
+    fun settingsBackGesture() {
+        launch()
+        rule.onNodeWithContentDescription("Settings").performClick()
+        settle()
+        val dispatcher = rule.activity.onBackPressedDispatcher
+        rule.runOnUiThread { dispatcher.dispatchOnBackStarted(backEvent(0f)) }
+        // A finger moves over several frames; each frame brings a little more progress.
+        repeat(BACK_STEPS) { step ->
+            rule.mainClock.advanceTimeBy(FRAME_MILLIS)
+            rule.onRoot().captureToImage()
+            val progress = BACK_PROGRESS * (step + 1) / BACK_STEPS
+            rule.runOnUiThread { dispatcher.dispatchOnBackProgressed(backEvent(progress)) }
+        }
+        captureMidway("settings-back-gesture", FRAME_MILLIS * 2)
+    }
+
+    @Test
     fun licences() {
         launch()
         // Two steps in a row, and the licence list loads off the main thread: let the clock run.
@@ -192,6 +235,44 @@ class ScreenshotTest {
         }
         rule.mainClock.autoAdvance = false
         capture("licences")
+    }
+
+    @Test
+    fun settingsAppearance() {
+        val palette = ThemePalette.Lagoon
+        launch(
+            settings = InMemorySettingsRepository(AppSettings(palette = palette)),
+            palette = palette,
+        )
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasTestTag(REDUCE_MOTION_TAG))
+        rule.mainClock.autoAdvance = false
+        capture("settings-appearance")
+    }
+
+    @Test
+    fun overviewLagoon() {
+        launch(palette = ThemePalette.Lagoon)
+        capture("overview-lagoon")
+    }
+
+    @Test
+    fun overviewTangerineDark() {
+        launch(dark = true, palette = ThemePalette.Tangerine)
+        capture("overview-tangerine-dark")
+    }
+
+    @Test
+    fun overviewBubblegum() {
+        launch(palette = ThemePalette.Bubblegum)
+        capture("overview-bubblegum")
+    }
+
+    @Test
+    fun overviewGrapeDark() {
+        launch(dark = true, palette = ThemePalette.Grape)
+        capture("overview-grape-dark")
     }
 
     @Test
@@ -267,6 +348,15 @@ class ScreenshotTest {
 private const val GROK_INDEX = 6
 private const val SETTLE_STEPS = 40
 private const val STEP_MILLIS = 50L
+private const val FRAME_MILLIS = 16L
+/** Part-way through the reveal into Settings, while the circle is still growing. */
+private const val REVEAL_MIDWAY_MILLIS = 64L
+private const val BACK_PROGRESS = 0.5f
+private const val BACK_STEPS = 10
+
+private fun backEvent(progress: Float) =
+    BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)
+
 /** The licence data is read from resources off the main thread. */
 private const val LOAD_TIMEOUT_MILLIS = 5_000L
 /** 24dp at xxhdpi, the height of a phone status bar. */

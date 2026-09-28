@@ -4,9 +4,12 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sebastiano.headroom.model.AppSettings
+import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.model.ThemeMode
+import dev.sebastiano.headroom.model.ThemePalette
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -20,6 +23,9 @@ data class SettingsUiState(
     val syncFrequency: SyncFrequency,
     /** The app's version name, shown at the bottom of the screen. */
     val appVersion: String,
+    val theme: ThemeMode = ThemeMode.System,
+    val motion: MotionPreference = MotionPreference.System,
+    val palette: ThemePalette = ThemePalette.Wallpaper,
 )
 
 /** Reads the settings from the [settings] repository and stores the user's choices in it. */
@@ -42,8 +48,20 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
         viewModelScope.launch { settings.setSyncFrequency(frequency) }
     }
 
+    fun setTheme(theme: ThemeMode) {
+        viewModelScope.launch { settings.setTheme(theme) }
+    }
+
+    fun setMotion(motion: MotionPreference) {
+        viewModelScope.launch { settings.setMotion(motion) }
+    }
+
+    fun setPalette(palette: ThemePalette) {
+        viewModelScope.launch { settings.setPalette(palette) }
+    }
+
     private fun AppSettings.toUiState(appVersion: String) =
-        SettingsUiState(quotaDisplay, syncFrequency, appVersion)
+        SettingsUiState(quotaDisplay, syncFrequency, appVersion, theme, motion, palette)
 
     private companion object {
         const val STOP_TIMEOUT = 5_000L

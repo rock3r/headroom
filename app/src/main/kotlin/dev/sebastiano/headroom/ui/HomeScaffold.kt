@@ -2,9 +2,10 @@ package dev.sebastiano.headroom.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.SharedTransitionScope.OverlayClip
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -34,6 +35,8 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.layout.PaneAdaptedValue
+import androidx.compose.material3.adaptive.layout.calculateDefaultEnterTransition
+import androidx.compose.material3.adaptive.layout.calculateDefaultExitTransition
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.ThreePaneScaffoldNavigator
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
@@ -62,6 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
@@ -96,6 +100,7 @@ internal fun HomeScaffold(
     modifier: Modifier = Modifier,
     openAccountRequest: OpenAccountRequest? = null,
     onConsumeOpenAccount: () -> Unit = {},
+    settingsReveal: PageReveal? = null,
     playEntrance: Boolean = false,
     onEntranceStart: () -> Unit = {},
 ) {
@@ -143,12 +148,16 @@ internal fun HomeScaffold(
             val bottomPadding = if (compact) ToolbarClearance else 0.dp
             val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
             val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+            // With motion reduced, tabs and the toolbar only fade.
+            val animate = animationsEnabled()
             AnimatedContent(
                 targetState = tab,
                 transitionSpec = {
-                    (fadeIn(effects) +
-                        scaleIn(effects, initialScale = FADE_THROUGH_SCALE)) togetherWith
-                        fadeOut(fast)
+                    if (!animate) fadeIn(fast) togetherWith fadeOut(fast)
+                    else
+                        (fadeIn(effects) +
+                            scaleIn(effects, initialScale = FADE_THROUGH_SCALE)) togetherWith
+                            fadeOut(fast)
                 },
                 label = "tab",
             ) { current ->
@@ -167,6 +176,7 @@ internal fun HomeScaffold(
                             onAllResets = { selectTab(HomeTab.Resets) },
                             onOpenAccounts = onOpenAccounts,
                             onOpenSettings = onOpenSettings,
+                            settingsReveal = settingsReveal,
                             bottomPadding = bottomPadding,
                             playEntrance = playEntrance,
                             onEntranceStart = onEntranceStart,
@@ -176,12 +186,9 @@ internal fun HomeScaffold(
                         WidgetsScreen(home, formatter, onAddWidget, bottomPadding = bottomPadding)
                 }
             }
-            val spatial =
-                MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntOffset>()
-            AnimatedVisibility(
+            ToolbarSlot(
                 visible = compact && !(tab == HomeTab.Overview && detailOnly),
-                enter = slideInVertically(spatial) { it } + fadeIn(effects),
-                exit = slideOutVertically(spatial) { it } + fadeOut(fast),
+                animate = animate,
                 modifier =
                     Modifier.align(Alignment.BottomCenter)
                         .navigationBarsPadding()
@@ -190,6 +197,52 @@ internal fun HomeScaffold(
                 HomeToolbar(tab, selectTab, home.isRefreshing, onRefresh)
             }
         }
+    }
+}
+
+/** The floating toolbar slides up into view, or only fades when motion is reduced. */
+@Composable
+private fun ToolbarSlot(
+    visible: Boolean,
+    animate: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatial =
+        MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntOffset>()
+    AnimatedVisibility(
+        visible = visible,
+        enter = if (animate) slideInVertically(spatial) { it } + fadeIn(effects) else fadeIn(fast),
+        exit = if (animate) slideOutVertically(spatial) { it } + fadeOut(fast) else fadeOut(fast),
+        modifier = modifier,
+    ) {
+        content()
+    }
+}
+
+/**
+ * The scopes a card and the detail share for the container transform, or null when [enabled] is
+ * false: in the two-pane layout, and when motion is reduced.
+ */
+@Composable
+private fun rememberSharedElements(
+    transitionScope: SharedTransitionScope,
+    visibilityScope: AnimatedVisibilityScope,
+    enabled: Boolean,
+): SharedElements? {
+    if (!enabled) return null
+    val containerSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val valueSpec = MaterialTheme.motionScheme.slowEffectsSpec<Rect>()
+    return remember(transitionScope, visibilityScope, containerSpec, valueSpec) {
+        SharedElements(
+            transitionScope = transitionScope,
+            visibilityScope = visibilityScope,
+            containerTransform = BoundsTransform { _, _ -> containerSpec },
+            valueTransform = BoundsTransform { _, _ -> valueSpec },
+            containerClip = transitionScope.OverlayClip(CardShape),
+        )
     }
 }
 
@@ -208,32 +261,30 @@ private fun OverviewPanes(
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenSettings: () -> Unit,
+    settingsReveal: PageReveal?,
     bottomPadding: androidx.compose.ui.unit.Dp,
     playEntrance: Boolean,
     onEntranceStart: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val containerSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
-    val valueSpec = MaterialTheme.motionScheme.slowEffectsSpec<Rect>()
     val twoPanes = width == LayoutWidth.Expanded
+    // With motion reduced, the card does not turn into the detail: the panes only fade.
+    val animate = animationsEnabled()
+    val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     SharedTransitionLayout {
         val transitionScope = this
         NavigableListDetailPaneScaffold(
             navigator = navigator,
             listPane = {
-                AnimatedPane {
-                    val shared =
-                        if (twoPanes) null
-                        else
-                            remember(this, containerSpec, valueSpec) {
-                                SharedElements(
-                                    transitionScope = transitionScope,
-                                    visibilityScope = this,
-                                    containerTransform = BoundsTransform { _, _ -> containerSpec },
-                                    valueTransform = BoundsTransform { _, _ -> valueSpec },
-                                    containerClip = OverlayClip(CardShape),
-                                )
-                            }
+                AnimatedPane(
+                    enterTransition =
+                        if (animate) motionDataProvider.calculateDefaultEnterTransition(paneRole)
+                        else fadeIn(fast),
+                    exitTransition =
+                        if (animate) motionDataProvider.calculateDefaultExitTransition(paneRole)
+                        else fadeOut(fast),
+                ) {
+                    val shared = rememberSharedElements(transitionScope, this, !twoPanes && animate)
                     OverviewScreen(
                         state = home,
                         formatter = formatter,
@@ -252,6 +303,7 @@ private fun OverviewPanes(
                         onAllResets = onAllResets,
                         onOpenAccounts = onOpenAccounts,
                         onOpenSettings = onOpenSettings,
+                        settingsReveal = settingsReveal,
                         columns = if (width == LayoutWidth.Medium) 2 else 1,
                         selectedAccountId = if (twoPanes) detail?.account?.id else null,
                         bottomPadding = bottomPadding,
@@ -262,21 +314,19 @@ private fun OverviewPanes(
                 }
             },
             detailPane = {
-                AnimatedPane {
+                AnimatedPane(
+                    enterTransition =
+                        if (animate) motionDataProvider.calculateDefaultEnterTransition(paneRole)
+                        else fadeIn(fast),
+                    exitTransition =
+                        if (animate) motionDataProvider.calculateDefaultExitTransition(paneRole)
+                        else fadeOut(fast),
+                ) {
                     val current = detail ?: return@AnimatedPane
                     if (twoPanes) {
                         DetailPane(current, formatter, onAlertChange, onChartWindowChange)
                     } else {
-                        val shared =
-                            remember(this, containerSpec, valueSpec) {
-                                SharedElements(
-                                    transitionScope = transitionScope,
-                                    visibilityScope = this,
-                                    containerTransform = BoundsTransform { _, _ -> containerSpec },
-                                    valueTransform = BoundsTransform { _, _ -> valueSpec },
-                                    containerClip = OverlayClip(CardShape),
-                                )
-                            }
+                        val shared = rememberSharedElements(transitionScope, this, animate)
                         DetailScreen(
                             state = current,
                             formatter = formatter,
@@ -344,12 +394,15 @@ private fun DetailPane(
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val animate = animationsEnabled()
     AnimatedContent(
         targetState = detail,
         contentKey = { it.account.id },
         transitionSpec = {
-            (fadeIn(effects) + scaleIn(effects, initialScale = PANE_SCALE)) togetherWith
-                fadeOut(fast)
+            if (!animate) fadeIn(fast) togetherWith fadeOut(fast)
+            else
+                (fadeIn(effects) + scaleIn(effects, initialScale = PANE_SCALE)) togetherWith
+                    fadeOut(fast)
         },
         modifier =
             Modifier.fillMaxSize()

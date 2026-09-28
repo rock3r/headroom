@@ -40,13 +40,34 @@ class SettingsTest {
     }
 
     @Test
+    fun `the appearance follows the device until the user picks otherwise`() {
+        assertEquals(ThemeMode.System, AppSettings().theme)
+        assertEquals(MotionPreference.System, AppSettings().motion)
+        assertEquals(ThemePalette.Wallpaper, AppSettings().palette)
+    }
+
+    @Test
+    fun `there are eight fixed palettes besides the wallpaper`() {
+        assertEquals(8, ThemePalette.entries.count { it != ThemePalette.Wallpaper })
+    }
+
+    @Test
     fun `the in-memory repository stores each setting`() =
         kotlinx.coroutines.test.runTest {
             val repository = InMemorySettingsRepository()
             repository.setQuotaDisplay(QuotaDisplay.Left)
             repository.setSyncFrequency(SyncFrequency.Hours3)
+            repository.setTheme(ThemeMode.Dark)
+            repository.setMotion(MotionPreference.Reduced)
+            repository.setPalette(ThemePalette.Lagoon)
             assertEquals(
-                AppSettings(QuotaDisplay.Left, SyncFrequency.Hours3),
+                AppSettings(
+                    QuotaDisplay.Left,
+                    SyncFrequency.Hours3,
+                    theme = ThemeMode.Dark,
+                    motion = MotionPreference.Reduced,
+                    palette = ThemePalette.Lagoon,
+                ),
                 repository.settings.value,
             )
         }

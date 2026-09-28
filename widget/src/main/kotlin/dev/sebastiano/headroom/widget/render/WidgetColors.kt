@@ -3,10 +3,10 @@ package dev.sebastiano.headroom.widget.render
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.ui.graphics.Color
+import dev.sebastiano.headroom.designsystem.headroomColorScheme
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.widget.ColourMode
 import dev.sebastiano.headroom.widget.style
 import kotlin.math.cos
@@ -14,8 +14,9 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * The colours one widget draws with. The base comes from the system dynamic palette; the colour
- * mode decides what the arcs, bars and shapes use.
+ * The colours one widget draws with. The base comes from the palette the user picked in the app:
+ * the system dynamic palette (which follows the wallpaper), or one of the fixed palettes. The
+ * colour mode decides what the arcs, bars and shapes use.
  */
 internal class WidgetColors
 private constructor(
@@ -76,12 +77,19 @@ private constructor(
         fun from(scheme: ColorScheme, mode: ColourMode, isDark: Boolean): WidgetColors =
             WidgetColors(scheme, mode, if (isDark) HueTones.Dark else HueTones.Light)
 
-        /** Colours from the system dynamic palette, which follows the wallpaper. */
-        fun dynamic(context: Context, mode: ColourMode, forceDark: Boolean = false): WidgetColors {
+        /**
+         * Colours from [palette], in the launcher's light or dark (dark when [forceDark]). The
+         * widgets follow the device's dark theme rather than the app's, since they live on the
+         * launcher.
+         */
+        fun forPalette(
+            context: Context,
+            palette: ThemePalette,
+            mode: ColourMode,
+            forceDark: Boolean = false,
+        ): WidgetColors {
             val isDark = forceDark || context.isNightMode()
-            val scheme =
-                if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            return from(scheme, mode, isDark)
+            return from(headroomColorScheme(context, palette, isDark), mode, isDark)
         }
 
         private fun Context.isNightMode(): Boolean =

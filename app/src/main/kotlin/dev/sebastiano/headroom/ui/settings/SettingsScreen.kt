@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -43,9 +44,15 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
+import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
+import dev.sebastiano.headroom.model.ThemeMode
+import dev.sebastiano.headroom.model.ThemePalette
+import dev.sebastiano.headroom.ui.CloseSettingsButton
+import dev.sebastiano.headroom.ui.PageReveal
+import dev.sebastiano.headroom.ui.SettingsTitle
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 
@@ -62,16 +69,22 @@ fun syncFrequencyTag(frequency: SyncFrequency): String = "sync-frequency-${frequ
 
 /** Callbacks of the settings screen. */
 data class SettingsActions(
-    val onBack: () -> Unit,
+    /** Closes Settings, back to the overview. */
+    val onClose: () -> Unit,
     val onQuotaDisplayChange: (QuotaDisplay) -> Unit,
     val onSyncFrequencyChange: (SyncFrequency) -> Unit,
     val onOpenLicences: () -> Unit,
     val onOpenAccounts: () -> Unit,
+    val onThemeChange: (ThemeMode) -> Unit = {},
+    val onMotionChange: (MotionPreference) -> Unit = {},
+    val onPaletteChange: (ThemePalette) -> Unit = {},
 )
 
 /**
- * The app settings: used or left, how often to sync in the background, the open-source licences and
- * the app version. The caller handles back, with the predictive back gesture.
+ * The app settings: the accounts, used or left, the appearance (light or dark, the colours and
+ * reduced motion), how often to sync in the background, the open-source licences and the app
+ * version. It closes with the close button in its header, which the overview's settings button
+ * turns into. The caller handles back, with the predictive back gesture.
  */
 @Composable
 fun SettingsScreen(
@@ -79,14 +92,19 @@ fun SettingsScreen(
     accounts: SettingsAccounts,
     actions: SettingsActions,
     modifier: Modifier = Modifier,
+    reveal: PageReveal? = null,
 ) {
     Surface(modifier = modifier.fillMaxSize().testTag(SETTINGS_TAG)) {
-        PageScaffold(title = stringResource(R.string.settings_title), onBack = actions.onBack) {
+        PageScaffold(onClose = actions.onClose, reveal = reveal) {
             val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth()
             item { SectionLabel(stringResource(R.string.settings_accounts), width) }
             item { AccountsRow(accounts, actions.onOpenAccounts, width) }
             item { SectionLabel(stringResource(R.string.settings_display), width) }
             item { QuotaDisplayPicker(state.quotaDisplay, actions.onQuotaDisplayChange, width) }
+            item { SectionLabel(stringResource(R.string.settings_appearance), width) }
+            item { ThemePicker(state.theme, actions.onThemeChange, width) }
+            item { PalettePicker(state.palette, actions.onPaletteChange, width) }
+            item { ReduceMotionRow(state.motion, actions.onMotionChange, width) }
             item { SectionLabel(stringResource(R.string.settings_sync), width) }
             item { SyncFrequencyList(state.syncFrequency, actions.onSyncFrequencyChange, width) }
             item {
@@ -113,13 +131,13 @@ fun SettingsScreen(
 }
 
 /**
- * A page with a back button and a title above a scrolling list, drawn edge to edge with the blur
- * behind the status bar. The list is centred and at most [MAX_CONTENT_WIDTH] wide on large screens.
+ * The settings header above a scrolling list, drawn edge to edge with the blur behind the status
+ * bar. The list is centred and at most [MAX_CONTENT_WIDTH] wide on large screens.
  */
 @Composable
 private fun PageScaffold(
-    title: String,
-    onBack: () -> Unit,
+    onClose: () -> Unit,
+    reveal: PageReveal?,
     modifier: Modifier = Modifier,
     content: LazyListScope.() -> Unit,
 ) {
@@ -133,15 +151,40 @@ private fun PageScaffold(
                 PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-                    top = insets.calculateTopPadding() + 4.dp,
+                    top = insets.calculateTopPadding() + 8.dp,
                     bottom = insets.calculateBottomPadding() + 24.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            item { PageTopBar(title, onBack) }
+            item { SettingsHeader(onClose, reveal) }
             content()
         }
+    }
+}
+
+/**
+ * The title and the close button, laid out like the overview's header so the close button sits
+ * where the settings button was.
+ */
+@Composable
+private fun SettingsHeader(
+    onClose: () -> Unit,
+    reveal: PageReveal?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .widthIn(max = MAX_CONTENT_WIDTH)
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            SettingsTitle(text = stringResource(R.string.settings_title), reveal = reveal)
+        }
+        CloseSettingsButton(onClick = onClose, reveal = reveal)
     }
 }
 
