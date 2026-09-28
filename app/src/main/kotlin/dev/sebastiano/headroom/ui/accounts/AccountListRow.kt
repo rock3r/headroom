@@ -132,18 +132,21 @@ internal fun AccountListRow(
     modifier: Modifier = Modifier,
     drag: RowDrag = RowDrag(),
 ) {
-    LiftableSegment(placement, modifier) {
+    LiftableSegment(placement, isOpen = mode == AccountRowMode.Editing, modifier) {
         AccountRowContent(account, mode, placement, actions, drag)
     }
 }
 
 /**
  * The row's segment: rounded on the outside of the group, and square where it meets its neighbours.
- * Lifted, it is a card of its own. With reduced motion it does not grow, and changes at once.
+ * Lifted, it is a card of its own. Open for editing ([isOpen]), it rounds like the raised card
+ * inside it, so no square corner shows behind the card. With reduced motion it does not grow, and
+ * changes at once.
  */
 @Composable
 private fun LiftableSegment(
     placement: RowPlacement,
+    isOpen: Boolean,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -154,6 +157,7 @@ private fun LiftableSegment(
             targetValue =
                 when {
                     lifted -> LIFTED_CORNER
+                    isOpen -> EDITING_CORNER
                     placement.index == 0 -> GROUP_CORNER
                     else -> 0.dp
                 },
@@ -165,6 +169,7 @@ private fun LiftableSegment(
             targetValue =
                 when {
                     lifted -> LIFTED_CORNER
+                    isOpen -> EDITING_CORNER
                     placement.index == placement.count - 1 -> GROUP_CORNER
                     else -> 0.dp
                 },
