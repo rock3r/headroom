@@ -2,10 +2,12 @@ package dev.sebastiano.headroom.island
 
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
-import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.provider.Settings
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
@@ -22,37 +24,29 @@ class IslandSettingsIntentsTest {
     }
 
     @Test
-    fun `the accessibility details intent names the service`() {
-        val intent = accessibilityDetailsIntent(service)
-        assertEquals("android.settings.ACCESSIBILITY_DETAILS_SETTINGS", intent.action)
-        assertEquals(service.flattenToString(), intent.getStringExtra(Intent.EXTRA_COMPONENT_NAME))
-    }
-
-    @Test
-    fun `the details page is tried first`() {
-        val started = mutableListOf<Intent>()
-        openAccessibilitySettings(service) { started += it }
+    fun `accessibility settings open on the general list, with the service highlighted`() {
+        // The page of a single service needs a permission only system apps hold.
+        val intent = accessibilitySettingsIntent(service)
+        assertEquals(Settings.ACTION_ACCESSIBILITY_SETTINGS, intent.action)
         assertEquals(
-            listOf("android.settings.ACCESSIBILITY_DETAILS_SETTINGS"),
-            started.map { it.action },
+            service.flattenToString(),
+            intent.getStringExtra(":settings:fragment_args_key"),
         )
     }
 
     @Test
-    fun `without a details page it falls back to the general accessibility settings`() {
-        val started = mutableListOf<Intent>()
-        openAccessibilitySettings(service) { intent ->
-            started += intent
-            if (intent.action == "android.settings.ACCESSIBILITY_DETAILS_SETTINGS") {
-                throw ActivityNotFoundException()
-            }
-        }
-        assertEquals(
-            listOf(
-                "android.settings.ACCESSIBILITY_DETAILS_SETTINGS",
-                Settings.ACTION_ACCESSIBILITY_SETTINGS,
-            ),
-            started.map { it.action },
-        )
+    fun `a settings page that cannot be opened does not crash the app`() {
+        assertTrue(openAccessibilitySettings(service) {})
+        assertFalse(openAccessibilitySettings(service) { throw SecurityException("denied") })
+        assertFalse(openAccessibilitySettings(service) { throw ActivityNotFoundException() })
+    }
+
+    @Test
+    fun `only apps installed from an APK file are restricted`() {
+        assertTrue(isRestrictedInstall(PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE))
+        assertTrue(isRestrictedInstall(PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE))
+        assertFalse(isRestrictedInstall(PackageInstaller.PACKAGE_SOURCE_OTHER))
+        assertFalse(isRestrictedInstall(PackageInstaller.PACKAGE_SOURCE_STORE))
+        assertFalse(isRestrictedInstall(PackageInstaller.PACKAGE_SOURCE_UNSPECIFIED))
     }
 }

@@ -47,6 +47,7 @@ class ResetIslandSetupScreenshotTest {
                         ResetIslandSetupContent(
                             ready = ready,
                             starting = starting,
+                            restricted = false,
                             onOpenAppInfo = {},
                             onOpenAccessibility = {},
                             onTry = {},

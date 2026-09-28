@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.island.appInfoIntent
+import dev.sebastiano.headroom.island.installIsRestricted
 import dev.sebastiano.headroom.island.islandServiceComponent
 import dev.sebastiano.headroom.island.openAccessibilitySettings
 import dev.sebastiano.headroom.model.Provider
@@ -53,10 +55,12 @@ internal fun ResetIslandSetup(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val restricted = remember(context) { context.installIsRestricted() }
     val demoMessage = stringResource(R.string.reset_island_demo_message)
     ResetIslandSetupSheet(
         ready = island.ready,
         starting = island.enabledInSettings && !island.ready,
+        restricted = restricted,
         onOpenAppInfo = { context.startActivity(appInfoIntent(context.packageName)) },
         onOpenAccessibility = {
             openAccessibilitySettings(islandServiceComponent(context), context::startActivity)
@@ -72,6 +76,7 @@ internal fun ResetIslandSetup(
 internal fun ResetIslandSetupSheet(
     ready: Boolean,
     starting: Boolean,
+    restricted: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
     onTry: () -> Unit,
@@ -86,6 +91,7 @@ internal fun ResetIslandSetupSheet(
         ResetIslandSetupContent(
             ready = ready,
             starting = starting,
+            restricted = restricted,
             onOpenAppInfo = onOpenAppInfo,
             onOpenAccessibility = onOpenAccessibility,
             onTry = onTry,
@@ -96,13 +102,15 @@ internal fun ResetIslandSetupSheet(
 
 /**
  * What the sheet says. Until the service is [ready] it explains the island, what it does not do,
- * and the two steps. Once [ready] it shows success and offers to try the island. [starting] means
- * Android lists the service as on but has not connected it yet.
+ * and the steps. Once [ready] it shows success and offers to try the island. [starting] means
+ * Android lists the service as on but has not connected it yet. [restricted] means Android blocks
+ * the service until the user allows restricted settings, which adds a second step.
  */
 @Composable
 internal fun ResetIslandSetupContent(
     ready: Boolean,
     starting: Boolean,
+    restricted: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
     onTry: () -> Unit,
@@ -121,6 +129,7 @@ internal fun ResetIslandSetupContent(
         } else {
             SetupSteps(
                 starting = starting,
+                restricted = restricted,
                 onOpenAppInfo = onOpenAppInfo,
                 onOpenAccessibility = onOpenAccessibility,
             )
@@ -131,6 +140,7 @@ internal fun ResetIslandSetupContent(
 @Composable
 private fun SetupSteps(
     starting: Boolean,
+    restricted: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
 ) {
@@ -146,21 +156,27 @@ private fun SetupSteps(
         )
         InfoBlock(R.string.island_setup_why_title, R.string.island_setup_why_body)
         InfoBlock(R.string.island_setup_not_title, R.string.island_setup_not_body)
+        // Android offers "Allow restricted settings" only after it has blocked one attempt, so
+        // that step comes second.
         StepCard(
             number = 1,
-            title = R.string.island_setup_step_1_title,
-            body = R.string.island_setup_step_1_body,
-            button = R.string.island_setup_step_1_button,
-            onClick = onOpenAppInfo,
-        )
-        StepCard(
-            number = 2,
-            title = R.string.island_setup_step_2_title,
-            body = R.string.island_setup_step_2_body,
-            button = R.string.island_setup_step_2_button,
+            title = R.string.island_setup_turn_on_title,
+            body =
+                if (restricted) R.string.island_setup_turn_on_body_restricted
+                else R.string.island_setup_turn_on_body,
+            button = R.string.island_setup_turn_on_button,
             onClick = onOpenAccessibility,
             note = if (starting) R.string.island_setup_connecting else null,
         )
+        if (restricted) {
+            StepCard(
+                number = 2,
+                title = R.string.island_setup_restricted_title,
+                body = R.string.island_setup_restricted_body,
+                button = R.string.island_setup_restricted_button,
+                onClick = onOpenAppInfo,
+            )
+        }
     }
 }
 

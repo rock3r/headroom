@@ -169,27 +169,21 @@ class ResetIslandSettingsTest {
     }
 
     @Test
-    fun `step 1 opens the app's own App info`() {
+    fun `an app not installed from an APK file only needs the service turned on`() {
+        // As adb installs it.
+        shadowOf(rule.activity.packageManager)
+            .setInstallSourceInfo(rule.activity.packageName, "com.android.shell", null)
         openRow()
         rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
-        rule.onNodeWithText("Open App info").performScrollTo().performClick()
 
-        val intent = nextIntent()!!
-        assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, intent.action)
-        assertEquals("package:${rule.activity.packageName}", intent.dataString)
-    }
-
-    @Test
-    fun `step 2 opens the service's page in accessibility settings`() {
-        openRow()
-        rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
+        rule.onNodeWithText("Open App info").assertDoesNotExist()
         rule.onNodeWithText("Open accessibility settings").performScrollTo().performClick()
 
         val intent = nextIntent()!!
-        assertEquals("android.settings.ACCESSIBILITY_DETAILS_SETTINGS", intent.action)
+        assertEquals(Settings.ACTION_ACCESSIBILITY_SETTINGS, intent.action)
         assertEquals(
             "${rule.activity.packageName}/dev.sebastiano.headroom.island.ResetIslandService",
-            intent.getStringExtra(Intent.EXTRA_COMPONENT_NAME),
+            intent.getStringExtra(":settings:fragment_args_key"),
         )
     }
 
