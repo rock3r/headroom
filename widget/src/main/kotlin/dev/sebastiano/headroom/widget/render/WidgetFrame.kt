@@ -92,7 +92,11 @@ internal fun ProviderAvatar(
         contentAlignment = RemoteAlignment.Center,
     ) {
         RemoteCanvas(RemoteModifier.fillMaxSize()) {
-            drawPolarShape(style.avatar, render.colors.avatar(provider).rc)
+            drawPolarShapeInSquare(
+                style.avatar,
+                render.colors.avatar(provider).rc,
+                render.fixedPxValue(sizeDp),
+            )
         }
         ProviderLogoIcon(
             provider = provider,

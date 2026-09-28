@@ -23,11 +23,13 @@ import dev.sebastiano.headroom.widget.WidgetSize
 import dev.sebastiano.headroom.widget.WidgetStyle
 import dev.sebastiano.headroom.widget.WidgetUiState
 import dev.sebastiano.headroom.widget.WidgetWindow
+import dev.sebastiano.headroom.widget.testing.PLAYER_MAX_VARIABLES
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import dev.sebastiano.headroom.widget.testing.documentOperations
 import dev.sebastiano.headroom.widget.testing.hasNamedHostActions
 import dev.sebastiano.headroom.widget.testing.hostActionIds
 import dev.sebastiano.headroom.widget.testing.logoCommands
+import dev.sebastiano.headroom.widget.testing.maxVariableId
 import dev.sebastiano.headroom.widget.testing.pathCommands
 import java.time.Instant
 import java.time.ZoneOffset
@@ -109,6 +111,32 @@ class WidgetRendererTest {
                 listOf("demo-claude", "demo-codex", "demo-grok").map { Tap.Open(it) },
             doc.taps(),
         )
+    }
+
+    @Test
+    fun `sixteen bars stay within the variables the Android 16 player can hold`() = runTest {
+        // Tall enough for every row, so the document holds all sixteen.
+        val size = WidgetSize(280f, 600f)
+        val accounts =
+            DemoData.manyAccounts(now) +
+                DemoData.manyAccounts(now).map {
+                    it.copy(account = it.account.copy(id = it.account.id + "-2", nickname = "Work"))
+                }
+        val state =
+            WidgetUiState.from(
+                accounts,
+                WidgetConfig(WidgetStyle.Bars),
+                now,
+                size,
+                WidgetHostCategory.HomeScreen,
+            )
+        val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+
+        val operations = documentOperations(doc.bytes)
+        assertEquals(16, hostActionIds(operations).size - 1, "A tap per account and the refresh")
+        val maxId = maxVariableId(operations)
+        assertTrue(maxId < PLAYER_MAX_VARIABLES, "The document uses variable $maxId")
+        WidgetRenderer.remoteViews(doc).playAt(size)
     }
 
     @Test
