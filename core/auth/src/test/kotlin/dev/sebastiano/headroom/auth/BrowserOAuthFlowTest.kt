@@ -174,6 +174,92 @@ class BrowserOAuthFlowTest {
         assertEquals(200, browser.await().status)
     }
 
+    /** A spec whose exchange waits for [gate], so a test can look at the moment in between. */
+    private fun gated(spec: FakeSpec, gate: CompletableDeferred<Unit>) =
+        object : BrowserOAuthSpec by spec {
+            override suspend fun exchange(
+                code: String,
+                redirectUri: String,
+                pkce: Pkce,
+                state: String,
+            ): TokenSet {
+                gate.await()
+                return spec.exchange(code, redirectUri, pkce, state)
+            }
+        }
+
+    @Test
+    fun `the app hears about a redirected code before the exchange finishes`() = runTest {
+        // The exchange and the first refresh take a few seconds; the app says so meanwhile.
+        val gate = CompletableDeferred<Unit>()
+        val signIn = BrowserOAuthFlow(gated(FakeSpec(), gate), io).start("headroom://signed-in")
+        val received = CompletableDeferred<Unit>()
+        val browser = async {
+            browserGet(
+                io,
+                "http://127.0.0.1:${portOf(signIn)}/callback?code=c&state=${stateOf(signIn)}",
+            )
+        }
+        val tokens = async { signIn.awaitTokens(onCodeReceived = { received.complete(Unit) }) }
+
+        received.await()
+        assertFalse(tokens.isCompleted)
+        gate.complete(Unit)
+        assertEquals("access-c", tokens.await().accessToken)
+        browser.await()
+    }
+
+    @Test
+    fun `the app hears about a code fetched by the provider's page`() = runTest {
+        var received = 0
+        val signIn = BrowserOAuthFlow(FakeSpec(), io).start("headroom://signed-in")
+        val browser = async {
+            browserGet(
+                io,
+                "http://127.0.0.1:${portOf(signIn)}/callback?code=c&state=${stateOf(signIn)}",
+                headers = mapOf("Origin" to PROVIDER_ORIGIN, "Sec-Fetch-Mode" to "cors"),
+            )
+        }
+
+        signIn.awaitTokens(onCodeReceived = { received++ })
+
+        assertEquals(1, received)
+        browser.await()
+    }
+
+    @Test
+    fun `the app hears about a pasted code before the exchange finishes`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val signIn = BrowserOAuthFlow(gated(FakeSpec(), gate), io).start(null)
+        val received = CompletableDeferred<Unit>()
+        val tokens = async { signIn.awaitTokens(onCodeReceived = { received.complete(Unit) }) }
+
+        signIn.submitPastedCode("pasted#${stateOf(signIn)}")
+
+        received.await()
+        assertFalse(tokens.isCompleted)
+        gate.complete(Unit)
+        assertEquals("access-pasted", tokens.await().accessToken)
+    }
+
+    @Test
+    fun `a redirect that carries no code is not reported as a code`() = runTest {
+        var received = 0
+        val signIn = BrowserOAuthFlow(FakeSpec(), io).start(null)
+        val browser = async {
+            browserGet(
+                io,
+                "http://127.0.0.1:${portOf(signIn)}/callback?error=access_denied" +
+                    "&state=${stateOf(signIn)}",
+            )
+        }
+
+        assertFailsWith<AuthException> { signIn.awaitTokens(onCodeReceived = { received++ }) }
+
+        assertEquals(0, received)
+        browser.await()
+    }
+
     @Test
     fun `a failed exchange shows a failure page and is rethrown`() = runTest {
         val failure = AuthException.Rejected(400, "invalid_grant", "bad code")

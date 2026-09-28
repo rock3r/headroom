@@ -149,6 +149,8 @@
     <string name="signin_key_label">API key</string>
     <string name="signin_key_submit">Save key</string>
     <string name="signin_key_rejected">This key does not look right. Check that you copied all of it.</string>
+    <string name="signin_finishing_title">Finishing sign-in</string>
+    <string name="signin_finishing_body">Getting your %1$s limits…</string>
     <string name="signin_success">Signed in as %1$s</string>
     <string name="signin_done">Done</string>
     <string name="signin_failed_title">Sign-in did not finish</string>

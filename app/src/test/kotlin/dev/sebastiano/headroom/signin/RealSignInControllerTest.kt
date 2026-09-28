@@ -5,6 +5,7 @@ import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
+import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -34,14 +35,21 @@ class RealSignInControllerTest {
         val result = CompletableDeferred<TokenSet>()
         val pasted = mutableListOf<String>()
         var closed = false
+        private var onCodeReceived: () -> Unit = {}
+
+        /**
+         * Pretends the redirect or a pasted code arrived; [result] is the exchange that follows.
+         */
+        fun receiveCode() = onCodeReceived()
 
         override fun submitPastedCode(code: String) {
             if (!code.contains("#")) throw AuthException.SignInFailed("bad code")
             pasted += code
         }
 
-        override suspend fun awaitTokens(): TokenSet =
+        override suspend fun awaitTokens(onCodeReceived: () -> Unit): TokenSet =
             try {
+                this.onCodeReceived = onCodeReceived
                 result.await()
             } finally {
                 if (slowUnwind)
@@ -93,11 +101,88 @@ class RealSignInControllerTest {
         steps: FakeSteps,
         completed: MutableList<TokenSet> = mutableListOf(),
         gate: CompletableDeferred<Unit>? = null,
+        storeFails: Boolean = false,
     ) =
         RealSignInController(steps, backgroundScope) { tokens ->
             gate?.await()
+            if (storeFails) throw IOException("disk full")
             completed += tokens
             Account("id", tokens.provider, tokens.label ?: tokens.provider.displayName)
+        }
+
+    @Test
+    fun `a browser sign-in is finishing from the moment the code arrives until it is stored`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val steps = FakeSteps()
+            val gate = CompletableDeferred<Unit>()
+            val controller = controller(steps, gate = gate)
+            controller.start(Provider.Claude)
+
+            steps.browser!!.receiveCode()
+            assertEquals(SignInState.Finishing(Provider.Claude), controller.state.value)
+
+            steps.browser!!.result.complete(tokens(Provider.Claude))
+            assertEquals(SignInState.Finishing(Provider.Claude), controller.state.value)
+
+            gate.complete(Unit)
+            assertEquals(
+                SignInState.Success(Provider.Claude, "sam@example.com"),
+                controller.state.value,
+            )
+        }
+
+    @Test
+    fun `a device code sign-in is finishing once it has tokens, until they are stored`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val steps = FakeSteps()
+            val gate = CompletableDeferred<Unit>()
+            val controller = controller(steps, gate = gate)
+            controller.start(Provider.Codex)
+
+            steps.device!!.result.complete(tokens(Provider.Codex))
+            assertEquals(SignInState.Finishing(Provider.Codex), controller.state.value)
+
+            gate.complete(Unit)
+            assertEquals(
+                SignInState.Success(Provider.Codex, "sam@example.com"),
+                controller.state.value,
+            )
+        }
+
+    @Test
+    fun `a failure while finishing ends the sign-in as failed`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val steps = FakeSteps()
+            val controller = controller(steps, storeFails = true)
+            controller.start(Provider.Claude)
+            steps.browser!!.receiveCode()
+            steps.browser!!.result.complete(tokens(Provider.Claude))
+            assertEquals(
+                SignInState.Failed(Provider.Claude, SignInError.Unknown),
+                controller.state.value,
+            )
+
+            controller.retry()
+            steps.browser!!.receiveCode()
+            steps.browser!!.result.completeExceptionally(AuthException.Network("offline"))
+            assertEquals(
+                SignInState.Failed(Provider.Claude, SignInError.Network),
+                controller.state.value,
+            )
+        }
+
+    @Test
+    fun `a code that reaches a cancelled sign-in does not bring it back`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val steps = FakeSteps()
+            val controller = controller(steps)
+            controller.start(Provider.Claude)
+            val cancelled = steps.browser!!
+            controller.cancel()
+
+            cancelled.receiveCode()
+
+            assertEquals(SignInState.Idle, controller.state.value)
         }
 
     @Test
@@ -212,7 +297,7 @@ class RealSignInControllerTest {
             val controller = controller(FakeSteps(), completed, gate)
             controller.start(Provider.ZAi)
             controller.submitApiKey("key-123")
-            assertEquals(SignInState.ApiKey(Provider.ZAi, saving = true), controller.state.value)
+            assertEquals(SignInState.Finishing(Provider.ZAi), controller.state.value)
             controller.submitApiKey("key-123")
             controller.submitApiKey("key-123")
             gate.complete(Unit)

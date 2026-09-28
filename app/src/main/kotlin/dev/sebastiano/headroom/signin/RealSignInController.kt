@@ -32,7 +32,8 @@ interface BrowserSession : AutoCloseable {
     /** @throws AuthException.SignInFailed when the text is not a usable code. */
     fun submitPastedCode(code: String)
 
-    suspend fun awaitTokens(): TokenSet
+    /** [onCodeReceived] runs once a code arrives, before it is exchanged for the tokens. */
+    suspend fun awaitTokens(onCodeReceived: () -> Unit): TokenSet
 }
 
 interface DeviceSession {
@@ -87,7 +88,7 @@ class RealSignInController(
         if (id == attempt) browser = session
         return session.use {
             mutableState.value = SignInState.Browser(provider, session.authorizeUrl)
-            session.awaitTokens()
+            session.awaitTokens(onCodeReceived = { if (id == attempt) finishing(provider) })
         }
     }
 
@@ -117,7 +118,13 @@ class RealSignInController(
         }
     }
 
+    /** From here until [finish] returns, nothing is left for the user to do. */
+    private fun finishing(provider: Provider) {
+        mutableState.value = SignInState.Finishing(provider)
+    }
+
     private suspend fun finish(provider: Provider, tokens: TokenSet) {
+        finishing(provider)
         val account = complete(tokens)
         mutableState.value = SignInState.Success(provider, account.label)
     }
@@ -139,8 +146,9 @@ class RealSignInController(
     override fun submitApiKey(key: String) {
         val current = provider ?: return
         val state = mutableState.value
-        // One key at a time: a second tap while saving would add a second copy of the account.
-        if (state !is SignInState.ApiKey || state.saving) return
+        // One key at a time: once a key is accepted the form is gone, so a second tap while
+        // finishing cannot add a second copy of the account.
+        if (state !is SignInState.ApiKey) return
         val tokens =
             try {
                 steps.apiKeyTokens(current, key)
@@ -148,7 +156,7 @@ class RealSignInController(
                 mutableState.value = SignInState.ApiKey(current, keyRejected = true)
                 return
             }
-        mutableState.value = SignInState.ApiKey(current, saving = true)
+        finishing(current)
         job = scope.launch {
             try {
                 finish(current, tokens)
@@ -220,7 +228,8 @@ class AuthSignInSteps(
 
         override fun submitPastedCode(code: String) = signIn.submitPastedCode(code)
 
-        override suspend fun awaitTokens(): TokenSet = signIn.awaitTokens()
+        override suspend fun awaitTokens(onCodeReceived: () -> Unit): TokenSet =
+            signIn.awaitTokens(onCodeReceived)
 
         override fun close() = signIn.close()
     }

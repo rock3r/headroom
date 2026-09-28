@@ -14,6 +14,9 @@ import androidx.compose.ui.test.performScrollToNode
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.signin.FakeSignInController
+import dev.sebastiano.headroom.signin.SignInController
+import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
@@ -36,12 +39,12 @@ import org.robolectric.annotation.GraphicsMode
 class ScreenshotTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private fun launch(dark: Boolean = false) {
+    private fun launch(dark: Boolean = false, signIn: SignInController = FakeSignInController()) {
         // Frames are driven by capture(), so that animations are drawn while they run.
         rule.mainClock.autoAdvance = false
         rule.setContent {
             HeadroomTheme(darkTheme = dark, dynamicColor = false) {
-                HeadroomApp(graph = testGraph(rule.activity))
+                HeadroomApp(graph = testGraph(rule.activity, signInController = signIn))
             }
         }
     }
@@ -128,6 +131,21 @@ class ScreenshotTest {
         rule.onNodeWithText("Add account").performClick()
         rule.onNodeWithTag(providerOptionTag(Provider.Claude)).performClick()
         capture("sign-in-browser")
+    }
+
+    @Test
+    fun signInFinishing() {
+        // The clock stays with capture(), so the stream of shapes is drawn part-way through.
+        launch(signIn = FakeSignInController(SignInState.Finishing(Provider.Claude)))
+        rule.onNodeWithContentDescription("Accounts").performClick()
+        capture("sign-in-finishing")
+    }
+
+    @Test
+    fun signInFinishingDark() {
+        launch(dark = true, signIn = FakeSignInController(SignInState.Finishing(Provider.Grok)))
+        rule.onNodeWithContentDescription("Accounts").performClick()
+        capture("sign-in-finishing-dark")
     }
 
     @Test
