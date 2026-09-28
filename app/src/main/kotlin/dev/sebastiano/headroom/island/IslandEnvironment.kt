@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.island
 
 import android.app.Activity
 import android.app.Application
+import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.Context
 import android.content.res.Configuration
@@ -17,6 +18,9 @@ internal interface IslandEnvironment {
     fun isDoNotDisturb(): Boolean
 
     fun isAppInForeground(): Boolean
+
+    /** The device is locked, or showing the lock screen. */
+    fun isKeyguardLocked(): Boolean
 }
 
 /** Counts the started activities, so the app knows whether the user can see it. */
@@ -52,6 +56,7 @@ internal class AndroidIslandEnvironment(
 ) : IslandEnvironment {
     private val power = context.getSystemService(PowerManager::class.java)
     private val notifications = context.getSystemService(NotificationManager::class.java)
+    private val keyguard = context.getSystemService(KeyguardManager::class.java)
 
     override fun isScreenOn(): Boolean = power.isInteractive
 
@@ -67,4 +72,6 @@ internal class AndroidIslandEnvironment(
         }
 
     override fun isAppInForeground(): Boolean = foreground.isForeground
+
+    override fun isKeyguardLocked(): Boolean = keyguard.isKeyguardLocked
 }

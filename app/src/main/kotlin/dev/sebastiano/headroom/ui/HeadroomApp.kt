@@ -200,7 +200,8 @@ private const val ENTER_SCALE = 0.96f
 private fun ResetIslandAccess.collectUi(): ResetIslandUi {
     val ready by ready.collectAsStateWithLifecycle()
     val enabled by enabledInSettings.collectAsStateWithLifecycle()
-    return ResetIslandUi(ready, enabled)
+    val overlay by overlayAllowed.collectAsStateWithLifecycle()
+    return ResetIslandUi(ready, enabled, overlay)
 }
 
 /** Asks [pinner] for a widget, and says so in [snackbar] when the launcher cannot add it. */

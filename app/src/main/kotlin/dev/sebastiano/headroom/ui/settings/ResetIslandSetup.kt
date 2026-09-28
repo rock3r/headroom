@@ -14,9 +14,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,10 +36,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.island.IslandMode
 import dev.sebastiano.headroom.island.appInfoIntent
 import dev.sebastiano.headroom.island.installIsRestricted
 import dev.sebastiano.headroom.island.islandServiceComponent
 import dev.sebastiano.headroom.island.openAccessibilitySettings
+import dev.sebastiano.headroom.island.openOverlaySettings
 import dev.sebastiano.headroom.model.Provider
 
 /** The set-up of the reset island: the sheet's content, for tests and screenshots. */
@@ -45,7 +49,8 @@ const val RESET_ISLAND_SETUP_TAG: String = "reset-island-setup"
 
 /**
  * The guided set-up of the reset island, as a bottom sheet. It opens Android's own settings pages
- * for the two steps, and shows success once the accessibility service is connected.
+ * for the steps, and shows success once the accessibility service is connected or Display over
+ * other apps is allowed.
  */
 @Composable
 internal fun ResetIslandSetup(
@@ -58,12 +63,15 @@ internal fun ResetIslandSetup(
     val restricted = remember(context) { context.installIsRestricted() }
     val demoMessage = stringResource(R.string.reset_island_demo_message)
     ResetIslandSetupSheet(
-        ready = island.ready,
+        mode = island.mode,
         starting = island.enabledInSettings && !island.ready,
         restricted = restricted,
         onOpenAppInfo = { context.startActivity(appInfoIntent(context.packageName)) },
         onOpenAccessibility = {
             openAccessibilitySettings(islandServiceComponent(context), context::startActivity)
+        },
+        onOpenOverlaySettings = {
+            openOverlaySettings(context.packageName, context::startActivity)
         },
         onTry = { onTry(Provider.Claude, demoMessage) },
         onDismiss = onDismiss,
@@ -74,11 +82,12 @@ internal fun ResetIslandSetup(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ResetIslandSetupSheet(
-    ready: Boolean,
+    mode: IslandMode,
     starting: Boolean,
     restricted: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
     onTry: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -89,11 +98,12 @@ internal fun ResetIslandSetupSheet(
         modifier = modifier,
     ) {
         ResetIslandSetupContent(
-            ready = ready,
+            mode = mode,
             starting = starting,
             restricted = restricted,
             onOpenAppInfo = onOpenAppInfo,
             onOpenAccessibility = onOpenAccessibility,
+            onOpenOverlaySettings = onOpenOverlaySettings,
             onTry = onTry,
             onDone = onDismiss,
         )
@@ -101,18 +111,21 @@ internal fun ResetIslandSetupSheet(
 }
 
 /**
- * What the sheet says. Until the service is [ready] it explains the island, what it does not do,
- * and the steps. Once [ready] it shows success and offers to try the island. [starting] means
- * Android lists the service as on but has not connected it yet. [restricted] means Android blocks
- * the service until the user allows restricted settings, which adds a second step.
+ * What the sheet says. While [mode] is [IslandMode.None] it explains the island, what it does not
+ * do, and two ways to set it up: the accessibility service, which is the recommended one, and
+ * Display over other apps, for a device whose admin blocks the service. Once either works it shows
+ * success and offers to try the island. [starting] means Android lists the service as on but has
+ * not connected it yet. [restricted] means Android blocks the service until the user allows
+ * restricted settings, which adds a second step.
  */
 @Composable
 internal fun ResetIslandSetupContent(
-    ready: Boolean,
+    mode: IslandMode,
     starting: Boolean,
     restricted: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
     onTry: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
@@ -124,14 +137,15 @@ internal fun ResetIslandSetupContent(
                 .verticalScroll(rememberScrollState())
                 .padding(start = 24.dp, end = 24.dp, bottom = 32.dp)
     ) {
-        if (ready) {
-            SetupDone(onTry = onTry, onDone = onDone)
+        if (mode != IslandMode.None) {
+            SetupDone(overlay = mode == IslandMode.Overlay, onTry = onTry, onDone = onDone)
         } else {
             SetupSteps(
                 starting = starting,
                 restricted = restricted,
                 onOpenAppInfo = onOpenAppInfo,
                 onOpenAccessibility = onOpenAccessibility,
+                onOpenOverlaySettings = onOpenOverlaySettings,
             )
         }
     }
@@ -143,6 +157,7 @@ private fun SetupSteps(
     restricted: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
+    onOpenOverlaySettings: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
@@ -177,6 +192,46 @@ private fun SetupSteps(
                 onClick = onOpenAppInfo,
             )
         }
+        OverlayRoute(onOpenOverlaySettings)
+    }
+}
+
+/**
+ * The second way to set up the island, for a device whose admin blocks accessibility services. It
+ * is separated from the steps above by a divider, and says plainly what it cannot do.
+ */
+@Composable
+private fun OverlayRoute(onOpenOverlaySettings: () -> Unit) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.padding(top = 8.dp),
+    ) {
+        HorizontalDivider()
+        Text(
+            text = stringResource(R.string.island_setup_overlay_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            text = stringResource(R.string.island_setup_overlay_body),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Bullet(R.string.island_setup_overlay_limit_place)
+            Bullet(R.string.island_setup_overlay_limit_lock)
+            Bullet(R.string.island_setup_overlay_limit_tap)
+        }
+        OutlinedButton(onClick = onOpenOverlaySettings) {
+            Text(stringResource(R.string.island_setup_overlay_button))
+        }
+    }
+}
+
+@Composable
+private fun Bullet(@StringRes text: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text = "\u2022", style = MaterialTheme.typography.bodyMedium)
+        Text(text = stringResource(text), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -242,7 +297,7 @@ private fun StepCard(
 }
 
 @Composable
-private fun SetupDone(onTry: () -> Unit, onDone: () -> Unit) {
+private fun SetupDone(overlay: Boolean, onTry: () -> Unit, onDone: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Surface(
             shape = CircleShape,
@@ -264,7 +319,11 @@ private fun SetupDone(onTry: () -> Unit, onDone: () -> Unit) {
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = stringResource(R.string.island_setup_done_body),
+            text =
+                stringResource(
+                    if (overlay) R.string.island_setup_done_body_overlay
+                    else R.string.island_setup_done_body
+                ),
             style = MaterialTheme.typography.bodyLarge,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

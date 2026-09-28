@@ -50,6 +50,24 @@ internal fun openAccessibilitySettings(service: ComponentName, start: (Intent) -
         false
     }
 
+/** Opens Headroom's own Display over other apps page, where the user allows the overlay. */
+internal fun overlayPermissionIntent(packageName: String): Intent =
+    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$packageName".toUri())
+
+/**
+ * Starts the Display over other apps page of [packageName] with [start], and returns false instead
+ * of crashing when this device cannot open it.
+ */
+internal fun openOverlaySettings(packageName: String, start: (Intent) -> Unit): Boolean =
+    try {
+        start(overlayPermissionIntent(packageName))
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    } catch (_: SecurityException) {
+        false
+    }
+
 /**
  * True when Android restricts accessibility access for an app installed from [packageSource]: an
  * APK file on the device or one downloaded by a browser. Store installs and adb installs are not

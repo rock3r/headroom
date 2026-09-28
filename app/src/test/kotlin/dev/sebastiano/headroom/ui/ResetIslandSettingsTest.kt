@@ -67,34 +67,70 @@ class ResetIslandSettingsTest {
     }
 
     @Test
-    fun `with the switch on and no service, the row needs accessibility access`() {
+    fun `with the switch on and no way to draw, the row needs permission`() {
         openRow(on = true)
         rule.onNodeWithTag(RESET_ISLAND_TAG).assertIsOn()
-        rule.onNodeWithText("Needs accessibility access").assertIsDisplayed()
+        rule.onNodeWithText("Needs permission").assertIsDisplayed()
     }
 
     @Test
-    fun `with the switch on and the service connected, the row is ready`() {
+    fun `with the switch on and the service connected, the row is ready through accessibility`() {
         island.readyState.value = true
         openRow(on = true)
-        rule.onNodeWithText("Ready").assertIsDisplayed()
+        rule.onNodeWithText("Ready (accessibility)").assertIsDisplayed()
     }
 
     @Test
-    fun `when the service is turned off later, the row needs access again`() {
+    fun `with the switch on and display over other apps allowed, the row says so`() {
+        island.overlayState.value = true
+        openRow(on = true)
+        rule.onNodeWithText("Ready (display over other apps)").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the service is the better mode when both are there`() {
+        island.readyState.value = true
+        island.overlayState.value = true
+        openRow(on = true)
+        rule.onNodeWithText("Ready (accessibility)").assertIsDisplayed()
+        rule.onNodeWithText("Ready (display over other apps)").assertDoesNotExist()
+    }
+
+    @Test
+    fun `with the switch off the row says Off, even when a mode is available`() {
+        island.overlayState.value = true
+        openRow(on = false)
+        rule.onNodeWithText("Off").assertIsDisplayed()
+        rule.onNodeWithText("Ready (display over other apps)").assertDoesNotExist()
+    }
+
+    @Test
+    fun `when the service is turned off later, the row needs permission again`() {
         island.readyState.value = true
         openRow(on = true)
-        rule.onNodeWithText("Ready").assertIsDisplayed()
+        rule.onNodeWithText("Ready (accessibility)").assertIsDisplayed()
 
         island.readyState.value = false
         rule.waitForIdle()
 
-        rule.onNodeWithText("Needs accessibility access").assertIsDisplayed()
-        rule.onNodeWithText("Ready").assertDoesNotExist()
+        rule.onNodeWithText("Needs permission").assertIsDisplayed()
+        rule.onNodeWithText("Ready (accessibility)").assertDoesNotExist()
     }
 
     @Test
-    fun `Try is disabled while the service is not connected`() {
+    fun `when the service goes away but display over other apps is allowed, the row falls back`() {
+        island.readyState.value = true
+        island.overlayState.value = true
+        openRow(on = true)
+
+        island.readyState.value = false
+        rule.waitForIdle()
+
+        rule.onNodeWithText("Ready (display over other apps)").assertIsDisplayed()
+    }
+
+    @Test
+    fun `Try is disabled while there is no way to draw`() {
         openRow(on = true)
         rule.onNodeWithContentDescription("Try the reset island").assertIsNotEnabled()
     }
@@ -114,6 +150,14 @@ class ResetIslandSettingsTest {
         rule.onNodeWithText("Off").assertIsDisplayed()
         rule.onNodeWithContentDescription("Try the reset island").assertIsEnabled().performClick()
         assertEquals(1, island.demos.size)
+    }
+
+    @Test
+    fun `Try works through display over other apps when the service is not connected`() {
+        island.overlayState.value = true
+        openRow(on = true)
+        rule.onNodeWithContentDescription("Try the reset island").assertIsEnabled().performClick()
+        assertEquals(listOf(Provider.Claude to "Claude weekly limit reset"), island.demos)
     }
 
     @Test
@@ -140,7 +184,17 @@ class ResetIslandSettingsTest {
 
         rule.onNodeWithTag(RESET_ISLAND_SETUP_TAG).assertDoesNotExist()
         assertTrue(settings.settings.value.resetIsland)
-        rule.onNodeWithText("Ready").assertIsDisplayed()
+        rule.onNodeWithText("Ready (accessibility)").assertIsDisplayed()
+    }
+
+    @Test
+    fun `turning the switch on with display over other apps allowed needs no set-up`() {
+        island.overlayState.value = true
+        openRow()
+        rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
+
+        rule.onNodeWithTag(RESET_ISLAND_SETUP_TAG).assertDoesNotExist()
+        assertTrue(settings.settings.value.resetIsland)
     }
 
     @Test
@@ -185,6 +239,72 @@ class ResetIslandSettingsTest {
             "${rule.activity.packageName}/dev.sebastiano.headroom.island.ResetIslandService",
             intent.getStringExtra(":settings:fragment_args_key"),
         )
+    }
+
+    @Test
+    fun `the set-up keeps accessibility as the way and adds display over other apps as another`() {
+        openRow()
+        rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
+
+        val accessibility =
+            rule.onNodeWithText("Turn on the service").performScrollTo().assertIsDisplayed()
+        val overlay =
+            rule
+                .onNodeWithText(
+                    "Blocked by your device's admin? Use Display over other apps instead"
+                )
+                .performScrollTo()
+                .assertIsDisplayed()
+        assertTrue(
+            accessibility.fetchSemanticsNode().positionInRoot.y <
+                overlay.fetchSemanticsNode().positionInRoot.y
+        )
+    }
+
+    @Test
+    fun `the set-up says what display over other apps cannot do`() {
+        openRow()
+        rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
+
+        rule
+            .onNodeWithText("The pill shows below the status bar", substring = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        rule
+            .onNodeWithText("It does not show on the lock screen.", substring = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+        rule
+            .onNodeWithText("You can tap it to open Headroom", substring = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `the display over other apps button opens Headroom's page for that permission`() {
+        openRow()
+        rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
+        rule.onNodeWithText("Allow display over other apps").performScrollTo().performClick()
+
+        val intent = nextIntent()!!
+        assertEquals(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, intent.action)
+        assertEquals("package:${rule.activity.packageName}", intent.dataString)
+    }
+
+    @Test
+    fun `when display over other apps is allowed the set-up shows success and offers Try it`() {
+        openRow()
+        rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
+        rule.onNodeWithText("The reset island is ready").assertDoesNotExist()
+
+        island.overlayState.value = true
+        rule.waitForIdle()
+
+        rule.onNodeWithText("The reset island is ready").assertIsDisplayed()
+        rule.onNodeWithText("It shows below the status bar", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Allow display over other apps").assertDoesNotExist()
+        rule.onNodeWithText("Try it").performClick()
+        assertEquals(listOf(Provider.Claude to "Claude weekly limit reset"), island.demos)
     }
 
     @Test

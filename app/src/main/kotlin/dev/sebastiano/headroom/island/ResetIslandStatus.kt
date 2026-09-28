@@ -7,19 +7,21 @@ import android.provider.Settings
 /** What the settings row says about the island. */
 enum class ResetIslandStatus {
     Off,
-    NeedsAccess,
-    Ready,
+    NeedsPermission,
+    ReadyAccessibility,
+    ReadyOverlay,
 }
 
 /**
- * The status line of the settings row. The island is [Ready][ResetIslandStatus.Ready] only when the
- * switch is on and the accessibility service is connected.
+ * The status line of the settings row. With the switch off it is [Off][ResetIslandStatus.Off]. With
+ * it on, it says which way the island is drawn, or that it needs a permission.
  */
-fun resetIslandStatus(enabled: Boolean, ready: Boolean): ResetIslandStatus =
+fun resetIslandStatus(enabled: Boolean, mode: IslandMode): ResetIslandStatus =
     when {
         !enabled -> ResetIslandStatus.Off
-        !ready -> ResetIslandStatus.NeedsAccess
-        else -> ResetIslandStatus.Ready
+        mode == IslandMode.Accessibility -> ResetIslandStatus.ReadyAccessibility
+        mode == IslandMode.Overlay -> ResetIslandStatus.ReadyOverlay
+        else -> ResetIslandStatus.NeedsPermission
     }
 
 /**

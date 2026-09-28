@@ -31,6 +31,13 @@ public fun interface ResetIsland {
      */
     public suspend fun show(provider: Provider, message: String): Boolean
 
+    /**
+     * Returns once the island that [show] started is gone. The caller keeps its coroutine, and so
+     * its process, alive until then: a background process can be frozen or killed while the island
+     * is still on screen. It returns at once when nothing is on screen.
+     */
+    public suspend fun awaitIdle() {}
+
     public companion object {
         /** An island that never shows. */
         public val None: ResetIsland = ResetIsland { _, _ -> false }
@@ -97,6 +104,8 @@ internal class AndroidResetNotifier(
                 )
                 .build()
         manager.notify(id, notification)
+        // The notification is out. Now keep the process alive until the island is gone.
+        if (onIsland) island.awaitIdle()
     }
 
     /**

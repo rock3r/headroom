@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
+import dev.sebastiano.headroom.island.IslandMode
 import dev.sebastiano.headroom.ui.settings.ResetIslandSetupContent
 import kotlin.test.assertTrue
 import org.junit.Rule
@@ -25,11 +26,12 @@ class ResetIslandStepsTest {
         rule.setContent {
             HeadroomTheme(dynamicColor = false) {
                 ResetIslandSetupContent(
-                    ready = false,
+                    mode = IslandMode.None,
                     starting = false,
                     restricted = true,
                     onOpenAppInfo = {},
                     onOpenAccessibility = {},
+                    onOpenOverlaySettings = {},
                     onTry = {},
                     onDone = {},
                 )

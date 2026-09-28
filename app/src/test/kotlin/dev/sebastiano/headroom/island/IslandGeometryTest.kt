@@ -125,4 +125,55 @@ class IslandGeometryTest {
         assertTrue(geometry.window.left >= 0)
         assertTrue(geometry.expanded.contains(geometry.collapsed))
     }
+
+    // The overlay island: a phone with a 100 px status bar, below which the pill hangs.
+    private val statusBar = 100
+
+    private fun overlay() = overlayIslandGeometry(statusBar, width, height, density)
+
+    @Test
+    fun `the overlay pill is as large as the accessibility pill`() {
+        val pill = overlay().expanded
+        assertEquals(778, pill.width)
+        assertEquals(100, pill.height)
+    }
+
+    @Test
+    fun `the overlay window is exactly the pill, so it covers nothing else`() {
+        val geometry = overlay()
+        assertEquals(geometry.window.width, geometry.expanded.width)
+        assertEquals(geometry.window.height, geometry.expanded.height)
+        assertEquals(PxRect(0, 0, geometry.window.width, geometry.window.height), geometry.expanded)
+    }
+
+    @Test
+    fun `the overlay window sits below the status bar, with a small margin`() {
+        val geometry = overlay()
+        assertEquals(statusBar + 10, geometry.window.top) // 4 dp * 2.5 px per dp
+        assertTrue(geometry.window.top > statusBar)
+    }
+
+    @Test
+    fun `the overlay pill is centred on the screen`() {
+        val window = overlay().window
+        assertEquals(width / 2f, window.centerX, 1f)
+    }
+
+    @Test
+    fun `the overlay pill grows from a small dot at its own centre`() {
+        val geometry = overlay()
+        assertEquals(40, geometry.collapsed.width) // 16 dp * 2.5 px per dp
+        assertEquals(40, geometry.collapsed.height)
+        assertEquals(geometry.expanded.centerX, geometry.collapsed.centerX, 1f)
+        assertEquals(geometry.expanded.centerY, geometry.collapsed.centerY, 1f)
+        assertTrue(geometry.expanded.contains(geometry.collapsed))
+    }
+
+    @Test
+    fun `the overlay window stays on the screen`() {
+        val geometry = overlayIslandGeometry(statusBar, 300, 300, density)
+        assertTrue(geometry.window.left >= 0)
+        assertTrue(geometry.window.right <= 300)
+        assertTrue(geometry.window.bottom <= 300)
+    }
 }

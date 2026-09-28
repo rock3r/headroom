@@ -80,8 +80,17 @@ class AndroidResetNotifierTest {
         assertEquals(1, shadowOf(manager).allNotifications.size)
     }
 
-    private class RecordingIsland(private val shows: Boolean) : ResetIsland {
+    private inner class RecordingIsland(private val shows: Boolean) : ResetIsland {
         val shown = mutableListOf<Pair<Provider, String>>()
+        var idleAwaits = 0
+
+        /** How many notifications were in the shade when the notifier began to wait. */
+        var postedWhenWaiting = -1
+
+        override suspend fun awaitIdle() {
+            idleAwaits++
+            postedWhenWaiting = shadowOf(manager).allNotifications.size
+        }
 
         override suspend fun show(provider: Provider, message: String): Boolean {
             shown += provider to message
@@ -142,5 +151,25 @@ class AndroidResetNotifierTest {
 
         val posted = shadowOf(manager).getNotification(id)
         assertEquals(AndroidResetNotifier.CHANNEL_ID, posted.channelId)
+    }
+
+    @Test
+    fun `when the island shows, the notifier posts first and then waits for the island to finish`() =
+        runTest {
+            val island = RecordingIsland(shows = true)
+            AndroidResetNotifier(context, ZoneId.of("UTC"), island)
+                .notifyReset(grok, grok.primaryWindow!!)
+
+            assertEquals(1, island.idleAwaits)
+            assertEquals(1, island.postedWhenWaiting)
+        }
+
+    @Test
+    fun `when the island does not show, the notifier does not wait for it`() = runTest {
+        val island = RecordingIsland(shows = false)
+        AndroidResetNotifier(context, ZoneId.of("UTC"), island)
+            .notifyReset(grok, grok.primaryWindow!!)
+
+        assertEquals(0, island.idleAwaits)
     }
 }

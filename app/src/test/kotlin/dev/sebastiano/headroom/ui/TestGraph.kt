@@ -101,14 +101,19 @@ fun testGraph(
 }
 
 /** A reset island whose service state a test can change, and that records what was shown. */
-class FakeResetIslandAccess(ready: Boolean = false, enabledInSettings: Boolean = false) :
-    ResetIslandAccess {
+class FakeResetIslandAccess(
+    ready: Boolean = false,
+    enabledInSettings: Boolean = false,
+    overlayAllowed: Boolean = false,
+) : ResetIslandAccess {
     val readyState = MutableStateFlow(ready)
+    val overlayState = MutableStateFlow(overlayAllowed)
     val enabledState = MutableStateFlow(enabledInSettings)
     var refreshes = 0
     val demos = mutableListOf<Pair<Provider, String>>()
 
     override val ready: StateFlow<Boolean> = readyState
+    override val overlayAllowed: StateFlow<Boolean> = overlayState
     override val enabledInSettings: StateFlow<Boolean> = enabledState
 
     override fun refresh() {
@@ -116,7 +121,7 @@ class FakeResetIslandAccess(ready: Boolean = false, enabledInSettings: Boolean =
     }
 
     override fun showDemo(provider: Provider, message: String): Boolean {
-        if (!readyState.value) return false
+        if (!readyState.value && !overlayState.value) return false
         demos += provider to message
         return true
     }

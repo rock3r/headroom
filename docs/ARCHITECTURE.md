@@ -48,9 +48,23 @@ camera cutout, shows the provider logo and one line, and shrinks back. It lives 
   it posts the notification. When the island shows the reset, the notification goes to a quiet
   channel, so the user gets no pop-up as well. `:core:data` never depends on `:app`.
 - `AppResetIsland` in `:app` implements the seam. `IslandConditions.blockedBy()` is the pure
-  decision: setting off, service not connected, screen off, landscape, Headroom in the foreground,
-  or Do Not Disturb.
+  decision: setting off, no mode available, screen off, landscape, Headroom in the foreground, or
+  Do Not Disturb. In `Overlay` mode a locked device also blocks the island.
+- `resolveIslandMode()` picks the mode. `Accessibility` when the service is connected. Otherwise
+  `Overlay` when the user allowed Display over other apps (`SYSTEM_ALERT_WINDOW`). Otherwise `None`,
+  and the reset uses the heads-up notification.
 - `IslandHub` is the in-process signal. `ResetIslandService`, an accessibility service with no
   events and no window content, reports that it is connected and collects the hub's requests.
   Only an accessibility overlay draws above the status bar, the shade and the lock screen.
 - `islandGeometry()` is the pure mapping from the camera cutout and the screen size to the pill.
+- `Overlay` mode is for a device whose admin blocks accessibility services. `AndroidIslandOverlay`
+  adds a `TYPE_APPLICATION_OVERLAY` window from a window context. That window draws below the
+  status bar, never shows on the lock screen, and is touchable on purpose: Android draws an
+  untouchable overlay at 80% alpha, so black would look grey. It is only as big as the pill
+  (`overlayIslandGeometry()`). A tap opens Headroom and a swipe up dismisses it.
+- The overlay window must not outlive its animation. A watchdog removes it a few seconds after the
+  longest island should have ended. Android also removes the windows of a process that dies.
+- The reset checker runs in a WorkManager worker, and a background process can be frozen while the
+  pill is on screen. So `AndroidResetNotifier` posts the notification first, then awaits
+  `ResetIsland.awaitIdle()`, which returns when the overlay window is gone. The worker's coroutine,
+  and so the process, stays alive for that time (about five seconds).

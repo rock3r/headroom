@@ -103,6 +103,37 @@ internal fun islandGeometry(
     )
 }
 
+/**
+ * The geometry of the island in `Overlay` mode. That window cannot draw over the status bar, so the
+ * pill hangs just below it, [statusBarHeight] pixels down plus a small margin, centred on the
+ * screen. It grows from a small dot at its own centre. The window is exactly the pill and nothing
+ * more, because it takes the touches in its own area. The grow spring passes its target by a
+ * little, and the window clips that.
+ */
+internal fun overlayIslandGeometry(
+    statusBarHeight: Int,
+    screenWidth: Int,
+    screenHeight: Int,
+    density: Float,
+): IslandGeometry {
+    val pillWidth = min((screenWidth * PILL_WIDTH_SHARE).roundToInt(), screenWidth)
+    val pillHeight = (PILL_HEIGHT_DP * density).roundToInt()
+    val left = ((screenWidth - pillWidth) / 2f).roundToInt()
+    val top =
+        (statusBarHeight + OVERLAY_MARGIN_DP * density)
+            .roundToInt()
+            .coerceAtMost((screenHeight - pillHeight).coerceAtLeast(0))
+    val window = PxRect(left, top, left + pillWidth, top + pillHeight)
+    val dot = (DOT_DP * density).roundToInt()
+    val dotLeft = ((pillWidth - dot) / 2f).roundToInt()
+    val dotTop = ((pillHeight - dot) / 2f).roundToInt()
+    return IslandGeometry(
+        window = window,
+        collapsed = PxRect(dotLeft, dotTop, dotLeft + dot, dotTop + dot),
+        expanded = PxRect(0, 0, pillWidth, pillHeight),
+    )
+}
+
 /** How much of the screen width the pill takes. */
 private const val PILL_WIDTH_SHARE = 0.72f
 
@@ -116,3 +147,6 @@ private const val DOT_DP = 16f
 
 /** Room around the pill for the grow spring, which passes its target by a little. */
 private const val OVERSHOOT_DP = 8f
+
+/** The gap between the status bar and the pill of the overlay island. */
+private const val OVERLAY_MARGIN_DP = 4f

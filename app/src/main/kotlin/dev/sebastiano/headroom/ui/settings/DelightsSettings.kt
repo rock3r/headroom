@@ -35,7 +35,8 @@ const val RESET_ISLAND_TAG: String = "reset-island"
 /**
  * The delights, each with its switch: the refresh shimmer, the reset confetti and the experimental
  * reset island. The island's row also shows its [islandStatus], and its Try button needs
- * [canTryIsland], which is true when the accessibility service is connected.
+ * [canTryIsland], which is true when the accessibility service is connected or Display over other
+ * apps is allowed.
  */
 @Composable
 internal fun DelightsList(
@@ -106,10 +107,13 @@ private fun IslandStatusLine(status: ResetIslandStatus, modifier: Modifier = Mod
         when (status) {
             ResetIslandStatus.Off ->
                 R.string.settings_reset_island_off to MaterialTheme.colorScheme.onSurfaceVariant
-            ResetIslandStatus.NeedsAccess ->
-                R.string.settings_reset_island_needs_access to MaterialTheme.colorScheme.error
-            ResetIslandStatus.Ready ->
-                R.string.settings_reset_island_ready to MaterialTheme.colorScheme.primary
+            ResetIslandStatus.NeedsPermission ->
+                R.string.settings_reset_island_needs_permission to MaterialTheme.colorScheme.error
+            ResetIslandStatus.ReadyAccessibility ->
+                R.string.settings_reset_island_ready_accessibility to
+                    MaterialTheme.colorScheme.primary
+            ResetIslandStatus.ReadyOverlay ->
+                R.string.settings_reset_island_ready_overlay to MaterialTheme.colorScheme.primary
         }
     Text(
         text = stringResource(text),

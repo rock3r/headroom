@@ -5,22 +5,34 @@ import kotlin.test.assertEquals
 
 class IslandAccessTest {
     @Test
-    fun `the switch off reads as Off, whatever the service does`() {
-        assertEquals(ResetIslandStatus.Off, resetIslandStatus(enabled = false, ready = false))
-        assertEquals(ResetIslandStatus.Off, resetIslandStatus(enabled = false, ready = true))
+    fun `the switch off reads as Off, whatever the mode`() {
+        for (mode in IslandMode.entries) {
+            assertEquals(ResetIslandStatus.Off, resetIslandStatus(enabled = false, mode = mode))
+        }
     }
 
     @Test
-    fun `the switch on without the service needs accessibility access`() {
+    fun `the switch on without any way to draw needs permission`() {
         assertEquals(
-            ResetIslandStatus.NeedsAccess,
-            resetIslandStatus(enabled = true, ready = false),
+            ResetIslandStatus.NeedsPermission,
+            resetIslandStatus(enabled = true, mode = IslandMode.None),
         )
     }
 
     @Test
-    fun `the switch on with the service connected is ready`() {
-        assertEquals(ResetIslandStatus.Ready, resetIslandStatus(enabled = true, ready = true))
+    fun `the switch on with the service connected is ready through accessibility`() {
+        assertEquals(
+            ResetIslandStatus.ReadyAccessibility,
+            resetIslandStatus(enabled = true, mode = IslandMode.Accessibility),
+        )
+    }
+
+    @Test
+    fun `the switch on with display over other apps is ready through the overlay`() {
+        assertEquals(
+            ResetIslandStatus.ReadyOverlay,
+            resetIslandStatus(enabled = true, mode = IslandMode.Overlay),
+        )
     }
 
     private val pkg = "dev.sebastiano.headroom"

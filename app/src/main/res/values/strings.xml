@@ -248,8 +248,9 @@
     <string name="settings_reset_island">Reset island (experimental)</string>
     <string name="settings_reset_island_body">A small black pill grows out of your camera cutout when a limit resets while Headroom is in the background.</string>
     <string name="settings_reset_island_off">Off</string>
-    <string name="settings_reset_island_needs_access">Needs accessibility access</string>
-    <string name="settings_reset_island_ready">Ready</string>
+    <string name="settings_reset_island_needs_permission">Needs permission</string>
+    <string name="settings_reset_island_ready_accessibility">Ready (accessibility)</string>
+    <string name="settings_reset_island_ready_overlay">Ready (display over other apps)</string>
     <string name="settings_try_reset_island">Try the reset island</string>
     <string name="reset_island_demo_message">Claude weekly limit reset</string>
     <string name="reset_island_service_label">Headroom reset island</string>
@@ -269,7 +270,14 @@
     <string name="island_setup_restricted_button">Open App info</string>
     <string name="island_setup_connecting">Almost there. Android is starting the service.</string>
     <string name="island_setup_done_title">The reset island is ready</string>
+    <string name="island_setup_overlay_title">Blocked by your device\'s admin? Use Display over other apps instead</string>
+    <string name="island_setup_overlay_body">If a work policy stops you from turning on the accessibility service, Headroom can draw the pill with the Display over other apps permission. It works, with three limits.</string>
+    <string name="island_setup_overlay_limit_place">The pill shows below the status bar, not around the camera.</string>
+    <string name="island_setup_overlay_limit_lock">It does not show on the lock screen. A reset that arrives while the phone is locked uses a normal pop-up notification.</string>
+    <string name="island_setup_overlay_limit_tap">You can tap it to open Headroom, or swipe it up to hide it.</string>
+    <string name="island_setup_overlay_button">Allow display over other apps</string>
     <string name="island_setup_done_body">It will show up when a limit resets and Headroom is in the background. You can turn the service off in accessibility settings at any time.</string>
+    <string name="island_setup_done_body_overlay">It shows below the status bar when a limit resets and Headroom is in the background. It does not show on the lock screen. You can take the permission away in Settings at any time.</string>
     <string name="island_setup_try">Try it</string>
     <string name="island_setup_close">Done</string>
     <string name="settings_sync">Background updates</string>

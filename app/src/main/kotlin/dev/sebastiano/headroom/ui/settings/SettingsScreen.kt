@@ -50,7 +50,9 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.island.IslandMode
 import dev.sebastiano.headroom.island.resetIslandStatus
+import dev.sebastiano.headroom.island.resolveIslandMode
 import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
@@ -100,13 +102,19 @@ data class SettingsActions(
     val onRefreshResetIsland: () -> Unit = {},
 )
 
-/** What the reset island's row and its set-up need to know about the accessibility service. */
+/** What the reset island's row and its set-up need to know about the two ways to draw it. */
 data class ResetIslandUi(
-    /** True while the service that draws the island is connected. */
+    /** True while the accessibility service that draws the island is connected. */
     val ready: Boolean = false,
     /** True when accessibility settings list the service as turned on. */
     val enabledInSettings: Boolean = false,
-)
+    /** True when the user allowed Display over other apps, the fallback without the service. */
+    val overlayAllowed: Boolean = false,
+) {
+    /** The best way to draw the island now. */
+    val mode: IslandMode
+        get() = resolveIslandMode(serviceConnected = ready, canDrawOverlays = overlayAllowed)
+}
 
 /**
  * The app settings: the accounts, used or left, the appearance (light or dark, the colours and
@@ -124,8 +132,8 @@ fun SettingsScreen(
     reveal: PageReveal? = null,
     resetIsland: ResetIslandUi = ResetIslandUi(),
 ) {
-    // The set-up opens when the island is switched on without the service. A return from
-    // accessibility settings reads the state again.
+    // The set-up opens when the island is switched on with no way to draw it. A return from
+    // one of the settings pages reads the state again.
     var showIslandSetup by rememberSaveable { mutableStateOf(false) }
     LifecycleResumeEffect(actions.onRefreshResetIsland) {
         actions.onRefreshResetIsland()
@@ -153,13 +161,15 @@ fun SettingsScreen(
                     refreshShimmer = state.refreshShimmer,
                     resetConfetti = state.resetConfetti,
                     resetIsland = state.resetIsland,
-                    islandStatus = resetIslandStatus(state.resetIsland, resetIsland.ready),
-                    canTryIsland = resetIsland.ready,
+                    islandStatus = resetIslandStatus(state.resetIsland, resetIsland.mode),
+                    canTryIsland = resetIsland.mode != IslandMode.None,
                     onRefreshShimmerChange = actions.onRefreshShimmerChange,
                     onResetConfettiChange = actions.onResetConfettiChange,
                     onResetIslandChange = { on ->
                         actions.onResetIslandChange(on)
-                        if (on && !resetIsland.ready) showIslandSetup = true
+                        if (on && resetIsland.mode == IslandMode.None) {
+                            showIslandSetup = true
+                        }
                     },
                     onTryResetIsland = actions.onTryResetIsland,
                     modifier = width,

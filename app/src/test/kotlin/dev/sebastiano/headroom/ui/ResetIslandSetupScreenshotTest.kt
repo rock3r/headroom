@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
+import dev.sebastiano.headroom.island.IslandMode
 import dev.sebastiano.headroom.ui.settings.ResetIslandSetupContent
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -35,7 +36,7 @@ import org.robolectric.annotation.GraphicsMode
 class ResetIslandSetupScreenshotTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private fun setup(ready: Boolean, starting: Boolean, name: String) {
+    private fun setup(mode: IslandMode, starting: Boolean, name: String) {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             HeadroomTheme(dynamicColor = false) {
@@ -45,11 +46,12 @@ class ResetIslandSetupScreenshotTest {
                 ) {
                     Box(Modifier.padding(top = 24.dp)) {
                         ResetIslandSetupContent(
-                            ready = ready,
+                            mode = mode,
                             starting = starting,
                             restricted = false,
                             onOpenAppInfo = {},
                             onOpenAccessibility = {},
+                            onOpenOverlaySettings = {},
                             onTry = {},
                             onDone = {},
                         )
@@ -66,9 +68,15 @@ class ResetIslandSetupScreenshotTest {
 
     // Robolectric draws nothing in a test that runs after the tall steps screen. Recording the
     // short "done" screen first avoids that, so the two tests run in the order of their names.
-    @Test fun a_done() = setup(ready = true, starting = false, name = "reset-island-setup-done")
+    @Test
+    fun a_done() =
+        setup(IslandMode.Accessibility, starting = false, name = "reset-island-setup-done")
 
-    @Test fun b_steps() = setup(ready = false, starting = false, name = "reset-island-setup")
+    @Test
+    fun b_doneOverlay() =
+        setup(IslandMode.Overlay, starting = false, name = "reset-island-setup-done-overlay")
+
+    @Test fun c_steps() = setup(IslandMode.None, starting = false, name = "reset-island-setup")
 
     private companion object {
         const val SETTLE_STEPS = 12

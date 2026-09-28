@@ -7,12 +7,16 @@ import androidx.work.Configuration
 import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.data.DataGraphOwner
 import dev.sebastiano.headroom.island.AndroidIslandEnvironment
+import dev.sebastiano.headroom.island.AndroidIslandOverlay
 import dev.sebastiano.headroom.island.AppResetIsland
 import dev.sebastiano.headroom.island.ForegroundTracker
 import dev.sebastiano.headroom.island.IslandHub
 import dev.sebastiano.headroom.island.isIslandServiceEnabled
+import dev.sebastiano.headroom.island.launchHeadroomIntent
+import dev.sebastiano.headroom.island.openHeadroom
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.widget.HeadroomWidgetHost
@@ -43,11 +47,25 @@ open class HeadroomApplication :
     /** Tells when the user can see the app, so the reset island stays out of its way. */
     private val foreground = ForegroundTracker()
 
+    /** True when the user turned motion off in Headroom's settings. The overlay island reads it. */
+    @Volatile private var reduceMotion = false
+
     /**
-     * The in-process signal between the reset checker and the island's accessibility service. The
-     * settings screen reads it too, to show whether the island is ready.
+     * The in-process signal between the reset checker and the island's windows: the accessibility
+     * service, or, without it, the overlay window that Display over other apps allows. The settings
+     * screen reads it too, to show whether the island is ready.
      */
-    val islandHub: IslandHub by lazy { IslandHub(readEnabled = { isIslandServiceEnabled(this) }) }
+    val islandHub: IslandHub by lazy {
+        IslandHub(
+            readEnabled = { isIslandServiceEnabled(this) },
+            overlay =
+                AndroidIslandOverlay(
+                    context = this,
+                    reduceMotion = { reduceMotion },
+                    openApp = { openHeadroom(launchHeadroomIntent(this), ::startActivity) },
+                ),
+        )
+    }
 
     override val dataGraph: DataGraph by lazy {
         DataGraph(
@@ -58,6 +76,7 @@ open class HeadroomApplication :
                     hub = islandHub,
                     isEnabled = { dataGraph.settings.settings.first().resetIsland },
                     environment = AndroidIslandEnvironment(this, foreground),
+                    mainContext = Dispatchers.Main.immediate,
                 ),
         )
     }
@@ -89,6 +108,12 @@ open class HeadroomApplication :
         if (!usesDataLayer) return
         registerActivityLifecycleCallbacks(foreground)
         dataGraph.start()
+        appScope.launch {
+            dataGraph.settings.settings
+                .map { it.motion == MotionPreference.Reduced }
+                .distinctUntilChanged()
+                .collect { reduceMotion = it }
+        }
         // Widgets redraw whenever the stored data, the used or left setting or the colour palette
         // changes; they never fetch on their own.
         appScope.launch {

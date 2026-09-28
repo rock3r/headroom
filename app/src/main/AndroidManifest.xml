@@ -14,6 +14,12 @@
         </intent>
     </queries>
 
+    <!--
+        Display over other apps. The reset island falls back to an overlay window under the status
+        bar when a device admin blocks the accessibility service. The user grants it in Settings.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:name=".HeadroomApplication"
         android:allowBackup="false"
