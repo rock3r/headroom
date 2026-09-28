@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.widget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 
@@ -31,6 +32,12 @@ public object WidgetIntents {
                 .setIdentifier("open:$appWidgetId:${accountId.orEmpty()}")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        // Android 17 does not resolve an implicit activity intent sent from a widget tap
+        // (START_INTENT_NOT_RESOLVED), so name the launcher activity.
+        intent.component =
+            context.packageManager.resolveActivity(intent, 0)?.activityInfo?.let {
+                ComponentName(it.packageName, it.name)
+            }
         if (accountId != null) intent.putExtra(EXTRA_ACCOUNT_ID, accountId)
         return PendingIntent.getActivity(context, appWidgetId, intent, IMMUTABLE_UPDATE)
     }

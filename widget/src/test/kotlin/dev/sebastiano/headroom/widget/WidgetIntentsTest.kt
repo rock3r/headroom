@@ -1,7 +1,9 @@
 package dev.sebastiano.headroom.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
+import android.content.IntentFilter
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -28,6 +30,22 @@ class WidgetIntentsTest {
         assertEquals(WidgetIntents.ACTION_REFRESH, intent.action)
         assertEquals(WidgetActionReceiver::class.java.name, intent.component?.className)
         assertEquals(7, intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1))
+    }
+
+    @Test
+    fun `open app names the launcher activity, because the system does not resolve implicit ones`() {
+        val launcher = ComponentName(app, "dev.sebastiano.headroom.MainActivity")
+        shadowOf(app.packageManager).apply {
+            addActivityIfNotPresent(launcher)
+            addIntentFilterForActivity(
+                launcher,
+                IntentFilter(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) },
+            )
+        }
+
+        val pending = shadowOf(WidgetIntents.openApp(app, appWidgetId = 7, accountId = null))
+
+        assertEquals(launcher, pending.savedIntent.component)
     }
 
     @Test
