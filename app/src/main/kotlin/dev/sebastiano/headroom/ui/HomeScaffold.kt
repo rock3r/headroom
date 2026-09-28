@@ -89,6 +89,7 @@ internal fun HomeScaffold(
     onRefresh: () -> Unit,
     onSelectAccount: (String) -> Unit,
     onAlertChange: (String, String, Boolean) -> Unit,
+    onChartWindowChange: (String) -> Unit,
     onOpenAccounts: () -> Unit,
     onAddWidget: (WidgetStyle) -> Unit,
     modifier: Modifier = Modifier,
@@ -161,6 +162,7 @@ internal fun HomeScaffold(
                             onRefresh = onRefresh,
                             onSelectAccount = onSelectAccount,
                             onAlertChange = onAlertChange,
+                            onChartWindowChange = onChartWindowChange,
                             onAllResets = { selectTab(HomeTab.Resets) },
                             onOpenAccounts = onOpenAccounts,
                             bottomPadding = bottomPadding,
@@ -200,6 +202,7 @@ private fun OverviewPanes(
     onRefresh: () -> Unit,
     onSelectAccount: (String) -> Unit,
     onAlertChange: (String, String, Boolean) -> Unit,
+    onChartWindowChange: (String) -> Unit,
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
@@ -258,7 +261,7 @@ private fun OverviewPanes(
                 AnimatedPane {
                     val current = detail ?: return@AnimatedPane
                     if (twoPanes) {
-                        DetailPane(current, formatter, onAlertChange)
+                        DetailPane(current, formatter, onAlertChange, onChartWindowChange)
                     } else {
                         val shared =
                             remember(this, containerSpec, valueSpec) {
@@ -274,6 +277,7 @@ private fun OverviewPanes(
                             state = current,
                             formatter = formatter,
                             onAlertChange = onAlertChange,
+                            onChartWindowChange = onChartWindowChange,
                             onBack = { scope.launch { navigator.navigateBack() } },
                             sharedElements = shared,
                             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
@@ -332,6 +336,7 @@ private fun DetailPane(
     detail: DetailUiState,
     formatter: ResetFormatter,
     onAlertChange: (String, String, Boolean) -> Unit,
+    onChartWindowChange: (String) -> Unit,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
@@ -350,7 +355,12 @@ private fun DetailPane(
                 .background(MaterialTheme.colorScheme.surfaceContainerLow),
         label = "detail pane",
     ) { shown ->
-        DetailScreen(state = shown, formatter = formatter, onAlertChange = onAlertChange)
+        DetailScreen(
+            state = shown,
+            formatter = formatter,
+            onAlertChange = onAlertChange,
+            onChartWindowChange = onChartWindowChange,
+        )
     }
 }
 

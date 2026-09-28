@@ -157,6 +157,30 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun `the chart switches between the account's long windows`() =
+        runTest(main.dispatcher) {
+            observe()
+            val claude = assertNotNull(viewModel.detail.value)
+            assertEquals(listOf("seven_day", "seven_day_opus"), claude.chartWindows.map { it.id })
+            assertEquals("seven_day", claude.chartWindowId)
+
+            viewModel.selectChartWindow("seven_day_opus")
+            runCurrent()
+            val opus = assertNotNull(viewModel.detail.value)
+            assertEquals("seven_day_opus", opus.chartWindowId)
+            assertEquals(
+                claude.account.windows.first { it.id == "seven_day_opus" }.usedPercent,
+                opus.chart?.usedPercent,
+            )
+
+            // Another account starts from its own primary window.
+            viewModel.select("demo-codex")
+            runCurrent()
+            val codex = assertNotNull(viewModel.detail.value)
+            assertEquals(codex.account.primary?.id, codex.chartWindowId)
+        }
+
+    @Test
     fun `the usage at past resets comes with each account`() =
         runTest(main.dispatcher) {
             observe()

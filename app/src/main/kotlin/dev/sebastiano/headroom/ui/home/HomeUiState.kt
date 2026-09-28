@@ -74,7 +74,15 @@ data class NextResetSummary(
 
 /** The detail screen: one account plus the chart of its primary window. */
 @Immutable
-data class DetailUiState(val now: Instant, val account: AccountSummary, val chart: ChartSummary?)
+data class DetailUiState(
+    val now: Instant,
+    val account: AccountSummary,
+    val chart: ChartSummary?,
+    /** The windows the chart can show, when there is more than one to pick from. */
+    val chartWindows: List<WindowSummary> = emptyList(),
+    /** The window the chart shows. */
+    val chartWindowId: String? = null,
+)
 
 @Immutable
 data class ChartSummary(

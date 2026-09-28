@@ -8,7 +8,9 @@ import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
+import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -115,27 +117,48 @@ class HomeViewModel(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), initialState())
 
+    /** The window the chart shows, as account id to window id, when the user picked one. */
+    private val chartWindow = MutableStateFlow<Pair<String, String>?>(null)
+
     /** The selected account's detail. Without a selection it shows the first account. */
     val detail: StateFlow<DetailUiState?> =
-        combine(state, selectedId) { home, id ->
+        combine(state, selectedId, chartWindow) { home, id, picked ->
                 val account =
                     home.accounts.firstOrNull { it.id == id } ?: home.accounts.firstOrNull()
-                account?.let { home.now to it }
+                account?.let {
+                    Triple(home.now, it, picked?.takeIf { p -> p.first == it.id }?.second)
+                }
             }
             .distinctUntilChanged()
             .flatMapLatest { selection ->
                 if (selection == null) return@flatMapLatest flowOf(null)
-                val (now, account) = selection
-                val window = repository.accounts.value.primaryWindowOf(account.id)
+                val (now, account, picked) = selection
+                val state = repository.accounts.value.firstOrNull { it.account.id == account.id }
+                val options = state?.snapshot?.windows.orEmpty().filter { it.isChartable }
+                val window = options.firstOrNull { it.id == picked } ?: state?.primaryWindow
+                val chartWindows =
+                    account.windows.filter { summary -> options.any { it.id == summary.id } }
                 if (window == null) {
                     flowOf(DetailUiState(now, account, chart = null))
                 } else {
                     repository.history(account.id, window.id).map { points ->
-                        DetailUiState(now, account, chartSummary(window, points, now))
+                        DetailUiState(
+                            now = now,
+                            account = account,
+                            chart = chartSummary(window, points, now),
+                            chartWindows = chartWindows,
+                            chartWindowId = window.id,
+                        )
                     }
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
+
+    /** Shows [windowId] of the selected account in the chart. */
+    fun selectChartWindow(windowId: String) {
+        val accountId = detail.value?.account?.id ?: return
+        chartWindow.value = accountId to windowId
+    }
 
     fun select(accountId: String) {
         savedStateHandle[SELECTED_ACCOUNT_KEY] = accountId
@@ -168,10 +191,13 @@ class HomeViewModel(
             accountsLoaded = accountsLoaded.value,
         )
 
-    private fun List<AccountState>.primaryWindowOf(accountId: String) = firstOrNull {
-        it.account.id == accountId
-    }
-        ?.primaryWindow
+    /** Weekly and monthly windows with a known start can be drawn against even pace. */
+    private val QuotaWindow.isChartable: Boolean
+        get() =
+            (kind == WindowKind.Weekly || kind == WindowKind.Monthly) &&
+                resetsAt != null &&
+                length != null &&
+                !isUnlimited
 
     private data class Environment(
         val isDemo: Boolean,

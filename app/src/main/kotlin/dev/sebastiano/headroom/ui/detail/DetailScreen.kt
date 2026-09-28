@@ -22,6 +22,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -36,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
@@ -67,6 +71,8 @@ const val DETAIL_TAG: String = "detail"
 
 fun alertSwitchTag(accountId: String, windowId: String): String = "alert-$accountId-$windowId"
 
+fun chartWindowTag(windowId: String): String = "chart-window-$windowId"
+
 /**
  * One account in depth: the hero ring (weekly outside, session inside), every window, the pace
  * chart drawn to scale, and the per-window reset alert switches.
@@ -79,6 +85,7 @@ fun DetailScreen(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     sharedElements: SharedElements? = null,
+    onChartWindowChange: (windowId: String) -> Unit = {},
 ) {
     val account = state.account
     val container =
@@ -117,7 +124,17 @@ fun DetailScreen(
                 )
             }
             WindowList(account, state.now, formatter, content)
-            state.chart?.let { ChartCard(it, state.now, formatter, content) }
+            state.chart?.let {
+                ChartCard(
+                    chart = it,
+                    now = state.now,
+                    formatter = formatter,
+                    windows = state.chartWindows,
+                    selectedWindowId = state.chartWindowId,
+                    onWindowChange = onChartWindowChange,
+                    modifier = content,
+                )
+            }
             AlertSection(account, formatter, onAlertChange, content)
         }
     }
@@ -293,11 +310,36 @@ private fun resetLine(window: WindowSummary, at: Instant, now: Instant, formatte
         else -> stringResource(R.string.detail_resets_at, formatter.long(at))
     }
 
+/** Picks which long window the chart draws, for accounts with more than one. */
+@Composable
+private fun ChartWindowPicker(
+    windows: List<WindowSummary>,
+    selectedWindowId: String?,
+    onWindowChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
+        windows.forEachIndexed { index, window ->
+            SegmentedButton(
+                selected = window.id == selectedWindowId,
+                onClick = { onWindowChange(window.id) },
+                shape = SegmentedButtonDefaults.itemShape(index, windows.size),
+                modifier = Modifier.testTag(chartWindowTag(window.id)),
+            ) {
+                Text(window.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
 @Composable
 private fun ChartCard(
     chart: ChartSummary,
     now: Instant,
     formatter: ResetFormatter,
+    windows: List<WindowSummary>,
+    selectedWindowId: String?,
+    onWindowChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -324,6 +366,10 @@ private fun ChartCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (windows.size > 1) {
+                Spacer(Modifier.height(8.dp))
+                ChartWindowPicker(windows, selectedWindowId, onWindowChange)
             }
             Spacer(Modifier.height(4.dp))
             val used = chart.usedPercent.roundToInt()

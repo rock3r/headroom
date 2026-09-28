@@ -3,8 +3,10 @@ package dev.sebastiano.headroom.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertRangeInfoEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -18,6 +20,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.designsystem.IndicatorStyle
 import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
 import dev.sebastiano.headroom.ui.detail.alertSwitchTag
+import dev.sebastiano.headroom.ui.detail.chartWindowTag
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import org.junit.Rule
 import org.junit.Test
@@ -56,6 +59,15 @@ class DetailTest {
         rule
             .onNodeWithText("At this rate you reach 100% in about 1d 17h, 1d 1h before the reset.")
             .assertExists()
+    }
+
+    @Test
+    fun `the chart can show another long window`() {
+        openClaude()
+        val opus = rule.onNodeWithTag(chartWindowTag("seven_day_opus"))
+        opus.performScrollTo().assertIsNotSelected().performClick()
+        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected()
+        rule.onNodeWithTag(chartWindowTag("seven_day")).assertIsNotSelected()
     }
 
     @Test

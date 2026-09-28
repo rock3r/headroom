@@ -139,6 +139,7 @@ fun HeadroomApp(
                     onRefresh = homeViewModel::refresh,
                     onSelectAccount = homeViewModel::select,
                     onAlertChange = homeViewModel::setAlert,
+                    onChartWindowChange = homeViewModel::selectChartWindow,
                     onOpenAccounts = { accountsOpen = true },
                     playEntrance = !entrancePlayed,
                     onEntranceStart = { entrancePlayed = true },
