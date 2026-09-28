@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -45,6 +46,7 @@ import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.SectionLabel
+import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import java.time.Duration
 import java.time.Instant
@@ -92,59 +94,67 @@ fun OverviewScreen(
             )
         },
     ) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
-            modifier =
-                Modifier.fillMaxSize()
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
-                    )
-                    .testTag(OVERVIEW_LIST_TAG),
-            contentPadding =
-                PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = insets.calculateTopPadding() + 8.dp,
-                    bottom = insets.calculateBottomPadding() + bottomPadding + 16.dp,
-                ),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            fullWidth("header") { OverviewHeader(state, onOpenAccounts) }
-            if (state.isDemo) {
-                fullWidth("demo") { DemoBanner(onAddAccount = onOpenAccounts) }
-            }
-            state.nextReset?.let { next ->
-                fullWidth("next") {
-                    NextResetCard(
-                        next = next,
-                        now = state.now,
-                        formatter = formatter,
-                        onAlertChange = onNextResetAlertChange,
-                        onAllResets = onAllResets,
-                    )
+        val gridState = rememberLazyGridState()
+        StatusBarBlurBox(scrollState = gridState, modifier = Modifier.fillMaxSize()) {
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Fixed(columns),
+                modifier =
+                    Modifier.fillMaxSize()
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                        )
+                        .testTag(OVERVIEW_LIST_TAG),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = insets.calculateTopPadding() + 8.dp,
+                        bottom = insets.calculateBottomPadding() + bottomPadding + 16.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                fullWidth("header") { OverviewHeader(state, onOpenAccounts) }
+                if (state.isDemo) {
+                    fullWidth("demo") { DemoBanner(onAddAccount = onOpenAccounts) }
                 }
-            }
-            if (state.accounts.isEmpty()) {
-                fullWidth("empty") {
-                    Text(
-                        text = stringResource(R.string.overview_empty),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(8.dp),
-                    )
-                }
-            } else {
-                fullWidth("section") { SectionLabel(stringResource(R.string.overview_this_week)) }
-                itemsIndexed(state.accounts, key = { _, account -> account.id }) { index, account ->
-                    StaggeredEntrance(index = index, play = playEntrance) {
-                        AccountCard(
-                            account = account,
+                state.nextReset?.let { next ->
+                    fullWidth("next") {
+                        NextResetCard(
+                            next = next,
                             now = state.now,
                             formatter = formatter,
-                            onClick = { onOpenAccount(account.id) },
-                            selected = account.id == selectedAccountId,
-                            sharedElements = sharedElements,
+                            onAlertChange = onNextResetAlertChange,
+                            onAllResets = onAllResets,
                         )
+                    }
+                }
+                if (state.accounts.isEmpty()) {
+                    fullWidth("empty") {
+                        Text(
+                            text = stringResource(R.string.overview_empty),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+                } else {
+                    fullWidth("section") {
+                        SectionLabel(stringResource(R.string.overview_this_week))
+                    }
+                    itemsIndexed(state.accounts, key = { _, account -> account.id }) {
+                        index,
+                        account ->
+                        StaggeredEntrance(index = index, play = playEntrance) {
+                            AccountCard(
+                                account = account,
+                                now = state.now,
+                                formatter = formatter,
+                                onClick = { onOpenAccount(account.id) },
+                                selected = account.id == selectedAccountId,
+                                sharedElements = sharedElements,
+                            )
+                        }
                     }
                 }
             }
