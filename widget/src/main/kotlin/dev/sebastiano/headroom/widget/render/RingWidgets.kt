@@ -161,7 +161,10 @@ internal fun RingGridWidget(
     }
 }
 
-/** A 2-column grid that fills the widget, one cell per gauge. */
+/**
+ * A grid that fills the widget, one cell per gauge. A wide widget puts every account in one row, a
+ * tall one stacks them, and a squarish one uses two columns; see [GridLayout].
+ */
 @RemoteComposable
 @Composable
 internal fun GaugeGrid(
@@ -175,7 +178,7 @@ internal fun GaugeGrid(
         verticalArrangement = RemoteArrangement.SpaceEvenly,
         horizontalAlignment = RemoteAlignment.CenterHorizontally,
     ) {
-        gauges.chunked(2).forEach { rowGauges ->
+        gauges.chunked(GridLayout.columns(render.size, gauges.size)).forEach { rowGauges ->
             RemoteRow(
                 modifier = RemoteModifier.fillMaxWidth().weight(1f.rf),
                 horizontalArrangement = RemoteArrangement.SpaceEvenly,

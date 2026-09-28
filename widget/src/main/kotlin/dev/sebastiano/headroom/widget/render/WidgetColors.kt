@@ -69,7 +69,7 @@ private constructor(
     fun avatar(provider: Provider): Color = oklch(tones.lightness, tones.chroma, provider.style.hue)
 
     companion object {
-        private const val BACKGROUND_ALPHA = 0.92f
+        private const val BACKGROUND_ALPHA = 1f
         private const val MONO_SECONDARY_ALPHA = 0.55f
         private const val CONTAINER_CHROMA = 0.07f
 
