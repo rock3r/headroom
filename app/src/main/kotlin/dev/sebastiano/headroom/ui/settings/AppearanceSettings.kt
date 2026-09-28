@@ -33,10 +33,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.luminance
@@ -47,6 +52,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
 import dev.sebastiano.headroom.R
@@ -215,6 +222,8 @@ private fun PaletteSwatch(
         modifier =
             modifier
                 .size(SWATCH_SIZE)
+                // The ripple follows the swatch's shape instead of filling its square.
+                .clip(MorphShape(morph, selection))
                 .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
                 .semantics { contentDescription = label }
                 .drawBehind {
@@ -239,6 +248,20 @@ private fun PaletteSwatch(
                 tint = if (colours.first.luminance() > LIGHT_SWATCH) OnLightSwatch else Color.White,
             )
         }
+    }
+}
+
+/** [morph] at [progress], stretched from its unit square to the size it outlines. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private class MorphShape(private val morph: Morph, private val progress: Float) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val path = morph.toPath(progress, Path())
+        path.transform(Matrix().apply { scale(size.width, size.height) })
+        return Outline.Generic(path)
     }
 }
 
