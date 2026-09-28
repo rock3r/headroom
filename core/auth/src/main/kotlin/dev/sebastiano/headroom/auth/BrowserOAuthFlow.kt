@@ -146,8 +146,12 @@ internal constructor(
     /**
      * Waits for the redirect or a pasted code, exchanges it for tokens, and answers the browser.
      * The listener is closed when this returns or throws.
+     *
+     * @param onCodeReceived called once, as soon as a code arrives and before it is exchanged, so
+     *   the app can say that it is finishing the sign-in. A redirect that carries an error instead
+     *   of a code does not call it.
      */
-    public suspend fun awaitTokens(): TokenSet =
+    public suspend fun awaitTokens(onCodeReceived: () -> Unit = {}): TokenSet =
         try {
             coroutineScope {
                 val redirect = async { server.awaitCallback() }
@@ -157,6 +161,7 @@ internal constructor(
                         pasted.onAwait { Arrival.Pasted(it) }
                     }
                 redirect.cancel()
+                onCodeReceived()
                 when (arrival) {
                     is Arrival.Redirect -> exchangeAndAnswer(arrival.callback)
                     is Arrival.Pasted ->
