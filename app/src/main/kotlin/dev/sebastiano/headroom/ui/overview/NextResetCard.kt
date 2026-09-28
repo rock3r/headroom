@@ -52,8 +52,6 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.home.NextResetSummary
 import java.time.Instant
-import kotlin.math.PI
-import kotlin.math.sin
 
 const val NEXT_RESET_ALERT_TAG: String = "next-reset-alert"
 const val NEXT_RESET_CARD_TAG: String = "next-reset-card"
@@ -200,9 +198,10 @@ private fun NextResetText(next: NextResetSummary, now: Instant, formatter: Reset
 }
 
 /**
- * How far the card's shape has drifted from its resting tilt, in degrees. It is read only while
- * drawing, so the drift redraws the shape's layer and never recomposes the card. The drift is a
- * sine over one long period, so each swing eases in and out, and it starts at the resting tilt.
+ * How far the card's shape has turned from its resting tilt, in degrees. It turns slowly and
+ * evenly, a full turn per period; a full turn looks the same as none, so it loops without a jump.
+ * It is read only while drawing, so the turn redraws the shape's layer and never recomposes the
+ * card.
  *
  * An endless animation is not timed by the duration scale, so with animations off or motion reduced
  * it is not started at all and the shape rests at its tilt. It costs nothing when the card is not
@@ -215,7 +214,7 @@ private fun rememberDecorationDrift(animate: Boolean): () -> Float {
     val phase =
         rememberInfiniteTransition(label = "next reset shape drift")
             .animateFloat(0f, 1f, HeadroomMotion.driftSpec(), label = "drift phase")
-    return remember(phase) { { DECO_DRIFT_DEGREES * sin(2 * PI.toFloat() * phase.value) } }
+    return remember(phase) { { FULL_TURN_DEGREES * phase.value } }
 }
 
 private val NoDrift: () -> Float = { 0f }
@@ -226,5 +225,4 @@ private const val DECO_ALPHA = 0.22f
 /** The shape's resting tilt: enough to read as placed by hand, not enough to look knocked over. */
 private const val DECO_TILT_DEGREES = 15f
 
-/** How far the shape drifts either side of its tilt over one period of the drift. */
-private const val DECO_DRIFT_DEGREES = 6f
+private const val FULL_TURN_DEGREES = 360f

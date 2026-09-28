@@ -76,14 +76,14 @@ object HeadroomMotion {
     private const val RIPPLE_DURATION_MILLIS = 800
 
     /**
-     * For a slow decorative drift that never stops, such as the tilt of the next reset card's
-     * shape. It runs one linear turn of a phase per period, and the caller turns the phase into
-     * motion with a sine, which eases both ends of every swing.
+     * For a slow decorative motion that never stops, such as the next reset card's shape turning.
+     * It runs a linear phase from 0 to 1 once per period and starts again, so a full turn per
+     * period loops without a jump. Slow enough to notice only when you look for it.
      */
     fun <T> driftSpec(): InfiniteRepeatableSpec<T> =
         infiniteRepeatable(tween(durationMillis = DRIFT_PERIOD_MILLIS, easing = LinearEasing))
 
-    private const val DRIFT_PERIOD_MILLIS = 24_000
+    private const val DRIFT_PERIOD_MILLIS = 60_000
 
     /** For fades and colour changes. */
     @Composable
