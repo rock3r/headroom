@@ -8,8 +8,10 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SharedTransitionScope.SharedContentState
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.Icon
@@ -38,13 +40,16 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
@@ -83,14 +88,43 @@ class PageReveal(
     @Composable
     @ReadOnlyComposable
     fun <T> spatialSpec(): FiniteAnimationSpec<T> =
-        if (scrubbing) HeadroomMotion.scrubSpec() else HeadroomMotion.containerSpec()
+        if (scrubbing) HeadroomMotion.scrubSpec() else MaterialTheme.motionScheme.slowSpatialSpec()
 
     /** The spec for the shared elements' fades. */
     @Composable
     @ReadOnlyComposable
     fun <T> effectsSpec(): FiniteAnimationSpec<T> =
-        if (scrubbing) HeadroomMotion.scrubSpec() else HeadroomMotion.effectsSpec()
+        if (scrubbing) HeadroomMotion.scrubSpec() else MaterialTheme.motionScheme.slowEffectsSpec()
 }
+
+/**
+ * Settings' content arriving with the reveal: it fades in while moving down a little into place,
+ * just behind the circle. Leaving, it only fades. Without the reveal (reduced motion, or another
+ * page) nothing extra happens.
+ */
+@Composable
+internal fun Modifier.revealContentEntrance(page: PageReveal?): Modifier {
+    if (page == null || !page.animate || !page.revealing) return this
+    val offset = with(LocalDensity.current) { CONTENT_DROP.roundToPx() }
+    val fade = page.effectsSpec<Float>()
+    val move = page.spatialSpec<IntOffset>()
+    return with(page.visibility) {
+        animateEnterExit(
+            enter =
+                fadeIn(if (page.scrubbing) fade else delayed(CONTENT_DELAY_MILLIS)) +
+                    slideInVertically(move) { -offset },
+            exit = fadeOut(fade),
+        )
+    }
+}
+
+/** A fade that waits a moment, so the circle leads and the content follows. */
+private fun delayed(delayMillis: Int): FiniteAnimationSpec<Float> =
+    tween(durationMillis = CONTENT_FADE_MILLIS, delayMillis = delayMillis)
+
+private val CONTENT_DROP = 24.dp
+private const val CONTENT_DELAY_MILLIS = 120
+private const val CONTENT_FADE_MILLIS = 320
 
 private const val BUTTON_KEY = "settings-button"
 private const val TITLE_KEY = "settings-title"

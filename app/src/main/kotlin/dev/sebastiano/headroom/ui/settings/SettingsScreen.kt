@@ -55,6 +55,7 @@ import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.SettingsTitle
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
+import dev.sebastiano.headroom.ui.revealContentEntrance
 
 const val SETTINGS_TAG: String = "settings"
 
@@ -94,9 +95,11 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     reveal: PageReveal? = null,
 ) {
+    // Everything below the header arrives with the reveal: see revealContentEntrance.
+    val entrance = Modifier.revealContentEntrance(reveal)
     Surface(modifier = modifier.fillMaxSize().testTag(SETTINGS_TAG)) {
         PageScaffold(onClose = actions.onClose, reveal = reveal) {
-            val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth()
+            val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().then(entrance)
             item { SectionLabel(stringResource(R.string.settings_accounts), width) }
             item { AccountsRow(accounts, actions.onOpenAccounts, width) }
             item { SectionLabel(stringResource(R.string.settings_display), width) }
