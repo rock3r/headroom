@@ -159,6 +159,29 @@ internal fun RemoteDrawScope.drawPolarShape(
 }
 
 /**
+ * Fills a [PolarShape] in a square [sidePx] pixels wide at the top left of the drawing area. Use it
+ * when the size is known at capture time: the document then holds plain numbers, where
+ * [drawPolarShape] writes an expression for every point. The Android 16 player holds at most 1000
+ * values per document, so this keeps a list of avatars within that limit.
+ */
+internal fun RemoteDrawScope.drawPolarShapeInSquare(
+    shape: PolarShape,
+    color: RemoteColor,
+    sidePx: Float,
+) {
+    val radius = sidePx / 2f
+    val outline = RemoteOutline.Generic {
+        shape.outline().forEachIndexed { i, p ->
+            val x = (radius + radius * p.x).rf
+            val y = (radius + radius * p.y).rf
+            if (i == 0) moveTo(x, y) else lineTo(x, y)
+        }
+        close()
+    }
+    drawOutline(outline, fillPaint(color))
+}
+
+/**
  * Fills [logo] in a square [sidePx] pixels wide at the top left of the drawing area. The square
  * includes the logo's own margin.
  */

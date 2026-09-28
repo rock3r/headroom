@@ -8,7 +8,6 @@ import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
 import java.time.Instant
-import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -162,8 +161,7 @@ public sealed interface WidgetUiState {
                 host == WidgetHostCategory.Keyguard ->
                     LockScreen(gauges.take(MAX_LOCK_SCREEN_ITEMS), next, mode)
                 config.style == WidgetStyle.Countdown -> Countdown(next, mode)
-                config.style == WidgetStyle.Bars ->
-                    Bars(gauges.take(BarsLayout.maxRows(size.heightDp)), mode)
+                config.style == WidgetStyle.Bars -> Bars(gauges, mode)
                 config.style == WidgetStyle.Rings && gauges.size == 1 ->
                     singleRing(selected, names, gauges.single(), config, now, size)
                 config.style == WidgetStyle.Rings -> RingGrid(gauges.take(MAX_GRID_ITEMS), mode)
@@ -273,14 +271,4 @@ public sealed interface WidgetUiState {
 
         private const val PERCENT = 100
     }
-}
-
-/** Row maths for the Bars widget, shared by the mapping and the renderer. */
-internal object BarsLayout {
-    const val PADDING_DP = 12f
-    const val ROW_DP = 24f
-    const val GAP_DP = 6f
-
-    fun maxRows(heightDp: Float): Int =
-        floor((heightDp - 2 * PADDING_DP + GAP_DP) / (ROW_DP + GAP_DP)).toInt().coerceAtLeast(1)
 }

@@ -206,21 +206,38 @@ class WidgetUiStateTest {
     }
 
     @Test
-    fun `bars show as many rows as fit the widget height`() {
-        val config = WidgetConfig(WidgetStyle.Bars)
+    fun `bars keep every account, however short the widget is`() {
+        val many = DemoData.manyAccounts(now)
 
-        assertEquals(
-            1,
-            assertIs<WidgetUiState.Bars>(map(config, size = WidgetSize(280f, 60f))).gauges.size,
-        )
-        assertEquals(
-            3,
-            assertIs<WidgetUiState.Bars>(map(config, size = WidgetSize(280f, 110f))).gauges.size,
-        )
-        assertEquals(
-            4,
-            assertIs<WidgetUiState.Bars>(map(config, size = WidgetSize(280f, 200f))).gauges.size,
-        )
+        listOf(WidgetSize(280f, 60f), WidgetSize(280f, 110f), WidgetSize(280f, 600f)).forEach {
+            val bars = assertIs<WidgetUiState.Bars>(map(WidgetConfig(WidgetStyle.Bars), many, it))
+            assertEquals(
+                many.map { state -> state.account.id },
+                bars.gauges.map { g -> g.accountId },
+            )
+        }
+    }
+
+    @Test
+    fun `bars with many selected accounts keep the configured order`() {
+        val order =
+            listOf(
+                "demo-jetbrains",
+                "demo-grok",
+                "demo-kimi",
+                "demo-claude",
+                "demo-opencode",
+                "demo-zai",
+                "demo-copilot",
+            )
+        val config = WidgetConfig(WidgetStyle.Bars, accountIds = order)
+
+        val bars =
+            assertIs<WidgetUiState.Bars>(
+                map(config, DemoData.manyAccounts(now), WidgetSize(280f, 110f))
+            )
+
+        assertEquals(order, bars.gauges.map { it.accountId })
     }
 
     @Test

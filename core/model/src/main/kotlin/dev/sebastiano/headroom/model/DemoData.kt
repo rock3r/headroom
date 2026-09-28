@@ -58,6 +58,47 @@ public object DemoData {
             ),
         )
 
+    /**
+     * [accounts] followed by one account for each other provider, for pictures of widgets that show
+     * many accounts. Demo mode itself uses [accounts].
+     */
+    public fun manyAccounts(now: Instant): List<AccountState> =
+        accounts(now) +
+            listOf(
+                state(
+                    Account("demo-kimi", Provider.Kimi, "sam"),
+                    "Moderato",
+                    now,
+                    weekly("weekly", "Weekly", 23.0, now.plus(Duration.ofMinutes(7488))),
+                ),
+                state(
+                    Account("demo-zai", Provider.ZAi, "sam@example.com"),
+                    "GLM Coding Pro",
+                    now,
+                    weekly("weekly", "Weekly", 46.0, now.plus(Duration.ofMinutes(2968))),
+                    session("five_hour", 64.0, now.plus(Duration.ofMinutes(140))),
+                ),
+                state(
+                    Account("demo-opencode", Provider.OpenCodeGo, "sam"),
+                    "Go",
+                    now,
+                    weekly("weekly", "Weekly", 9.0, now.plus(Duration.ofMinutes(9208))),
+                ),
+                state(
+                    Account("demo-jetbrains", Provider.JetBrains, "sam@example.com"),
+                    "AI Pro",
+                    now,
+                    QuotaWindow(
+                        id = "monthly",
+                        label = "Monthly credits",
+                        kind = WindowKind.Monthly,
+                        usedPercent = 77.0,
+                        resetsAt = now.plus(Duration.ofDays(11)),
+                        length = MONTH,
+                    ),
+                ),
+            )
+
     private fun state(account: Account, plan: String, now: Instant, vararg windows: QuotaWindow) =
         AccountState(
             account,

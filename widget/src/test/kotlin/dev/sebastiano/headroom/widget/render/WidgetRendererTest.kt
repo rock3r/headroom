@@ -23,12 +23,15 @@ import dev.sebastiano.headroom.widget.WidgetSize
 import dev.sebastiano.headroom.widget.WidgetStyle
 import dev.sebastiano.headroom.widget.WidgetUiState
 import dev.sebastiano.headroom.widget.WidgetWindow
+import dev.sebastiano.headroom.widget.testing.PLAYER_MAX_VARIABLES
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import dev.sebastiano.headroom.widget.testing.documentOperations
 import dev.sebastiano.headroom.widget.testing.hasNamedHostActions
 import dev.sebastiano.headroom.widget.testing.hostActionIds
 import dev.sebastiano.headroom.widget.testing.logoCommands
+import dev.sebastiano.headroom.widget.testing.maxVariableId
 import dev.sebastiano.headroom.widget.testing.pathCommands
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
@@ -37,6 +40,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -69,6 +73,19 @@ class WidgetRendererTest {
     ): WidgetDocument =
         WidgetRenderer.capture(context, state(config, size, host), APP_WIDGET_ID, size, strings)
 
+    /** The Bars widget with an account for every provider, more than a short widget fits. */
+    private suspend fun captureManyBars(size: WidgetSize): WidgetDocument {
+        val state =
+            WidgetUiState.from(
+                DemoData.manyAccounts(now),
+                WidgetConfig(WidgetStyle.Bars),
+                now,
+                size,
+                WidgetHostCategory.HomeScreen,
+            )
+        return WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+    }
+
     @Test
     fun `single ring shows the account, both windows and can flip`() = runTest {
         val config = WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-claude"))
@@ -100,15 +117,94 @@ class WidgetRendererTest {
 
     @Test
     fun `bars show a row per account with name and percentage`() = runTest {
-        val doc = capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 110f))
+        val doc = capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f))
 
-        doc.assertText("Claude", "Codex", "Grok", "71%", "34%", "88%")
-        doc.assertNoText("Copilot")
+        doc.assertText("Claude", "Codex", "Grok", "Copilot", "71%", "34%", "88%", "58%")
+        doc.assertNoText("more")
         assertEquals(
             listOf(Tap.Refresh) +
-                listOf("demo-claude", "demo-codex", "demo-grok").map { Tap.Open(it) },
+                listOf("demo-claude", "demo-codex", "demo-grok", "demo-copilot").map {
+                    Tap.Open(it)
+                },
             doc.taps(),
         )
+    }
+
+    @Test
+    fun `without scrolling, bars that do not fit end in a more row that opens the app`() = runTest {
+        val size = WidgetSize(280f, 110f)
+        val doc = captureManyBars(size)
+
+        doc.assertText("Claude", "Codex", "+6 more", "6 more accounts. Open Headroom.")
+        doc.assertNoText("Grok")
+        assertFalse(documentOperations(doc.bytes).contains(SCROLL_OPERATION))
+        assertEquals(
+            listOf(Tap.Refresh, Tap.Open(null), Tap.Open("demo-claude"), Tap.Open("demo-codex")),
+            doc.taps(),
+        )
+
+        // Three rows share the 86 dp inside the padding: the more row starts at 73 dp.
+        val app = context as RecordingHostApplication
+        WidgetRenderer.remoteViews(doc).play(size).tap(xDp = 60f, yDp = 85f)
+        val opened = shadowOf(app).nextStartedActivity
+        assertNotNull(opened, "Tapping the more row should open the app")
+        assertNull(opened.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID))
+    }
+
+    @Test
+    @Config(sdk = [37])
+    fun `with scrolling, bars that do not fit show every account in a vertical scroll`() = runTest {
+        val doc = captureManyBars(WidgetSize(280f, 110f))
+
+        doc.assertText(
+            "Claude",
+            "Codex",
+            "Grok",
+            "Copilot",
+            "Kimi",
+            "Z.AI",
+            "OpenCode",
+            "JetBrains",
+        )
+        doc.assertNoText("more")
+        assertContains(documentOperations(doc.bytes), SCROLL_OPERATION)
+        assertEquals(
+            listOf(Tap.Refresh) + DemoData.manyAccounts(now).map { Tap.Open(it.account.id) },
+            doc.taps(),
+        )
+    }
+
+    @Test
+    fun `sixteen bars stay within the variables the Android 16 player can hold`() = runTest {
+        // Tall enough for every row, so the document holds all sixteen.
+        val size = WidgetSize(280f, 600f)
+        val accounts =
+            DemoData.manyAccounts(now) +
+                DemoData.manyAccounts(now).map {
+                    it.copy(account = it.account.copy(id = it.account.id + "-2", nickname = "Work"))
+                }
+        val state =
+            WidgetUiState.from(
+                accounts,
+                WidgetConfig(WidgetStyle.Bars),
+                now,
+                size,
+                WidgetHostCategory.HomeScreen,
+            )
+        val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+
+        val operations = documentOperations(doc.bytes)
+        assertEquals(16, hostActionIds(operations).size - 1, "A tap per account and the refresh")
+        val maxId = maxVariableId(operations)
+        assertTrue(maxId < PLAYER_MAX_VARIABLES, "The document uses variable $maxId")
+        WidgetRenderer.remoteViews(doc).playAt(size)
+    }
+
+    @Test
+    fun `bars that fit the widget do not scroll`() = runTest {
+        val doc = capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f))
+
+        assertFalse(documentOperations(doc.bytes).contains(SCROLL_OPERATION))
     }
 
     @Test
@@ -143,7 +239,7 @@ class WidgetRendererTest {
 
     @Test
     fun `bar avatars draw the provider logos, not letters`() = runTest {
-        val doc = capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 110f))
+        val doc = capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f))
 
         doc.assertDrawsLogos(Provider.Claude, Provider.Codex, Provider.Grok)
     }
@@ -228,6 +324,8 @@ class WidgetRendererTest {
                 )
             )
             .playAt(WidgetSize(300f, 120f))
+        WidgetRenderer.remoteViews(captureManyBars(WidgetSize(280f, 110f)))
+            .playAt(WidgetSize(280f, 110f))
     }
 
     /**
@@ -262,6 +360,7 @@ class WidgetRendererTest {
                 capture(WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-claude"))),
                 capture(WidgetConfig(WidgetStyle.Rings)),
                 capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f)),
+                captureManyBars(WidgetSize(280f, 110f)),
                 capture(WidgetConfig(WidgetStyle.Shape, accountIds = listOf("demo-grok"))),
                 capture(WidgetConfig(WidgetStyle.Shape)),
                 capture(WidgetConfig(WidgetStyle.Countdown)),
@@ -306,6 +405,93 @@ class WidgetRendererTest {
             WidgetIntents.ACTION_REFRESH,
             shadowOf(app).broadcastIntents.lastOrNull()?.action,
         )
+    }
+
+    @Test
+    @Config(sdk = [37])
+    fun `scrolled bars in the platform player open the account under the finger`() = runTest {
+        val size = WidgetSize(280f, 110f)
+        val app = context as RecordingHostApplication
+        val widget = WidgetRenderer.remoteViews(captureManyBars(size)).play(size)
+
+        // Rows are 24 dp tall with 6 dp gaps under 12 dp of padding: the second row is Codex.
+        widget.tap(xDp = 60f, yDp = 54f)
+        assertEquals(
+            "demo-codex",
+            shadowOf(app).nextStartedActivity?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID),
+        )
+
+        // Dragging up scrolls to the end of the list and does not tap the row it started on.
+        widget.drag(xDp = 60f, fromYDp = 100f, toYDp = -100f)
+        assertNull(shadowOf(app).nextStartedActivity, "A drag should not open an account")
+
+        // At the end of the list, the bottom row is JetBrains, the last account.
+        widget.tap(xDp = 60f, yDp = 86f)
+        assertEquals(
+            "demo-jetbrains",
+            shadowOf(app).nextStartedActivity?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID),
+        )
+
+        // Row taps open their account only; the card around the rows refreshes.
+        assertTrue(
+            shadowOf(app).broadcastIntents.none { it.action == WidgetIntents.ACTION_REFRESH }
+        )
+        widget.tap(xDp = 4f, yDp = 55f)
+        assertEquals(
+            WidgetIntents.ACTION_REFRESH,
+            shadowOf(app).broadcastIntents.lastOrNull()?.action,
+        )
+    }
+
+    /** Widget views played in the platform player, to send touches to in dp. */
+    private inner class PlayedWidget(private val view: View) {
+        private val density = context.resources.displayMetrics.density
+
+        fun tap(xDp: Float, yDp: Float) {
+            // Wait between gestures: the Android 17 player ignores a second tap that comes quickly.
+            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP)
+            touch(MotionEvent.ACTION_DOWN, xDp, yDp)
+            touch(MotionEvent.ACTION_UP, xDp, yDp)
+            settle()
+        }
+
+        fun drag(xDp: Float, fromYDp: Float, toYDp: Float) {
+            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP)
+            touch(MotionEvent.ACTION_DOWN, xDp, fromYDp)
+            (1..DRAG_STEPS).forEach { step ->
+                touch(MotionEvent.ACTION_MOVE, xDp, fromYDp + (toYDp - fromYDp) * step / DRAG_STEPS)
+            }
+            touch(MotionEvent.ACTION_UP, xDp, toYDp)
+            settle()
+        }
+
+        private fun touch(action: Int, xDp: Float, yDp: Float) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(TOUCH_STEP_MS))
+            val time = SystemClock.uptimeMillis()
+            val event = MotionEvent.obtain(time, time, action, xDp * density, yDp * density, 0)
+            view.dispatchTouchEvent(event)
+            event.recycle()
+        }
+
+        private fun settle() {
+            shadowOf(Looper.getMainLooper()).idle()
+            view.draw(Canvas(createBitmap(view.width, view.height)))
+        }
+    }
+
+    /** Plays the views in the platform player at [size] and draws them once. */
+    private fun RemoteViews.play(size: WidgetSize): PlayedWidget {
+        val density = context.resources.displayMetrics.density
+        val width = (size.widthDp * density).toInt()
+        val height = (size.heightDp * density).toInt()
+        val view = apply(context, FrameLayout(context))
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        view.layout(0, 0, width, height)
+        view.draw(Canvas(createBitmap(width, height)))
+        return PlayedWidget(view)
     }
 
     /** Plays the views in the platform player and taps at a point given as shares of the size. */
@@ -394,5 +580,9 @@ class WidgetRendererTest {
         const val APP_WIDGET_ID = 7
         const val MIN_INK = 0.03f
         const val TAP_MS = 50L
+        const val DRAG_STEPS = 10
+        const val TOUCH_STEP_MS = 16L
+        val GESTURE_GAP: Duration = Duration.ofSeconds(1)
+        const val SCROLL_OPERATION = "ScrollModifierOperation"
     }
 }

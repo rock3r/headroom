@@ -18,6 +18,16 @@ fun documentOperations(bytes: ByteArray): String {
     return document.toNestedString()
 }
 
+/**
+ * The highest variable id in [operations]. The Android 16 player keeps variables in arrays of
+ * [PLAYER_MAX_VARIABLES] entries and fails to load a document with a higher id.
+ */
+fun maxVariableId(operations: String): Int =
+    Regex("""\[(\d+)]""").findAll(operations).maxOf { it.groupValues[1].toInt() }
+
+/** How many variables the Android 16 widget player can hold. */
+const val PLAYER_MAX_VARIABLES = 1000
+
 /** Ids of the id-based host actions in [operations], the only ones widget hosts listen to. */
 fun hostActionIds(operations: String): Set<Int> =
     Regex("""HostActionOperation\((-?\d+)\)""")

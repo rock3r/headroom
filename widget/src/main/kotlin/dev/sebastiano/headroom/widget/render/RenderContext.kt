@@ -15,6 +15,8 @@ internal class RenderContext(
     val size: WidgetSize,
     /** The tap targets, registered while the document is composed. */
     val taps: WidgetTaps,
+    /** Whether the widget player scrolls lists and still sends taps to the right rows. */
+    val playerScrolls: Boolean,
     /** Display density, to turn dp into pixels at capture time. */
     private val density: Float,
     private val fontScale: Float,

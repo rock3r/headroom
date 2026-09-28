@@ -18,6 +18,12 @@
     <string name="widget_window_monthly">monthly</string>
     <string name="widget_window_other">limit</string>
 
+    <!-- Bars -->
+    <plurals name="widget_more_accounts">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
+
     <!-- Countdown and lock screen -->
     <string name="widget_countdown_title">Next %1$s reset</string>
     <string name="widget_countdown_none">No reset coming up</string>
@@ -36,5 +42,9 @@
     <string name="widget_cd_countdown">Next %1$s reset in %2$s: %3$s, %4$s</string>
     <string name="widget_cd_refresh">Refresh usage</string>
     <string name="widget_cd_open">Open %1$s in Headroom</string>
+    <plurals name="widget_cd_more_accounts">
+        <item quantity="one">%1$d more account. Open Headroom.</item>
+        <item quantity="other">%1$d more accounts. Open Headroom.</item>
+    </plurals>
     <string name="widget_cd_flip">Switch between the %1$s and session numbers</string>
 </resources>

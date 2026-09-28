@@ -30,7 +30,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Records the widget pictures for the README by playing each widget in the Android 16 widget
- * player. It only runs when asked to: `./gradlew :widget:recordWidgetGallery`.
+ * player, and the scrolling Bars widget in the Android 17 one. It only runs when asked to:
+ * `./gradlew :widget:recordWidgetGallery`.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = RecordingHostApplication::class, qualifiers = "xxhdpi")
@@ -38,15 +39,20 @@ import org.robolectric.annotation.GraphicsMode
 class WidgetGalleryRecorder {
     private val context = RuntimeEnvironment.getApplication()
     private val now = Instant.parse("2026-09-27T12:32:00Z")
-    private val accounts = DemoData.accounts(now)
     private val strings = WidgetStrings(context, ZoneOffset.UTC, Locale.US, is24Hour = true)
 
-    @Test
-    fun recordGallery() = runTest {
+    @Test fun recordGallery() = record(shots)
+
+    /** Android 17 is the first player the Bars widget scrolls in, see `WidgetRenderer`. */
+    @Test @Config(sdk = [37]) fun recordScrollingGallery() = record(scrollingShots)
+
+    private fun record(shots: List<Shot>) = runTest {
         val outDir = System.getProperty(OUTPUT_PROPERTY)
         assumeTrue("Set $OUTPUT_PROPERTY to record the gallery", !outDir.isNullOrBlank())
         val dir = File(checkNotNull(outDir)).apply { mkdirs() }
         shots.forEach { shot ->
+            val accounts =
+                if (shot.manyAccounts) DemoData.manyAccounts(now) else DemoData.accounts(now)
             val state = WidgetUiState.from(accounts, shot.config, now, shot.size, shot.host)
             val document = WidgetRenderer.capture(context, state, APP_WIDGET_ID, shot.size, strings)
             val widget = WidgetRenderer.remoteViews(document).draw(shot.size)
@@ -97,6 +103,8 @@ class WidgetGalleryRecorder {
         val config: WidgetConfig,
         val size: WidgetSize,
         val host: WidgetHostCategory = WidgetHostCategory.HomeScreen,
+        /** Shows an account for every provider instead of the four demo accounts. */
+        val manyAccounts: Boolean = false,
     )
 
     private companion object {
@@ -116,6 +124,20 @@ class WidgetGalleryRecorder {
                 ),
                 Shot("widget-rings-grid", WidgetConfig(WidgetStyle.Rings), WidgetSize(160f, 160f)),
                 Shot("widget-bars", WidgetConfig(WidgetStyle.Bars), WidgetSize(320f, 140f)),
+                Shot(
+                    "widget-bars-tall",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(320f, 420f),
+                    manyAccounts = true,
+                ),
+                // The Android 16 player cannot scroll, so the accounts that do not fit become a
+                // "+N more" row.
+                Shot(
+                    "widget-bars-more",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(320f, 140f),
+                    manyAccounts = true,
+                ),
                 Shot("widget-shape", WidgetConfig(WidgetStyle.Shape), WidgetSize(160f, 160f)),
                 Shot(
                     "widget-lock-screen",
@@ -123,6 +145,16 @@ class WidgetGalleryRecorder {
                     WidgetSize(320f, 140f),
                     WidgetHostCategory.Keyguard,
                 ),
+            )
+
+        val scrollingShots =
+            listOf(
+                Shot(
+                    "widget-bars-scroll",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(320f, 140f),
+                    manyAccounts = true,
+                )
             )
     }
 }
