@@ -61,6 +61,11 @@ data class WindowSummary(
     val resetsAt: Instant?,
     val canAlert: Boolean,
     val alertEnabled: Boolean,
+    /** How much is used, in [amountUnit], for windows that count an amount such as credits. */
+    val usedAmount: Double? = null,
+    /** The limit, in [amountUnit]. */
+    val limitAmount: Double? = null,
+    val amountUnit: String? = null,
 )
 
 @Immutable

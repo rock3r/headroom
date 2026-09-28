@@ -99,6 +99,9 @@ private fun QuotaWindow.toSummary(accountId: String, now: Instant, alerts: Alert
         resetsAt = resetsAt,
         canAlert = ResetPolicy.canAlert(this),
         alertEnabled = alerts.isOn(accountId, this),
+        usedAmount = usedAmount,
+        limitAmount = limitAmount,
+        amountUnit = amountUnit,
     )
 
 private fun AlertSwitches.isOn(accountId: String, window: QuotaWindow) =
