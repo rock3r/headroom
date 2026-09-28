@@ -10,6 +10,7 @@ import android.widget.RemoteViews
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.widget.render.WidgetRenderer
 import java.time.Instant
 
@@ -21,21 +22,24 @@ public class WidgetUpdater
 internal constructor(
     private val configStore: WidgetConfigStore,
     private val gateway: (Context) -> AppWidgetGateway = ::SystemAppWidgetGateway,
-    private val render: WidgetRender = { context, state, appWidgetId, size ->
-        WidgetRenderer.remoteViews(WidgetRenderer.capture(context, state, appWidgetId, size))
+    private val render: WidgetRender = { context, state, appWidgetId, size, palette ->
+        WidgetRenderer.remoteViews(
+            WidgetRenderer.capture(context, state, appWidgetId, size, palette)
+        )
     },
 ) {
     public constructor(configStore: WidgetConfigStore) : this(configStore, ::SystemAppWidgetGateway)
 
     /**
      * Redraws every placed widget of every style from [accounts] as they are at [now], showing how
-     * much is used or how much is left as [display] says.
+     * much is used or how much is left as [display] says, in the colours of [palette].
      */
     public suspend fun updateAll(
         context: Context,
         accounts: List<AccountState>,
         now: Instant,
         display: QuotaDisplay = QuotaDisplay.Used,
+        palette: ThemePalette = ThemePalette.Wallpaper,
     ) {
         val widgets = gateway(context)
         WidgetStyle.entries.forEach { style ->
@@ -56,7 +60,7 @@ internal constructor(
                             options.hostCategory(),
                             display,
                         )
-                    render(context, state, appWidgetId, size)
+                    render(context, state, appWidgetId, size, palette)
                 }
                 widgets.update(appWidgetId, layouts)
             }
@@ -82,7 +86,7 @@ internal constructor(
                 )
             widgets.setPreview(
                 HeadroomWidgetProvider.classFor(style),
-                render(context, state, PREVIEW_WIDGET_ID, size),
+                render(context, state, PREVIEW_WIDGET_ID, size, ThemePalette.Wallpaper),
             )
         }
     }
@@ -92,7 +96,8 @@ internal constructor(
     }
 }
 
-internal typealias WidgetRender = suspend (Context, WidgetUiState, Int, WidgetSize) -> RemoteViews
+internal typealias WidgetRender =
+    suspend (Context, WidgetUiState, Int, WidgetSize, ThemePalette) -> RemoteViews
 
 /** The parts of [AppWidgetManager] the updater uses, so tests can replace them. */
 internal interface AppWidgetGateway {

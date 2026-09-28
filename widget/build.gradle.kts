@@ -7,6 +7,7 @@ android { namespace = "dev.sebastiano.headroom.widget" }
 
 dependencies {
     implementation(projects.core.model)
+    implementation(projects.core.designsystem)
     implementation(libs.remote.creation.compose)
     implementation(libs.remote.creation.core)
     implementation(libs.remote.core)

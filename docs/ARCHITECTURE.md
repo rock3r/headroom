@@ -13,8 +13,9 @@
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
 
 Dependencies point down: `:app` → `:widget`, `:core:designsystem`, `:core:data` →
-`:core:quota`, `:core:auth` → `:core:model`. The JVM modules have no Android dependencies, so
-their tests run fast on the JVM.
+`:core:quota`, `:core:auth` → `:core:model`. `:widget` also uses `:core:designsystem`, for the
+colour palettes it shares with the app. The JVM modules have no Android dependencies, so their
+tests run fast on the JVM.
 
 ## Data flow
 
