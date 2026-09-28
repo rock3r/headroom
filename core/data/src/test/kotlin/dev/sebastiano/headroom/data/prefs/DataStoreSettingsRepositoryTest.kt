@@ -45,6 +45,7 @@ class DataStoreSettingsRepositoryTest {
         settings.setOverviewSort(OverviewSort.MostUsedFirst)
         settings.setRefreshShimmer(false)
         settings.setResetConfetti(false)
+        settings.setResetIsland(true)
         assertEquals(
             AppSettings(
                 QuotaDisplay.Left,
@@ -55,6 +56,7 @@ class DataStoreSettingsRepositoryTest {
                 overviewSort = OverviewSort.MostUsedFirst,
                 refreshShimmer = false,
                 resetConfetti = false,
+                resetIsland = true,
             ),
             DataStoreSettingsRepository(store).settings.first(),
         )
@@ -70,6 +72,17 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun `the reset island is off by default and stays on once turned on`() = runTest {
+        val store = store()
+        val settings = DataStoreSettingsRepository(store)
+        assertEquals(false, settings.settings.first().resetIsland)
+        settings.setResetIsland(true)
+        assertEquals(true, DataStoreSettingsRepository(store).settings.first().resetIsland)
+        settings.setResetIsland(false)
+        assertEquals(false, DataStoreSettingsRepository(store).settings.first().resetIsland)
+    }
+
+    @Test
     fun `an unknown stored value falls back to the default`() = runTest {
         val store = store()
         store.edit {
@@ -81,6 +94,7 @@ class DataStoreSettingsRepositoryTest {
             it[stringPreferencesKey("overview_sort")] = "Alphabetical"
             it[stringPreferencesKey("refresh_shimmer")] = "Sometimes"
             it[stringPreferencesKey("reset_confetti")] = "Maybe"
+            it[stringPreferencesKey("reset_island")] = "Perhaps"
         }
         assertEquals(AppSettings(), DataStoreSettingsRepository(store).settings.first())
     }

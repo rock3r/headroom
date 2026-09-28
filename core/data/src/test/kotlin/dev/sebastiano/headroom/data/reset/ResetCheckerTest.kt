@@ -57,7 +57,7 @@ class ResetCheckerTest {
     private class RecordingNotifier : ResetNotifier {
         val notified = mutableListOf<Pair<AccountState, QuotaWindow>>()
 
-        override fun notifyReset(account: AccountState, window: QuotaWindow) {
+        override suspend fun notifyReset(account: AccountState, window: QuotaWindow) {
             notified += account to window
         }
     }

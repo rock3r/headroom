@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import dev.sebastiano.headroom.data.R
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.time.ZoneId
@@ -15,22 +16,47 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal fun interface ResetNotifier {
-    fun notifyReset(account: AccountState, window: QuotaWindow)
+    suspend fun notifyReset(account: AccountState, window: QuotaWindow)
 }
 
-/** Posts "your weekly limit has reset" notifications on their own channel. */
+/**
+ * Shows a reset on the screen itself, as a pill that grows out of the camera cutout. The app
+ * implements it, because only the app knows if the user allows it and if the screen is free for it.
+ */
+public fun interface ResetIsland {
+    /**
+     * Shows [message] with the logo of [provider], and returns true. It returns false, and shows
+     * nothing, when the island is off, cannot show now, or would be in the way. The caller then
+     * relies on the notification alone.
+     */
+    public suspend fun show(provider: Provider, message: String): Boolean
+
+    public companion object {
+        /** An island that never shows. */
+        public val None: ResetIsland = ResetIsland { _, _ -> false }
+    }
+}
+
+/**
+ * Posts "your weekly limit has reset" notifications on their own channel. It offers each reset to
+ * the [island] first. When the island shows the reset, the notification stays as the thing to tap,
+ * but it arrives on a quiet channel, so the user does not get a pop-up as well.
+ */
 internal class AndroidResetNotifier(
     private val context: Context,
     private val zone: ZoneId = ZoneId.systemDefault(),
+    private val island: ResetIsland = ResetIsland.None,
 ) : ResetNotifier {
     private val manager = context.getSystemService(NotificationManager::class.java)
 
-    override fun notifyReset(account: AccountState, window: QuotaWindow) {
-        ensureChannel()
+    override suspend fun notifyReset(account: AccountState, window: QuotaWindow) {
         val name = account.account.name
-        val titleRes =
-            if (window.kind == WindowKind.Monthly) R.string.reset_title_monthly
-            else R.string.reset_title_weekly
+        val monthly = window.kind == WindowKind.Monthly
+        val islandRes = if (monthly) R.string.reset_island_monthly else R.string.reset_island_weekly
+        val onIsland = island.show(account.account.provider, context.getString(islandRes, name))
+        val channelId = if (onIsland) QUIET_CHANNEL_ID else CHANNEL_ID
+        ensureChannels()
+        val titleRes = if (monthly) R.string.reset_title_monthly else R.string.reset_title_weekly
         val body =
             window.resetsAt?.let { next ->
                 context.getString(
@@ -41,7 +67,7 @@ internal class AndroidResetNotifier(
         val id = notificationId(account.account.id, window.id)
 
         val notification =
-            Notification.Builder(context, CHANNEL_ID)
+            Notification.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_reset)
                 .setContentTitle(context.getString(titleRes, name))
                 .setContentText(body)
@@ -76,17 +102,26 @@ internal class AndroidResetNotifier(
     /**
      * A reset pops up as a heads-up notification. Android never raises the importance of a channel
      * that exists, so the high-importance channel has a new id and the old quiet one is removed.
+     * The quiet channel is for resets the island already showed: it has no pop-up and no sound.
      */
-    private fun ensureChannel() {
+    private fun ensureChannels() {
         manager.deleteNotificationChannel(OLD_CHANNEL_ID)
-        val channel =
+        manager.createNotificationChannel(
             NotificationChannel(
                     CHANNEL_ID,
                     context.getString(R.string.reset_channel_name),
                     NotificationManager.IMPORTANCE_HIGH,
                 )
                 .apply { description = context.getString(R.string.reset_channel_description) }
-        manager.createNotificationChannel(channel)
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                    QUIET_CHANNEL_ID,
+                    context.getString(R.string.reset_quiet_channel_name),
+                    NotificationManager.IMPORTANCE_LOW,
+                )
+                .apply { description = context.getString(R.string.reset_quiet_channel_description) }
+        )
     }
 
     private fun nextResetFormat(): DateTimeFormatter =
@@ -101,6 +136,9 @@ internal class AndroidResetNotifier(
 
     companion object {
         const val CHANNEL_ID: String = "reset_alerts"
+
+        /** Where a reset goes when the island showed it: in the shade, without a pop-up. */
+        const val QUIET_CHANNEL_ID: String = "reset_alerts_quiet"
 
         /** The quiet channel resets used before they popped up. */
         private const val OLD_CHANNEL_ID = "weekly_resets"
