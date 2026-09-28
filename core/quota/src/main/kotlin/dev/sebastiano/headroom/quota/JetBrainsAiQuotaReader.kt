@@ -6,6 +6,7 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.time.Duration
 import java.time.Instant
+import java.util.Locale
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -15,7 +16,8 @@ import kotlinx.serialization.json.doubleOrNull
 /**
  * Where the JetBrains AI quota reader sends its calls.
  *
- * @property aiBaseUrl The JetBrains AI (Grazie) API, which gives licenses, tokens and the quota.
+ * @property aiBaseUrl The JetBrains AI (Grazie) API, which gives licenses, tokens and the quota of
+ *   licenses and of workspace seats.
  * @property accountTokenUrl The JetBrains Account OAuth token endpoint, which switches the audience
  *   of the refresh token.
  * @property accessOptionsUrl The JetBrains user management endpoint that lists the account's AI
@@ -45,75 +47,157 @@ internal class JetBrainsAiEndpoints(
 }
 
 /**
- * Reads the JetBrains AI (Grazie) quota: how many AI credits of the current period are used, and
- * when the period ends.
+ * Reads the JetBrains AI quotas: how many AI credits of the current period are used, and when the
+ * period ends. It returns one window for each license and workspace seat it can read.
  *
- * First it finds a license. With a refresh token, it does what the Junie CLI does: it switches the
- * refresh token's audience to JetBrains user management and lists the account's AI access options.
- * The first enabled option with a license id is used, preferring the account's own license. Without
- * a usable option, the OpenID ID token of the sign-in obtains the free grazie-lite license.
+ * With a refresh token, it does what the Junie CLI does: it switches the refresh token's audience
+ * to JetBrains user management and lists the account's AI access options. Then it reads every
+ * enabled option, up to [MAX_QUOTA_SOURCES] of them, one after the other. A failed option is
+ * skipped and does not stop the others.
+ * - A license: the OpenID ID token and the license id obtain a JetBrains AI token, which reads the
+ *   quota and its refill schedule from the `/user/v5` API.
+ * - A workspace seat: the refresh token switches to the `ai-access` audience for the seat's
+ *   organisation and workspace, as the IDE and the Junie CLI do, and that token reads the quota and
+ *   its refill schedule from the `/quota/api` API, as the IDE does.
  *
- * Then the ID token and the license id obtain a JetBrains AI token, and that token reads the quota
- * and its refill schedule. When the access option's license gives no quota, for example a maximum
- * of zero, the grazie-lite license is tried too. No more than these two licenses are read.
+ * When no option gives a quota, the ID token obtains the free grazie-lite license and reads its
+ * quota, as before access options existed.
  *
- * A token that the audience switch returns, including a new refresh token, is never stored.
+ * The quota amounts are in units of 1/100,000 of a credit, the scale the IDE uses to show credits.
  *
- * [log] receives one line per call with the HTTP status. It never receives a token, a license id, a
- * name, an email address or a header value.
+ * A token that an audience switch returns, including a new refresh token, is never stored.
+ *
+ * [log] receives one line per call with the HTTP status, the amounts of each quota and a summary.
+ * It never receives a token, a license, organisation or workspace id, a name, an email address or a
+ * header value.
  */
 internal class JetBrainsAiQuotaReader(
     private val httpClient: QuotaHttpClient,
     private val log: (String) -> Unit,
 ) {
-    /** The quota window, or `null` when no license gives one. */
-    suspend fun readWindow(
+    /** The quota windows, the one closest to its limit first. Empty when no license gives one. */
+    suspend fun readWindows(
         endpoints: JetBrainsAiEndpoints,
         idToken: String,
         refreshToken: String?,
-    ): QuotaWindow? {
+    ): List<QuotaWindow> {
         val identityHeaders =
             mapOf(
                 "Authorization" to bearer(idToken),
                 "Accept" to JSON_TYPE,
                 "Content-Type" to JSON_TYPE,
             )
-        val option = refreshToken?.let { findAccessOption(endpoints, it) }
-        val optionLicenseId = option?.licenseId
-        if (optionLicenseId != null) {
-            val source = "access option (${safeWord(option.type)})"
-            log("Using the $source license")
-            readLicenseWindow(endpoints.aiBaseUrl, identityHeaders, optionLicenseId)?.let {
-                return it
+        if (refreshToken != null) {
+            val sources = findQuotaSources(endpoints, refreshToken)
+            val read = sources.mapNotNull { (position, source) ->
+                val tag = "${source.logName.substringBefore(' ')} $position"
+                val window =
+                    when (source) {
+                        is JetBrainsQuotaSource.License ->
+                            readLicenseWindow(
+                                tag,
+                                endpoints.aiBaseUrl,
+                                identityHeaders,
+                                source.licenseId,
+                                source,
+                            )
+                        is JetBrainsQuotaSource.Workspace ->
+                            readSeatWindow(tag, endpoints, refreshToken, source)
+                    }
+                window?.let { source to it }
             }
-            log("No quota from the $source license, trying the grazie-lite license")
+            if (read.isNotEmpty()) {
+                log(
+                    "${read.size} quota windows: " +
+                        read.joinToString { (source, window) ->
+                            "${source.logName} ${formatPercent(window.usedPercent)}"
+                        }
+                )
+                return read.map { it.second }.sortedByDescending { it.usedPercent }
+            }
+            if (sources.isNotEmpty()) {
+                log("No quota from the access options, trying the grazie-lite license")
+            }
         }
+        return listOfNotNull(readLiteWindow(endpoints, identityHeaders))
+    }
+
+    private suspend fun readLiteWindow(
+        endpoints: JetBrainsAiEndpoints,
+        identityHeaders: Map<String, String>,
+    ): QuotaWindow? {
         val liteLicenseId =
             send(LICENSE_STEP, post("${endpoints.aiBaseUrl}$LICENSE_PATH", identityHeaders))
                 ?.objectOrNull("license")
                 ?.nonBlankStringOrNull("licenseId") ?: return missing(LICENSE_STEP, "licenseId")
         log("Using the grazie-lite license")
-        return readLicenseWindow(endpoints.aiBaseUrl, identityHeaders, liteLicenseId)
+        return readLicenseWindow(
+            tag = null,
+            aiBaseUrl = endpoints.aiBaseUrl,
+            identityHeaders = identityHeaders,
+            licenseId = liteLicenseId,
+            source = null,
+        )
     }
 
     /**
-     * The access option to read the quota with, or `null` when a step fails or no option is usable.
+     * The sources to read from the account's access options, or an empty list when a step fails or
+     * no option is usable.
      */
-    private suspend fun findAccessOption(
+    private suspend fun findQuotaSources(
         endpoints: JetBrainsAiEndpoints,
         refreshToken: String,
-    ): JetBrainsAccessOption? {
+    ): List<IndexedValue<JetBrainsQuotaSource>> {
+        val accessToken =
+            switchAudience(SWITCH_STEP, endpoints, refreshToken, USER_MANAGEMENT_AUDIENCE)
+                ?: return emptyList()
+        val response =
+            send(
+                OPTIONS_STEP,
+                QuotaHttpRequest(
+                    url = endpoints.accessOptionsUrl,
+                    headers = mapOf("Authorization" to bearer(accessToken), "Accept" to JSON_TYPE),
+                ),
+                logBodyStart = false,
+            ) ?: return emptyList()
+        log("$OPTIONS_STEP shape: ${redactedShape(response, keepNumbers = false)}")
+        val options =
+            parseAccessOptions(response)
+                ?: return noSources("$OPTIONS_STEP: response has no aiAccessOptions list")
+        log("$OPTIONS_STEP: ${options.size} options: ${options.map { it.summary }}")
+        return quotaSources(options).ifEmpty {
+            noSources("$OPTIONS_STEP: no enabled option has a license or workspace id")
+        }
+    }
+
+    private fun noSources(reason: String): List<IndexedValue<JetBrainsQuotaSource>> {
+        log(reason)
+        return emptyList()
+    }
+
+    /**
+     * Switches the refresh token to [audience], scoped by the [scope] parameters, in the order the
+     * Junie CLI sends them. Returns the new access token, or `null` after logging why there is
+     * none.
+     */
+    private suspend fun switchAudience(
+        step: String,
+        endpoints: JetBrainsAiEndpoints,
+        refreshToken: String,
+        audience: String,
+        scope: List<Pair<String, String>> = emptyList(),
+    ): String? {
         val form =
-            listOf(
+            (listOf(
                     "grant_type" to "switch_audience",
                     "refresh_token" to refreshToken,
-                    "audience" to USER_MANAGEMENT_AUDIENCE,
+                    "audience" to audience,
                     "client_id" to CLIENT_ID,
-                )
+                ) + scope)
                 .joinToString("&") { (key, value) -> "$key=${formEncode(value)}" }
         val switched =
             send(
-                SWITCH_STEP,
+                step,
                 QuotaHttpRequest(
                     url = endpoints.accountTokenUrl,
                     method = "POST",
@@ -123,44 +207,37 @@ internal class JetBrainsAiQuotaReader(
                 logBodyStart = false,
             ) ?: return null
         if ("refresh_token" in switched) {
-            log("$SWITCH_STEP: response has a new refresh token, which is not stored")
+            log("$step: response has a new refresh token, which is not stored")
         }
-        val accessToken =
-            switched.nonBlankStringOrNull("access_token")
-                ?: return noOption("$SWITCH_STEP: response has no access_token")
-        val response =
-            send(
-                OPTIONS_STEP,
-                QuotaHttpRequest(
-                    url = endpoints.accessOptionsUrl,
-                    headers = mapOf("Authorization" to bearer(accessToken), "Accept" to JSON_TYPE),
-                ),
-                logBodyStart = false,
-            ) ?: return null
-        log("$OPTIONS_STEP shape: ${redactedShape(response, keepNumbers = false)}")
-        val options =
-            parseAccessOptions(response)
-                ?: return noOption("$OPTIONS_STEP: response has no aiAccessOptions list")
-        log("$OPTIONS_STEP: ${options.size} options: ${options.map { it.summary }}")
-        return chooseAccessOption(options)
-            ?: noOption("$OPTIONS_STEP: no enabled option has a license id")
+        return switched.nonBlankStringOrNull("access_token")
+            ?: run {
+                log("$step: response has no access_token")
+                null
+            }
     }
 
-    private fun noOption(reason: String): JetBrainsAccessOption? {
-        log(reason)
-        return null
-    }
-
-    /** The quota window of [licenseId], or `null` when any step fails or it has no quota. */
+    /**
+     * The quota window of [licenseId], or `null` when any step fails or it has no quota. With a
+     * [source], the window is that option's. Without one, it is the grazie-lite window.
+     */
     private suspend fun readLicenseWindow(
+        tag: String?,
         aiBaseUrl: String,
         identityHeaders: Map<String, String>,
         licenseId: String,
+        source: JetBrainsQuotaSource?,
     ): QuotaWindow? {
+        // Error bodies of an access option may name the account, so only their shape is logged.
+        val logBodyStart = source == null
         val accessBody = JsonObject(mapOf("licenseId" to JsonPrimitive(licenseId))).toString()
+        val accessStep = tagged(tag, ACCESS_STEP)
         val aiToken =
-            send(ACCESS_STEP, post("$aiBaseUrl$ACCESS_PATH", identityHeaders, accessBody))
-                ?.nonBlankStringOrNull("token") ?: return missing(ACCESS_STEP, "token")
+            send(
+                    accessStep,
+                    post("$aiBaseUrl$ACCESS_PATH", identityHeaders, accessBody),
+                    logBodyStart,
+                )
+                ?.nonBlankStringOrNull("token") ?: return missing(accessStep, "token")
         val aiHeaders =
             mapOf(
                 "Grazie-Authenticate-JWT" to aiToken,
@@ -168,44 +245,96 @@ internal class JetBrainsAiQuotaReader(
                 "Accept" to JSON_TYPE,
                 "Content-Type" to JSON_TYPE,
             )
-        val quota =
-            send(QUOTA_STEP, post("$aiBaseUrl$QUOTA_PATH", aiHeaders))?.objectOrNull("current")
-                ?: return missing(QUOTA_STEP, "current")
-        val used = parseCredit(quota["current"]) ?: return missing(QUOTA_STEP, "current amount")
+        return readWindow(
+            tag = tag,
+            quota = { step -> send(step, post("$aiBaseUrl$QUOTA_PATH", aiHeaders), logBodyStart) },
+            refill = { step ->
+                send(step, post("$aiBaseUrl$REFILL_PATH", aiHeaders), logBodyStart)
+            },
+            source = source,
+        )
+    }
+
+    /** The quota window of a workspace seat, or `null` when any step fails or it has no quota. */
+    private suspend fun readSeatWindow(
+        tag: String,
+        endpoints: JetBrainsAiEndpoints,
+        refreshToken: String,
+        source: JetBrainsQuotaSource.Workspace,
+    ): QuotaWindow? {
+        val seatToken =
+            switchAudience(
+                tagged(tag, SWITCH_STEP),
+                endpoints,
+                refreshToken,
+                AI_ACCESS_AUDIENCE,
+                listOfNotNull(
+                    source.orgId?.let { "org_id" to it },
+                    "workspace_id" to source.workspaceId,
+                ),
+            ) ?: return null
+        val headers = mapOf("Authorization" to bearer(seatToken), "Accept" to JSON_TYPE)
+        fun get(path: String) =
+            QuotaHttpRequest(url = "${endpoints.aiBaseUrl}$path", headers = headers)
+        return readWindow(
+            tag = tag,
+            quota = { step -> send(step, get(SEAT_QUOTA_PATH), logBodyStart = false) },
+            refill = { step -> send(step, get(SEAT_REFILL_PATH), logBodyStart = false) },
+            source = source,
+        )
+    }
+
+    /**
+     * Reads the quota and then its refill schedule, and builds the window. The two APIs answer with
+     * the same `{"current": ...}` shapes.
+     */
+    private suspend fun readWindow(
+        tag: String?,
+        quota: suspend (step: String) -> JsonObject?,
+        refill: suspend (step: String) -> JsonObject?,
+        source: JetBrainsQuotaSource?,
+    ): QuotaWindow? {
+        val quotaStep = tagged(tag, QUOTA_STEP)
+        val current =
+            quota(quotaStep)?.objectOrNull("current") ?: return missing(quotaStep, "current")
+        log("$quotaStep amounts: ${redactedShape(amountsOf(current))}")
+        val used = parseCredit(current["current"]) ?: return missing(quotaStep, "current amount")
         val maximum =
-            parseCredit(quota["maximum"])?.takeIf { it > 0 }
-                ?: run {
-                    log("$QUOTA_STEP shape: ${redactedShape(quota)}")
-                    return missing(QUOTA_STEP, "positive maximum")
-                }
-        val refill =
-            send(REFILL_STEP, post("$aiBaseUrl$REFILL_PATH", aiHeaders))?.objectOrNull("current")
-                ?: return missing(REFILL_STEP, "current")
+            parseCredit(current["maximum"])?.takeIf { it > 0 }
+                ?: return missing(quotaStep, "positive maximum")
+        val refillStep = tagged(tag, REFILL_STEP)
+        val schedule =
+            refill(refillStep)?.objectOrNull("current") ?: return missing(refillStep, "current")
         val period =
-            refill
+            schedule
                 .objectOrNull("tariff")
                 ?.objectOrNull("period")
                 ?.longOrNull("millis")
                 ?.takeIf { it > 0 }
                 ?.let(Duration::ofMillis)
         val kind = jetBrainsWindowKind(period)
-        val window =
-            quotaWindow(
-                id = WINDOW_ID,
-                label = WINDOW_LABELS[kind] ?: DEFAULT_LABEL,
+        return quotaWindow(
+                id = source?.windowId ?: LITE_WINDOW_ID,
+                label = source?.label ?: LITE_WINDOW_LABELS[kind] ?: LITE_DEFAULT_LABEL,
                 usedPercent = (used / maximum * MAX_PERCENT).coerceIn(MIN_PERCENT, MAX_PERCENT),
                 resetsAt =
-                    (refill.longOrNull("next") ?: quota.longOrNull("until"))?.let(
+                    (schedule.longOrNull("next") ?: current.longOrNull("until"))?.let(
                         Instant::ofEpochMilli
                     ),
                 length = period,
                 kind = kind,
             )
-        log(
-            "Quota window: ${window.usedPercent}% used, kind ${window.kind}, " +
-                "resets at ${window.resetsAt}, period ${window.length}"
-        )
-        return window
+            .copy(
+                usedAmount = used / QUOTA_UNITS_PER_CREDIT,
+                limitAmount = maximum / QUOTA_UNITS_PER_CREDIT,
+                amountUnit = CREDITS_UNIT,
+            )
+            .also { window ->
+                log(
+                    "${tagged(tag, "Quota window")}: ${formatPercent(window.usedPercent)} used, " +
+                        "kind ${window.kind}, resets at ${window.resetsAt}, period ${window.length}"
+                )
+            }
     }
 
     private fun post(url: String, headers: Map<String, String>, body: String = EMPTY_BODY) =
@@ -216,7 +345,7 @@ internal class JetBrainsAiQuotaReader(
      *
      * A failed call logs the start of its body when [logBodyStart] is true. Otherwise it logs only
      * the body's [redactedShape] and a [safeWord] OAuth error code, for calls whose error body
-     * could contain a token or a name.
+     * could contain a token, an id or a name.
      */
     private suspend fun send(
         step: String,
@@ -265,6 +394,9 @@ internal class JetBrainsAiQuotaReader(
         const val CLIENT_ID = "junie-cli"
         const val USER_MANAGEMENT_AUDIENCE = "jcp-user-management"
 
+        /** The audience of a workspace seat's token, for the seat's organisation and workspace. */
+        const val AI_ACCESS_AUDIENCE = "ai-access"
+
         const val SWITCH_STEP = "switch-audience"
         const val OPTIONS_STEP = "ai-access-options"
         const val LICENSE_STEP = "license/obtain"
@@ -276,13 +408,35 @@ internal class JetBrainsAiQuotaReader(
         const val QUOTA_PATH = "/user/v5/quota/get"
         const val REFILL_PATH = "/user/v5/quota/metadata/refill"
 
-        const val WINDOW_ID = "ai_credits"
-        const val DEFAULT_LABEL = "AI credits"
-        val WINDOW_LABELS = mapOf(WindowKind.Weekly to "Weekly", WindowKind.Monthly to "Monthly")
+        /** The IDE's `JcpQuotaClient` paths, on the JetBrains AI API, for workspace seats. */
+        const val SEAT_QUOTA_PATH = "/quota/api/quota/get"
+        const val SEAT_REFILL_PATH = "/quota/api/quota/refill"
+
+        /** The IDE's `UNITS_IN_CREDIT`: the quota API counts 100,000 units per AI credit. */
+        const val QUOTA_UNITS_PER_CREDIT = 100_000.0
+        const val CREDITS_UNIT = "credits"
+
+        const val LITE_WINDOW_ID = "ai_credits"
+        const val LITE_DEFAULT_LABEL = "AI credits"
+        val LITE_WINDOW_LABELS =
+            mapOf(WindowKind.Weekly to "Weekly", WindowKind.Monthly to "Monthly")
+
+        /** The quota fields the log shows: amounts and the end date, no ids. */
+        val AMOUNT_KEYS = listOf("current", "maximum", "until", "tariffQuota", "topUpQuota")
+
+        fun tagged(tag: String?, step: String) = if (tag == null) step else "$tag $step"
+
+        fun amountsOf(quota: JsonObject) = JsonObject(quota.filterKeys { it in AMOUNT_KEYS })
     }
 }
 
 private fun formEncode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8)
+
+/** A percentage for the log: whole numbers as they are, others with one decimal. */
+private fun formatPercent(percent: Double): String {
+    val rounded = String.format(Locale.ROOT, "%.1f", percent)
+    return rounded.removeSuffix(".0") + "%"
+}
 
 /**
  * An error body as the log may show it: the OAuth `error` code when it is a [safeWord], and the

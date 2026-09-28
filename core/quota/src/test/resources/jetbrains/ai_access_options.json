@@ -1,12 +1,18 @@
 {
   "aiAccessOptions": [
     {
+      "type": "license",
+      "aiAccessEnabled": true,
+      "name": "AIP",
+      "licenseId": "test-junie-license-id",
+      "licensedTo": "sam@example.com",
+      "validThrough": "2027-01-01",
+      "code": "AIP",
+      "fullName": "Sam Example"
+    },
+    {
       "type": "workspace",
       "aiAccessEnabled": true,
-      "name": "Example Team AI",
-      "licenseId": "test-workspace-license-id",
-      "licensedTo": "Example Org",
-      "validThrough": null,
       "orgId": "test-org-id",
       "orgName": "Example Org",
       "workspaceId": "test-workspace-id",
@@ -15,26 +21,26 @@
     {
       "type": "license",
       "aiAccessEnabled": false,
-      "name": "Expired AI Pro",
+      "name": "AIU",
       "licenseId": "test-disabled-license-id",
       "licensedTo": "Sam Example",
-      "validThrough": "2025-01-01",
-      "orgId": null,
-      "orgName": null,
-      "workspaceId": null,
-      "workspaceName": null
+      "validThrough": "2025-01-01"
     },
     {
-      "type": "license",
+      "type": "workspace",
       "aiAccessEnabled": true,
-      "name": "Junie Pro",
-      "licenseId": "test-junie-license-id",
-      "licensedTo": "sam@example.com",
-      "validThrough": "2027-01-01",
-      "orgId": null,
-      "orgName": null,
-      "workspaceId": null,
-      "workspaceName": null
+      "orgId": "test-alumni-org-id",
+      "orgName": "Example Alumni Org",
+      "workspaceId": "test-alumni-workspace-id",
+      "workspaceName": "Example Alumni"
+    },
+    {
+      "type": "workspace",
+      "aiAccessEnabled": false,
+      "orgId": "test-off-org-id",
+      "orgName": "Example Off Org",
+      "workspaceId": "test-off-workspace-id",
+      "workspaceName": "Example Off"
     }
   ]
 }
