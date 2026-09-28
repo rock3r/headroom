@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -62,6 +63,21 @@ class DeepLinkTest {
         rule.waitForIdle()
         rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
         rule.onNodeWithText("SuperGrok · sam").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a widget tap while another tab is open shows the account, not a list without a toolbar`() {
+        val activity = launch(widgetTap(null))
+        rule.onNodeWithContentDescription("Resets").performClick()
+        rule.waitForIdle()
+
+        activity.newIntent(widgetTap("demo-grok"))
+        rule.waitForIdle()
+
+        // The pane scaffold was not on screen when the navigator moved to the detail. It must
+        // still end up showing the detail the navigator recorded.
+        rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertDoesNotExist()
     }
 
     @Test

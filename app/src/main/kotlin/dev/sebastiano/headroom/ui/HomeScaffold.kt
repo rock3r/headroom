@@ -272,6 +272,15 @@ private fun OverviewPanes(
 ) {
     val scope = rememberCoroutineScope()
     val twoPanes = width == LayoutWidth.Expanded
+    // The navigator can move while this tab is off screen, for example when a widget opens an
+    // account from another tab. The scaffold's animation only runs while the scaffold is on
+    // screen, so it would keep showing the list while the navigator (and the toolbar) think the
+    // detail is showing. A seek with no progress brings the scaffold to the navigator's value.
+    LaunchedEffect(navigator) {
+        if (navigator.scaffoldState.targetState != navigator.scaffoldValue) {
+            navigator.seekBack(fraction = 0f)
+        }
+    }
     // With motion reduced, the card does not turn into the detail: the panes only fade.
     val animate = animationsEnabled()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
