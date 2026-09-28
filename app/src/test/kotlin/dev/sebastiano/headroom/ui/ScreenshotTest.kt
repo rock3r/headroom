@@ -14,11 +14,14 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
+import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
+import dev.sebastiano.headroom.ui.accounts.accountRowTag
 import dev.sebastiano.headroom.ui.accounts.providerOptionTag
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
@@ -40,12 +43,23 @@ import org.robolectric.annotation.GraphicsMode
 class ScreenshotTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
-    private fun launch(dark: Boolean = false, signIn: SignInController = FakeSignInController()) {
+    private fun launch(
+        dark: Boolean = false,
+        signIn: SignInController = FakeSignInController(),
+        realAccounts: List<AccountState> = emptyList(),
+    ) {
         // Frames are driven by capture(), so that animations are drawn while they run.
         rule.mainClock.autoAdvance = false
         rule.setContent {
             HeadroomTheme(darkTheme = dark, dynamicColor = false) {
-                HeadroomApp(graph = testGraph(rule.activity, signInController = signIn))
+                HeadroomApp(
+                    graph =
+                        testGraph(
+                            rule.activity,
+                            realAccounts = realAccounts,
+                            signInController = signIn,
+                        )
+                )
             }
         }
     }
@@ -130,6 +144,23 @@ class ScreenshotTest {
         launch()
         rule.onNodeWithContentDescription("Accounts").performClick()
         capture("accounts")
+    }
+
+    @Test
+    fun accountEditing() {
+        // Demo accounts cannot be edited, so these are the demo accounts signed in for real.
+        val accounts =
+            DemoData.accounts(FIXED_NOW).map {
+                if (it.account.id == "demo-codex")
+                    it.copy(account = it.account.copy(nickname = "Work"))
+                else it
+            }
+        launch(realAccounts = accounts)
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithContentDescription("Accounts").performClick()
+        rule.onNodeWithTag(accountRowTag("demo-codex")).performClick()
+        rule.mainClock.autoAdvance = false
+        capture("accounts-editing")
     }
 
     @Test
