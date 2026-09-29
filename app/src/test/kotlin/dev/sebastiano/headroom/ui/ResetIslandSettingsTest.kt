@@ -267,7 +267,7 @@ class ResetIslandSettingsTest {
         rule.onNodeWithTag(RESET_ISLAND_TAG).performClick()
 
         rule
-            .onNodeWithText("The pill shows below the status bar", substring = true)
+            .onNodeWithText("The status bar icons can show on top of the pill", substring = true)
             .performScrollTo()
             .assertIsDisplayed()
         rule
@@ -301,7 +301,7 @@ class ResetIslandSettingsTest {
         rule.waitForIdle()
 
         rule.onNodeWithText("The reset island is ready").assertIsDisplayed()
-        rule.onNodeWithText("It shows below the status bar", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("It grows out of the camera", substring = true).assertIsDisplayed()
         rule.onNodeWithText("Allow display over other apps").assertDoesNotExist()
         rule.onNodeWithText("Try it").performClick()
         assertEquals(listOf(Provider.Claude to "Claude weekly limit reset"), island.demos)
