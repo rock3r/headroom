@@ -21,11 +21,8 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 
-/**
- * The island's geometry for the camera cutout and the screen, right now. A [tight] window is
- * exactly the pill.
- */
-internal fun WindowManager.measureIsland(density: Float, tight: Boolean = false): IslandGeometry {
+/** The island's geometry for the camera cutout and the screen, right now. */
+internal fun WindowManager.measureIsland(density: Float): IslandGeometry {
     val metrics = maximumWindowMetrics
     val bounds = metrics.bounds
     val cutout = metrics.windowInsets.displayCutout
@@ -42,7 +39,7 @@ internal fun WindowManager.measureIsland(density: Float, tight: Boolean = false)
                 .takeIf { box -> rect != null && !box.isEmpty && rect.contains(box) }
         }
     val hole = cameraHole(outline, rect)
-    return islandGeometry(hole, bounds.width(), bounds.height(), density, tight)
+    return islandGeometry(hole, bounds.width(), bounds.height(), density)
 }
 
 /** The two kinds of window the island can be drawn in. */

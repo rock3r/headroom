@@ -93,9 +93,10 @@ internal class AndroidIslandOverlay(
         return Live(window, windowManager, windowContext.resources.displayMetrics.density)
     }
 
-    // The window takes the touches in its own area, so it is exactly the pill.
+    // The window takes the touches in its own area, including the little room around the pill that
+    // the grow spring needs. That margin is only 8 dp, and only for a few seconds.
     private fun measure(current: Live): IslandGeometry =
-        current.windowManager.measureIsland(current.density, tight = true)
+        current.windowManager.measureIsland(current.density)
 
     private companion object {
         const val TAG = "HeadroomIsland"

@@ -13,8 +13,7 @@ class IslandGeometryTest {
     /** A round camera hole, 30 dp across, 10 dp from the top, in the middle. */
     private val hole = PxRect(left = 502, top = 25, right = 577, bottom = 100)
 
-    private fun withHole(tight: Boolean = false) =
-        islandGeometry(hole, width, height, density, tight)
+    private fun withHole() = islandGeometry(hole, width, height, density)
 
     private fun withoutHole() = islandGeometry(null, width, height, density)
 
@@ -60,17 +59,12 @@ class IslandGeometryTest {
     }
 
     @Test
-    fun `the accessibility window has room for the spring's overshoot`() {
+    fun `the window has room for the spring's overshoot, so the rounded ends are never cut`() {
         val geometry = withHole()
-        assertTrue(geometry.window.width > geometry.expanded.width)
+        val room = 20 // 8 dp at 2.5 px per dp
+        assertEquals(geometry.expanded.left - room, 0)
+        assertEquals(geometry.window.width - room, geometry.expanded.right)
         assertTrue(geometry.window.height > geometry.expanded.height)
-    }
-
-    @Test
-    fun `the overlay window is exactly the pill, because it takes the touches in its area`() {
-        val geometry = withHole(tight = true)
-        assertEquals(PxRect(0, 0, geometry.window.width, geometry.window.height), geometry.expanded)
-        assertEquals(hole.centerX, geometry.window.left + geometry.collapsed.centerX, 1f)
     }
 
     @Test

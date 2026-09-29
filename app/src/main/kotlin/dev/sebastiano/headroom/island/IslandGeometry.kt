@@ -66,15 +66,14 @@ internal data class IslandGeometry(
  * and [SIDE_DP] wider on each side, so the hole sits exactly in the middle. Without a cutout it is
  * the same pill around a small dot at the top centre, a small margin down.
  *
- * A [tight] window is exactly the pill, for a window that takes the touches in its own area. A
- * loose one has room for the grow spring, which passes its target by a little.
+ * The window has room around the pill for the grow spring, which passes its target by a little, so
+ * the rounded ends are never cut.
  */
 internal fun islandGeometry(
     cutout: PxRect?,
     screenWidth: Int,
     screenHeight: Int,
     density: Float,
-    tight: Boolean = false,
 ): IslandGeometry {
     fun px(dp: Float) = (dp * density).roundToInt()
     val hole =
@@ -95,7 +94,7 @@ internal fun islandGeometry(
     val capsuleSide = max(pad, ((bottom - top) - hole.width) / 2)
     val capsule = PxRect(hole.left - capsuleSide, top, hole.right + capsuleSide, bottom)
 
-    val room = if (tight) 0 else px(OVERSHOOT_DP)
+    val room = px(OVERSHOOT_DP)
     val reach =
         PxRect(
             expanded.left - room,
