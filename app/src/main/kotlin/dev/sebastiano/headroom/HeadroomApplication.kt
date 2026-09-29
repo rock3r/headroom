@@ -19,7 +19,6 @@ import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ThemePalette
-import dev.sebastiano.headroom.tracing.installAppTracing
 import dev.sebastiano.headroom.widget.HeadroomWidgetHost
 import dev.sebastiano.headroom.widget.WidgetConfigStore
 import dev.sebastiano.headroom.widget.WidgetUpdater
@@ -106,7 +105,6 @@ open class HeadroomApplication :
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
-        installAppTracing()
         if (!usesDataLayer) return
         registerActivityLifecycleCallbacks(foreground)
         dataGraph.start()

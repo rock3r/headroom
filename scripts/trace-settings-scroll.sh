@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Records a Perfetto system trace while scrolling Headroom's Settings screen, then merges in the
-# app's own AndroidX Tracing 2 sections. Needs a debug build installed and Settings open.
+# Records a Perfetto system trace while scrolling Headroom's Settings screen, together with the
+# app's in-process AndroidX Tracing 2 sections: the app's own and Compose's composable names.
+# Needs a debug build installed and Settings open.
 # Usage: scripts/trace-settings-scroll.sh <adb serial> [output directory]
 # See docs/TRACING.md.
 set -euo pipefail
@@ -8,8 +9,15 @@ set -euo pipefail
 serial="${1:?Pass the adb serial of the device}"
 out="${2:-build/traces}"
 package="dev.sebastiano.headroom"
+receiver="$package/androidx.tracing.profiler.ConnectedProfilerTracingReceiver"
 adb=(adb -s "$serial")
 mkdir -p "$out"
+rm -rf "$out/app"
+
+# The same broadcasts an IDE profiler sends to androidx.tracing's receiver. START clears old
+# in-process traces and turns recording on; it stays on, even across restarts, until STOP.
+broadcast() { "${adb[@]}" shell am broadcast -a "androidx.tracing.profiler.action.$1" -n "$receiver" | tail -1; }
+broadcast START >/dev/null
 
 "${adb[@]}" push "$(dirname "$0")/perfetto/scroll.pbtxt" /data/local/tmp/headroom-scroll.pbtxt >/dev/null
 "${adb[@]}" shell 'cat /data/local/tmp/headroom-scroll.pbtxt | perfetto --txt -c - -o /data/misc/perfetto-traces/headroom-scroll.pftrace --background' >/dev/null
@@ -25,12 +33,14 @@ for _ in 1 2 3; do
   "${adb[@]}" shell input swipe "$x" "$high" "$x" "$low" 300; sleep 1.2
 done
 
-# Going home makes the app flush its trace buffer. Then wait for Perfetto to stop.
-"${adb[@]}" shell input keyevent KEYCODE_HOME
-sleep 8
+# FLUSH_TRACES_GET_PATH writes the in-process trace out, copies it where the shell can read it,
+# and answers with that folder. Then wait for the 20 second system trace to end.
+path=$(broadcast FLUSH_TRACES_GET_PATH | sed -nE 's/.*data="([^"]+)".*/\1/p')
+if [ -z "$path" ]; then echo "The app did not flush its trace. Is a debug build running?" >&2; exit 1; fi
+broadcast STOP >/dev/null
+sleep 6
 
 "${adb[@]}" pull /data/misc/perfetto-traces/headroom-scroll.pftrace "$out/system.pftrace" >/dev/null
-latest=$("${adb[@]}" shell run-as "$package" ls no_backup/perfetto_traces | tr -d '\r' | sort | tail -1)
-"${adb[@]}" exec-out run-as "$package" cat "no_backup/perfetto_traces/$latest" > "$out/app.pftrace"
-cat "$out/system.pftrace" "$out/app.pftrace" > "$out/merged.pftrace"
+"${adb[@]}" pull "$path" "$out/app" >/dev/null
+cat "$out/system.pftrace" "$out"/app/*.perfetto-trace > "$out/merged.pftrace"
 echo "Merged trace: $out/merged.pftrace"

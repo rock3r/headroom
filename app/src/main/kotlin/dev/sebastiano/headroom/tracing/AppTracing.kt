@@ -6,17 +6,21 @@ import androidx.compose.runtime.Composable
 import androidx.tracing.Tracer
 
 /**
- * The app's own trace sections, recorded with AndroidX Tracing 2. Debug builds install a real
- * tracer at start-up (`installAppTracing`, in the debug source set); release builds keep the
- * library's stub, which records nothing and costs almost nothing.
+ * The app's own trace sections, recorded with AndroidX Tracing 2. In debug builds,
+ * `androidx.tracing:tracing-wire` registers a recording tracer as the global one at start-up, and
+ * records only after a `START` broadcast (see docs/TRACING.md). Release builds do not include it,
+ * so they keep the library's stub, which records nothing and costs almost nothing.
  */
 object AppTracing {
     /** Every section Headroom records is in this category. */
     const val CATEGORY: String = "headroom"
 
-    @Volatile
-    var tracer: Tracer = Tracer.getStubTracer()
-        internal set
+    /**
+     * The process-wide [Tracer.global]. Compose records composable names through it too, so the
+     * app's sections and Compose's land in the same trace.
+     */
+    val tracer: Tracer
+        get() = Tracer.global
 }
 
 /**
