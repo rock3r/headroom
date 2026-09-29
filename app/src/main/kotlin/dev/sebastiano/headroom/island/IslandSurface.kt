@@ -225,7 +225,7 @@ private fun IslandContent(
     val pill = geometry.expanded
     val hole = geometry.collapsed
     // Content sits as far in from each end as it sits from the top, so it follows the rounded end.
-    val inset = with(density) { ((pill.height.toDp() - LOGO_SIZE) / 2).coerceAtLeast(4.dp) }
+    val inset = with(density) { ((pill.height.toDp() - LOGO_SIZE) / 2).coerceAtLeast(MIN_INSET) }
     val leftWidth = with(density) { (hole.left - pill.left).toDp() }
     val rightWidth = with(density) { (pill.right - hole.right).toDp() }
     Row(modifier = modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -333,10 +333,14 @@ private fun ResetLabel(visible: Boolean, modifier: Modifier = Modifier) {
             animationSpec = HeadroomMotion.effectsSpec(),
             label = "island-label",
         )
+    // A fixed size, like the logo and the ring: the pill has no room to grow with the font scale.
+    // A screen reader reads the island's description instead.
+    val fixedSize = with(LocalDensity.current) { LABEL_SIZE.toSp() }
     Text(
         text = stringResource(R.string.reset_island_reset),
         color = Color.White,
-        style = MaterialTheme.typography.labelMedium,
+        style =
+            MaterialTheme.typography.labelMedium.copy(fontSize = fixedSize, lineHeight = fixedSize),
         maxLines = 1,
         softWrap = false,
         modifier =
@@ -364,6 +368,10 @@ private val BADGE_SIZE = 11.dp
 private val RING_SIZE = 18.dp
 private val RING_STROKE = 2.5.dp
 private val LABEL_SLIDE = (-6).dp
+private val LABEL_SIZE = 12.dp
+
+/** Content never gets closer than this to a rounded end. */
+private val MIN_INSET = 10.dp
 
 /** A charging green, bright enough on black. */
 private val RefillGreen = Color(0xFF4ADE80)

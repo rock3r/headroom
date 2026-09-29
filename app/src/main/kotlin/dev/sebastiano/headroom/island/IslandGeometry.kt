@@ -29,8 +29,23 @@ internal data class PxRect(val left: Int, val top: Int, val right: Int, val bott
             max(bottom, other.bottom),
         )
 
+    val isEmpty: Boolean
+        get() = width <= 0 || height <= 0
+
     fun offset(dx: Int, dy: Int): PxRect = PxRect(left + dx, top + dy, right + dx, bottom + dy)
 }
+
+/**
+ * The camera hole itself. Android reports a cutout as a bounding [rect], which on a Pixel runs from
+ * the top edge down past the hole, so the [outline] of the cutout is used when there is one.
+ * Without it, a rect taller than wide is taken as a round hole at its bottom.
+ */
+internal fun cameraHole(outline: PxRect?, rect: PxRect?): PxRect? =
+    outline
+        ?: rect?.let {
+            if (it.height > it.width) PxRect(it.left, it.bottom - it.width, it.right, it.bottom)
+            else it
+        }
 
 /**
  * Where the island is, in pixels. [window] is the overlay window on the screen. The other rects are
@@ -108,7 +123,7 @@ internal fun islandGeometry(
 }
 
 /** How far the pill reaches past the hole on each side, for the logo and for the ring. */
-private const val SIDE_DP = 64f
+private const val SIDE_DP = 70f
 
 /** How much larger than the hole the pill is, above, below and around it. */
 private const val PAD_DP = 6f

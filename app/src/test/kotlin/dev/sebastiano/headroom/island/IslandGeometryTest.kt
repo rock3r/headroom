@@ -92,4 +92,19 @@ class IslandGeometryTest {
         assertTrue(geometry.expanded.contains(geometry.collapsed))
         assertEquals(geometry.expanded.centerX, geometry.collapsed.centerX, 1f)
     }
+
+    @Test
+    fun `the hole is the camera's own outline, not the tall rectangle Android reports`() {
+        // A Pixel reports its punch hole as a rectangle from the top edge down past the hole.
+        val rect = PxRect(left = 570, top = 0, right = 660, bottom = 190)
+        val outline = PxRect(left = 580, top = 52, right = 650, bottom = 122)
+        assertEquals(outline, cameraHole(outline = outline, rect = rect))
+    }
+
+    @Test
+    fun `without an outline, a tall rectangle is taken as a round hole at its bottom`() {
+        val rect = PxRect(left = 570, top = 0, right = 660, bottom = 190)
+        assertEquals(PxRect(570, 100, 660, 190), cameraHole(outline = null, rect = rect))
+        assertEquals(null, cameraHole(outline = null, rect = null))
+    }
 }

@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.island
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -27,12 +28,21 @@ import dev.sebastiano.headroom.designsystem.HeadroomTheme
 internal fun WindowManager.measureIsland(density: Float, tight: Boolean = false): IslandGeometry {
     val metrics = maximumWindowMetrics
     val bounds = metrics.bounds
-    val cutout =
-        metrics.windowInsets.displayCutout
+    val cutout = metrics.windowInsets.displayCutout
+    val rect =
+        cutout
             ?.boundingRects
             ?.firstOrNull { it.top == 0 }
             ?.let { PxRect(it.left, it.top, it.right, it.bottom) }
-    return islandGeometry(cutout, bounds.width(), bounds.height(), density, tight)
+    // The outline of the top cutout: the path covers every cutout, so keep the part in the rect.
+    val outline =
+        cutout?.cutoutPath?.let { path ->
+            val box = RectF().also { path.computeBounds(it) }
+            PxRect(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
+                .takeIf { box -> rect != null && !box.isEmpty && rect.contains(box) }
+        }
+    val hole = cameraHole(outline, rect)
+    return islandGeometry(hole, bounds.width(), bounds.height(), density, tight)
 }
 
 /** The two kinds of window the island can be drawn in. */
