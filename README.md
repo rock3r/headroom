@@ -102,6 +102,13 @@ Keystore and are never backed up.
 | GitHub Copilot, Kimi Code | Device code: enter a short code on the provider's page. |
 | Z.AI, OpenCode Go | API key. |
 
+## Installing
+
+Download the APK from the [latest release](https://github.com/rock3r/headroom/releases/latest) and
+open it on your phone. Headroom needs Android 16 or later. Releases are signed with the same key
+every time, so later releases install over earlier ones. [docs/RELEASING.md](docs/RELEASING.md)
+explains how a release is made.
+
 ## Building
 
 You need JDK 21 and the Android SDK with platform 37.

@@ -13,9 +13,34 @@ android {
     defaultConfig {
         applicationId = "dev.sebastiano.headroom"
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
         // Starts the app in demo mode with a fixed clock for the end-to-end tests.
         testInstrumentationRunner = "dev.sebastiano.headroom.HeadroomTestRunner"
+    }
+    // The release key comes from the environment, so it never lives in the repository. CI sets
+    // these
+    // from its secrets; see docs/RELEASING.md. Without them, a release build is left unsigned.
+    val keystore = providers.environmentVariable("HEADROOM_KEYSTORE_FILE").orNull
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = providers.environmentVariable("HEADROOM_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("HEADROOM_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("HEADROOM_KEY_PASSWORD").get()
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            signingConfig = signingConfigs.findByName("release")
+        }
     }
     testOptions {
         managedDevices {
