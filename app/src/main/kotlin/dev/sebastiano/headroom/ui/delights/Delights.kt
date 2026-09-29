@@ -26,6 +26,7 @@ import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.GlobalPositionAwareModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import dev.sebastiano.headroom.designsystem.animationsEnabled
@@ -218,6 +219,11 @@ private data class DelightAnchorElement(val key: Any) : ModifierNodeElement<Deli
 
     override fun update(node: DelightAnchorNode) {
         node.update(key)
+    }
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "delightAnchor"
+        properties["key"] = key
     }
 }
 

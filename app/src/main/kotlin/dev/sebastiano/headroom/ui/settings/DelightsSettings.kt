@@ -1,14 +1,10 @@
 package dev.sebastiano.headroom.ui.settings
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.island.ResetIslandStatus
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.tracing.tracedItem
 import dev.sebastiano.headroom.ui.delights.LocalDelights
 import dev.sebastiano.headroom.ui.delights.delightAnchor
 
@@ -33,13 +30,15 @@ const val RESET_CONFETTI_TAG: String = "reset-confetti"
 const val RESET_ISLAND_TAG: String = "reset-island"
 
 /**
- * The delights, each with its switch: the refresh shimmer, the reset confetti and the experimental
- * reset island. The island's row also shows its [islandStatus], and its Try button needs
- * [canTryIsland], which is true when the accessibility service is connected or Display over other
- * apps is allowed.
+ * The delights, each with its switch, as one list item per row: the refresh shimmer, the reset
+ * confetti and the experimental reset island. The island's row also shows its [islandStatus], and
+ * its Try button needs [canTryIsland], which is true when the accessibility service is connected or
+ * Display over other apps is allowed. The first row gets [firstModifier], the others [modifier].
  */
-@Composable
-internal fun DelightsList(
+@Suppress(
+    "LongParameterList"
+) // Each delight's state and actions; grouping them would only hide it.
+internal fun LazyListScope.delightRows(
     refreshShimmer: Boolean,
     resetConfetti: Boolean,
     resetIsland: Boolean,
@@ -49,19 +48,11 @@ internal fun DelightsList(
     onResetConfettiChange: (Boolean) -> Unit,
     onResetIslandChange: (Boolean) -> Unit,
     onTryResetIsland: (Provider, String) -> Unit,
-    modifier: Modifier = Modifier,
+    firstModifier: Modifier,
+    modifier: Modifier,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-    ) {
+    tracedItem("Settings: DelightRow shimmer", key = "delight-shimmer") {
         val delights = LocalDelights.current
-        val colours =
-            listOf(
-                MaterialTheme.colorScheme.primary,
-                MaterialTheme.colorScheme.secondary,
-                MaterialTheme.colorScheme.tertiary,
-            )
         DelightRow(
             title = R.string.settings_refresh_shimmer,
             body = R.string.settings_refresh_shimmer_body,
@@ -71,8 +62,17 @@ internal fun DelightsList(
             tryLabel = R.string.settings_try_refresh_shimmer,
             canTry = delights?.canShimmer == true,
             onTry = { delights?.playShimmer() },
-            modifier = Modifier.testTag(REFRESH_SHIMMER_TAG),
+            modifier = firstModifier.testTag(REFRESH_SHIMMER_TAG),
         )
+    }
+    tracedItem("Settings: DelightRow confetti", key = "delight-confetti") {
+        val delights = LocalDelights.current
+        val colours =
+            listOf(
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.secondary,
+                MaterialTheme.colorScheme.tertiary,
+            )
         DelightRow(
             title = R.string.settings_reset_confetti,
             body = R.string.settings_reset_confetti_body,
@@ -83,8 +83,10 @@ internal fun DelightsList(
             canTry = delights?.canBurst == true,
             onTry = { delights?.burstFrom(listOf(TRY_CONFETTI_ANCHOR), colours) },
             tryModifier = Modifier.delightAnchor(TRY_CONFETTI_ANCHOR),
-            modifier = Modifier.testTag(RESET_CONFETTI_TAG),
+            modifier = modifier.testTag(RESET_CONFETTI_TAG),
         )
+    }
+    tracedItem("Settings: DelightRow island", key = "delight-island") {
         val demoMessage = stringResource(R.string.reset_island_demo_message)
         DelightRow(
             title = R.string.settings_reset_island,
@@ -96,7 +98,7 @@ internal fun DelightsList(
             canTry = canTryIsland,
             onTry = { onTryResetIsland(Provider.Claude, demoMessage) },
             status = islandStatus,
-            modifier = Modifier.testTag(RESET_ISLAND_TAG),
+            modifier = modifier.testTag(RESET_ISLAND_TAG),
         )
     }
 }
@@ -123,7 +125,6 @@ private fun IslandStatusLine(status: ResetIslandStatus, modifier: Modifier = Mod
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DelightRow(
     @StringRes title: Int,
@@ -138,21 +139,14 @@ private fun DelightRow(
     tryModifier: Modifier = Modifier,
     status: ResetIslandStatus? = null,
 ) {
-    SegmentedListItem(
-        checked = checked,
-        onCheckedChange = onChange,
-        shapes = ListItemDefaults.segmentedShapes(index = index, count = DELIGHTS),
-        colors =
-            ListItemDefaults.segmentedColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            ),
-        supportingContent = {
-            Column {
-                Text(stringResource(body))
-                if (status != null) IslandStatusLine(status, Modifier.padding(top = 4.dp))
-            }
-        },
-        trailingContent = {
+    SettingsRow(
+        headline = stringResource(title),
+        action = RowAction.Toggle(checked, onChange),
+        index = index,
+        count = DELIGHTS,
+        supporting = stringResource(body),
+        below = status?.let { { IslandStatusLine(it, Modifier.padding(top = 4.dp)) } },
+        trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Plays the delight once, so it can be seen without waiting for a refresh or a
                 // reset.
@@ -168,9 +162,7 @@ private fun DelightRow(
             }
         },
         modifier = modifier,
-    ) {
-        Text(stringResource(title))
-    }
+    )
 }
 
 private const val DELIGHTS = 3

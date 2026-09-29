@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
@@ -24,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -171,8 +168,13 @@ fun SettingsScreen(
 /**
  * The rows of the settings list. Each one is recorded as a trace section called `Settings: <row>`,
  * so a slow frame while scrolling shows which row was being composed: see docs/TRACING.md.
+ *
+ * Every row of a group is its own list item, so the list composes a group one row at a time as it
+ * scrolls in, instead of all at once. The list puts [ListItemDefaults.SegmentedGap] between items;
+ * the first item of each block adds [BLOCK_GAP] above itself, so blocks sit further apart than the
+ * rows of a group.
  */
-@Suppress("LongParameterList") // Everything the rows show and do; grouping them would only hide it.
+@Suppress("LongParameterList", "LongMethod") // One flat list of every row, in screen order.
 private fun LazyListScope.settingsRows(
     state: SettingsUiState,
     accounts: SettingsAccounts,
@@ -182,98 +184,122 @@ private fun LazyListScope.settingsRows(
     width: Modifier,
     onShowIslandSetup: () -> Unit,
 ) {
+    val block = width.padding(top = BLOCK_GAP)
     tracedItem("Settings: SectionLabel accounts") {
-        SectionLabel(stringResource(R.string.settings_accounts), width)
+        SectionLabel(stringResource(R.string.settings_accounts), block)
     }
-    tracedItem("Settings: AccountsRow") { AccountsRow(accounts, actions.onOpenAccounts, width) }
+    tracedItem("Settings: AccountsRow") { AccountsRow(accounts, actions.onOpenAccounts, block) }
     tracedItem("Settings: SectionLabel display") {
-        SectionLabel(stringResource(R.string.settings_display), width)
+        SectionLabel(stringResource(R.string.settings_display), block)
     }
     tracedItem("Settings: QuotaDisplayPicker") {
-        QuotaDisplayPicker(state.quotaDisplay, actions.onQuotaDisplayChange, width)
+        QuotaDisplayPicker(state.quotaDisplay, actions.onQuotaDisplayChange, block)
     }
     tracedItem("Settings: SectionLabel appearance") {
-        SectionLabel(stringResource(R.string.settings_appearance), width)
+        SectionLabel(stringResource(R.string.settings_appearance), block)
     }
-    tracedItem("Settings: ThemePicker") { ThemePicker(state.theme, actions.onThemeChange, width) }
+    tracedItem("Settings: ThemePicker") { ThemePicker(state.theme, actions.onThemeChange, block) }
     tracedItem("Settings: PalettePicker") {
-        PalettePicker(state.palette, actions.onPaletteChange, width)
+        PalettePicker(state.palette, actions.onPaletteChange, block)
     }
     tracedItem("Settings: ReduceMotionRow") {
-        ReduceMotionRow(state.motion, actions.onMotionChange, width)
+        ReduceMotionRow(state.motion, actions.onMotionChange, block)
     }
     tracedItem("Settings: SectionLabel delights") {
-        SectionLabel(stringResource(R.string.settings_delights), width)
+        SectionLabel(stringResource(R.string.settings_delights), block)
     }
-    tracedItem("Settings: DelightsList") {
-        DelightsList(
-            refreshShimmer = state.refreshShimmer,
-            resetConfetti = state.resetConfetti,
-            resetIsland = state.resetIsland,
-            islandStatus = resetIslandStatus(state.resetIsland, resetIsland.mode),
-            canTryIsland = resetIsland.mode != IslandMode.None,
-            onRefreshShimmerChange = actions.onRefreshShimmerChange,
-            onResetConfettiChange = actions.onResetConfettiChange,
-            onResetIslandChange = { on ->
-                actions.onResetIslandChange(on)
-                if (on && resetIsland.mode == IslandMode.None) {
-                    onShowIslandSetup()
-                }
-            },
-            onTryResetIsland = actions.onTryResetIsland,
-            modifier = width,
-        )
-    }
+    delightRows(
+        refreshShimmer = state.refreshShimmer,
+        resetConfetti = state.resetConfetti,
+        resetIsland = state.resetIsland,
+        islandStatus = resetIslandStatus(state.resetIsland, resetIsland.mode),
+        canTryIsland = resetIsland.mode != IslandMode.None,
+        onRefreshShimmerChange = actions.onRefreshShimmerChange,
+        onResetConfettiChange = actions.onResetConfettiChange,
+        onResetIslandChange = { on ->
+            actions.onResetIslandChange(on)
+            if (on && resetIsland.mode == IslandMode.None) {
+                onShowIslandSetup()
+            }
+        },
+        onTryResetIsland = actions.onTryResetIsland,
+        firstModifier = block,
+        modifier = width,
+    )
     if (!animate) {
         tracedItem("Settings: delights note") {
             Text(
                 text = stringResource(R.string.settings_delights_reduced),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = width.padding(horizontal = 6.dp),
+                modifier = block.padding(horizontal = 6.dp),
             )
         }
     }
     tracedItem("Settings: SectionLabel sync") {
-        SectionLabel(stringResource(R.string.settings_sync), width)
+        SectionLabel(stringResource(R.string.settings_sync), block)
     }
-    tracedItem("Settings: SyncFrequencyList") {
-        SyncFrequencyList(state.syncFrequency, actions.onSyncFrequencyChange, width)
+    val frequencies = SyncFrequency.entries
+    frequencies.forEachIndexed { index, frequency ->
+        tracedItem("Settings: SyncFrequencyRow", key = "sync-${frequency.name}") {
+            SyncFrequencyRow(
+                frequency = frequency,
+                selected = frequency == state.syncFrequency,
+                onSelect = { actions.onSyncFrequencyChange(frequency) },
+                index = index,
+                count = frequencies.size,
+                modifier = if (index == 0) block else width,
+            )
+        }
     }
     tracedItem("Settings: sync note") {
         Text(
             text = stringResource(R.string.settings_sync_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = width.padding(horizontal = 6.dp),
+            modifier = block.padding(horizontal = 6.dp),
         )
     }
     tracedItem("Settings: SectionLabel widgets") {
-        SectionLabel(stringResource(R.string.settings_widgets), width)
+        SectionLabel(stringResource(R.string.settings_widgets), block)
     }
-    tracedItem("Settings: WidgetList") { WidgetList(actions.onAddWidget, width) }
+    val styles = WidgetStyle.entries
+    styles.forEachIndexed { index, style ->
+        tracedItem("Settings: WidgetRow", key = "widget-${style.name}") {
+            WidgetRow(
+                style = style,
+                onAdd = { actions.onAddWidget(style) },
+                index = index,
+                count = styles.size,
+                modifier = if (index == 0) block else width,
+            )
+        }
+    }
     tracedItem("Settings: widgets note") {
         Text(
             text = stringResource(R.string.settings_widgets_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = width.padding(horizontal = 6.dp),
+            modifier = block.padding(horizontal = 6.dp),
         )
     }
     tracedItem("Settings: SectionLabel about") {
-        SectionLabel(stringResource(R.string.settings_about), width)
+        SectionLabel(stringResource(R.string.settings_about), block)
     }
-    tracedItem("Settings: LicencesRow") { LicencesRow(actions.onOpenLicences, width) }
+    tracedItem("Settings: LicencesRow") { LicencesRow(actions.onOpenLicences, block) }
     tracedItem("Settings: version") {
         Text(
             text = stringResource(R.string.settings_version, state.appVersion),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = width.padding(top = 8.dp),
+            modifier = block.padding(top = 8.dp),
         )
     }
 }
+
+/** The space between blocks of the settings list, on top of the gap between all its items. */
+private val BLOCK_GAP = 10.dp
 
 /**
  * The settings header above a scrolling list, drawn edge to edge with the blur behind the status
@@ -299,7 +325,7 @@ private fun PageScaffold(
                     top = insets.calculateTopPadding() + 8.dp,
                     bottom = insets.calculateBottomPadding() + 24.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item { SettingsHeader(onClose, reveal) }
@@ -407,70 +433,50 @@ private fun QuotaDisplayPicker(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** One sync frequency of the group, picked like a radio button. */
 @Composable
-private fun SyncFrequencyList(
+private fun SyncFrequencyRow(
     frequency: SyncFrequency,
-    onChange: (SyncFrequency) -> Unit,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    index: Int,
+    count: Int,
     modifier: Modifier = Modifier,
 ) {
-    val options = SyncFrequency.entries
-    val colors =
-        ListItemDefaults.segmentedColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
-    Column(
-        modifier = modifier.selectableGroup(),
-        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-    ) {
-        options.forEachIndexed { index, option ->
-            val selected = option == frequency
-            SegmentedListItem(
-                selected = selected,
-                onClick = { onChange(option) },
-                shapes = ListItemDefaults.segmentedShapes(index = index, count = options.size),
-                colors = colors,
-                leadingContent = { RadioButton(selected = selected, onClick = null) },
-                modifier = Modifier.testTag(syncFrequencyTag(option)),
-            ) {
-                Text(syncFrequencyLabel(option))
-            }
-        }
-    }
+    SettingsRow(
+        headline = syncFrequencyLabel(frequency),
+        action = RowAction.Select(selected, onSelect),
+        index = index,
+        count = count,
+        leading = { RadioButton(selected = selected, onClick = null) },
+        modifier = modifier.testTag(syncFrequencyTag(frequency)),
+    )
 }
 
-/** One row per widget style; a tap asks the launcher to add that widget to the home screen. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** One widget style; a tap asks the launcher to add that widget to the home screen. */
 @Composable
-private fun WidgetList(onAddWidget: (WidgetStyle) -> Unit, modifier: Modifier = Modifier) {
-    val styles = WidgetStyle.entries
-    val colors =
-        ListItemDefaults.segmentedColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        )
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-    ) {
-        styles.forEachIndexed { index, style ->
-            val title = stringResource(style.title)
-            SegmentedListItem(
-                onClick = { onAddWidget(style) },
-                shapes = ListItemDefaults.segmentedShapes(index = index, count = styles.size),
-                colors = colors,
-                supportingContent = { Text(stringResource(style.body)) },
-                trailingContent = {
-                    Icon(
-                        painter = painterResource(HeadroomIcons.Add),
-                        contentDescription = stringResource(R.string.widget_add_description, title),
-                    )
-                },
-                modifier = Modifier.testTag(addWidgetTag(style)),
-            ) {
-                Text(title)
-            }
-        }
-    }
+private fun WidgetRow(
+    style: WidgetStyle,
+    onAdd: () -> Unit,
+    index: Int,
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    val title = stringResource(style.title)
+    SettingsRow(
+        headline = title,
+        action = RowAction.Click(onAdd),
+        index = index,
+        count = count,
+        supporting = stringResource(style.body),
+        trailing = {
+            Icon(
+                painter = painterResource(HeadroomIcons.Add),
+                contentDescription = stringResource(R.string.widget_add_description, title),
+            )
+        },
+        modifier = modifier.testTag(addWidgetTag(style)),
+    )
 }
 
 private val WidgetStyle.title: Int
@@ -493,7 +499,6 @@ private val WidgetStyle.body: Int
             WidgetStyle.Countdown -> R.string.widget_countdown_body
         }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AccountsRow(
     accounts: SettingsAccounts,
@@ -501,31 +506,25 @@ private fun AccountsRow(
     modifier: Modifier = Modifier,
 ) {
     val count = accounts.providers.size
-    SegmentedListItem(
-        onClick = onOpenAccounts,
-        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
-        colors =
-            ListItemDefaults.segmentedColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            ),
-        leadingContent =
-            if (accounts.isDemo || count == 0) null
+    val none = accounts.isDemo || count == 0
+    SettingsRow(
+        headline = stringResource(R.string.settings_accounts_row),
+        action = RowAction.Click(onOpenAccounts),
+        index = 0,
+        count = 1,
+        supporting =
+            if (none) stringResource(R.string.settings_accounts_none)
+            else pluralStringResource(R.plurals.settings_accounts_count, count, count),
+        leading =
+            if (none) null
             else {
                 { AvatarStack(accounts.providers) }
             },
-        supportingContent = {
-            Text(
-                if (accounts.isDemo || count == 0) stringResource(R.string.settings_accounts_none)
-                else pluralStringResource(R.plurals.settings_accounts_count, count, count)
-            )
-        },
-        trailingContent = {
+        trailing = {
             Icon(painter = painterResource(HeadroomIcons.ChevronRight), contentDescription = null)
         },
         modifier = modifier.testTag(SETTINGS_ACCOUNTS_TAG),
-    ) {
-        Text(stringResource(R.string.settings_accounts_row))
-    }
+    )
 }
 
 /** Up to four provider avatars, overlapping, so the row reads as "these accounts" at a glance. */
@@ -547,21 +546,17 @@ private const val AVATAR_OVERLAP = 8
 
 @Composable
 private fun LicencesRow(onOpenLicences: () -> Unit, modifier: Modifier = Modifier) {
-    SegmentedListItem(
-        onClick = onOpenLicences,
-        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
-        colors =
-            ListItemDefaults.segmentedColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            ),
-        supportingContent = { Text(stringResource(R.string.settings_licences_body)) },
-        trailingContent = {
+    SettingsRow(
+        headline = stringResource(R.string.settings_licences),
+        action = RowAction.Click(onOpenLicences),
+        index = 0,
+        count = 1,
+        supporting = stringResource(R.string.settings_licences_body),
+        trailing = {
             Icon(painter = painterResource(HeadroomIcons.ChevronRight), contentDescription = null)
         },
         modifier = modifier,
-    ) {
-        Text(stringResource(R.string.settings_licences))
-    }
+    )
 }
 
 @Composable

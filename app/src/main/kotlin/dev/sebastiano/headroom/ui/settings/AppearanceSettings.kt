@@ -17,12 +17,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -146,7 +144,6 @@ internal fun PalettePicker(
 }
 
 /** The switch that keeps motion to short fades. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ReduceMotionRow(
     motion: MotionPreference,
@@ -154,22 +151,18 @@ internal fun ReduceMotionRow(
     modifier: Modifier = Modifier,
 ) {
     val reduced = motion == MotionPreference.Reduced
-    SegmentedListItem(
-        checked = reduced,
-        onCheckedChange = { checked ->
-            onChange(if (checked) MotionPreference.Reduced else MotionPreference.System)
-        },
-        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
-        colors =
-            ListItemDefaults.segmentedColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer
-            ),
-        supportingContent = { Text(stringResource(R.string.settings_reduce_motion_body)) },
-        trailingContent = { Switch(checked = reduced, onCheckedChange = null) },
+    SettingsRow(
+        headline = stringResource(R.string.settings_reduce_motion),
+        action =
+            RowAction.Toggle(reduced) { checked ->
+                onChange(if (checked) MotionPreference.Reduced else MotionPreference.System)
+            },
+        index = 0,
+        count = 1,
+        supporting = stringResource(R.string.settings_reduce_motion_body),
+        trailing = { Switch(checked = reduced, onCheckedChange = null) },
         modifier = modifier.testTag(REDUCE_MOTION_TAG),
-    ) {
-        Text(stringResource(R.string.settings_reduce_motion))
-    }
+    )
 }
 
 /** A rounded card with a title, like the other pickers on the settings page. */
