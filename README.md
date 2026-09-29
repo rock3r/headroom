@@ -4,6 +4,8 @@ Headroom is an Android app that shows how much of your AI subscription limits yo
 covers Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go and JetBrains AI.
 It has home screen and lock screen widgets, and it tells you when a weekly limit resets.
 
+Headroom is free software under the [Apache License 2.0](LICENSE).
+
 <p align="center">
   <img src="docs/media/demo.gif" alt="Headroom demo: the overview, opening an account, the Resets tab and a refresh" width="300">
 </p>
@@ -25,6 +27,16 @@ The recording is also available as a [video](docs/media/demo.mp4). It shows demo
 | Dark theme | Accounts | Sign-in with a device code |
 |---|---|---|
 | ![Overview, dark](docs/screenshots/overview-dark.png) | ![Accounts](docs/screenshots/accounts.png) | ![Device code](docs/screenshots/sign-in-device-code.png) |
+
+| Settings | A colour palette | Refresh shimmer | Reset confetti |
+|---|---|---|---|
+| ![Settings](docs/screenshots/settings.png) | ![Grape palette, dark](docs/screenshots/overview-grape-dark.png) | ![Refresh shimmer](docs/screenshots/refresh-shimmer-dark.png) | ![Reset confetti](docs/screenshots/reset-confetti.png) |
+
+The experimental reset island grows out of the camera cutout when a limit resets while Headroom is
+in the background. It shows the account's logo, with a letter when you have more than one account
+of that provider, and a ring that fills back up:
+
+![Reset island](docs/screenshots/reset-island-badge.png)
 
 On a tablet or an unfolded foldable, the list and the account detail sit side by side:
 
@@ -53,14 +65,27 @@ Android 16 widget player.
 - **Wavy means attention.** A bar is wavy only when its account is over pace or above 85%.
   Everything else stays flat.
 - **Reset alerts.** Headroom sets an alarm for each weekly window. When it fires, the app fetches
-  the account again and notifies you only if the reset really happened. Session and daily limits
-  never alert; monthly ones can be turned on.
+  the account again and notifies you only if the reset really happened. The notification pops up
+  as a heads-up. Session and daily limits never alert; monthly ones can be turned on, and each
+  alert has a bell you can switch in the Resets tab.
 - **Widgets for the home screen and the lock screen.** There are four styles (Rings, Bars, Shape
   and Countdown), and each widget remembers its own accounts, window and colours. Settings can
   add any style to the home screen.
 - **Stats.** The Stats tab reads the usage history stored on the device: how many resets came
   without hitting the limit, each provider's share of the quota burned, the hours you use most,
   the closest call, the headroom left at resets, and a 7-day line per account.
+- **Your order, or sorted.** Drag accounts into your own order, or sort the overview by how much
+  is used or by the next reset.
+- **Settings.** Show quotas as used or as left, choose how often the app updates in the
+  background, and pick light, dark or the device's theme. The colours come from your wallpaper or
+  from one of eight palettes, and a theme change spreads out from where you tapped. Reduced motion
+  turns the moving transitions into short fades.
+- **Delights.** Optional touches you can turn off: a sheen with a trail of sparkles when new
+  numbers arrive, and confetti when a limit resets while the app is open. Each has a Try button.
+- **Reset island (experimental).** A small black pill grows out of the camera cutout when a limit
+  resets and Headroom is in the background. It is drawn by an accessibility service that reads
+  nothing on screen, or, when a device policy blocks that, by an overlay the user allows with
+  Display over other apps. A guided set-up in Settings explains both.
 - **Adaptive layouts.** Phones get a floating toolbar; foldables and tablets get a navigation rail,
   and on wide screens the list and the detail show side by side.
 - **Demo mode.** With no account signed in, the app shows clearly labelled example data.
@@ -126,14 +151,18 @@ More detail: [docs/TESTING.md](docs/TESTING.md), [docs/STATIC-ANALYSIS.md](docs/
 
 ## Known limitations
 
-- Nothing has been tested against real provider accounts yet. The fetchers and sign-in flows are
-  tested against recorded responses and a local test server.
+- Headroom has been used with real accounts on one Pixel phone only. The automated tests use
+  recorded responses and a local test server, so a provider that changes its responses can break
+  a fetcher before the tests notice.
 - Remote Compose is still alpha. The widgets use a few of its restricted APIs for the live
   countdown, and pin one library version.
 - The widgets were checked in the Android 16 widget player under Robolectric, not yet on a device
   launcher. Lock screen widgets and the tap-to-flip ring are untested on hardware.
 - While a browser sign-in is open, Android may stop the app in the background, which cancels the
   sign-in. If that happens, start the sign-in again.
+- The reset island depends on the device. Some work profiles and device policies block its
+  accessibility service. The Display over other apps fallback works there, but the status bar
+  icons draw over the pill where they meet it, and it does not show on the lock screen.
 
 ## Credits
 
@@ -141,3 +170,10 @@ Most provider logos come from [models.dev](https://models.dev)
 ([sst/models.dev](https://github.com/sst/models.dev), MIT licence). The JetBrains mark is
 adapted from [Simple Icons](https://simpleicons.org) (CC0). All logos are trademarks of
 their owners. Headroom uses them only to show which provider an account belongs to.
+
+## Licence
+
+Copyright 2026 Sebastiano Poggi.
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text. The
+provider logos are not covered by this licence; see the credits above.

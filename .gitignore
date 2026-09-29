@@ -13,8 +13,15 @@ captures/
 .externalNativeBuild/
 .cxx/
 
-# Agent tooling and plans (local only)
+# Build artefacts and signing
+*.apk
+*.aab
+*.jks
+*.keystore
+.env
+*.hprof
+
+# Agent tooling, plans and worktrees (local only)
 .plans/
-.claude/launch.json
-.claude/settings.local.json
+.claude/
 .worktrees/
