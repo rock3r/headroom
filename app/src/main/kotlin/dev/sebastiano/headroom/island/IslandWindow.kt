@@ -20,6 +20,21 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 
+/**
+ * The island's geometry for the camera cutout and the screen, right now. A [tight] window is
+ * exactly the pill.
+ */
+internal fun WindowManager.measureIsland(density: Float, tight: Boolean = false): IslandGeometry {
+    val metrics = maximumWindowMetrics
+    val bounds = metrics.bounds
+    val cutout =
+        metrics.windowInsets.displayCutout
+            ?.boundingRects
+            ?.firstOrNull { it.top == 0 }
+            ?.let { PxRect(it.left, it.top, it.right, it.bottom) }
+    return islandGeometry(cutout, bounds.width(), bounds.height(), density, tight)
+}
+
 /** The two kinds of window the island can be drawn in. */
 internal enum class IslandWindowKind {
     /**
@@ -31,9 +46,10 @@ internal enum class IslandWindowKind {
 
     /**
      * A `TYPE_APPLICATION_OVERLAY` window, for when the user allowed Display over other apps. It
-     * sits below the status bar, is never shown on the lock screen, and takes the touches in its
-     * own area. It is touchable on purpose: Android draws an untouchable overlay at 80% opacity,
-     * which would turn the black pill grey.
+     * sits around the camera cutout too, but the status bar icons draw over it where they meet, it
+     * is never shown on the lock screen, and it takes the touches in its own area. It is touchable
+     * on purpose: Android draws an untouchable overlay at 80% opacity, which would turn the black
+     * pill grey.
      */
     Application,
 }
@@ -226,6 +242,9 @@ internal class IslandWindow(
             )
             .apply {
                 gravity = Gravity.TOP or Gravity.START
+                // Around the camera cutout, like the accessibility island.
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
                 setTitle(WINDOW_TITLE)
             }
 

@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.island
 
+import dev.sebastiano.headroom.data.reset.IslandReset
 import dev.sebastiano.headroom.data.reset.ResetIsland
-import dev.sebastiano.headroom.model.Provider
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.withContext
 
@@ -20,7 +20,7 @@ internal class AppResetIsland(
     private val environment: IslandEnvironment,
     private val mainContext: CoroutineContext,
 ) : ResetIsland {
-    override suspend fun show(provider: Provider, message: String): Boolean {
+    override suspend fun show(reset: IslandReset): Boolean {
         val mode = hub.mode()
         val conditions =
             IslandConditions(
@@ -34,8 +34,8 @@ internal class AppResetIsland(
             )
         if (!conditions.allowsIsland()) return false
         return when (mode) {
-            IslandMode.Accessibility -> hub.show(provider, message)
-            IslandMode.Overlay -> withContext(mainContext) { hub.showOverlay(provider, message) }
+            IslandMode.Accessibility -> hub.show(reset)
+            IslandMode.Overlay -> withContext(mainContext) { hub.showOverlay(reset) }
             IslandMode.None -> false
         }
     }

@@ -33,7 +33,15 @@ internal class ResetChecker(
         val reference =
             (before ?: after).copy(usedPercent = alarm.usedBefore, resetsAt = alarm.expectedResetAt)
         return if (ResetDetector.hasReset(reference, after)) {
-            notifier.notifyReset(account, after)
+            val otherNames =
+                repository
+                    .current()
+                    .filter {
+                        it.account.provider == account.account.provider &&
+                            it.account.id != account.account.id
+                    }
+                    .map { it.account.name }
+            notifier.notifyReset(account, after, alarm.usedBefore, otherNames)
             ledger.markNotified(alarm)
             ResetCheckOutcome.Notified
         } else {

@@ -40,26 +40,12 @@ class ResetIslandService : AccessibilityService() {
                 .collect { request ->
                     val reduceMotion =
                         app.graph.settings.settings.first().motion == MotionPreference.Reduced
-                    islandWindow.show(request, measureGeometry(), reduceMotion)
+                    val geometry =
+                        getSystemService(WindowManager::class.java)
+                            .measureIsland(resources.displayMetrics.density)
+                    islandWindow.show(request, geometry, reduceMotion)
                 }
         }
-    }
-
-    /** Where the camera cutout and the screen are, right now. */
-    private fun measureGeometry(): IslandGeometry {
-        val metrics = getSystemService(WindowManager::class.java).maximumWindowMetrics
-        val bounds = metrics.bounds
-        val cutout =
-            metrics.windowInsets.displayCutout
-                ?.boundingRects
-                ?.firstOrNull { it.top == 0 }
-                ?.let { PxRect(it.left, it.top, it.right, it.bottom) }
-        return islandGeometry(
-            cutout = cutout,
-            screenWidth = bounds.width(),
-            screenHeight = bounds.height(),
-            density = resources.displayMetrics.density,
-        )
     }
 
     override fun onUnbind(intent: Intent?): Boolean {

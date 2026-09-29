@@ -56,9 +56,18 @@ class ResetCheckerTest {
 
     private class RecordingNotifier : ResetNotifier {
         val notified = mutableListOf<Pair<AccountState, QuotaWindow>>()
+        val usedBefore = mutableListOf<Double?>()
+        val otherNames = mutableListOf<List<String>>()
 
-        override suspend fun notifyReset(account: AccountState, window: QuotaWindow) {
+        override suspend fun notifyReset(
+            account: AccountState,
+            window: QuotaWindow,
+            usedBefore: Double?,
+            otherNames: List<String>,
+        ) {
             notified += account to window
+            this.usedBefore += usedBefore
+            this.otherNames += otherNames
         }
     }
 
@@ -109,6 +118,20 @@ class ResetCheckerTest {
         assertEquals(1, repo.refreshes)
         assertEquals("weekly", notifier.notified.single().second.id)
     }
+
+    @Test
+    fun `the notifier learns the usage before the reset and the provider's other accounts`() =
+        runTest {
+            val second =
+                grok.copy(account = grok.account.copy(id = "grok-2", nickname = "Grok work"))
+            val repo = ScriptedRepository(before + second) { afterReset() + second }
+            val notifier = RecordingNotifier()
+
+            checker(repo, notifier).check(alarm, attempt = 1)
+
+            assertEquals(listOf<Double?>(88.0), notifier.usedBefore)
+            assertEquals(listOf(listOf("Grok work")), notifier.otherNames)
+        }
 
     @Test
     fun `no reset yet asks for a retry with the backoff delay`() = runTest {

@@ -45,7 +45,7 @@ class IslandScreenshotTest {
     private val geometry = phoneGeometry()
     private var stage by mutableStateOf(IslandStage.Collapsed)
 
-    private fun scene(provider: Provider = Provider.Claude, message: String = MESSAGE) {
+    private fun scene(request: IslandRequest = demoRequest()) {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             HeadroomTheme(darkTheme = true, dynamicColor = false) {
@@ -56,7 +56,7 @@ class IslandScreenshotTest {
                         .testTag(SCENE_TAG)
                 ) {
                     CameraHole()
-                    WindowFrame(geometry) { ResetIslandSurface(geometry, stage, provider, message) }
+                    WindowFrame(geometry) { ResetIslandSurface(geometry, stage, request) }
                 }
             }
         }
@@ -96,14 +96,6 @@ class IslandScreenshotTest {
     }
 
     @Test
-    fun expanded() {
-        scene()
-        goTo(IslandStage.Showing)
-        play(SETTLE_MILLIS)
-        capture("reset-island-expanded")
-    }
-
-    @Test
     fun growing() {
         scene()
         goTo(IslandStage.Growing)
@@ -112,19 +104,37 @@ class IslandScreenshotTest {
     }
 
     @Test
-    fun aLongNameIsCutShort() {
-        scene(Provider.JetBrains, "Work account with a very long name weekly limit reset")
+    fun ringFilling() {
+        scene()
+        goTo(IslandStage.Showing)
+        play(RING_MIDWAY_MILLIS)
+        capture("reset-island-filling")
+    }
+
+    @Test
+    fun expanded() {
+        scene()
         goTo(IslandStage.Showing)
         play(SETTLE_MILLIS)
-        capture("reset-island-long")
+        capture("reset-island-expanded")
+    }
+
+    @Test
+    fun expandedWithBadge() {
+        scene(demoRequest(badge = "W").copy(provider = Provider.Codex))
+        goTo(IslandStage.Showing)
+        play(SETTLE_MILLIS)
+        capture("reset-island-badge")
     }
 
     private companion object {
-        const val MESSAGE = "Claude weekly limit reset"
         const val SCENE_TAG = "island-scene"
         const val BACKDROP = 0xFFF1EEE8
         const val STEP_MILLIS = 32L
-        const val SETTLE_MILLIS = 1_500L
+        const val SETTLE_MILLIS = 1_600L
+
+        /** Half way through the ring filling up, before "reset" shows. */
+        const val RING_MIDWAY_MILLIS = 448L
 
         /** A little way into the grow spring, when the pill is half open and has no words yet. */
         const val GROWING_MILLIS = 64L

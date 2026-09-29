@@ -252,6 +252,7 @@
     <string name="settings_reset_island_ready_accessibility">Ready (accessibility)</string>
     <string name="settings_reset_island_ready_overlay">Ready (display over other apps)</string>
     <string name="settings_try_reset_island">Try the reset island</string>
+    <string name="reset_island_reset">reset</string>
     <string name="reset_island_demo_message">Claude weekly limit reset</string>
     <string name="reset_island_service_label">Headroom reset island</string>
     <string name="reset_island_service_description">Draws the reset island, a small pill above the camera cutout that shows when one of your limits has reset. It does not read anything on your screen, and it does not read other apps.</string>

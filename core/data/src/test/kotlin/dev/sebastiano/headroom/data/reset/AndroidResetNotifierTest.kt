@@ -26,7 +26,12 @@ class AndroidResetNotifierTest {
     @Test
     fun `posts a reset notification on the weekly resets channel`() = runTest {
         val notifier = AndroidResetNotifier(context, ZoneId.of("UTC"))
-        notifier.notifyReset(grok, grok.primaryWindow!!)
+        notifier.notifyReset(
+            grok,
+            grok.primaryWindow!!,
+            usedBefore = null,
+            otherNames = emptyList(),
+        )
 
         val posted = shadowOf(manager).allNotifications.single()
         assertEquals(AndroidResetNotifier.CHANNEL_ID, posted.channelId)
@@ -40,7 +45,8 @@ class AndroidResetNotifierTest {
 
     @Test
     fun `a reset pops up as a heads-up notification`() = runTest {
-        AndroidResetNotifier(context, ZoneId.of("UTC")).notifyReset(grok, grok.primaryWindow!!)
+        AndroidResetNotifier(context, ZoneId.of("UTC"))
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
         val channel = manager.getNotificationChannel(AndroidResetNotifier.CHANNEL_ID)
         assertEquals(NotificationManager.IMPORTANCE_HIGH, channel.importance)
@@ -57,7 +63,13 @@ class AndroidResetNotifierTest {
                 )
             )
 
-            AndroidResetNotifier(context, ZoneId.of("UTC")).notifyReset(grok, grok.primaryWindow!!)
+            AndroidResetNotifier(context, ZoneId.of("UTC"))
+                .notifyReset(
+                    grok,
+                    grok.primaryWindow!!,
+                    usedBefore = null,
+                    otherNames = emptyList(),
+                )
 
             assertNull(manager.getNotificationChannel("weekly_resets"))
         }
@@ -66,7 +78,8 @@ class AndroidResetNotifierTest {
     fun `a named account is called by its name`() = runTest {
         val named = grok.copy(account = grok.account.copy(nickname = "Side project"))
 
-        AndroidResetNotifier(context, ZoneId.of("UTC")).notifyReset(named, named.primaryWindow!!)
+        AndroidResetNotifier(context, ZoneId.of("UTC"))
+            .notifyReset(named, named.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
         val posted = shadowOf(manager).allNotifications.single()
         assertEquals("Side project weekly limit has reset", shadowOf(posted).contentTitle)
@@ -75,13 +88,23 @@ class AndroidResetNotifierTest {
     @Test
     fun `the same window replaces its previous notification`() = runTest {
         val notifier = AndroidResetNotifier(context, ZoneId.of("UTC"))
-        notifier.notifyReset(grok, grok.primaryWindow!!)
-        notifier.notifyReset(grok, grok.primaryWindow!!)
+        notifier.notifyReset(
+            grok,
+            grok.primaryWindow!!,
+            usedBefore = null,
+            otherNames = emptyList(),
+        )
+        notifier.notifyReset(
+            grok,
+            grok.primaryWindow!!,
+            usedBefore = null,
+            otherNames = emptyList(),
+        )
         assertEquals(1, shadowOf(manager).allNotifications.size)
     }
 
     private inner class RecordingIsland(private val shows: Boolean) : ResetIsland {
-        val shown = mutableListOf<Pair<Provider, String>>()
+        val shown = mutableListOf<IslandReset>()
         var idleAwaits = 0
 
         /** How many notifications were in the shade when the notifier began to wait. */
@@ -92,8 +115,8 @@ class AndroidResetNotifierTest {
             postedWhenWaiting = shadowOf(manager).allNotifications.size
         }
 
-        override suspend fun show(provider: Provider, message: String): Boolean {
-            shown += provider to message
+        override suspend fun show(reset: IslandReset): Boolean {
+            shown += reset
             return shows
         }
     }
@@ -102,9 +125,12 @@ class AndroidResetNotifierTest {
     fun `the island is offered the provider and a short line`() = runTest {
         val island = RecordingIsland(shows = true)
         AndroidResetNotifier(context, ZoneId.of("UTC"), island)
-            .notifyReset(grok, grok.primaryWindow!!)
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
-        assertEquals(listOf(Provider.Grok to "Grok weekly limit reset"), island.shown)
+        val reset = island.shown.single()
+        assertEquals(Provider.Grok, reset.provider)
+        assertEquals("Grok weekly limit reset", reset.description)
+        assertEquals(null, reset.badge)
     }
 
     @Test
@@ -112,15 +138,32 @@ class AndroidResetNotifierTest {
         val named = grok.copy(account = grok.account.copy(nickname = "Side project"))
         val island = RecordingIsland(shows = true)
         AndroidResetNotifier(context, ZoneId.of("UTC"), island)
-            .notifyReset(named, named.primaryWindow!!)
+            .notifyReset(named, named.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
-        assertEquals("Side project weekly limit reset", island.shown.single().second)
+        assertEquals("Side project weekly limit reset", island.shown.single().description)
+    }
+
+    @Test
+    fun `the island gets the account's badge and the usage before the reset`() = runTest {
+        val duck = grok.copy(account = grok.account.copy(nickname = "Grok duck"))
+        val island = RecordingIsland(shows = true)
+        AndroidResetNotifier(context, ZoneId.of("UTC"), island)
+            .notifyReset(
+                duck,
+                duck.primaryWindow!!,
+                usedBefore = 88.0,
+                otherNames = listOf("Grok main"),
+            )
+
+        val reset = island.shown.single()
+        assertEquals("D", reset.badge)
+        assertEquals(88.0, reset.usedBefore)
     }
 
     @Test
     fun `when the island shows, the notification is posted on the quiet channel`() = runTest {
         AndroidResetNotifier(context, ZoneId.of("UTC"), RecordingIsland(shows = true))
-            .notifyReset(grok, grok.primaryWindow!!)
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
         val posted = shadowOf(manager).allNotifications.single()
         assertEquals(AndroidResetNotifier.QUIET_CHANNEL_ID, posted.channelId)
@@ -135,7 +178,7 @@ class AndroidResetNotifierTest {
     @Test
     fun `when the island does not show, the notification pops up as before`() = runTest {
         AndroidResetNotifier(context, ZoneId.of("UTC"), RecordingIsland(shows = false))
-            .notifyReset(grok, grok.primaryWindow!!)
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
         val posted = shadowOf(manager).allNotifications.single()
         assertEquals(AndroidResetNotifier.CHANNEL_ID, posted.channelId)
@@ -145,9 +188,9 @@ class AndroidResetNotifierTest {
     fun `a reset that replaces a quiet notification takes the heads-up channel back`() = runTest {
         val id = AndroidResetNotifier.notificationId(grok.account.id, grok.primaryWindow!!.id)
         AndroidResetNotifier(context, ZoneId.of("UTC"), RecordingIsland(shows = true))
-            .notifyReset(grok, grok.primaryWindow!!)
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
         AndroidResetNotifier(context, ZoneId.of("UTC"), RecordingIsland(shows = false))
-            .notifyReset(grok, grok.primaryWindow!!)
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
         val posted = shadowOf(manager).getNotification(id)
         assertEquals(AndroidResetNotifier.CHANNEL_ID, posted.channelId)
@@ -158,7 +201,12 @@ class AndroidResetNotifierTest {
         runTest {
             val island = RecordingIsland(shows = true)
             AndroidResetNotifier(context, ZoneId.of("UTC"), island)
-                .notifyReset(grok, grok.primaryWindow!!)
+                .notifyReset(
+                    grok,
+                    grok.primaryWindow!!,
+                    usedBefore = null,
+                    otherNames = emptyList(),
+                )
 
             assertEquals(1, island.idleAwaits)
             assertEquals(1, island.postedWhenWaiting)
@@ -168,7 +216,7 @@ class AndroidResetNotifierTest {
     fun `when the island does not show, the notifier does not wait for it`() = runTest {
         val island = RecordingIsland(shows = false)
         AndroidResetNotifier(context, ZoneId.of("UTC"), island)
-            .notifyReset(grok, grok.primaryWindow!!)
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
 
         assertEquals(0, island.idleAwaits)
     }

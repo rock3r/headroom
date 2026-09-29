@@ -7,7 +7,6 @@ import android.hardware.display.DisplayManager
 import android.provider.Settings
 import android.util.Log
 import android.view.Display
-import android.view.WindowInsets
 import android.view.WindowManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -94,23 +93,9 @@ internal class AndroidIslandOverlay(
         return Live(window, windowManager, windowContext.resources.displayMetrics.density)
     }
 
-    /** Where the status bar ends and how big the screen is, right now. */
-    private fun measure(current: Live): IslandGeometry {
-        val metrics = current.windowManager.maximumWindowMetrics
-        val bounds = metrics.bounds
-        val top =
-            metrics.windowInsets
-                .getInsetsIgnoringVisibility(
-                    WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout()
-                )
-                .top
-        return overlayIslandGeometry(
-            statusBarHeight = top,
-            screenWidth = bounds.width(),
-            screenHeight = bounds.height(),
-            density = current.density,
-        )
-    }
+    // The window takes the touches in its own area, so it is exactly the pill.
+    private fun measure(current: Live): IslandGeometry =
+        current.windowManager.measureIsland(current.density, tight = true)
 
     private companion object {
         const val TAG = "HeadroomIsland"

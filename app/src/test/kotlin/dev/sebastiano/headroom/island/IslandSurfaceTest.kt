@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.IntOffset
@@ -43,12 +44,12 @@ class IslandSurfaceTest {
                 WindowFrame(geometry) {
                     if (host) {
                         ResetIslandHost(
-                            request = IslandRequest(Provider.Claude, MESSAGE, serial = 1),
+                            request = demoRequest(),
                             geometry = geometry,
                             onFinish = { finished++ },
                         )
                     } else {
-                        ResetIslandSurface(geometry, stage, Provider.Claude, MESSAGE)
+                        ResetIslandSurface(geometry, stage, demoRequest())
                     }
                 }
             }
@@ -116,11 +117,12 @@ class IslandSurfaceTest {
     }
 
     @Test
-    fun `the words are in the pill once it shows`() {
+    fun `once it shows, the pill says what reset, and the ring is followed by the word reset`() {
         show()
         goTo(IslandStage.Showing)
         settle()
-        rule.onNodeWithText(MESSAGE).assertExists()
+        rule.onNodeWithContentDescription(MESSAGE).assertExists()
+        rule.onNodeWithText("reset").assertExists()
     }
 
     @Test
@@ -141,8 +143,11 @@ class IslandSurfaceTest {
     }
 
     @Test
-    fun `the host holds the words for about four seconds`() {
-        assertEquals(4_000L, IslandTiming.HOLD)
+    fun `the whole island is on screen for about four seconds`() {
+        val total =
+            IslandTiming.GROW + IslandTiming.HOLD + IslandTiming.FADE_OUT + IslandTiming.SHRINK
+        assertTrue(total in 3_800L..4_500L, "on screen for $total ms")
+        assertTrue(IslandTiming.RING_FILL < IslandTiming.HOLD, "the ring fills while it holds")
     }
 
     private fun assertEquals(expected: Int, actual: Int, tolerance: Int) {
@@ -161,6 +166,16 @@ class IslandSurfaceTest {
 }
 
 /** A phone 411 dp wide at 3 px per dp, with a camera hole in the top middle. */
+/** The Try button's island: Claude, 85% used before the reset, so the ring fills up from 15%. */
+internal fun demoRequest(badge: String? = null, serial: Long = 1): IslandRequest =
+    IslandRequest(
+        provider = Provider.Claude,
+        badge = badge,
+        leftBefore = 0.15f,
+        description = "Claude weekly limit reset",
+        serial = serial,
+    )
+
 internal fun phoneGeometry(): IslandGeometry =
     islandGeometry(
         cutout = PxRect(left = 586, top = 36, right = 646, bottom = 96),

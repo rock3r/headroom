@@ -11,13 +11,35 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.accountBadge
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal fun interface ResetNotifier {
-    suspend fun notifyReset(account: AccountState, window: QuotaWindow)
+    /**
+     * Tells the user that [window] of [account] has reset. [usedBefore] is how much of it was used
+     * before, from 0 to 100, when known. [otherNames] are the names of the user's other accounts of
+     * the same provider, so the island can tell this one apart.
+     */
+    suspend fun notifyReset(
+        account: AccountState,
+        window: QuotaWindow,
+        usedBefore: Double?,
+        otherNames: List<String>,
+    )
 }
+
+/** One reset for the island to show. */
+public data class IslandReset(
+    val provider: Provider,
+    /** The letter that tells this account apart from the others of its provider, or null. */
+    val badge: String?,
+    /** How much of the limit was used before the reset, from 0 to 100, or null when unknown. */
+    val usedBefore: Double?,
+    /** What the island says to a screen reader, for example "Claude weekly limit reset". */
+    val description: String,
+)
 
 /**
  * Shows a reset on the screen itself, as a pill that grows out of the camera cutout. The app
@@ -25,11 +47,10 @@ internal fun interface ResetNotifier {
  */
 public fun interface ResetIsland {
     /**
-     * Shows [message] with the logo of [provider], and returns true. It returns false, and shows
-     * nothing, when the island is off, cannot show now, or would be in the way. The caller then
-     * relies on the notification alone.
+     * Shows [reset], and returns true. It returns false, and shows nothing, when the island is off,
+     * cannot show now, or would be in the way. The caller then relies on the notification alone.
      */
-    public suspend fun show(provider: Provider, message: String): Boolean
+    public suspend fun show(reset: IslandReset): Boolean
 
     /**
      * Returns once the island that [show] started is gone. The caller keeps its coroutine, and so
@@ -40,7 +61,7 @@ public fun interface ResetIsland {
 
     public companion object {
         /** An island that never shows. */
-        public val None: ResetIsland = ResetIsland { _, _ -> false }
+        public val None: ResetIsland = ResetIsland { false }
     }
 }
 
@@ -56,11 +77,24 @@ internal class AndroidResetNotifier(
 ) : ResetNotifier {
     private val manager = context.getSystemService(NotificationManager::class.java)
 
-    override suspend fun notifyReset(account: AccountState, window: QuotaWindow) {
+    override suspend fun notifyReset(
+        account: AccountState,
+        window: QuotaWindow,
+        usedBefore: Double?,
+        otherNames: List<String>,
+    ) {
         val name = account.account.name
         val monthly = window.kind == WindowKind.Monthly
         val islandRes = if (monthly) R.string.reset_island_monthly else R.string.reset_island_weekly
-        val onIsland = island.show(account.account.provider, context.getString(islandRes, name))
+        val onIsland =
+            island.show(
+                IslandReset(
+                    provider = account.account.provider,
+                    badge = accountBadge(name, otherNames),
+                    usedBefore = usedBefore,
+                    description = context.getString(islandRes, name),
+                )
+            )
         val channelId = if (onIsland) QUIET_CHANNEL_ID else CHANNEL_ID
         ensureChannels()
         val titleRes = if (monthly) R.string.reset_title_monthly else R.string.reset_title_weekly

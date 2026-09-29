@@ -33,62 +33,61 @@ internal data class PxRect(val left: Int, val top: Int, val right: Int, val bott
 }
 
 /**
- * Where the island is, in pixels. [window] is the overlay window on the screen. [collapsed] (the
- * camera hole, or a small dot) and [expanded] (the pill) are inside it, relative to its top left
- * corner.
+ * Where the island is, in pixels. [window] is the overlay window on the screen. The other rects are
+ * inside it, relative to its top left corner: [collapsed] is the camera hole (or a small dot),
+ * [capsule] a pill as tall as the island around the hole, and [expanded] the whole island. The
+ * island grows from [collapsed] to [capsule], then sideways to [expanded].
  */
 internal data class IslandGeometry(
     val window: PxRect,
     val collapsed: PxRect,
+    val capsule: PxRect,
     val expanded: PxRect,
 )
 
 /**
  * Maps the camera [cutout] (or null when the screen has none) and the screen size to the geometry
- * of the island. The pill is about 72% of the screen wide and 40 dp high, centred on the cutout. It
- * grows from the size of the cutout. Without a cutout it grows from a small dot at the top centre,
- * a small margin down. The window is only as large as the pill can get, including the little
- * overshoot of the grow spring.
+ * of the island. The island is a compact pill around the hole: a little larger than it all round,
+ * and [SIDE_DP] wider on each side, so the hole sits exactly in the middle. Without a cutout it is
+ * the same pill around a small dot at the top centre, a small margin down.
+ *
+ * A [tight] window is exactly the pill, for a window that takes the touches in its own area. A
+ * loose one has room for the grow spring, which passes its target by a little.
  */
 internal fun islandGeometry(
     cutout: PxRect?,
     screenWidth: Int,
     screenHeight: Int,
     density: Float,
+    tight: Boolean = false,
 ): IslandGeometry {
-    val pillWidth = (screenWidth * PILL_WIDTH_SHARE).roundToInt()
-    val pillHeight = (PILL_HEIGHT_DP * density).roundToInt()
-    val centreX = cutout?.centerX ?: (screenWidth / 2f)
-    val left =
-        (centreX - pillWidth / 2f)
-            .roundToInt()
-            .coerceIn(0, (screenWidth - pillWidth).coerceAtLeast(0))
+    fun px(dp: Float) = (dp * density).roundToInt()
+    val hole =
+        cutout
+            ?: run {
+                val dot = px(DOT_DP)
+                val left = ((screenWidth - dot) / 2f).roundToInt()
+                val top = px(EDGE_MARGIN_DP) + (px(MIN_HEIGHT_DP) - dot) / 2
+                PxRect(left, top, left + dot, top + dot)
+            }
+    val pad = px(PAD_DP)
+    val pillHeight = max(hole.height + 2 * pad, px(MIN_HEIGHT_DP))
+    val top = (hole.centerY - pillHeight / 2f).roundToInt().coerceAtLeast(0)
+    val bottom = max(top + pillHeight, hole.bottom + pad)
+    // Measured from the hole's own edges, so both sides are the same to the pixel.
+    val side = px(SIDE_DP)
+    val expanded = PxRect(hole.left - side, top, hole.right + side, bottom)
+    val capsuleSide = max(pad, ((bottom - top) - hole.width) / 2)
+    val capsule = PxRect(hole.left - capsuleSide, top, hole.right + capsuleSide, bottom)
 
-    val expanded: PxRect
-    val collapsed: PxRect
-    if (cutout != null) {
-        // Centred on the hole, but never above the screen, and always covering the whole hole.
-        val top = min(cutout.top, (cutout.centerY - pillHeight / 2f).roundToInt().coerceAtLeast(0))
-        expanded = PxRect(left, top, left + pillWidth, max(top + pillHeight, cutout.bottom))
-        collapsed = cutout
-    } else {
-        val top = (EDGE_MARGIN_DP * density).roundToInt()
-        expanded = PxRect(left, top, left + pillWidth, top + pillHeight)
-        val dot = (DOT_DP * density).roundToInt()
-        val dotLeft = (expanded.centerX - dot / 2f).roundToInt()
-        val dotTop = (expanded.centerY - dot / 2f).roundToInt()
-        collapsed = PxRect(dotLeft, dotTop, dotLeft + dot, dotTop + dot)
-    }
-
-    val overshoot = (OVERSHOOT_DP * density).roundToInt()
+    val room = if (tight) 0 else px(OVERSHOOT_DP)
     val reach =
         PxRect(
-                expanded.left - overshoot,
-                expanded.top - overshoot,
-                expanded.right + overshoot,
-                expanded.bottom + overshoot,
-            )
-            .union(collapsed)
+            expanded.left - room,
+            expanded.top - room,
+            expanded.right + room,
+            expanded.bottom + room,
+        )
     val window =
         PxRect(
             reach.left.coerceAtLeast(0),
@@ -96,48 +95,26 @@ internal fun islandGeometry(
             reach.right.coerceAtMost(screenWidth),
             reach.bottom.coerceAtMost(screenHeight),
         )
+    // Near an edge the window is cut; the pill moves in with it, so it stays whole.
+    val shift =
+        (window.left - expanded.left).coerceAtLeast(0) -
+            (expanded.right - window.right).coerceAtLeast(0)
     return IslandGeometry(
         window = window,
-        collapsed = collapsed.offset(-window.left, -window.top),
-        expanded = expanded.offset(-window.left, -window.top),
+        collapsed = hole.offset(-window.left, -window.top),
+        capsule = capsule.offset(shift - window.left, -window.top),
+        expanded = expanded.offset(shift - window.left, -window.top),
     )
 }
 
-/**
- * The geometry of the island in `Overlay` mode. That window cannot draw over the status bar, so the
- * pill hangs just below it, [statusBarHeight] pixels down plus a small margin, centred on the
- * screen. It grows from a small dot at its own centre. The window is exactly the pill and nothing
- * more, because it takes the touches in its own area. The grow spring passes its target by a
- * little, and the window clips that.
- */
-internal fun overlayIslandGeometry(
-    statusBarHeight: Int,
-    screenWidth: Int,
-    screenHeight: Int,
-    density: Float,
-): IslandGeometry {
-    val pillWidth = min((screenWidth * PILL_WIDTH_SHARE).roundToInt(), screenWidth)
-    val pillHeight = (PILL_HEIGHT_DP * density).roundToInt()
-    val left = ((screenWidth - pillWidth) / 2f).roundToInt()
-    val top =
-        (statusBarHeight + OVERLAY_MARGIN_DP * density)
-            .roundToInt()
-            .coerceAtMost((screenHeight - pillHeight).coerceAtLeast(0))
-    val window = PxRect(left, top, left + pillWidth, top + pillHeight)
-    val dot = (DOT_DP * density).roundToInt()
-    val dotLeft = ((pillWidth - dot) / 2f).roundToInt()
-    val dotTop = ((pillHeight - dot) / 2f).roundToInt()
-    return IslandGeometry(
-        window = window,
-        collapsed = PxRect(dotLeft, dotTop, dotLeft + dot, dotTop + dot),
-        expanded = PxRect(0, 0, pillWidth, pillHeight),
-    )
-}
+/** How far the pill reaches past the hole on each side, for the logo and for the ring. */
+private const val SIDE_DP = 64f
 
-/** How much of the screen width the pill takes. */
-private const val PILL_WIDTH_SHARE = 0.72f
+/** How much larger than the hole the pill is, above, below and around it. */
+private const val PAD_DP = 6f
 
-private const val PILL_HEIGHT_DP = 40f
+/** The pill is never lower than this, however small the hole. */
+private const val MIN_HEIGHT_DP = 32f
 
 /** The gap above the pill when there is no camera cutout to grow from. */
 private const val EDGE_MARGIN_DP = 8f
@@ -147,6 +124,3 @@ private const val DOT_DP = 16f
 
 /** Room around the pill for the grow spring, which passes its target by a little. */
 private const val OVERSHOOT_DP = 8f
-
-/** The gap between the status bar and the pill of the overlay island. */
-private const val OVERLAY_MARGIN_DP = 4f

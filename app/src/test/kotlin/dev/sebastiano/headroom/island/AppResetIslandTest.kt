@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.island
 
+import dev.sebastiano.headroom.data.reset.IslandReset
 import dev.sebastiano.headroom.model.Provider
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
@@ -55,6 +56,19 @@ class AppResetIslandTest {
     private val island =
         AppResetIsland(hub, { enabled }, environment, mainContext = UnconfinedTestDispatcher())
 
+    private fun reset(description: String, provider: Provider = Provider.Claude) =
+        IslandReset(provider, badge = null, usedBefore = 75.0, description = description)
+
+    @Test
+    fun `the request carries the badge, and the ring starts from what was left`() {
+        assertEquals(
+            IslandRequest(Provider.Codex, "D", 0.25f, "d", serial = 7),
+            IslandReset(Provider.Codex, "D", 75.0, "d").toRequest(serial = 7),
+        )
+        assertEquals(0.1f, IslandReset(Provider.Codex, null, null, "d").toRequest(1).leftBefore)
+        assertEquals(0f, IslandReset(Provider.Codex, null, 130.0, "d").toRequest(1).leftBefore)
+    }
+
     @Test
     fun `it shows the reset when the service is connected and nothing is in the way`() =
         runTest(UnconfinedTestDispatcher()) {
@@ -62,43 +76,51 @@ class AppResetIslandTest {
             backgroundScope.launch { hub.requests.collect { seen += it } }
             hub.serviceConnected(true)
 
-            assertEquals(true, island.show(Provider.Claude, "Claude weekly limit reset"))
+            assertEquals(true, island.show(reset("Claude weekly limit reset", Provider.Claude)))
             assertEquals(
-                listOf(IslandRequest(Provider.Claude, "Claude weekly limit reset", serial = 1)),
+                listOf(
+                    IslandRequest(
+                        Provider.Claude,
+                        null,
+                        0.25f,
+                        "Claude weekly limit reset",
+                        serial = 1,
+                    )
+                ),
                 seen,
             )
         }
 
     @Test
     fun `it shows nothing without a connected service`() = runTest {
-        assertEquals(false, island.show(Provider.Claude, "Claude weekly limit reset"))
+        assertEquals(false, island.show(reset("Claude weekly limit reset", Provider.Claude)))
     }
 
     @Test
     fun `it shows nothing when the setting is off`() = runTest {
         hub.serviceConnected(true)
         enabled = false
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
     }
 
     @Test
     fun `it shows nothing while the app is in the foreground`() = runTest {
         hub.serviceConnected(true)
         environment.appInForeground = true
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
     }
 
     @Test
     fun `it shows nothing with the screen off, in landscape, or in Do Not Disturb`() = runTest {
         hub.serviceConnected(true)
         environment.screenOn = false
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
         environment.screenOn = true
         environment.landscape = true
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
         environment.landscape = false
         environment.doNotDisturb = true
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
     }
 
     @Test
@@ -128,7 +150,8 @@ class AppResetIslandTest {
             assertEquals(false, hub.showDemo(Provider.Claude, "demo"))
             hub.serviceConnected(true)
             assertEquals(true, hub.showDemo(Provider.Claude, "demo"))
-            assertEquals("demo", seen.single().message)
+            assertEquals("demo", seen.single().description)
+            assertEquals(0.15f, seen.single().leftBefore, 0.001f)
         }
 
     @Test
@@ -146,9 +169,11 @@ class AppResetIslandTest {
     fun `without the service, display over other apps shows the reset`() = runTest {
         overlay.allowed = true
 
-        assertEquals(true, island.show(Provider.Claude, "Claude weekly limit reset"))
+        assertEquals(true, island.show(reset("Claude weekly limit reset", Provider.Claude)))
         assertEquals(
-            listOf(IslandRequest(Provider.Claude, "Claude weekly limit reset", serial = 1)),
+            listOf(
+                IslandRequest(Provider.Claude, null, 0.25f, "Claude weekly limit reset", serial = 1)
+            ),
             overlay.shown,
         )
     }
@@ -161,7 +186,7 @@ class AppResetIslandTest {
             hub.serviceConnected(true)
             overlay.allowed = true
 
-            assertEquals(true, island.show(Provider.Claude, "x"))
+            assertEquals(true, island.show(reset("x", Provider.Claude)))
             assertEquals(1, seen.size)
             assertEquals(emptyList(), overlay.shown)
         }
@@ -170,7 +195,7 @@ class AppResetIslandTest {
     fun `a locked device sends the reset to the heads-up notification in overlay mode`() = runTest {
         overlay.allowed = true
         environment.keyguardLocked = true
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
         assertEquals(emptyList(), overlay.shown)
     }
 
@@ -180,20 +205,20 @@ class AppResetIslandTest {
             backgroundScope.launch { hub.requests.collect {} }
             hub.serviceConnected(true)
             environment.keyguardLocked = true
-            assertEquals(true, island.show(Provider.Claude, "x"))
+            assertEquals(true, island.show(reset("x", Provider.Claude)))
         }
 
     @Test
     fun `the overlay keeps the suppressions of the island`() = runTest {
         overlay.allowed = true
         environment.appInForeground = true
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
         environment.appInForeground = false
         enabled = false
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
         enabled = true
         environment.screenOn = false
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
         assertEquals(emptyList(), overlay.shown)
     }
 
@@ -201,7 +226,7 @@ class AppResetIslandTest {
     fun `an overlay window that cannot be added does not count as shown`() = runTest {
         overlay.allowed = true
         overlay.showWorks = false
-        assertEquals(false, island.show(Provider.Claude, "x"))
+        assertEquals(false, island.show(reset("x", Provider.Claude)))
     }
 
     @Test
@@ -217,7 +242,7 @@ class AppResetIslandTest {
             }
         val onMain = AppResetIsland(hub, { enabled }, environment, mainContext = main)
 
-        assertEquals(true, onMain.show(Provider.Claude, "x"))
+        assertEquals(true, onMain.show(reset("x")))
         assertEquals(1, dispatches)
         assertEquals(1, overlay.shown.size)
     }
@@ -226,7 +251,7 @@ class AppResetIslandTest {
     fun `awaiting idle waits until the overlay is gone, so the process stays alive for it`() =
         runTest {
             overlay.allowed = true
-            assertEquals(true, island.show(Provider.Claude, "x"))
+            assertEquals(true, island.show(reset("x", Provider.Claude)))
 
             val waiting = launch { island.awaitIdle() }
             advanceUntilIdle()
@@ -247,7 +272,7 @@ class AppResetIslandTest {
         enabled = false
 
         assertEquals(true, hub.showDemo(Provider.Claude, "demo"))
-        assertEquals("demo", overlay.shown.single().message)
+        assertEquals("demo", overlay.shown.single().description)
     }
 
     @Test

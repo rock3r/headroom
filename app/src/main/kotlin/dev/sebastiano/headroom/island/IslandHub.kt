@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.island
 
+import dev.sebastiano.headroom.data.reset.IslandReset
 import dev.sebastiano.headroom.model.Provider
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.channels.BufferOverflow
@@ -10,13 +11,38 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** One reset to show on the island: whose logo, and which words. */
+/** One reset to show on the island. */
 data class IslandRequest(
     val provider: Provider,
-    val message: String,
-    /** Numbers the requests, so the same words shown twice still count as two requests. */
+    /** The letter that tells the account apart from others of its provider, or null. */
+    val badge: String?,
+    /** How much of the limit was left before the reset, from 0 to 1. The ring fills up from it. */
+    val leftBefore: Float,
+    /** What the island says to a screen reader. */
+    val description: String,
+    /** Numbers the requests, so the same reset shown twice still counts as two requests. */
     val serial: Long,
 )
+
+/** The request for [this] reset. A reset whose usage before is unknown starts from a little. */
+internal fun IslandReset.toRequest(serial: Long): IslandRequest =
+    IslandRequest(
+        provider = provider,
+        badge = badge,
+        leftBefore =
+            usedBefore?.let { (1 - it / FULL_PERCENT).toFloat().coerceIn(0f, 1f) }
+                ?: UNKNOWN_LEFT_BEFORE,
+        description = description,
+        serial = serial,
+    )
+
+private const val FULL_PERCENT = 100.0
+
+/** Where the ring starts when nobody knows how much was left before the reset. */
+private const val UNKNOWN_LEFT_BEFORE = 0.1f
+
+/** The Try button's reset: 85% used, so the ring fills up from 15%. */
+private const val DEMO_USED_BEFORE = 85.0
 
 /**
  * The island's second window, for when the accessibility service is not available: a
@@ -135,28 +161,30 @@ class IslandHub(
     /** The mode that works right now. It reads the overlay permission again. */
     fun mode(): IslandMode = resolveIslandMode(connected.value, overlay.isAllowed())
 
-    override fun showDemo(provider: Provider, message: String): Boolean =
-        when (mode()) {
-            IslandMode.Accessibility -> show(provider, message)
-            IslandMode.Overlay -> showOverlay(provider, message)
+    override fun showDemo(provider: Provider, message: String): Boolean {
+        val demo = IslandReset(provider, badge = null, usedBefore = DEMO_USED_BEFORE, message)
+        return when (mode()) {
+            IslandMode.Accessibility -> show(demo)
+            IslandMode.Overlay -> showOverlay(demo)
             IslandMode.None -> false
         }
+    }
 
     /**
      * Hands a request to the service. It returns true only when the service is connected and is
      * listening, so the caller knows the island really shows it.
      */
-    fun show(provider: Provider, message: String): Boolean {
+    fun show(reset: IslandReset): Boolean {
         if (!connected.value || pending.subscriptionCount.value == 0) return false
-        return pending.tryEmit(IslandRequest(provider, message, serial.incrementAndGet()))
+        return pending.tryEmit(reset.toRequest(serial.incrementAndGet()))
     }
 
     /**
      * Shows a request in the overlay window. Call it on the main thread. It returns true only when
      * the window is on screen.
      */
-    fun showOverlay(provider: Provider, message: String): Boolean =
-        overlay.show(IslandRequest(provider, message, serial.incrementAndGet()))
+    fun showOverlay(reset: IslandReset): Boolean =
+        overlay.show(reset.toRequest(serial.incrementAndGet()))
 
     /** Returns once no overlay window is on screen. See [IslandOverlay.awaitIdle]. */
     suspend fun awaitIdle() = overlay.awaitIdle()

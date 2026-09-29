@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Looper
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
-import dev.sebastiano.headroom.model.Provider
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,7 +19,7 @@ class AndroidIslandOverlayTest {
     private var opened = 0
     private val overlay =
         AndroidIslandOverlay(context, reduceMotion = { false }, openApp = { opened++ })
-    private val request = IslandRequest(Provider.Claude, "Claude weekly limit reset", serial = 1)
+    private val request = demoRequest()
 
     @Test
     fun `display over other apps is not allowed until the user allows it`() {
