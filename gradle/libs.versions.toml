@@ -8,6 +8,9 @@ ktfmt = "0.27.0"
 roborazzi = "1.75.0"
 
 composeBom = "2026.09.00"
+tracing = "2.0.3"
+# Matches the Compose runtime that the BOM resolves to.
+composeRuntimeTracing = "1.11.0"
 material3 = "1.5.0-alpha29"
 material3Adaptive = "1.3.0"
 remoteCompose = "1.0.0-alpha20"
@@ -39,6 +42,9 @@ uiautomator = "2.4.0"
 concurrentFutures = "1.2.0"
 
 [libraries]
+androidx-tracing = { module = "androidx.tracing:tracing", version.ref = "tracing" }
+androidx-tracing-wire = { module = "androidx.tracing:tracing-wire", version.ref = "tracing" }
+compose-runtime-tracing = { module = "androidx.compose.runtime:runtime-tracing", version.ref = "composeRuntimeTracing" }
 # Build logic
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

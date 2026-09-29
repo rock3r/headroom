@@ -83,6 +83,11 @@ dependencies {
     implementation(libs.haze)
     implementation(libs.haze.blur)
     implementation(libs.aboutlibraries.compose.m3)
+    // Trace sections for performance work. Release builds keep the library's stub tracer; debug
+    // builds record in-process with tracing-wire, and name composables in system traces.
+    implementation(libs.androidx.tracing)
+    debugImplementation(libs.androidx.tracing.wire)
+    debugImplementation(libs.compose.runtime.tracing)
     implementation(libs.reorderable)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)

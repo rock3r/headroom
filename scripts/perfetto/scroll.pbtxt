@@ -1,0 +1,14 @@
+# A 20 second system trace for scrolling work: scheduling, frame timeline, and the app's own
+# android.os.Trace sections. atrace_apps also turns on the app's AndroidX Tracing 2 sections.
+buffers { size_kb: 131072 fill_policy: RING_BUFFER }
+buffers { size_kb: 8192 fill_policy: RING_BUFFER }
+data_sources { config { name: "linux.ftrace" ftrace_config {
+  ftrace_events: "sched/sched_switch" ftrace_events: "sched/sched_waking" ftrace_events: "power/cpu_frequency"
+  atrace_categories: "gfx" atrace_categories: "view" atrace_categories: "input" atrace_categories: "dalvik"
+  atrace_categories: "am"
+  atrace_apps: "dev.sebastiano.headroom" } } }
+data_sources { config { name: "android.surfaceflinger.frametimeline" } }
+data_sources { config { name: "track_event" track_event_config { enabled_categories: "*" } } }
+data_sources { config { name: "linux.process_stats" target_buffer: 1
+  process_stats_config { scan_all_processes_on_start: true } } }
+duration_ms: 20000

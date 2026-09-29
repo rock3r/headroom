@@ -59,6 +59,7 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.model.ThemeMode
 import dev.sebastiano.headroom.model.ThemePalette
+import dev.sebastiano.headroom.tracing.tracedItem
 import dev.sebastiano.headroom.ui.CloseSettingsButton
 import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.SettingsTitle
@@ -147,75 +148,15 @@ fun SettingsScreen(
     Surface(modifier = modifier.fillMaxSize().testTag(SETTINGS_TAG)) {
         PageScaffold(onClose = actions.onClose, reveal = reveal) {
             val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().then(entrance)
-            item { SectionLabel(stringResource(R.string.settings_accounts), width) }
-            item { AccountsRow(accounts, actions.onOpenAccounts, width) }
-            item { SectionLabel(stringResource(R.string.settings_display), width) }
-            item { QuotaDisplayPicker(state.quotaDisplay, actions.onQuotaDisplayChange, width) }
-            item { SectionLabel(stringResource(R.string.settings_appearance), width) }
-            item { ThemePicker(state.theme, actions.onThemeChange, width) }
-            item { PalettePicker(state.palette, actions.onPaletteChange, width) }
-            item { ReduceMotionRow(state.motion, actions.onMotionChange, width) }
-            item { SectionLabel(stringResource(R.string.settings_delights), width) }
-            item {
-                DelightsList(
-                    refreshShimmer = state.refreshShimmer,
-                    resetConfetti = state.resetConfetti,
-                    resetIsland = state.resetIsland,
-                    islandStatus = resetIslandStatus(state.resetIsland, resetIsland.mode),
-                    canTryIsland = resetIsland.mode != IslandMode.None,
-                    onRefreshShimmerChange = actions.onRefreshShimmerChange,
-                    onResetConfettiChange = actions.onResetConfettiChange,
-                    onResetIslandChange = { on ->
-                        actions.onResetIslandChange(on)
-                        if (on && resetIsland.mode == IslandMode.None) {
-                            showIslandSetup = true
-                        }
-                    },
-                    onTryResetIsland = actions.onTryResetIsland,
-                    modifier = width,
-                )
-            }
-            if (!animate) {
-                item {
-                    Text(
-                        text = stringResource(R.string.settings_delights_reduced),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = width.padding(horizontal = 6.dp),
-                    )
-                }
-            }
-            item { SectionLabel(stringResource(R.string.settings_sync), width) }
-            item { SyncFrequencyList(state.syncFrequency, actions.onSyncFrequencyChange, width) }
-            item {
-                Text(
-                    text = stringResource(R.string.settings_sync_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = width.padding(horizontal = 6.dp),
-                )
-            }
-            item { SectionLabel(stringResource(R.string.settings_widgets), width) }
-            item { WidgetList(actions.onAddWidget, width) }
-            item {
-                Text(
-                    text = stringResource(R.string.settings_widgets_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = width.padding(horizontal = 6.dp),
-                )
-            }
-            item { SectionLabel(stringResource(R.string.settings_about), width) }
-            item { LicencesRow(actions.onOpenLicences, width) }
-            item {
-                Text(
-                    text = stringResource(R.string.settings_version, state.appVersion),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = width.padding(top = 8.dp),
-                )
-            }
+            settingsRows(
+                state = state,
+                accounts = accounts,
+                actions = actions,
+                resetIsland = resetIsland,
+                animate = animate,
+                width = width,
+                onShowIslandSetup = { showIslandSetup = true },
+            )
         }
         if (showIslandSetup) {
             ResetIslandSetup(
@@ -224,6 +165,113 @@ fun SettingsScreen(
                 onDismiss = { showIslandSetup = false },
             )
         }
+    }
+}
+
+/**
+ * The rows of the settings list. Each one is recorded as a trace section called `Settings: <row>`,
+ * so a slow frame while scrolling shows which row was being composed: see docs/TRACING.md.
+ */
+@Suppress("LongParameterList") // Everything the rows show and do; grouping them would only hide it.
+private fun LazyListScope.settingsRows(
+    state: SettingsUiState,
+    accounts: SettingsAccounts,
+    actions: SettingsActions,
+    resetIsland: ResetIslandUi,
+    animate: Boolean,
+    width: Modifier,
+    onShowIslandSetup: () -> Unit,
+) {
+    tracedItem("Settings: SectionLabel accounts") {
+        SectionLabel(stringResource(R.string.settings_accounts), width)
+    }
+    tracedItem("Settings: AccountsRow") { AccountsRow(accounts, actions.onOpenAccounts, width) }
+    tracedItem("Settings: SectionLabel display") {
+        SectionLabel(stringResource(R.string.settings_display), width)
+    }
+    tracedItem("Settings: QuotaDisplayPicker") {
+        QuotaDisplayPicker(state.quotaDisplay, actions.onQuotaDisplayChange, width)
+    }
+    tracedItem("Settings: SectionLabel appearance") {
+        SectionLabel(stringResource(R.string.settings_appearance), width)
+    }
+    tracedItem("Settings: ThemePicker") { ThemePicker(state.theme, actions.onThemeChange, width) }
+    tracedItem("Settings: PalettePicker") {
+        PalettePicker(state.palette, actions.onPaletteChange, width)
+    }
+    tracedItem("Settings: ReduceMotionRow") {
+        ReduceMotionRow(state.motion, actions.onMotionChange, width)
+    }
+    tracedItem("Settings: SectionLabel delights") {
+        SectionLabel(stringResource(R.string.settings_delights), width)
+    }
+    tracedItem("Settings: DelightsList") {
+        DelightsList(
+            refreshShimmer = state.refreshShimmer,
+            resetConfetti = state.resetConfetti,
+            resetIsland = state.resetIsland,
+            islandStatus = resetIslandStatus(state.resetIsland, resetIsland.mode),
+            canTryIsland = resetIsland.mode != IslandMode.None,
+            onRefreshShimmerChange = actions.onRefreshShimmerChange,
+            onResetConfettiChange = actions.onResetConfettiChange,
+            onResetIslandChange = { on ->
+                actions.onResetIslandChange(on)
+                if (on && resetIsland.mode == IslandMode.None) {
+                    onShowIslandSetup()
+                }
+            },
+            onTryResetIsland = actions.onTryResetIsland,
+            modifier = width,
+        )
+    }
+    if (!animate) {
+        tracedItem("Settings: delights note") {
+            Text(
+                text = stringResource(R.string.settings_delights_reduced),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = width.padding(horizontal = 6.dp),
+            )
+        }
+    }
+    tracedItem("Settings: SectionLabel sync") {
+        SectionLabel(stringResource(R.string.settings_sync), width)
+    }
+    tracedItem("Settings: SyncFrequencyList") {
+        SyncFrequencyList(state.syncFrequency, actions.onSyncFrequencyChange, width)
+    }
+    tracedItem("Settings: sync note") {
+        Text(
+            text = stringResource(R.string.settings_sync_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = width.padding(horizontal = 6.dp),
+        )
+    }
+    tracedItem("Settings: SectionLabel widgets") {
+        SectionLabel(stringResource(R.string.settings_widgets), width)
+    }
+    tracedItem("Settings: WidgetList") { WidgetList(actions.onAddWidget, width) }
+    tracedItem("Settings: widgets note") {
+        Text(
+            text = stringResource(R.string.settings_widgets_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = width.padding(horizontal = 6.dp),
+        )
+    }
+    tracedItem("Settings: SectionLabel about") {
+        SectionLabel(stringResource(R.string.settings_about), width)
+    }
+    tracedItem("Settings: LicencesRow") { LicencesRow(actions.onOpenLicences, width) }
+    tracedItem("Settings: version") {
+        Text(
+            text = stringResource(R.string.settings_version, state.appVersion),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = width.padding(top = 8.dp),
+        )
     }
 }
 
