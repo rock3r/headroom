@@ -63,7 +63,19 @@ object HeadroomMotion {
             easing = REVEAL_EASING,
         )
 
+    /**
+     * For the circle that opens and closes Settings. It uses [revealSpec]'s curve, shorter: the
+     * page waits for the reveal before it scrolls, so a long one gets in the way.
+     */
+    fun <T> pageRevealSpec(delayMillis: Int = 0): FiniteAnimationSpec<T> =
+        tween(
+            durationMillis = PAGE_REVEAL_DURATION_MILLIS,
+            delayMillis = delayMillis,
+            easing = REVEAL_EASING,
+        )
+
     private const val REVEAL_DURATION_MILLIS = 520
+    private const val PAGE_REVEAL_DURATION_MILLIS = 300
     private val REVEAL_EASING = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
     /**
