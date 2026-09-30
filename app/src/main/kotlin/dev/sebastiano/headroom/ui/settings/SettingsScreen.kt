@@ -318,6 +318,10 @@ private fun PageScaffold(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().testTag(SETTINGS_LIST_TAG),
+            // The header's title and close button fly in from the overview's settings button. If
+            // the list scrolled during the reveal, they would land where the header used to be
+            // and float over the rows, so the list waits for the reveal to end.
+            userScrollEnabled = reveal?.revealing != true,
             contentPadding =
                 PaddingValues(
                     start = 16.dp,
