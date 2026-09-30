@@ -26,6 +26,7 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
+import dev.sebastiano.headroom.ui.components.SignInExpiredRow
 import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
 import dev.sebastiano.headroom.ui.home.toSummary
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
@@ -124,6 +125,23 @@ class SignInExpiredTest {
         rule.onNodeWithContentDescription("Cancel sign-in").performClick()
 
         rule.onNodeWithTag(OVERVIEW_LIST_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `last updated rounds to the nearest hour`() {
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                SignInExpiredRow(
+                    accountId = "a",
+                    dataFrom = FIXED_NOW.minus(Duration.ofMinutes(118)),
+                    now = FIXED_NOW,
+                    onSignIn = {},
+                )
+            }
+        }
+        rule
+            .onNode(hasContentDescription("Sign-in expired, data from 2 hours ago"))
+            .assertIsDisplayed()
     }
 
     @Test

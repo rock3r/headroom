@@ -367,4 +367,19 @@ class RealSignInControllerTest {
                 controller.state.value,
             )
         }
+
+    @Test
+    fun `a sign-in shows its first step at once, while the browser session starts`() =
+        runTest(kotlinx.coroutines.test.StandardTestDispatcher()) {
+            val steps = FakeSteps()
+            val controller = controller(steps)
+            controller.start(Provider.Claude)
+            assertEquals(SignInState.Starting(Provider.Claude), controller.state.value)
+
+            testScheduler.runCurrent()
+            assertEquals(
+                SignInState.Browser(Provider.Claude, "https://example.com/authorize"),
+                controller.state.value,
+            )
+        }
 }

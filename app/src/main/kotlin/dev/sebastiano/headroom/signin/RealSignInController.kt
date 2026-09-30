@@ -85,8 +85,14 @@ class RealSignInController(
         this.accountId = accountId
         when (steps.kindOf(provider)) {
             SignInKind.ApiKey -> mutableState.value = SignInState.ApiKey(provider)
-            SignInKind.Browser -> run(provider) { id -> browserSignIn(provider, id) }
-            SignInKind.DeviceCode -> run(provider) { _ -> deviceSignIn(provider) }
+            SignInKind.Browser -> {
+                mutableState.value = SignInState.Starting(provider)
+                run(provider) { id -> browserSignIn(provider, id) }
+            }
+            SignInKind.DeviceCode -> {
+                mutableState.value = SignInState.Starting(provider)
+                run(provider) { _ -> deviceSignIn(provider) }
+            }
         }
     }
 

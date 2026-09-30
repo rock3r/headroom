@@ -1,6 +1,5 @@
 package dev.sebastiano.headroom.ui.components
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.model.Age
 import dev.sebastiano.headroom.model.Provider
 import java.time.Instant
 
@@ -37,16 +38,16 @@ fun signInExpiredRowTag(accountId: String): String = "sign-in-expired-$accountId
 
 const val SIGN_IN_EXPIRED_BANNER_TAG: String = "sign-in-expired-banner"
 
-/** "2 hours ago", in the user's language. */
+/** "2 hours ago", rounded to the nearest unit (see [Age]), in the user's language. */
 @Composable
 @ReadOnlyComposable
 private fun ago(at: Instant, now: Instant): String =
-    DateUtils.getRelativeTimeSpanString(
-            at.toEpochMilli(),
-            now.toEpochMilli(),
-            DateUtils.MINUTE_IN_MILLIS,
-        )
-        .toString()
+    when (val age = Age.between(at, now)) {
+        Age.JustNow -> stringResource(R.string.age_just_now)
+        is Age.Minutes -> pluralStringResource(R.plurals.age_minutes, age.count, age.count)
+        is Age.Hours -> pluralStringResource(R.plurals.age_hours, age.count, age.count)
+        is Age.Days -> pluralStringResource(R.plurals.age_days, age.count, age.count)
+    }
 
 /** "Last updated 2 hours ago", or "Not updated yet" before the first good sync. */
 @Composable

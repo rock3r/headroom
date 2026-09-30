@@ -38,6 +38,12 @@ sealed interface SignInState {
     data object Idle : SignInState
 
     /**
+     * The sign-in has started and its first step is being prepared, for example the browser
+     * session. The screen shows the sign-in at once instead of what was there before.
+     */
+    data class Starting(val provider: Provider) : SignInState
+
+    /**
      * The provider's sign-in page is open in the browser, and the app waits for it to return. The
      * user can paste the code the page shows instead; [codeRejected] is true after a bad code.
      */

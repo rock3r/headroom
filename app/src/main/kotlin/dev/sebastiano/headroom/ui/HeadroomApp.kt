@@ -464,7 +464,8 @@ private enum class Page {
 }
 
 private fun SignInState.isWaitingForUser() =
-    this is SignInState.Browser ||
+    this is SignInState.Starting ||
+        this is SignInState.Browser ||
         this is SignInState.DeviceCode ||
         this is SignInState.ApiKey ||
         this is SignInState.Finishing

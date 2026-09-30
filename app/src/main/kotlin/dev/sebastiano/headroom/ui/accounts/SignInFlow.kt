@@ -56,6 +56,7 @@ const val SIGN_IN_USER_CODE_TAG: String = "sign-in-user-code"
 internal fun SignInFlow(state: SignInState, actions: AccountsActions, again: AccountRow? = null) {
     val provider =
         when (state) {
+            is SignInState.Starting -> state.provider
             is SignInState.Browser -> state.provider
             is SignInState.DeviceCode -> state.provider
             is SignInState.ApiKey -> state.provider
@@ -89,6 +90,7 @@ internal fun SignInFlow(state: SignInState, actions: AccountsActions, again: Acc
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (state) {
+                    is SignInState.Starting -> Waiting(stringResource(R.string.signin_starting))
                     is SignInState.Browser -> BrowserStep(state, actions)
                     is SignInState.DeviceCode -> DeviceCodeStep(state, actions)
                     is SignInState.ApiKey -> ApiKeyStep(state, actions)

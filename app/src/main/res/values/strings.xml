@@ -84,6 +84,20 @@
     <!-- When a stale account's numbers are from, such as "Last updated 2 hours ago". -->
     <string name="stale_last_updated">Last updated %1$s</string>
     <string name="stale_never_updated">Not updated yet</string>
+    <!-- How long ago something happened, rounded to the nearest unit. -->
+    <string name="age_just_now">just now</string>
+    <plurals name="age_minutes">
+        <item quantity="one">%d minute ago</item>
+        <item quantity="other">%d minutes ago</item>
+    </plurals>
+    <plurals name="age_hours">
+        <item quantity="one">%d hour ago</item>
+        <item quantity="other">%d hours ago</item>
+    </plurals>
+    <plurals name="age_days">
+        <item quantity="one">%d day ago</item>
+        <item quantity="other">%d days ago</item>
+    </plurals>
     <!-- What a screen reader says about a stale account, such as "Sign-in expired, data from 2 hours ago". -->
     <string name="stale_description">Sign-in expired, data from %1$s</string>
     <string name="stale_description_no_data">Sign-in expired, no data yet</string>
@@ -371,6 +385,7 @@
     <string name="signin_key_label">API key</string>
     <string name="signin_key_submit">Save key</string>
     <string name="signin_key_rejected">This key does not look right. Check that you copied all of it.</string>
+    <string name="signin_starting">Getting the sign-in ready</string>
     <string name="signin_finishing_title">Finishing sign-in</string>
     <string name="signin_finishing_body">Getting your %1$s limits…</string>
     <string name="signin_success">Signed in as %1$s</string>
