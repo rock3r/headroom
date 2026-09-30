@@ -52,7 +52,9 @@ class WidgetGalleryRecorder {
 
     @Test
     @Config(qualifiers = "night-xxhdpi")
-    fun recordExpiredSignInDark() = record(expiredShots, suffix = "-dark")
+    fun recordExpiredSignInDark() =
+        // The lock screen is always dark, so it has one picture.
+        record(expiredShots.filter { it.host == WidgetHostCategory.HomeScreen }, suffix = "-dark")
 
     private fun record(shots: List<Shot>, suffix: String = "") = runTest {
         val outDir = System.getProperty(OUTPUT_PROPERTY)
@@ -69,10 +71,9 @@ class WidgetGalleryRecorder {
                 WidgetUiState.from(accounts, shot.config, now, shot.size, shot.host, shot.display)
             val document = WidgetRenderer.capture(context, state, APP_WIDGET_ID, shot.size, strings)
             val widget = WidgetRenderer.remoteViews(document).draw(shot.size)
-            File(dir, "${shot.name}$suffix.png")
-                .apply { parentFile?.mkdirs() }
-                .outputStream()
-                .use { onWallpaper(widget).compress(Bitmap.CompressFormat.PNG, FULL_QUALITY, it) }
+            File(dir, "${shot.name}$suffix.png").outputStream().use {
+                onWallpaper(widget).compress(Bitmap.CompressFormat.PNG, FULL_QUALITY, it)
+            }
         }
     }
 
@@ -171,49 +172,46 @@ class WidgetGalleryRecorder {
                 ),
             )
 
-        /** Next to the README pictures, in the prototype's own folder. */
-        const val EXPIRED_DIR = "../prototypes/expired-sign-in"
-
         val expiredShots =
             listOf(
                 Shot(
-                    "$EXPIRED_DIR/widget-bars",
+                    "widget-expired-bars",
                     WidgetConfig(WidgetStyle.Bars),
                     WidgetSize(320f, 140f),
                     expiredSignIn = true,
                 ),
                 Shot(
-                    "$EXPIRED_DIR/widget-ring",
+                    "widget-expired-ring",
                     WidgetConfig(WidgetStyle.Rings, listOf("demo-claude")),
                     WidgetSize(160f, 160f),
                     expiredSignIn = true,
                 ),
                 Shot(
-                    "$EXPIRED_DIR/widget-rings-grid",
+                    "widget-expired-rings-grid",
                     WidgetConfig(WidgetStyle.Rings),
                     WidgetSize(160f, 160f),
                     expiredSignIn = true,
                 ),
                 Shot(
-                    "$EXPIRED_DIR/widget-shape",
+                    "widget-expired-shape",
                     WidgetConfig(WidgetStyle.Shape, listOf("demo-claude")),
                     WidgetSize(160f, 160f),
                     expiredSignIn = true,
                 ),
                 Shot(
-                    "$EXPIRED_DIR/widget-shape-grid",
+                    "widget-expired-shape-grid",
                     WidgetConfig(WidgetStyle.Shape),
                     WidgetSize(160f, 160f),
                     expiredSignIn = true,
                 ),
                 Shot(
-                    "$EXPIRED_DIR/widget-bars-short",
+                    "widget-expired-bars-short",
                     WidgetConfig(WidgetStyle.Bars),
                     WidgetSize(250f, 110f),
                     expiredSignIn = true,
                 ),
                 Shot(
-                    "$EXPIRED_DIR/widget-lock-screen",
+                    "widget-expired-lock-screen",
                     WidgetConfig(WidgetStyle.Rings),
                     WidgetSize(320f, 140f),
                     WidgetHostCategory.Keyguard,

@@ -74,21 +74,28 @@ next reset, the widgets never show them.
   `scope.model` or `scope.surface`. Rows are classified by `kind`, never by label. A row is left
   out when a flat `seven_day_<name>` key reports the same model, so nothing shows twice.
 
-## Expired sign-in (prototype)
+## Expired sign-in
 
-An account whose last sync failed with `QuotaErrorKind.Auth` has an expired sign-in
-(`AccountState.isSignInExpired`). Its snapshot is kept, but it is stale.
+An account whose sync failed with `QuotaErrorKind.Auth` has an expired sign-in
+(`AccountState.isSignInExpired`). Its snapshot is kept, but it is stale. `RoomQuotaRepository`
+keeps the Auth error through later errors, such as a network error. Only a sync that works clears
+it.
 
 - The app and the widgets draw its numbers faded and pulled towards grey (`Modifier.stale` and
   `StaleStyle` in `:core:designsystem`). They are never wavy, and pace is worked out at the time
-  of the last good sync.
+  of the last good sync. "Last updated 2 hours ago" rounds to the nearest unit (`Age`).
+- The card, the detail and every widget layout show a "Sign in" action that is never faded. A
+  widget tap on such an account opens its sign-in.
 - It never leads the next reset, gets no reset alarms, and its resets are not listed as upcoming.
 - `SignInAlertingRepository` in `:core:data` runs `SignInAlertPolicy` after every refresh. The
-  first time an account expires, it posts a warning on the "Sign-in problems" channel. A good sync
-  or removing the account cancels it. A network error changes nothing.
-- The warning, the card's "Sign in" button and the detail's banner start the provider's normal
-  sign-in for that account. `SignInManager.reauthenticate` stores the new tokens under the same
-  account id, so the history, name and alert switches stay.
+  first time an account expires, it posts a warning on the "Sign-in problems" channel. Tapping it
+  does not remove it: a good sync or removing the account does. A network error changes nothing.
+- Every "Sign in" starts the provider's normal sign-in for that account, as a `SignInState.Starting`
+  step at once. `SignInManager.reauthenticate` stores the new tokens under the same account id, so
+  the history, name and alert switches stay, and updates the label when the provider reports a new
+  email. It refuses a different account: by the provider's account id when both sides have one,
+  otherwise by the email. Copilot and the API-key providers name no account, so any sign-in is
+  accepted for them.
 - Debug builds preview it with demo data:
   `adb shell am broadcast -n dev.sebastiano.headroom/.DemoSignInExpiredReceiver`
   (add `--ez clear true` to undo).

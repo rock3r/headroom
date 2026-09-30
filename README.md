@@ -42,6 +42,14 @@ On a tablet or an unfolded foldable, the list and the account detail sit side by
 
 ![Expanded layout](docs/screenshots/expanded.png)
 
+When an account's sign-in expires, Headroom keeps its last numbers but fades them, says when they
+are from, and offers to sign in again. A notification says so once, and goes away when the account
+works again:
+
+| Overview | Account detail | Widget | Notification |
+|---|---|---|---|
+| ![Expired sign-in, overview](docs/screenshots/expired-sign-in-overview.png) | ![Expired sign-in, detail](docs/screenshots/expired-sign-in-detail.png) | ![Expired sign-in, widget](docs/screenshots/widgets/widget-expired-bars.png) | ![Expired sign-in, notification](docs/screenshots/expired-sign-in-notification.png) |
+
 ### Widgets
 
 Every widget is a Remote Compose document drawn by the launcher. The pictures below come from the
@@ -64,6 +72,10 @@ Android 16 widget player.
   current rate.
 - **Wavy means attention.** A bar is wavy only when its account is over pace or above 85%.
   Everything else stays flat.
+- **Expired sign-ins.** When an account's sign-in expires, its last numbers stay on screen, faded,
+  with when they are from and a button to sign in again. The new sign-in keeps the account's
+  history, name and alerts. A notification says so once, and goes away when the account works
+  again. Expired accounts never drive the next reset or reset alerts.
 - **Reset alerts.** Headroom sets an alarm for each weekly window. When it fires, the app fetches
   the account again and notifies you only if the reset really happened. The notification pops up
   as a heads-up. Session and daily limits never alert; monthly ones can be turned on, and each

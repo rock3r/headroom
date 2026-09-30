@@ -30,6 +30,20 @@ same numbers every run. They run on a Gradle Managed Device (`pixel9api37`), whi
 creates and starts itself. Locally you need the Android 37 `google_apis` system image. In CI
 the same task runs with a software GPU.
 
+To run the instrumented tests on an emulator or phone you already have running, without the
+managed device, install both APKs on it and start the runner:
+
+```bash
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+adb -s <serial> install -r -g app/build/outputs/apk/debug/app-debug.apk
+adb -s <serial> install -r -g app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb -s <serial> shell am instrument -w \
+    dev.sebastiano.headroom.test/dev.sebastiano.headroom.HeadroomTestRunner
+```
+
+The tests share one app process. A test that changes the demo accounts puts them back after it
+runs.
+
 ### Screenshots
 
 Roborazzi records screenshots of the main screens from Robolectric with

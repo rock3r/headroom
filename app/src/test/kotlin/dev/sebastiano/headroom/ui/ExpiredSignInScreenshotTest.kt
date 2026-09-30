@@ -22,9 +22,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Pictures of the expired sign-in prototype, recorded with `./gradlew :app:recordRoborazziDebug`
- * into `docs/screenshots/prototypes/expired-sign-in`. Claude's sign-in expired two hours ago; the
- * other demo accounts are fresh.
+ * Pictures of an expired sign-in, recorded with `./gradlew :app:recordRoborazziDebug` into
+ * `docs/screenshots`, named `expired-sign-in-*`. Claude's sign-in expired two hours ago; the other
+ * demo accounts are fresh.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -92,9 +92,6 @@ class ExpiredSignInScreenshotTest {
         }
 
     @Test
-    fun cardLagoon() = launch(palette = ThemePalette.Lagoon).also { captureCard("card-lagoon") }
-
-    @Test
     fun detail() {
         launch()
         openDetail()
@@ -108,14 +105,36 @@ class ExpiredSignInScreenshotTest {
         capture("detail-dark")
     }
 
+    /** An unfolded foldable: two columns of cards. */
+    @Test @Config(qualifiers = MEDIUM) fun medium() = launch().also { capture("medium") }
+
+    /** A tablet: the list and the detail with its banner side by side. */
+    @Test
+    @Config(qualifiers = EXPANDED)
+    fun expanded() {
+        launch()
+        openDetail()
+        capture("expanded")
+    }
+
+    @Test
+    @Config(qualifiers = EXPANDED)
+    fun expandedDark() {
+        launch(dark = true)
+        openDetail()
+        capture("expanded-dark")
+    }
+
     private companion object {
         val CLAUDE_CARD = accountCardTag("demo-claude")
         const val SETTLE_STEPS = 40
         const val STEP_MILLIS = 50L
+        const val MEDIUM = "w700dp-h1000dp-xhdpi"
+        const val EXPANDED = "w1280dp-h800dp-xhdpi"
 
         fun screenshot(name: String): String {
             val dir = System.getProperty("roborazzi.output.dir") ?: "build/outputs/roborazzi"
-            return "$dir/prototypes/expired-sign-in/$name.png"
+            return "$dir/expired-sign-in-$name.png"
         }
     }
 }
