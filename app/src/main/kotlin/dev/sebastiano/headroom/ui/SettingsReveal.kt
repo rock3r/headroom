@@ -10,7 +10,6 @@ import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.Icon
@@ -103,16 +102,30 @@ class PageReveal(
 @Composable
 internal fun Modifier.revealContentEntrance(page: PageReveal?): Modifier {
     if (page == null || !page.animate || !page.revealing) return this
-    val offset = with(LocalDensity.current) { CONTENT_DROP.roundToPx() }
+    val offset = with(LocalDensity.current) { CONTENT_DROP.toPx() }
     // The content waits a moment, so the circle leads and the content follows it in.
     val delay = if (page.scrubbing) 0 else CONTENT_DELAY_MILLIS
-    return with(page.visibility) {
-        animateEnterExit(
-            enter =
-                fadeIn(HeadroomMotion.revealSpec(delay)) +
-                    slideInVertically(HeadroomMotion.revealSpec(delay)) { -offset },
-            exit = fadeOut(page.effectsSpec()),
-        )
+    val enterSpec = HeadroomMotion.revealSpec<Float>(delay)
+    val exitSpec = page.effectsSpec<Float>()
+    // One pair of values, made here once and shared by every row that uses this modifier. A lazy
+    // list composes a row when it scrolls into view; with animateEnterExit, each row composed
+    // during
+    // the reveal ran its own entrance, and stayed hidden until the reveal ended.
+    val transition = page.visibility.transition
+    val alpha by
+        transition.animateFloat(
+            transitionSpec = { if (targetState == EnterExitState.Visible) enterSpec else exitSpec },
+            label = "content alpha",
+        ) {
+            if (it == EnterExitState.Visible) 1f else 0f
+        }
+    val drop by
+        transition.animateFloat(transitionSpec = { enterSpec }, label = "content drop") {
+            if (it == EnterExitState.PreEnter) -offset else 0f
+        }
+    return graphicsLayer {
+        this.alpha = alpha
+        translationY = drop
     }
 }
 
