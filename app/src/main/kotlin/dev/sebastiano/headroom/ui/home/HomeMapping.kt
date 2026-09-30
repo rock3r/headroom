@@ -162,7 +162,8 @@ internal fun chartSummary(
         usedPercent = window.usedPercent,
         expectedPercent = Pace.expectedPercent(window, now) ?: 0.0,
         kind = window.kind,
-        points = points,
+        // History keeps earlier windows too. Their samples would pile up on the left edge.
+        points = points.filter { !it.at.isBefore(start) && !it.at.isAfter(now) },
         projectedLimitAt = hit,
         projectedEndPercent = projectedEnd,
     )
