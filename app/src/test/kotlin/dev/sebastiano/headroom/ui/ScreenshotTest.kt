@@ -307,6 +307,13 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = EXPANDED)
+    fun toolbarRailExpanded() {
+        launch()
+        capture("toolbar-expanded")
+    }
+
+    @Test
     fun settingsWidgets() {
         launch()
         rule.mainClock.autoAdvance = true

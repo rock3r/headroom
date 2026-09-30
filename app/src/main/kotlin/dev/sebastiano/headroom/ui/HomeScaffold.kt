@@ -137,11 +137,13 @@ internal fun HomeScaffold(
         navigationSuiteType = suiteType,
         primaryActionContent = {
             if (width != LayoutWidth.Compact) {
-                RefreshButton(
-                    refreshing = home.isRefreshing,
-                    onRefresh = onRefresh,
-                    inToolbar = false,
-                )
+                Box(Modifier.padding(horizontal = 20.dp)) {
+                    RefreshButton(
+                        refreshing = home.isRefreshing,
+                        onRefresh = onRefresh,
+                        inToolbar = false,
+                    )
+                }
             }
         },
         modifier = modifier,
@@ -394,10 +396,14 @@ private fun HomeNavigationItems(
                 )
             },
             label = { Text(stringResource(item.label)) },
+            modifier = Modifier.testTag(navigationItemTag(item)),
             navigationSuiteType = suiteType,
         )
     }
 }
+
+/** The stable test tag for a navigation destination, e.g. "nav-item-overview". */
+internal fun navigationItemTag(item: HomeTab): String = "nav-item-${item.name.lowercase()}"
 
 /**
  * Opens the requested account. The caller passes only requests for accounts on screen; see
