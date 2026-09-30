@@ -129,11 +129,9 @@ internal fun LockScreenWidget(
                     LockScreenGauge(
                         gauge,
                         render,
-                        RemoteModifier.weight(1f.rf)
-                            .clickable(render.taps.openApp(gauge.accountId))
-                            .semantics {
-                                contentDescription = render.strings.gaugeDescription(gauge).rs
-                            },
+                        RemoteModifier.weight(1f.rf).clickable(render.taps.open(gauge)).semantics {
+                            contentDescription = render.strings.gaugeDescription(gauge).rs
+                        },
                     )
                 }
             }
@@ -156,7 +154,7 @@ private fun LockScreenGauge(
     render: RenderContext,
     modifier: RemoteModifier = RemoteModifier,
 ) {
-    val colors = render.colors
+    val colors = render.colorsFor(gauge)
     RemoteColumn(modifier = modifier, horizontalAlignment = RemoteAlignment.CenterHorizontally) {
         RemoteBox(
             modifier = RemoteModifier.width(render.px(LOCK_RING)).height(render.px(LOCK_RING)),
@@ -178,12 +176,17 @@ private fun LockScreenGauge(
             fontSize = render.sp(LOCK_NUMBER),
             fontWeight = FontWeight.ExtraBold,
         )
-        WidgetText(
-            gauge.name,
-            colors.onSurfaceVariant,
-            render.sp(LOCK_NAME),
-            fontWeight = FontWeight.Medium,
-        )
+        // The logo in the ring names a stale account, so its name line asks to sign in.
+        if (gauge.stale) {
+            SignInLabel(render, render.sp(LOCK_NAME))
+        } else {
+            WidgetText(
+                gauge.name,
+                colors.onSurfaceVariant,
+                render.sp(LOCK_NAME),
+                fontWeight = FontWeight.Medium,
+            )
+        }
     }
 }
 

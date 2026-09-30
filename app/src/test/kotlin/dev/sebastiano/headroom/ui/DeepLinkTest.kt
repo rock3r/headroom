@@ -59,6 +59,13 @@ class DeepLinkTest {
     }
 
     @Test
+    fun `a widget tap on an expired account opens its sign-in`() {
+        launch(widgetTap("demo-claude").putExtra(WidgetIntents.EXTRA_SIGN_IN_AGAIN, true))
+        rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
+        rule.onNodeWithText("Sign in to Claude again").assertIsDisplayed()
+    }
+
+    @Test
     fun `a widget tap opens that account's detail`() {
         launch(widgetTap("demo-codex"))
         rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()

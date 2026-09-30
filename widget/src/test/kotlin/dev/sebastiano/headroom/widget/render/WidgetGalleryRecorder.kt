@@ -194,6 +194,31 @@ class WidgetGalleryRecorder {
                     WidgetSize(160f, 160f),
                     expiredSignIn = true,
                 ),
+                Shot(
+                    "$EXPIRED_DIR/widget-shape",
+                    WidgetConfig(WidgetStyle.Shape, listOf("demo-claude")),
+                    WidgetSize(160f, 160f),
+                    expiredSignIn = true,
+                ),
+                Shot(
+                    "$EXPIRED_DIR/widget-shape-grid",
+                    WidgetConfig(WidgetStyle.Shape),
+                    WidgetSize(160f, 160f),
+                    expiredSignIn = true,
+                ),
+                Shot(
+                    "$EXPIRED_DIR/widget-bars-short",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(250f, 110f),
+                    expiredSignIn = true,
+                ),
+                Shot(
+                    "$EXPIRED_DIR/widget-lock-screen",
+                    WidgetConfig(WidgetStyle.Rings),
+                    WidgetSize(320f, 140f),
+                    WidgetHostCategory.Keyguard,
+                    expiredSignIn = true,
+                ),
             )
 
         val scrollingShots =

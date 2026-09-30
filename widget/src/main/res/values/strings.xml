@@ -41,6 +41,8 @@
     <string name="widget_cd_gauge_left">%1$s: %2$s of the %3$s limit left.</string>
     <string name="widget_cd_gauge_left_attention">%1$s: %2$s of the %3$s limit left, over pace.</string>
     <string name="widget_cd_resets">Resets %1$s.</string>
+    <string name="widget_sign_in">Sign in</string>
+    <string name="widget_cd_sign_in">Sign in to %1$s again</string>
     <string name="widget_cd_stale">Sign-in expired, these numbers are out of date.</string>
     <string name="widget_cd_countdown">Next %1$s reset in %2$s: %3$s, %4$s</string>
     <string name="widget_cd_refresh">Refresh usage</string>

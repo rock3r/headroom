@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.widget.render
 import android.app.PendingIntent
 import android.content.Context
 import androidx.compose.remote.creation.compose.action.Action
+import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.WidgetIntents
 
 /**
@@ -13,6 +14,7 @@ import dev.sebastiano.headroom.widget.WidgetIntents
 internal class WidgetTaps(private val context: Context, private val appWidgetId: Int) {
     private val intents = linkedMapOf<Int, PendingIntent>()
     private val accountIds = linkedMapOf<String?, Int>()
+    private val signInIds = linkedMapOf<String, Int>()
 
     /** The pending intent for each tap id used in the document. */
     val pendingIntents: Map<Int, PendingIntent>
@@ -35,9 +37,21 @@ internal class WidgetTaps(private val context: Context, private val appWidgetId:
         return WidgetTapAction(id)
     }
 
+    /** Opens [gauge]'s account, or its sign-in when its sign-in expired. */
+    fun open(gauge: Gauge): Action {
+        if (!gauge.stale) return openApp(gauge.accountId)
+        val id = signInIds.getOrPut(gauge.accountId) { FIRST_SIGN_IN_ID + signInIds.size }
+        intents.getOrPut(id) {
+            WidgetIntents.openApp(context, appWidgetId, gauge.accountId, signInAgain = true)
+        }
+        return WidgetTapAction(id)
+    }
+
     private companion object {
         const val REFRESH_ID = 1
         const val OPEN_APP_ID = 2
         const val FIRST_ACCOUNT_ID = 16
+        /** Far above the account ids, which grow with the number of accounts. */
+        const val FIRST_SIGN_IN_ID = 1024
     }
 }

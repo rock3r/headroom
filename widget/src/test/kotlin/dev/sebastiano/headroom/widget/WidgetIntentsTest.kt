@@ -66,6 +66,21 @@ class WidgetIntentsTest {
     }
 
     @Test
+    fun `sign in again opens the app at the sign-in of one account`() {
+        val signIn = shadowOf(WidgetIntents.openApp(app, 7, "demo-claude", signInAgain = true))
+
+        assertEquals(
+            "demo-claude",
+            signIn.savedIntent.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID),
+        )
+        assertTrue(signIn.savedIntent.getBooleanExtra(WidgetIntents.EXTRA_SIGN_IN_AGAIN, false))
+        assertNotEquals(
+            WidgetIntents.openApp(app, 7, "demo-claude"),
+            WidgetIntents.openApp(app, 7, "demo-claude", signInAgain = true),
+        )
+    }
+
+    @Test
     fun `pending intents are distinct per widget and per account`() {
         assertNotEquals(WidgetIntents.refresh(app, 1), WidgetIntents.refresh(app, 2))
         assertNotEquals(

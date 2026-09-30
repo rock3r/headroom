@@ -302,6 +302,40 @@ class WidgetRendererTest {
     }
 
     @Test
+    fun `an expired account says Sign in in every layout, and its tap signs it in again`() =
+        runTest {
+            val expired = DemoData.accountsWithExpiredSignIn(now)
+            val claudeOnly = listOf("demo-claude")
+            val layouts =
+                listOf(
+                    Triple(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f), HOME),
+                    Triple(WidgetConfig(WidgetStyle.Bars), WidgetSize(250f, 100f), HOME),
+                    Triple(
+                        WidgetConfig(WidgetStyle.Rings, claudeOnly),
+                        WidgetSize(160f, 160f),
+                        HOME,
+                    ),
+                    Triple(WidgetConfig(WidgetStyle.Rings), WidgetSize(160f, 160f), HOME),
+                    Triple(
+                        WidgetConfig(WidgetStyle.Shape, claudeOnly),
+                        WidgetSize(160f, 160f),
+                        HOME,
+                    ),
+                    Triple(WidgetConfig(WidgetStyle.Shape), WidgetSize(160f, 160f), HOME),
+                    Triple(WidgetConfig(WidgetStyle.Rings), WidgetSize(300f, 120f), LOCK),
+                )
+            layouts.forEach { (config, size, host) ->
+                val state = WidgetUiState.from(expired, config, now, size, host)
+                val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+                val label = "$config $size $host"
+                assertContains(doc.text(), "Sign in", message = label)
+                assertContains(doc.text(), "Sign-in expired", message = label)
+                assertTrue(Tap.SignIn("demo-claude") in doc.taps(), label)
+                assertFalse(Tap.Open("demo-claude") in doc.taps(), label)
+            }
+        }
+
+    @Test
     fun `empty widgets explain why and open the app`() = runTest {
         val doc =
             capture(
@@ -568,6 +602,8 @@ class WidgetRendererTest {
         data object Refresh : Tap
 
         data class Open(val accountId: String?) : Tap
+
+        data class SignIn(val accountId: String?) : Tap
     }
 
     private fun WidgetDocument.taps(): List<Tap> {
@@ -580,6 +616,10 @@ class WidgetRendererTest {
         assertEquals(APP_WIDGET_ID, intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1))
         return when {
             shadow.isBroadcast && intent.action == WidgetIntents.ACTION_REFRESH -> Tap.Refresh
+            shadow.isActivity &&
+                intent.action == Intent.ACTION_MAIN &&
+                intent.getBooleanExtra(WidgetIntents.EXTRA_SIGN_IN_AGAIN, false) ->
+                Tap.SignIn(intent.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID))
             shadow.isActivity && intent.action == Intent.ACTION_MAIN ->
                 Tap.Open(intent.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID))
             else -> error("Unexpected pending intent $intent")
@@ -619,3 +659,6 @@ class WidgetRendererTest {
         const val SCROLL_OPERATION = "ScrollModifierOperation"
     }
 }
+
+private val HOME = WidgetHostCategory.HomeScreen
+private val LOCK = WidgetHostCategory.Keyguard

@@ -18,6 +18,7 @@ import androidx.compose.remote.creation.compose.modifier.height
 import androidx.compose.remote.creation.compose.modifier.padding
 import androidx.compose.remote.creation.compose.modifier.semantics
 import androidx.compose.remote.creation.compose.modifier.width
+import androidx.compose.remote.creation.compose.state.RemoteTextUnit
 import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.remote.creation.compose.state.rememberMutableRemoteBoolean
 import androidx.compose.remote.creation.compose.state.rf
@@ -66,12 +67,14 @@ internal fun SingleRingWidget(
                 strings.percent(gauge.shownPercent).rs,
             )
     val word =
-        if (session == null) strings.windowWord(gauge.window).rs
+        if (gauge.stale) strings.signIn.rs
+        else if (session == null) strings.windowWord(gauge.window).rs
         else
             showSession.select(
                 strings.windowWord(session.window).rs,
                 strings.windowWord(gauge.window).rs,
             )
+    val wordColor = if (gauge.stale) render.colors.signIn else colors.onSurfaceVariant
     val description =
         listOfNotNull(
                 strings.gaugeDescription(gauge),
@@ -114,8 +117,8 @@ internal fun SingleRingWidget(
                     color = colors.onSurfaceVariant,
                     fontSize = render.sp(LABEL),
                     modifier =
-                        RemoteModifier.clickable(render.taps.openApp(gauge.accountId)).semantics {
-                            contentDescription = strings.openAction(gauge.name).rs
+                        RemoteModifier.clickable(render.taps.open(gauge)).semantics {
+                            contentDescription = strings.openAction(gauge.name, gauge.stale).rs
                         },
                 )
                 val bigPx = render.textPx(BIG)
@@ -136,7 +139,7 @@ internal fun SingleRingWidget(
                                 word,
                                 width / 2f.rf,
                                 (bigPx * NUMBER_LINE + labelPx * LABEL_LINE / 2f).rf,
-                                textPaint(colors.onSurfaceVariant, labelPx, bold = true),
+                                textPaint(wordColor, labelPx, bold = true),
                             )
                         }
                     }
@@ -189,12 +192,12 @@ internal fun GaugeGrid(
                         gauge,
                         RemoteModifier.weight(1f.rf)
                             .fillMaxHeight()
-                            .clickable(render.taps.openApp(gauge.accountId))
+                            .clickable(render.taps.open(gauge))
                             .semantics {
                                 contentDescription =
                                     (render.strings.gaugeDescription(gauge) +
                                             " " +
-                                            render.strings.openAction(gauge.name))
+                                            render.strings.openAction(gauge.name, gauge.stale))
                                         .rs
                             },
                     )
@@ -242,7 +245,15 @@ private fun SmallRing(
             render.sp(SMALL_NAME),
             fontWeight = FontWeight.SemiBold,
         )
+        if (gauge.stale) SignInLabel(render, render.sp(SMALL_NAME))
     }
+}
+
+/** The compact "Sign in" label under a stale gauge. It is never faded. */
+@RemoteComposable
+@Composable
+internal fun SignInLabel(render: RenderContext, fontSize: RemoteTextUnit) {
+    WidgetText(render.strings.signIn, render.colors.signIn, fontSize)
 }
 
 internal const val PERCENT = 100f

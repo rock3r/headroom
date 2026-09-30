@@ -36,6 +36,9 @@ private constructor(
     val paceTick: Color = scheme.onSurface.faded()
     val countdownContainer: Color = scheme.tertiaryContainer
     val onCountdownContainer: Color = scheme.onTertiaryContainer
+    /** The "Sign in" label of an expired account. It is never faded. */
+    val signIn: Color = scheme.error
+
     /** The text colour on an avatar, which always has the provider hue. */
     val onAvatar: Color = scheme.surface
 

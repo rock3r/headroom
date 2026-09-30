@@ -99,7 +99,9 @@ class MainActivity : ComponentActivity() {
             return
         }
         val accountId = intent?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID) ?: return
-        openAccount.value = OpenAccountRequest(accountId, requests++)
+        // A widget tap on an account whose sign-in expired opens its sign-in.
+        val signInAgain = intent.getBooleanExtra(WidgetIntents.EXTRA_SIGN_IN_AGAIN, false)
+        openAccount.value = OpenAccountRequest(accountId, requests++, signInAgain)
     }
 
     /**

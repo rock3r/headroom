@@ -48,8 +48,8 @@ internal fun SingleShapeWidget(
                 color = colors.onShapeFill,
                 fontSize = render.sp(LABEL),
                 modifier =
-                    RemoteModifier.clickable(render.taps.openApp(gauge.accountId)).semantics {
-                        contentDescription = strings.openAction(gauge.name).rs
+                    RemoteModifier.clickable(render.taps.open(gauge)).semantics {
+                        contentDescription = strings.openAction(gauge.name, gauge.stale).rs
                     },
             )
             WidgetText(
@@ -58,8 +58,12 @@ internal fun SingleShapeWidget(
                 fontSize = render.sp(BIG),
                 fontWeight = FontWeight.Black,
             )
-            gauge.reset?.let { reset ->
-                WidgetText(strings.reset(reset), colors.onShapeFill, render.sp(LABEL))
+            if (gauge.stale) {
+                SignInLabel(render, render.sp(LABEL))
+            } else {
+                gauge.reset?.let { reset ->
+                    WidgetText(strings.reset(reset), colors.onShapeFill, render.sp(LABEL))
+                }
             }
         }
     }
@@ -100,6 +104,7 @@ private fun SmallShape(
                 fontWeight = FontWeight.ExtraBold,
             )
             ProviderLogoIcon(gauge.provider, render.pxValue(SMALL_LOGO), colors.onShapeFill)
+            if (gauge.stale) SignInLabel(render, render.sp(SMALL_SIGN_IN))
         }
     }
 }
@@ -108,3 +113,4 @@ private const val LABEL = 10f
 private const val BIG = 28f
 private const val SMALL_NUMBER = 15f
 private const val SMALL_LOGO = 13f
+private const val SMALL_SIGN_IN = 9f

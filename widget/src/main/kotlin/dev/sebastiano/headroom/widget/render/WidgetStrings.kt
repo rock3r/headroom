@@ -127,7 +127,19 @@ internal class WidgetStrings(
 
     fun refreshAction(): String = context.getString(R.string.widget_cd_refresh)
 
-    fun openAction(name: String): String = context.getString(R.string.widget_cd_open, name)
+    /**
+     * What tapping an account does, for a screen reader: open it, or with [signInAgain] sign it in
+     * again.
+     */
+    fun openAction(name: String, signInAgain: Boolean = false): String =
+        context.getString(
+            if (signInAgain) R.string.widget_cd_sign_in else R.string.widget_cd_open,
+            name,
+        )
+
+    /** The label on a gauge whose sign-in expired. */
+    val signIn: String
+        get() = context.getString(R.string.widget_sign_in)
 
     fun flipAction(window: GaugeWindow): String =
         context.getString(R.string.widget_cd_flip, windowWord(window))

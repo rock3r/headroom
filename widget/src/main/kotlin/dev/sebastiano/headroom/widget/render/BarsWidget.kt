@@ -121,10 +121,13 @@ private fun BarRow(
             modifier
                 .fillMaxWidth()
                 .height(render.fixedPx(metrics.rowDp))
-                .clickable(render.taps.openApp(gauge.accountId))
+                .clickable(render.taps.open(gauge))
                 .semantics {
                     contentDescription =
-                        (strings.gaugeDescription(gauge) + " " + strings.openAction(gauge.name)).rs
+                        (strings.gaugeDescription(gauge) +
+                                " " +
+                                strings.openAction(gauge.name, gauge.stale))
+                            .rs
                 },
         // Spacing comes from padding: the Android 16 player does not take arranged spacing out of
         // the width it gives to weighted children, so the row would overflow.
@@ -138,15 +141,29 @@ private fun BarRow(
             verticalArrangement = RemoteArrangement.Center,
             horizontalAlignment = RemoteAlignment.Start,
         ) {
-            WidgetText(
-                text = gauge.name,
-                color = colors.onSurface,
-                fontSize = (NAME_SP * scale).sp.asRemoteTextUnit(),
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Start,
-            )
+            // A short row has room for one line: the avatar names the account, the line asks to
+            // sign in.
+            val twoLines = metrics.rowDp >= STALE_TWO_LINES_MIN_ROW_DP
+            if (!gauge.stale || twoLines) {
+                WidgetText(
+                    text = gauge.name,
+                    color = colors.onSurface,
+                    fontSize = (NAME_SP * scale).sp.asRemoteTextUnit(),
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Start,
+                )
+            }
             val reset = gauge.reset
-            if (metrics.showResetLine && reset != null) {
+            if (gauge.stale) {
+                WidgetText(
+                    text = strings.signIn,
+                    color = render.colors.signIn,
+                    fontSize =
+                        ((if (twoLines) RESET_SP else NAME_SP) * scale).sp.asRemoteTextUnit(),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start,
+                )
+            } else if (metrics.showResetLine && reset != null) {
                 WidgetText(
                     text = strings.reset(reset),
                     color = colors.onSurfaceVariant,
@@ -198,3 +215,5 @@ private const val BAR_HEIGHT = 12f
 private const val NAME_SP = 12f
 private const val VALUE_SP = 13f
 private const val RESET_SP = 9.5f
+/** Rows at least this tall show a stale account's name and its "Sign in" label. */
+private const val STALE_TWO_LINES_MIN_ROW_DP = 30f

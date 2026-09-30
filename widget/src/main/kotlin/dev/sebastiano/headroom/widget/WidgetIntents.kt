@@ -15,6 +15,13 @@ public object WidgetIntents {
     /** On the launch intent: the account the user tapped, if any. */
     public const val EXTRA_ACCOUNT_ID: String = "dev.sebastiano.headroom.widget.extra.ACCOUNT_ID"
 
+    /**
+     * On the launch intent, with [EXTRA_ACCOUNT_ID]: true when the tapped account's sign-in
+     * expired, so the app opens its sign-in instead of its detail.
+     */
+    public const val EXTRA_SIGN_IN_AGAIN: String =
+        "dev.sebastiano.headroom.widget.extra.SIGN_IN_AGAIN"
+
     internal fun refresh(context: Context, appWidgetId: Int): PendingIntent {
         val intent =
             Intent(context, WidgetActionReceiver::class.java)
@@ -24,12 +31,18 @@ public object WidgetIntents {
         return PendingIntent.getBroadcast(context, appWidgetId, intent, IMMUTABLE_UPDATE)
     }
 
-    internal fun openApp(context: Context, appWidgetId: Int, accountId: String?): PendingIntent {
+    internal fun openApp(
+        context: Context,
+        appWidgetId: Int,
+        accountId: String?,
+        signInAgain: Boolean = false,
+    ): PendingIntent {
+        val kind = if (signInAgain) "sign-in" else "open"
         val intent =
             Intent(Intent.ACTION_MAIN)
                 .addCategory(Intent.CATEGORY_LAUNCHER)
                 .setPackage(context.packageName)
-                .setIdentifier("open:$appWidgetId:${accountId.orEmpty()}")
+                .setIdentifier("$kind:$appWidgetId:${accountId.orEmpty()}")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
         // Android 17 does not resolve an implicit activity intent sent from a widget tap
@@ -39,6 +52,7 @@ public object WidgetIntents {
                 ComponentName(it.packageName, it.name)
             }
         if (accountId != null) intent.putExtra(EXTRA_ACCOUNT_ID, accountId)
+        if (signInAgain) intent.putExtra(EXTRA_SIGN_IN_AGAIN, true)
         return PendingIntent.getActivity(context, appWidgetId, intent, IMMUTABLE_UPDATE)
     }
 
