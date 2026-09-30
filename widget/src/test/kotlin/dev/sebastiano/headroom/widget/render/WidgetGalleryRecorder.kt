@@ -47,7 +47,7 @@ class WidgetGalleryRecorder {
     /** Android 17 is the first player the Bars widget scrolls in, see `WidgetRenderer`. */
     @Test @Config(sdk = [37]) fun recordScrollingGallery() = record(scrollingShots)
 
-    /** The expired sign-in prototype: Claude's numbers are stale. */
+    /** An expired sign-in: Claude's numbers are stale. */
     @Test fun recordExpiredSignIn() = record(expiredShots)
 
     @Test
