@@ -32,6 +32,7 @@ internal fun quotaWindow(
     group: String? = null,
     kind: WindowKind = WindowKind.fromLength(length),
     isUnlimited: Boolean = false,
+    binding: String? = null,
 ): QuotaWindow =
     QuotaWindow(
         id = id,
@@ -42,6 +43,7 @@ internal fun quotaWindow(
         length = length,
         group = group,
         isUnlimited = isUnlimited,
+        binding = binding,
     )
 
 /** `seven_day_opus` becomes `Seven day opus`. Used when a provider sends an unknown window. */

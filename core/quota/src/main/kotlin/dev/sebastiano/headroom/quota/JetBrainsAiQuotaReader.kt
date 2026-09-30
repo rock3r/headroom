@@ -403,6 +403,7 @@ internal class JetBrainsAiQuotaReader(
         return quotaWindow(
                 id = source?.windowId ?: LITE_WINDOW_ID,
                 label = source?.label ?: LITE_WINDOW_LABELS[kind] ?: LITE_DEFAULT_LABEL,
+                binding = source?.chatBinding,
                 usedPercent = (used / maximum * MAX_PERCENT).coerceIn(MIN_PERCENT, MAX_PERCENT),
                 resetsAt = resetsAt,
                 length = period,

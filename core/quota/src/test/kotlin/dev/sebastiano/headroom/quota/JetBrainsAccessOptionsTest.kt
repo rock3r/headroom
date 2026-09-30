@@ -394,6 +394,31 @@ class JetBrainsAccessOptionsTest {
     }
 
     @Test
+    fun `each window exposes a chat binding and never a token`() = runTest {
+        routes()
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals("license:$OPTION_LICENSE", snapshot.window(LICENSE_LABEL).binding)
+        assertEquals(
+            "workspace:$WORKSPACE_ID:$ORG_ID",
+            snapshot.window(WORKSPACE_LABEL).binding,
+        )
+        assertEquals(
+            "workspace:$ALUMNI_WORKSPACE_ID:$ALUMNI_ORG_ID",
+            snapshot.window(ALUMNI_LABEL).binding,
+        )
+        val logged = logs.joinToString("\n")
+        for (window in snapshot.windows) {
+            val binding = window.binding
+            assertTrue(binding != null && binding !in logged, logged)
+        }
+        for (secret in listOf(ID_TOKEN, ACCESS_TOKEN, REFRESH_TOKEN, OPTION_JWT, ORGS_JWT)) {
+            assertTrue(secret !in logged, logged)
+        }
+    }
+
+    @Test
     fun `labels a workspace with its name, and with its organisation's when it has none`() =
         runTest {
             routes(
