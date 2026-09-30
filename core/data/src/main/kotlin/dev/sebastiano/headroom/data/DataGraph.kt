@@ -56,6 +56,9 @@ public interface AccountsRepository : QuotaRepository {
     /** Names the account. A blank or null [nickname] removes the name. */
     public suspend fun renameAccount(accountId: String, nickname: String?)
 
+    /** Stores what the provider calls the account, for example a changed email address. */
+    public suspend fun relabelAccount(accountId: String, label: String)
+
     /** Puts the accounts in the order of [orderedIds]. Every list of accounts follows it. */
     public suspend fun reorderAccounts(orderedIds: List<String>)
 }
@@ -130,6 +133,9 @@ public class DataGraph(
 
                 override suspend fun renameAccount(accountId: String, nickname: String?) =
                     roomRepository.renameAccount(accountId, nickname)
+
+                override suspend fun relabelAccount(accountId: String, label: String) =
+                    roomRepository.relabelAccount(accountId, label)
 
                 override suspend fun reorderAccounts(orderedIds: List<String>) =
                     roomRepository.reorderAccounts(orderedIds)

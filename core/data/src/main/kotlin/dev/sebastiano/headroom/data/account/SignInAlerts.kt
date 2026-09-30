@@ -90,7 +90,8 @@ internal class SignInAlertingRepository(
 
 /**
  * Posts sign-in warnings on their own channel, at default importance. The notification and its
- * "Sign in" action both open the app at the sign-in of the account, through [openSignIn].
+ * "Sign in" action both open the app at the sign-in of the account, through [openSignIn]. Tapping
+ * it does not remove it: the problem lasts until the account syncs again, which cancels it.
  */
 internal class AndroidSignInNotifier(
     private val context: Context,
@@ -128,7 +129,6 @@ internal class AndroidSignInNotifier(
                 .setContentText(body)
                 .setStyle(Notification.BigTextStyle().bigText(body))
                 .setCategory(Notification.CATEGORY_ERROR)
-                .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(intent)
                 .addAction(

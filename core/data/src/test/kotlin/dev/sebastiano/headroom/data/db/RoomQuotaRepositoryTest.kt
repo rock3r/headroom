@@ -94,6 +94,36 @@ class RoomQuotaRepositoryTest {
         }
 
     @Test
+    fun `an expired sign-in stays expired through later errors, until a sync works`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var result: QuotaResult = QuotaResult.Failure(QuotaErrorKind.Auth, "expired")
+            val repo = repo({ result }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.refresh()
+
+            QuotaErrorKind.entries
+                .filterNot { it == QuotaErrorKind.Auth }
+                .forEach { kind ->
+                    result = QuotaResult.Failure(kind, "later")
+                    repo.refresh()
+                    assertEquals(QuotaErrorKind.Auth, repo.current().single().lastError, kind.name)
+                }
+
+            result = QuotaResult.Success(claude.snapshot!!)
+            repo.refresh()
+            assertNull(repo.current().single().lastError)
+        }
+
+    @Test
+    fun `an account's label can be updated`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.relabelAccount(claude.account.id, "sam@new.example.com")
+            assertEquals("sam@new.example.com", repo.current().single().account.label)
+        }
+
+    @Test
     fun `concurrent refreshes of one account fetch only once`() =
         runTest(UnconfinedTestDispatcher()) {
             var calls = 0

@@ -86,6 +86,8 @@ class SignInAlertsTest {
 
         override suspend fun renameAccount(accountId: String, nickname: String?) = Unit
 
+        override suspend fun relabelAccount(accountId: String, label: String) = Unit
+
         override suspend fun reorderAccounts(orderedIds: List<String>) = Unit
 
         override suspend fun refresh(accountId: String?) = Unit

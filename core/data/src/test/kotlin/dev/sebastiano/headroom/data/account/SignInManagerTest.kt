@@ -34,6 +34,15 @@ class SignInManagerTest {
 
         override suspend fun renameAccount(accountId: String, nickname: String?) = Unit
 
+        override suspend fun relabelAccount(accountId: String, label: String) {
+            state.value =
+                state.value.map {
+                    if (it.account.id == accountId)
+                        it.copy(account = it.account.copy(label = label))
+                    else it
+                }
+        }
+
         override suspend fun reorderAccounts(orderedIds: List<String>) = Unit
 
         override suspend fun refresh(accountId: String?) {
@@ -147,5 +156,51 @@ class SignInManagerTest {
 
         assertEquals("new-id", account.id)
         assertEquals(listOf("new-id"), accounts.state.value.map { it.account.id })
+    }
+
+    @Test
+    fun `signing in again updates the account's label when the provider renamed it`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        SignInManager(store, accounts) { "first" }
+            .complete(tokens.copy(providerAccountId = "org-1"))
+
+        val account =
+            SignInManager(store, accounts)
+                .reauthenticate(
+                    "first",
+                    tokens.copy(providerAccountId = "org-1", label = "sam@new.example.com"),
+                )
+
+        assertEquals("sam@new.example.com", account.label)
+        assertEquals("sam@new.example.com", accounts.state.value.single().account.label)
+    }
+
+    @Test
+    fun `without a provider account id, a different email means a different account`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        SignInManager(store, accounts) { "first" }.complete(tokens)
+
+        assertFailsWith<DifferentAccountException> {
+            SignInManager(store, accounts)
+                .reauthenticate("first", tokens.copy(label = "alex@example.com"))
+        }
+        // The same email, in another case, is the same account.
+        SignInManager(store, accounts)
+            .reauthenticate("first", tokens.copy(label = "Sam@Example.com"))
+    }
+
+    @Test
+    fun `a sign-in that names no account, such as an API key, is accepted`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        val key = TokenSet(Provider.ZAi, CredentialKind.ApiKey, "old-key", null, null, label = null)
+        SignInManager(store, accounts) { "z" }.complete(key)
+
+        SignInManager(store, accounts).reauthenticate("z", key.copy(accessToken = "new-key"))
+
+        assertEquals("new-key", store.load("z")?.accessToken)
+        assertEquals("Z.AI", accounts.state.value.single().account.label)
     }
 }

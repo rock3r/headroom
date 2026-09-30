@@ -91,6 +91,13 @@ class AndroidSignInNotifierTest {
     }
 
     @Test
+    fun `tapping the warning does not remove it, only a good sync or a removal does`() {
+        notifier().notifyExpired(claude, showAccountName = false)
+
+        assertEquals(0, posted().flags and Notification.FLAG_AUTO_CANCEL)
+    }
+
+    @Test
     fun `cancel removes the account's warning`() {
         val notifier = notifier()
         notifier.notifyExpired(claude, showAccountName = false)

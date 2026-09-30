@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.data.db
 
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.UsagePoint
@@ -61,6 +62,11 @@ internal class RoomQuotaRepository(
     /** Names the account. A blank [nickname] removes the name, so the provider's name shows. */
     suspend fun renameAccount(accountId: String, nickname: String?) {
         dao.setNickname(accountId, nickname?.trim()?.ifEmpty { null })
+    }
+
+    /** Stores what the provider now calls the account, for example a changed email address. */
+    suspend fun relabelAccount(accountId: String, label: String) {
+        dao.setLabel(accountId, label)
     }
 
     /** Stores the order the user put the accounts in, in one transaction. */
@@ -138,8 +144,13 @@ internal class RoomQuotaRepository(
                     pruneBeforeEpochMs = now.minus(HISTORY_RETENTION).toEpochMilli(),
                 )
             }
-            // An update, not an upsert: a removed account must stay removed.
-            is QuotaResult.Failure -> dao.updateError(entity.id, result.kind.name)
+            // An update, not an upsert: a removed account must stay removed. An expired sign-in
+            // stays expired through later errors, such as a network error: only a sync that
+            // works shows the user can stop worrying about it.
+            is QuotaResult.Failure -> {
+                val expired = entity.lastError == QuotaErrorKind.Auth.name
+                dao.updateError(entity.id, if (expired) entity.lastError else result.kind.name)
+            }
             null -> Unit
         }
     }
