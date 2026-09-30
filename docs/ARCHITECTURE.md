@@ -29,7 +29,7 @@ themselves.
    calls the provider's fetcher.
 3. The result is stored as the latest snapshot plus a history point per window.
 4. The UI and the widgets observe the repository as a `Flow`.
-5. The reset scheduler sets one alarm per weekly window, one minute after `resets_at`. The
+5. The reset scheduler sets one alarm per weekly window, 10 seconds after `resets_at`. The
    alarm re-fetches that account and posts a notification only when the reset really happened
    (usage dropped, or `resets_at` moved forward by about a week).
 

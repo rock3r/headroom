@@ -6,7 +6,7 @@ import dev.sebastiano.headroom.model.ResetPolicy
 import java.time.Duration
 import java.time.Instant
 
-/** One scheduled check, one minute after a window is due to reset. */
+/** One scheduled check, a few seconds after a window is due to reset. */
 internal data class ResetAlarm(
     val accountId: String,
     val windowId: String,
@@ -20,8 +20,11 @@ internal data class ResetAlarm(
 }
 
 internal object ResetAlarmPlanner {
-    /** Checking right at the reset time races the provider; a minute later is safe. */
-    private val GRACE: Duration = Duration.ofMinutes(1)
+    /**
+     * Checking right at the reset time races the provider. A few seconds later usually sees the
+     * reset, and [ResetRetryPolicy] checks again soon when it does not.
+     */
+    private val GRACE: Duration = ResetPolicy.CHECK_DELAY
 
     fun plan(
         accounts: List<AccountState>,
@@ -32,7 +35,7 @@ internal object ResetAlarmPlanner {
             val resetsAt = window.resetsAt
             val eligible =
                 resetsAt != null &&
-                    // Keep a window inside its grace minute: its alarm has not fired yet.
+                    // Keep a window inside its grace seconds: its alarm has not fired yet.
                     resetsAt.plus(GRACE).isAfter(now) &&
                     ResetPolicy.canAlert(window) &&
                     isEnabled(state.account.id, window)

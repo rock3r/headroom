@@ -1,5 +1,7 @@
 package dev.sebastiano.headroom.model
 
+import java.time.Duration
+
 /** Which windows may send a "your limit has reset" notification. */
 public object ResetPolicy {
     /** Session and daily windows reset too often to be worth an alert. */
@@ -8,4 +10,7 @@ public object ResetPolicy {
 
     /** Weekly windows alert unless the user turns them off. Monthly ones are opt-in. */
     public fun alertsByDefault(window: QuotaWindow): Boolean = window.kind == WindowKind.Weekly
+
+    /** How long after a window's reset time the app checks that the reset happened. */
+    public val CHECK_DELAY: Duration = Duration.ofSeconds(10)
 }

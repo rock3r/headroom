@@ -48,6 +48,7 @@ import dev.sebastiano.headroom.designsystem.PaceChartModel
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
@@ -561,7 +562,7 @@ private fun AlertRow(
                         window.alertEnabled && window.resetsAt != null ->
                             stringResource(
                                 R.string.detail_alert_at,
-                                formatter.long(window.resetsAt.plus(ALERT_DELAY)),
+                                formatter.long(window.resetsAt.plus(ResetPolicy.CHECK_DELAY)),
                             )
                         window.kind == WindowKind.Monthly ->
                             stringResource(R.string.detail_alert_monthly_default)
@@ -581,6 +582,3 @@ private fun AlertRow(
         )
     }
 }
-
-/** The app checks a reset one minute after the provider says it happens. */
-private val ALERT_DELAY: Duration = Duration.ofMinutes(1)

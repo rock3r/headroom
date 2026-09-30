@@ -138,14 +138,14 @@ class ResetCheckerTest {
         val repo = ScriptedRepository(before) { before }
         val notifier = RecordingNotifier()
         assertEquals(
-            ResetCheckOutcome.Retry(Duration.ofMinutes(2)),
+            ResetCheckOutcome.Retry(Duration.ofSeconds(30)),
             checker(repo, notifier).check(alarm, 1),
         )
         assertEquals(
             ResetCheckOutcome.Retry(Duration.ofMinutes(60)),
-            checker(repo, notifier).check(alarm, 4),
+            checker(repo, notifier).check(alarm, 5),
         )
-        assertEquals(ResetCheckOutcome.GaveUp, checker(repo, notifier).check(alarm, 5))
+        assertEquals(ResetCheckOutcome.GaveUp, checker(repo, notifier).check(alarm, 6))
         assertEquals(emptyList(), notifier.notified)
     }
 

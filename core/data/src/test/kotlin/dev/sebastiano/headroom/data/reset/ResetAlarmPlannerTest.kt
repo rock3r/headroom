@@ -14,11 +14,11 @@ class ResetAlarmPlannerTest {
     private val defaults = { _: String, window: QuotaWindow -> window.kind.name == "Weekly" }
 
     @Test
-    fun `plans one alarm per enabled weekly window, one minute after the reset`() {
+    fun `plans one alarm per enabled weekly window, ten seconds after the reset`() {
         val alarms = ResetAlarmPlanner.plan(accounts, now, isEnabled = defaults)
         val grok = alarms.single { it.accountId == "demo-grok" }
         assertEquals("weekly", grok.windowId)
-        assertEquals(now.plus(Duration.ofMinutes(928 + 1)), grok.triggerAt)
+        assertEquals(now.plus(Duration.ofMinutes(928)).plusSeconds(10), grok.triggerAt)
         assertEquals(88.0, grok.usedBefore)
         // Claude has two weekly windows, Codex one, Grok one; Copilot is monthly and off by
         // default.
@@ -59,10 +59,17 @@ class ResetAlarmPlannerTest {
     }
 
     @Test
-    fun `a window inside its grace minute keeps its alarm`() {
+    fun `a window inside its grace seconds keeps its alarm`() {
+        val resetsAt = now.plus(Duration.ofMinutes(928))
+        val alarms = ResetAlarmPlanner.plan(accounts, resetsAt.plusSeconds(5), isEnabled = defaults)
+        assertEquals(true, alarms.any { it.accountId == "demo-grok" })
+    }
+
+    @Test
+    fun `a window past its grace seconds gets no new alarm`() {
         val resetsAt = now.plus(Duration.ofMinutes(928))
         val alarms =
             ResetAlarmPlanner.plan(accounts, resetsAt.plusSeconds(30), isEnabled = defaults)
-        assertEquals(true, alarms.any { it.accountId == "demo-grok" })
+        assertEquals(false, alarms.any { it.accountId == "demo-grok" })
     }
 }
