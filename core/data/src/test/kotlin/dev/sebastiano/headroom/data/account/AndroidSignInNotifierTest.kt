@@ -28,8 +28,8 @@ class AndroidSignInNotifierTest {
             .first { it.account.id == "demo-claude" }
             .copy(lastError = QuotaErrorKind.Auth)
 
-    private fun notifier() =
-        AndroidSignInNotifier(context, ZoneId.of("UTC"), Locale.US) { accountId ->
+    private fun notifier(is24Hour: Boolean = true) =
+        AndroidSignInNotifier(context, ZoneId.of("UTC"), Locale.US, { is24Hour }) { accountId ->
             Intent("test.OPEN").putExtra(SignInIntents.EXTRA_ACCOUNT_ID, accountId)
         }
 
@@ -55,6 +55,13 @@ class AndroidSignInNotifierTest {
                 "The numbers you see are from Sun 27 Sep, 10:32.",
             shadowOf(posted()).contentText,
         )
+    }
+
+    @Test
+    fun `follows the device's 12-hour clock`() {
+        notifier(is24Hour = false).notifyExpired(claude, showAccountName = false)
+
+        assertTrue(shadowOf(posted()).contentText.endsWith("Sun 27 Sep, 10:32 AM."))
     }
 
     @Test

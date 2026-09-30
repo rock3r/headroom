@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.text.format.DateFormat
 import androidx.core.content.edit
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.data.R
@@ -95,6 +96,8 @@ internal class AndroidSignInNotifier(
     private val context: Context,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val locale: Locale = Locale.getDefault(),
+    /** Whether the user's clock shows 24 hours, read when a warning is posted. */
+    private val is24Hour: () -> Boolean = { DateFormat.is24HourFormat(context) },
     private val openSignIn: (accountId: String) -> Intent? = { SignInIntents.open(context, it) },
 ) : SignInNotifier {
     private val manager = context.getSystemService(NotificationManager::class.java)
@@ -113,7 +116,8 @@ internal class AndroidSignInNotifier(
             account.snapshot?.fetchedAt?.let { syncedAt ->
                 context.getString(
                     R.string.sign_in_expired_body_with_time,
-                    DateTimeFormatter.ofPattern(TIME_PATTERN, locale).format(syncedAt.atZone(zone)),
+                    DateTimeFormatter.ofPattern(timePattern(), locale)
+                        .format(syncedAt.atZone(zone)),
                 )
             } ?: context.getString(R.string.sign_in_expired_body)
         val intent = pendingIntent(account.account.id)
@@ -138,6 +142,9 @@ internal class AndroidSignInNotifier(
                 .build()
         manager.notify(TAG, notificationId(account.account.id), notification)
     }
+
+    /** "Sun 27 Sep, 10:32", or "Sun 27 Sep, 10:32 AM" on a 12-hour clock. */
+    private fun timePattern(): String = if (is24Hour()) "EEE d MMM, HH:mm" else "EEE d MMM, h:mm a"
 
     override fun cancel(accountId: String) {
         manager.cancel(TAG, notificationId(accountId))
@@ -168,7 +175,6 @@ internal class AndroidSignInNotifier(
     companion object {
         const val CHANNEL_ID: String = "sign_in_problems"
         private const val TAG = "sign_in_expired"
-        private const val TIME_PATTERN = "EEE d MMM, HH:mm"
 
         fun notificationId(accountId: String): Int = accountId.hashCode()
     }
