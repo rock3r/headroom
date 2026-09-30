@@ -113,7 +113,7 @@ private fun BarRow(
     metrics: BarsMetrics,
     modifier: RemoteModifier = RemoteModifier,
 ) {
-    val colors = render.colors
+    val colors = render.colorsFor(gauge)
     val strings = render.strings
     val scale = metrics.textScale
     RemoteRow(

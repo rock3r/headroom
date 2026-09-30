@@ -47,20 +47,32 @@ class WidgetGalleryRecorder {
     /** Android 17 is the first player the Bars widget scrolls in, see `WidgetRenderer`. */
     @Test @Config(sdk = [37]) fun recordScrollingGallery() = record(scrollingShots)
 
-    private fun record(shots: List<Shot>) = runTest {
+    /** The expired sign-in prototype: Claude's numbers are stale. */
+    @Test fun recordExpiredSignIn() = record(expiredShots)
+
+    @Test
+    @Config(qualifiers = "night-xxhdpi")
+    fun recordExpiredSignInDark() = record(expiredShots, suffix = "-dark")
+
+    private fun record(shots: List<Shot>, suffix: String = "") = runTest {
         val outDir = System.getProperty(OUTPUT_PROPERTY)
         assumeTrue("Set $OUTPUT_PROPERTY to record the gallery", !outDir.isNullOrBlank())
         val dir = File(checkNotNull(outDir)).apply { mkdirs() }
         shots.forEach { shot ->
             val accounts =
-                if (shot.manyAccounts) DemoData.manyAccounts(now) else DemoData.accounts(now)
+                when {
+                    shot.expiredSignIn -> DemoData.accountsWithExpiredSignIn(now)
+                    shot.manyAccounts -> DemoData.manyAccounts(now)
+                    else -> DemoData.accounts(now)
+                }
             val state =
                 WidgetUiState.from(accounts, shot.config, now, shot.size, shot.host, shot.display)
             val document = WidgetRenderer.capture(context, state, APP_WIDGET_ID, shot.size, strings)
             val widget = WidgetRenderer.remoteViews(document).draw(shot.size)
-            File(dir, "${shot.name}.png").outputStream().use {
-                onWallpaper(widget).compress(Bitmap.CompressFormat.PNG, FULL_QUALITY, it)
-            }
+            File(dir, "${shot.name}$suffix.png")
+                .apply { parentFile?.mkdirs() }
+                .outputStream()
+                .use { onWallpaper(widget).compress(Bitmap.CompressFormat.PNG, FULL_QUALITY, it) }
         }
     }
 
@@ -109,6 +121,8 @@ class WidgetGalleryRecorder {
         val manyAccounts: Boolean = false,
         /** Shows how much is left instead of how much is used. */
         val display: QuotaDisplay = QuotaDisplay.Used,
+        /** Shows the demo accounts with Claude's sign-in expired. */
+        val expiredSignIn: Boolean = false,
     )
 
     private companion object {
@@ -154,6 +168,31 @@ class WidgetGalleryRecorder {
                     WidgetConfig(WidgetStyle.Rings),
                     WidgetSize(320f, 140f),
                     WidgetHostCategory.Keyguard,
+                ),
+            )
+
+        /** Next to the README pictures, in the prototype's own folder. */
+        const val EXPIRED_DIR = "../prototypes/expired-sign-in"
+
+        val expiredShots =
+            listOf(
+                Shot(
+                    "$EXPIRED_DIR/widget-bars",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(320f, 140f),
+                    expiredSignIn = true,
+                ),
+                Shot(
+                    "$EXPIRED_DIR/widget-ring",
+                    WidgetConfig(WidgetStyle.Rings, listOf("demo-claude")),
+                    WidgetSize(160f, 160f),
+                    expiredSignIn = true,
+                ),
+                Shot(
+                    "$EXPIRED_DIR/widget-rings-grid",
+                    WidgetConfig(WidgetStyle.Rings),
+                    WidgetSize(160f, 160f),
+                    expiredSignIn = true,
                 ),
             )
 

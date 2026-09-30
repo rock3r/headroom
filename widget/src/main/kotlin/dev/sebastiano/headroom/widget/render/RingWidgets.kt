@@ -47,7 +47,7 @@ internal fun SingleRingWidget(
 ) {
     val gauge = state.gauge
     val session = state.session
-    val colors = render.colors
+    val colors = render.colorsFor(gauge)
     val strings = render.strings
     val showSession = rememberMutableRemoteBoolean(false)
 
@@ -211,7 +211,7 @@ private fun SmallRing(
     render: RenderContext,
     modifier: RemoteModifier = RemoteModifier,
 ) {
-    val colors = render.colors
+    val colors = render.colorsFor(gauge)
     RemoteColumn(
         modifier = modifier,
         verticalArrangement = RemoteArrangement.Center,

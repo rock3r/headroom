@@ -77,4 +77,27 @@ class WidgetColorsTest {
             "expected $expected but was $actual",
         )
     }
+
+    @Test
+    fun `stale colours are faded towards the background and towards grey`() {
+        val colors = WidgetColors.from(light, ColourMode.PerAccount, isDark = false)
+        val stale = colors.stale()
+
+        val fresh = colors.accent(Provider.Claude)
+        val faded = stale.accent(Provider.Claude)
+        assertTrue(saturation(faded) < saturation(fresh) / 2, "not greyer: $faded")
+        assertTrue(distance(faded, colors.background) < distance(fresh, colors.background))
+        assertEquals(colors.background, stale.background)
+        // Avatars keep their hue, so the account stays recognisable.
+        assertEquals(colors.avatar(Provider.Claude), stale.avatar(Provider.Claude))
+    }
+
+    private fun saturation(color: Color): Float {
+        val max = maxOf(color.red, color.green, color.blue)
+        val min = minOf(color.red, color.green, color.blue)
+        return if (max == 0f) 0f else (max - min) / max
+    }
+
+    private fun distance(a: Color, b: Color): Float =
+        abs(a.red - b.red) + abs(a.green - b.green) + abs(a.blue - b.blue)
 }

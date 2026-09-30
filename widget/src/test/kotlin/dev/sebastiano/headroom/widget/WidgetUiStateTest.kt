@@ -40,6 +40,30 @@ class WidgetUiStateTest {
     }
 
     @Test
+    fun `an account whose sign-in expired is stale, never wavy, and paced at its last sync`() {
+        val accounts = DemoData.accountsWithExpiredSignIn(now)
+        val config = WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-claude"))
+
+        val ring = assertIs<WidgetUiState.SingleRing>(map(config, accounts, WidgetSize(160f, 160f)))
+
+        assertTrue(ring.gauge.stale)
+        assertEquals(false, ring.gauge.needsAttention)
+        assertEquals(false, ring.wavy)
+        val syncedAt = now.minus(Duration.ofHours(2))
+        val expected =
+            dev.sebastiano.headroom.model.Pace.expectedPercent(
+                accounts.first().primaryWindow!!,
+                syncedAt,
+            )
+        assertEquals(expected?.let { kotlin.math.round(it).toInt() }, ring.gauge.pacePercent)
+        // Its session reset has passed since then, so no reset time is shown for it.
+        assertNull(ring.session?.reset)
+        // Fresh accounts are not stale.
+        val bars = assertIs<WidgetUiState.Bars>(map(WidgetConfig(WidgetStyle.Bars), accounts))
+        assertEquals(listOf(true, false, false, false), bars.gauges.map { it.stale })
+    }
+
+    @Test
     fun `selected account ids keep the configured order and skip unknown ids`() {
         val config =
             WidgetConfig(WidgetStyle.Bars, accountIds = listOf("demo-grok", "gone", "demo-claude"))

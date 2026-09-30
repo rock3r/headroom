@@ -29,7 +29,7 @@ internal fun SingleShapeWidget(
     modifier: RemoteModifier = RemoteModifier,
 ) {
     val gauge = state.gauge
-    val colors = render.colors
+    val colors = render.colorsFor(gauge)
     val strings = render.strings
     RemoteBox(
         modifier =
@@ -87,7 +87,7 @@ private fun SmallShape(
     render: RenderContext,
     modifier: RemoteModifier = RemoteModifier,
 ) {
-    val colors = render.colors
+    val colors = render.colorsFor(gauge)
     RemoteBox(modifier = modifier, contentAlignment = RemoteAlignment.Center) {
         RemoteCanvas(RemoteModifier.fillMaxSize()) {
             drawPolarShape(gauge.shape.polar, colors.shapeFill(gauge.provider).rc)

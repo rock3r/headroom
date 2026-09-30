@@ -67,8 +67,12 @@ internal class WidgetStrings(
                 percent(gauge.shownPercent),
                 windowWord(gauge.window),
             )
-        val reset = gauge.reset ?: return usage
-        return usage + " " + context.getString(R.string.widget_cd_resets, reset(reset))
+        val withReset =
+            gauge.reset?.let {
+                usage + " " + context.getString(R.string.widget_cd_resets, reset(it))
+            } ?: usage
+        return if (gauge.stale) withReset + " " + context.getString(R.string.widget_cd_stale)
+        else withReset
     }
 
     fun countdownTitle(window: GaugeWindow?): String =

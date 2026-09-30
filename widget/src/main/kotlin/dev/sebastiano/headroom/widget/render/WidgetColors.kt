@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
+import dev.sebastiano.headroom.designsystem.StaleStyle
 import dev.sebastiano.headroom.designsystem.headroomColorScheme
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ThemePalette
@@ -23,19 +26,29 @@ private constructor(
     private val scheme: ColorScheme,
     private val mode: ColourMode,
     private val tones: HueTones,
+    /** Draws every gauge colour as stale data, see [stale]. */
+    private val isStale: Boolean = false,
 ) {
     val background: Color = scheme.surfaceContainer.copy(alpha = BACKGROUND_ALPHA)
-    val onSurface: Color = scheme.onSurface
-    val onSurfaceVariant: Color = scheme.onSurfaceVariant
-    val track: Color = scheme.surfaceContainerHighest
-    val paceTick: Color = scheme.onSurface
+    val onSurface: Color = scheme.onSurface.faded()
+    val onSurfaceVariant: Color = scheme.onSurfaceVariant.faded()
+    val track: Color = scheme.surfaceContainerHighest.faded()
+    val paceTick: Color = scheme.onSurface.faded()
     val countdownContainer: Color = scheme.tertiaryContainer
     val onCountdownContainer: Color = scheme.onTertiaryContainer
     /** The text colour on an avatar, which always has the provider hue. */
     val onAvatar: Color = scheme.surface
 
+    /**
+     * These colours for the gauges of an account whose sign-in expired: pulled towards grey and
+     * faded into the background, as the app draws stale data. Avatars keep their hue.
+     */
+    fun stale(): WidgetColors = WidgetColors(scheme, mode, tones, isStale = true)
+
     /** The main arc or bar of an account. */
-    fun accent(provider: Provider): Color =
+    fun accent(provider: Provider): Color = accentColor(provider).faded()
+
+    private fun accentColor(provider: Provider): Color =
         when (mode) {
             ColourMode.Wallpaper -> scheme.primary
             ColourMode.PerAccount -> avatar(provider)
@@ -43,14 +56,18 @@ private constructor(
         }
 
     /** The inner (session) ring of a single-account Rings widget. */
-    fun secondaryAccent(provider: Provider): Color =
+    fun secondaryAccent(provider: Provider): Color = secondaryColor(provider).faded()
+
+    private fun secondaryColor(provider: Provider): Color =
         when (mode) {
             ColourMode.Wallpaper -> scheme.tertiary
             ColourMode.PerAccount -> avatar(provider)
             ColourMode.Mono -> scheme.onSurface.copy(alpha = MONO_SECONDARY_ALPHA)
         }
 
-    fun shapeFill(provider: Provider): Color =
+    fun shapeFill(provider: Provider): Color = shapeColor(provider).faded()
+
+    private fun shapeColor(provider: Provider): Color =
         when (mode) {
             ColourMode.Wallpaper -> scheme.primaryContainer
             ColourMode.PerAccount ->
@@ -64,7 +81,23 @@ private constructor(
             ColourMode.Wallpaper -> scheme.onPrimaryContainer
             ColourMode.PerAccount,
             ColourMode.Mono -> scheme.onSurface
-        }
+        }.faded()
+
+    /** Remote Compose has no layer to fade a group, so each stale colour is faded on its own. */
+    private fun Color.faded(): Color {
+        if (!isStale) return this
+        val grey = luminance()
+        val greyed =
+            Color(
+                red = mix(grey, red, StaleStyle.SATURATION),
+                green = mix(grey, green, StaleStyle.SATURATION),
+                blue = mix(grey, blue, StaleStyle.SATURATION),
+                alpha = alpha,
+            )
+        return lerp(scheme.surfaceContainer, greyed, StaleStyle.ALPHA)
+    }
+
+    private fun mix(start: Float, stop: Float, fraction: Float) = start + (stop - start) * fraction
 
     /** Avatars keep the provider hue in every mode, so accounts stay recognisable. */
     fun avatar(provider: Provider): Color = oklch(tones.lightness, tones.chroma, provider.style.hue)

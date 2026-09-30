@@ -70,6 +70,8 @@ public data class Gauge(
     val reset: ResetLabel?,
     /** Whether the widget shows how much is used or how much is left. */
     val display: QuotaDisplay = QuotaDisplay.Used,
+    /** The account's sign-in expired: these are old numbers, drawn faded and never wavy. */
+    val stale: Boolean = false,
 ) {
     /** The number the widget shows, and how much of its ring or bar is filled: 0 to 100. */
     val shownPercent: Int
@@ -250,6 +252,9 @@ public sealed interface WidgetUiState {
         ): Gauge {
             val used = window.usedPercent.roundToInt().coerceIn(0, PERCENT)
             val isSession = window.kind == WindowKind.Session
+            val stale = state.isSignInExpired
+            // Stale numbers are compared with the pace of when they were fetched.
+            val asOf = if (stale) state.snapshot?.fetchedAt ?: now else now
             return Gauge(
                 accountId = state.account.id,
                 name = name,
@@ -257,12 +262,17 @@ public sealed interface WidgetUiState {
                 usedPercent = used,
                 window = GaugeWindow.of(window.kind),
                 pacePercent =
-                    if (isSession) null else Pace.expectedPercent(window, now)?.roundToInt(),
-                needsAttention = Pace.needsAttention(window, now),
+                    if (isSession) null else Pace.expectedPercent(window, asOf)?.roundToInt(),
+                needsAttention = !stale && Pace.needsAttention(window, now),
                 shape = UsageShape.forPercent(used),
-                reset = resetLabel(window, isSession, now),
+                // A stale window whose reset has passed shows no reset time: it has reset.
+                reset =
+                    resetLabel(window, isSession, now).takeUnless { stale && window.hasReset(now) },
+                stale = stale,
             )
         }
+
+        private fun QuotaWindow.hasReset(now: Instant): Boolean = resetsAt?.isAfter(now) == false
 
         private fun resetLabel(window: QuotaWindow, isSession: Boolean, now: Instant): ResetLabel? {
             val resetsAt = window.resetsAt ?: return null

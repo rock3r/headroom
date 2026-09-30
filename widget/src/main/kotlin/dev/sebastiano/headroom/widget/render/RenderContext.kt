@@ -5,6 +5,7 @@ import androidx.compose.remote.creation.compose.state.RemoteTextUnit
 import androidx.compose.remote.creation.compose.state.asRemoteTextUnit
 import androidx.compose.remote.creation.compose.state.rf
 import androidx.compose.ui.unit.sp
+import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.WidgetSize
 
 /** What every widget composable needs besides its state. */
@@ -26,6 +27,11 @@ internal class RenderContext(
      * limits, so a tablet cell or a small phone cell keeps the same proportions.
      */
     private val unit: Float = (size.minDp / DESIGN_WIDGET_DP).coerceIn(MIN_SCALE, MAX_SCALE)
+
+    private val staleColors by lazy { colors.stale() }
+
+    /** The colours to draw [gauge] with: faded when its numbers are stale. */
+    fun colorsFor(gauge: Gauge): WidgetColors = if (gauge.stale) staleColors else colors
 
     /** Text size for a design size, scaled with the widget. */
     fun sp(design: Float): RemoteTextUnit = (design * unit).sp.asRemoteTextUnit()

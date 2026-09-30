@@ -89,6 +89,15 @@ class WidgetStringsTest {
     }
 
     @Test
+    fun `says when a gauge is stale because its sign-in expired`() {
+        assertEquals(
+            "Claude: 71% of the weekly limit used. Resets Thu 15:48. " +
+                "Sign-in expired, these numbers are out of date.",
+            strings.gaugeDescription(gauge.copy(needsAttention = false, stale = true)),
+        )
+    }
+
+    @Test
     fun `describes a gauge by what is left in left mode`() {
         val left = gauge.copy(display = QuotaDisplay.Left)
         assertEquals("29%", strings.percent(left.shownPercent))
