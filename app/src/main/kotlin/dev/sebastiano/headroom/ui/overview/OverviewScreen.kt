@@ -86,6 +86,7 @@ fun OverviewScreen(
     settingsReveal: PageReveal? = null,
     playEntrance: Boolean = false,
     onEntranceStart: () -> Unit = {},
+    onSignInAgain: (accountId: String) -> Unit = {},
 ) {
     // Cards composed from now on (on scroll, or on coming back) appear without an entrance.
     SideEffect { if (playEntrance) onEntranceStart() }
@@ -175,6 +176,7 @@ fun OverviewScreen(
                                 selected = account.id == selectedAccountId,
                                 sharedElements = sharedElements,
                                 display = state.display,
+                                onSignIn = { onSignInAgain(account.id) },
                             )
                         }
                     }

@@ -66,8 +66,10 @@ internal fun AccountState.toSummary(
     justReset: Boolean = false,
 ): AccountSummary {
     val primary = primaryWindow
+    // Stale numbers are compared with the pace of when they were fetched, not with today's.
+    val asOf = if (isSignInExpired) snapshot?.fetchedAt ?: now else now
     val summary = { window: QuotaWindow ->
-        window.toSummary(account.id, now, alerts, pastResets[account.id to window.id].orEmpty())
+        window.toSummary(account.id, asOf, alerts, pastResets[account.id to window.id].orEmpty())
     }
     return AccountSummary(
         id = account.id,
@@ -87,9 +89,10 @@ internal fun AccountState.toSummary(
                 .map(summary),
         pace =
             primary?.let {
-                if (justReset) PaceChipState.JustReset else PaceChipState.from(it, now)
+                if (justReset) PaceChipState.JustReset else PaceChipState.from(it, asOf)
             },
-        needsAttention = primary?.let { Pace.needsAttention(it, now) } ?: false,
+        // Stale data never asks for attention: it may be long out of date.
+        needsAttention = !isSignInExpired && primary?.let { Pace.needsAttention(it, now) } ?: false,
         error = lastError,
         pastResets = primary?.let { pastResets[account.id to it.id] }.orEmpty(),
         justReset = justReset,
@@ -104,6 +107,8 @@ internal fun AccountState.toSummary(
             } else {
                 emptyList()
             },
+        signInExpired = isSignInExpired,
+        dataFrom = snapshot?.fetchedAt,
     )
 }
 

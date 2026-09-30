@@ -147,7 +147,12 @@ class StatusBarBlurTest {
     @Config(qualifiers = "w1280dp-h500dp")
     fun `the expanded detail pane sits below the status bar and never blurs it`() {
         launch()
+        // At this height the first card starts below the fold. Bring it up to tap it, then put the
+        // list back at the top, so only the detail pane is scrolled.
+        val list = rule.onNodeWithTag(OVERVIEW_LIST_TAG)
+        list.performScrollToNode(hasTestTag(accountCardTag("demo-claude")))
         rule.onNodeWithTag(accountCardTag("demo-claude")).performClick()
+        list.performScrollToIndex(0)
         rule.onNodeWithText("Session limits never send alerts.").performScrollTo()
         blur.assertCountEquals(0)
     }

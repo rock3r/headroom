@@ -6,6 +6,7 @@ import dev.sebastiano.headroom.auth.AuthMethods
 import dev.sebastiano.headroom.auth.BrowserSignIn
 import dev.sebastiano.headroom.auth.DeviceCodePrompt
 import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.data.account.DifferentAccountException
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import java.io.IOException
@@ -57,11 +58,13 @@ interface SignInSteps {
 
 /**
  * Runs sign-ins against the auth layer. When a sign-in produces tokens, [complete] stores them and
- * adds the account.
+ * adds the account. A sign-in started for an existing account goes to [completeAgain] instead,
+ * which stores the tokens for that account.
  */
 class RealSignInController(
     private val steps: SignInSteps,
     private val scope: CoroutineScope,
+    private val completeAgain: (suspend (accountId: String, TokenSet) -> Account)? = null,
     private val complete: suspend (TokenSet) -> Account,
 ) : SignInController {
     private val mutableState = MutableStateFlow<SignInState>(SignInState.Idle)
@@ -73,9 +76,13 @@ class RealSignInController(
     private var browser: BrowserSession? = null
     private var provider: Provider? = null
 
-    override fun start(provider: Provider) {
+    /** The existing account this sign-in is for, or null for a new account. */
+    private var accountId: String? = null
+
+    override fun start(provider: Provider, accountId: String?) {
         stop()
         this.provider = provider
+        this.accountId = accountId
         when (steps.kindOf(provider)) {
             SignInKind.ApiKey -> mutableState.value = SignInState.ApiKey(provider)
             SignInKind.Browser -> run(provider) { id -> browserSignIn(provider, id) }
@@ -111,6 +118,8 @@ class RealSignInController(
             } catch (_: IOException) {
                 // The sign-in worked but storing it did not.
                 mutableState.value = SignInState.Failed(provider, SignInError.Unknown)
+            } catch (_: DifferentAccountException) {
+                mutableState.value = SignInState.Failed(provider, SignInError.DifferentAccount)
             } finally {
                 // A cancelled attempt can finish unwinding after a new one started.
                 if (id == attempt) browser = null
@@ -125,7 +134,10 @@ class RealSignInController(
 
     private suspend fun finish(provider: Provider, tokens: TokenSet) {
         finishing(provider)
-        val account = complete(tokens)
+        val existing = accountId
+        val again = completeAgain
+        val account =
+            if (existing != null && again != null) again(existing, tokens) else complete(tokens)
         mutableState.value = SignInState.Success(provider, account.label)
     }
 
@@ -162,17 +174,20 @@ class RealSignInController(
                 finish(current, tokens)
             } catch (_: IOException) {
                 mutableState.value = SignInState.Failed(current, SignInError.Unknown)
+            } catch (_: DifferentAccountException) {
+                mutableState.value = SignInState.Failed(current, SignInError.DifferentAccount)
             }
         }
     }
 
     override fun retry() {
-        provider?.let(::start)
+        provider?.let { start(it, accountId) }
     }
 
     override fun cancel() {
         stop()
         provider = null
+        accountId = null
         mutableState.value = SignInState.Idle
     }
 

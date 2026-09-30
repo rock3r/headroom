@@ -69,8 +69,10 @@ fun ResetsScreen(
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
 ) {
+    // A stale account's resets get no alert, so they are not listed as upcoming.
     val upcoming =
         state.accounts
+            .filterNot { it.signInExpired }
             .flatMap { account ->
                 account.windows
                     .filter { it.canAlert && it.resetsAt?.isAfter(state.now) == true }

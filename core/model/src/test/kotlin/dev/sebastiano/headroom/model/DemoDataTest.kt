@@ -30,6 +30,17 @@ class DemoDataTest {
     }
 
     @Test
+    fun `the expired sign-in scenario has Claude two hours stale and the others fresh`() {
+        val accounts = DemoData.accountsWithExpiredSignIn(now)
+
+        assertEquals(DemoData.accounts(now).map { it.account }, accounts.map { it.account })
+        val claude = accounts.first()
+        assertTrue(claude.isSignInExpired)
+        assertEquals(now.minus(java.time.Duration.ofHours(2)), claude.snapshot?.fetchedAt)
+        assertEquals(DemoData.accounts(now).drop(1), accounts.drop(1))
+    }
+
+    @Test
     fun `the soonest weekly reset in demo data is Grok`() {
         val next = NextReset.find(DemoData.accounts(now), now)
         assertEquals(Provider.Grok, next?.account?.provider)

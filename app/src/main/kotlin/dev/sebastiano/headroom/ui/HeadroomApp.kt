@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +53,7 @@ import dev.sebastiano.headroom.ui.accounts.AccountsStep
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.delights.HomeDelights
+import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.settings.LicencesScreen
 import dev.sebastiano.headroom.ui.settings.ResetIslandUi
@@ -97,24 +99,15 @@ fun HeadroomApp(
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
     // A widget tap leaves the page on top, unless the user is in the middle of signing in.
     val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
-    // A request is acted on once, even if the host is slow to clear it: a request left behind
-    // must never keep the accounts screen from opening.
-    var handledRequest by remember { mutableStateOf<Long?>(null) }
-    val pending = openAccountRequest?.takeIf { it.serial != handledRequest }
-    val decision = pending?.let { request ->
-        decideOpenAccount(request.accountId, home.accounts.map { it.id }, home.accountsLoaded)
-    }
-    // Unknown accounts are dropped once loading is done; a pending request never blocks the UI.
-    SideEffect { if (decision == OpenAccountDecision.Ignore) onConsumeOpenAccount() }
-    val openNow = pending.takeIf { decision == OpenAccountDecision.Open && !signingIn }
+    val requests = rememberPendingRequest(openAccountRequest, home, onConsumeOpenAccount)
+    val openNow = requests.ready.takeIf { !signingIn && it?.signInAgain != true }
     val shown = if (openNow == null) page else Page.Home
-    // The user's tap wins over an account a widget asked for earlier.
-    val dropPending = {
-        pending?.let {
-            handledRequest = it.serial
-            onConsumeOpenAccount()
+    val signInAgain =
+        rememberSignInAgain(accountsViewModel, accounts.step, requests.ready, requests::drop) {
+            again ->
+            if (again) accountsFromSettings = false
+            page = if (again) Page.Accounts else Page.Home
         }
-    }
 
     val accountsActions =
         accountsActions(accountsViewModel) {
@@ -163,22 +156,22 @@ fun HeadroomApp(
                         onChartWindowChange = homeViewModel::selectChartWindow,
                         onSortChange = homeViewModel::setOverviewSort,
                         onOpenAccounts = {
-                            dropPending()
+                            requests.drop()
                             accountsFromSettings = false
                             page = Page.Accounts
                         },
                         onOpenSettings = {
-                            dropPending()
+                            requests.drop()
                             page = Page.Settings
                         },
                         settingsReveal = reveal,
                         playEntrance = !entrancePlayed,
                         onEntranceStart = { entrancePlayed = true },
+                        onSignInAgain = signInAgain,
                         openAccountRequest = openNow,
                         onConsumeOpenAccount = {
-                            handledRequest = openNow?.serial
                             page = Page.Home
-                            onConsumeOpenAccount()
+                            requests.handle(openNow?.serial)
                         },
                         stats = { bottomPadding ->
                             // Collected only while the tab shows: no stats work off screen.
@@ -194,6 +187,94 @@ fun HeadroomApp(
 }
 
 private const val ENTER_SCALE = 0.96f
+
+/** An account request, from a widget tap or a sign-in warning, that the UI has not acted on yet. */
+private class PendingRequest(
+    /** The request, once the accounts are known well enough to act on it. */
+    val ready: OpenAccountRequest?,
+    private val pending: OpenAccountRequest?,
+    private val markHandled: (serial: Long?) -> Unit,
+) {
+    /** Marks the request with [serial] as handled, and tells the host to clear it. */
+    fun handle(serial: Long?) = markHandled(serial)
+
+    /** Drops the pending request: the user's own tap wins over one that came earlier. */
+    fun drop() {
+        pending?.let { handle(it.serial) }
+    }
+}
+
+/**
+ * Tracks [request] until it is handled. A request is acted on once, even if the host is slow to
+ * clear it: a request left behind must never keep the accounts screen from opening. Unknown
+ * accounts are dropped once loading is done, see [decideOpenAccount].
+ */
+@Composable
+private fun rememberPendingRequest(
+    request: OpenAccountRequest?,
+    home: HomeUiState,
+    onConsume: () -> Unit,
+): PendingRequest {
+    var handledRequest by remember { mutableStateOf<Long?>(null) }
+    val pending = request?.takeIf { it.serial != handledRequest }
+    val decision = pending?.let {
+        decideOpenAccount(
+            it.accountId,
+            home.accounts.map { account -> account.id },
+            home.accountsLoaded,
+        )
+    }
+    SideEffect { if (decision == OpenAccountDecision.Ignore) onConsume() }
+    return PendingRequest(pending.takeIf { decision == OpenAccountDecision.Open }, pending) { serial
+        ->
+        handledRequest = serial
+        onConsume()
+    }
+}
+
+/**
+ * Starts signing an account in again, from a card, the detail or a sign-in warning's [request].
+ * [onPage] is called with true to show the accounts page with the sign-in, and with false once that
+ * sign-in is over (done, cancelled or backed out of), to go back to the overview.
+ */
+@Composable
+private fun rememberSignInAgain(
+    viewModel: AccountsViewModel,
+    step: AccountsStep,
+    request: OpenAccountRequest?,
+    onHandleRequest: () -> Unit,
+    onPage: (signingInAgain: Boolean) -> Unit,
+): (accountId: String) -> Unit {
+    // Started, and whether its sign-in step has shown yet: a browser sign-in starts a moment late.
+    var started by rememberSaveable { mutableStateOf(false) }
+    var shown by rememberSaveable { mutableStateOf(false) }
+    val signingIn = (step as? AccountsStep.SignIn)?.again != null
+    val currentOnHandleRequest by rememberUpdatedState(onHandleRequest)
+    val currentOnPage by rememberUpdatedState(onPage)
+    // Remembered, so the screens it is passed to can skip recomposing.
+    val start =
+        remember(viewModel) {
+            { accountId: String ->
+                currentOnHandleRequest()
+                viewModel.signInAgain(accountId)
+                started = true
+                shown = false
+                currentOnPage(true)
+            }
+        }
+    SideEffect {
+        when {
+            request?.signInAgain == true -> start(request.accountId)
+            started && signingIn -> shown = true
+            started && shown -> {
+                started = false
+                shown = false
+                currentOnPage(false)
+            }
+        }
+    }
+    return start
+}
 
 /** The reset island's service state, as the settings screen shows it. */
 @Composable

@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import dev.sebastiano.headroom.data.SignInIntents
 import dev.sebastiano.headroom.ui.AppearanceTheme
 import dev.sebastiano.headroom.ui.HeadroomApp
 import dev.sebastiano.headroom.ui.OpenAccountRequest
@@ -27,7 +28,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    /** The account a widget tap asked for, until the UI has opened it. */
+    /** The account a widget tap or a sign-in warning asked for, until the UI has opened it. */
     private val openAccount = MutableStateFlow<OpenAccountRequest?>(null)
     private var requests = 0L
 
@@ -37,7 +38,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val graph = (application as HeadroomApplication).graph
         // After a configuration change the launch intent is old news: the UI restores itself.
-        if (savedInstanceState == null) handleWidgetTap(intent)
+        if (savedInstanceState == null) handleRequest(intent)
         val settings = graph.settings.settings.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         keepSplashUntil { settings.value != null }
         setContent {
@@ -68,14 +69,14 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * The activity is single-task: widget taps and the sign-in return link arrive here. The return
-     * link carries nothing to act on; bringing the task forward is all it needs, so whatever the
-     * accounts screen shows (a finished sign-in, for example) stays on screen.
+     * The activity is single-task: widget taps, sign-in warnings and the sign-in return link arrive
+     * here. The return link carries nothing to act on; bringing the task forward is all it needs,
+     * so whatever the accounts screen shows (a finished sign-in, for example) stays on screen.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleWidgetTap(intent)
+        handleRequest(intent)
     }
 
     /** Keeps the splash screen up, by holding back the first frame, until [ready] is true. */
@@ -92,7 +93,11 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private fun handleWidgetTap(intent: Intent?) {
+    private fun handleRequest(intent: Intent?) {
+        intent?.getStringExtra(SignInIntents.EXTRA_ACCOUNT_ID)?.let { accountId ->
+            openAccount.value = OpenAccountRequest(accountId, requests++, signInAgain = true)
+            return
+        }
         val accountId = intent?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID) ?: return
         openAccount.value = OpenAccountRequest(accountId, requests++)
     }

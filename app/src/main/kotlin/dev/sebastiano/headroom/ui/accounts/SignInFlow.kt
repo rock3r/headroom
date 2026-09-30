@@ -47,9 +47,13 @@ const val SIGN_IN_CODE_FIELD_TAG: String = "sign-in-code"
 const val SIGN_IN_KEY_FIELD_TAG: String = "sign-in-key"
 const val SIGN_IN_USER_CODE_TAG: String = "sign-in-user-code"
 
-/** Renders one sign-in step from the [SignInState] the controller publishes. */
+/**
+ * Renders one sign-in step from the [SignInState] the controller publishes. With [again], the
+ * sign-in is for that existing account: the title says "again", and a line says which account to
+ * sign in as.
+ */
 @Composable
-internal fun SignInFlow(state: SignInState, actions: AccountsActions) {
+internal fun SignInFlow(state: SignInState, actions: AccountsActions, again: AccountRow? = null) {
     val provider =
         when (state) {
             is SignInState.Browser -> state.provider
@@ -61,12 +65,24 @@ internal fun SignInFlow(state: SignInState, actions: AccountsActions) {
             SignInState.Idle -> return
         }
     StepScaffold(
-        title = stringResource(R.string.signin_title, provider.displayName),
+        title =
+            if (again != null) stringResource(R.string.signin_title_again, provider.displayName)
+            else stringResource(R.string.signin_title, provider.displayName),
         navigationIcon = HeadroomIcons.Close,
         navigationLabel = stringResource(R.string.signin_cancel),
         onNavigate = actions.onBack,
     ) {
         item { SignInHeader(provider, finishing = state is SignInState.Finishing) }
+        if (again != null && state !is SignInState.Success) {
+            item {
+                Text(
+                    text = stringResource(R.string.signin_again_body, again.label),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
+                )
+            }
+        }
         item {
             Column(
                 modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
@@ -78,7 +94,7 @@ internal fun SignInFlow(state: SignInState, actions: AccountsActions) {
                     is SignInState.ApiKey -> ApiKeyStep(state, actions)
                     is SignInState.Finishing -> FinishingStep(state)
                     is SignInState.Success -> SuccessStep(state, actions)
-                    is SignInState.Failed -> FailedStep(state, actions)
+                    is SignInState.Failed -> FailedStep(state, actions, again)
                     SignInState.Idle -> Unit
                 }
             }
@@ -251,7 +267,7 @@ private fun SuccessStep(state: SignInState.Success, actions: AccountsActions) {
 }
 
 @Composable
-private fun FailedStep(state: SignInState.Failed, actions: AccountsActions) {
+private fun FailedStep(state: SignInState.Failed, actions: AccountsActions, again: AccountRow?) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -267,14 +283,17 @@ private fun FailedStep(state: SignInState.Failed, actions: AccountsActions) {
         }
         Text(
             text =
-                stringResource(
-                    when (state.error) {
-                        SignInError.Denied -> R.string.signin_error_denied
-                        SignInError.Expired -> R.string.signin_error_expired
-                        SignInError.Network -> R.string.signin_error_network
-                        SignInError.Unknown -> R.string.signin_error_unknown
-                    }
-                ),
+                when (state.error) {
+                    SignInError.Denied -> stringResource(R.string.signin_error_denied)
+                    SignInError.Expired -> stringResource(R.string.signin_error_expired)
+                    SignInError.Network -> stringResource(R.string.signin_error_network)
+                    SignInError.DifferentAccount ->
+                        stringResource(
+                            R.string.signin_error_different_account,
+                            again?.label ?: state.provider.displayName,
+                        )
+                    SignInError.Unknown -> stringResource(R.string.signin_error_unknown)
+                },
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )

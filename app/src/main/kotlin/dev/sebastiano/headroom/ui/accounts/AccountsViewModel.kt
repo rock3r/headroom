@@ -38,7 +38,8 @@ sealed interface AccountsStep {
 
     data object PickProvider : AccountsStep
 
-    data class SignIn(val state: SignInState) : AccountsStep
+    /** A sign-in step. [again] is the existing account being signed in again, if any. */
+    data class SignIn(val state: SignInState, val again: AccountRow? = null) : AccountsStep
 }
 
 @Immutable
@@ -62,13 +63,19 @@ class AccountsViewModel(
 ) : ViewModel() {
     private val picking = MutableStateFlow(false)
 
+    /** The account being signed in again, or null for a new sign-in. */
+    private val again = MutableStateFlow<AccountRow?>(null)
+
+    private val accounts = repository.accounts
+
     val state: StateFlow<AccountsUiState> =
-        combine(repository.accounts, isDemo, picking, signInController.state) {
+        combine(repository.accounts, isDemo, picking, signInController.state, again) {
                 accounts,
                 demo,
                 pick,
-                signIn ->
-                AccountsUiState(accounts.map { it.toRow() }, demo, step(pick, signIn))
+                signIn,
+                againFor ->
+                AccountsUiState(accounts.map { it.toRow() }, demo, step(pick, signIn, againFor))
             }
             .stateIn(
                 viewModelScope,
@@ -76,7 +83,7 @@ class AccountsViewModel(
                 AccountsUiState(
                     repository.accounts.value.map { it.toRow() },
                     isDemo = false,
-                    step = step(picking.value, signInController.state.value),
+                    step = step(picking.value, signInController.state.value, again.value),
                 ),
             )
 
@@ -98,7 +105,18 @@ class AccountsViewModel(
     }
 
     fun pickProvider(provider: Provider) {
+        again.value = null
         signInController.start(provider)
+    }
+
+    /**
+     * Starts signing [accountId] in again with its provider, for example after its sign-in expired.
+     * The account keeps its id, history, name and alerts. Unknown accounts are ignored.
+     */
+    fun signInAgain(accountId: String) {
+        val account = accounts.value.firstOrNull { it.account.id == accountId } ?: return
+        again.value = account.toRow()
+        signInController.start(account.account.provider, accountId)
     }
 
     fun submitCode(code: String) = signInController.submitCode(code)
@@ -111,6 +129,7 @@ class AccountsViewModel(
     fun back() {
         if (signInController.state.value != SignInState.Idle) {
             signInController.cancel()
+            again.value = null
         } else {
             picking.value = false
         }
@@ -120,11 +139,12 @@ class AccountsViewModel(
     fun finish() {
         signInController.cancel()
         picking.value = false
+        again.value = null
     }
 
-    private fun step(picking: Boolean, signIn: SignInState): AccountsStep =
+    private fun step(picking: Boolean, signIn: SignInState, again: AccountRow?): AccountsStep =
         when {
-            signIn != SignInState.Idle -> AccountsStep.SignIn(signIn)
+            signIn != SignInState.Idle -> AccountsStep.SignIn(signIn, again)
             picking -> AccountsStep.PickProvider
             else -> AccountsStep.List
         }

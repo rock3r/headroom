@@ -14,6 +14,7 @@ import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.TestHeadroomApplication
+import dev.sebastiano.headroom.data.SignInIntents
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.accounts.SIGN_IN_KEY_FIELD_TAG
@@ -46,6 +47,16 @@ class DeepLinkTest {
         Robolectric.buildActivity(MainActivity::class.java, intent).setup().also {
             rule.waitForIdle()
         }
+
+    @Test
+    fun `a sign-in warning opens the sign-in of that account`() {
+        launch(
+            Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+                .putExtra(SignInIntents.EXTRA_ACCOUNT_ID, "demo-claude")
+        )
+        rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
+        rule.onNodeWithText("Sign in to Claude again").assertIsDisplayed()
+    }
 
     @Test
     fun `a widget tap opens that account's detail`() {

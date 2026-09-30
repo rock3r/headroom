@@ -33,10 +33,12 @@ import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.PaceChip
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaBar
+import dev.sebastiano.headroom.designsystem.stale
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.asFraction
+import dev.sebastiano.headroom.ui.components.SignInExpiredRow
 import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.quotaLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
@@ -61,6 +63,7 @@ fun AccountCard(
     selected: Boolean = false,
     sharedElements: SharedElements? = null,
     display: QuotaDisplay = QuotaDisplay.Used,
+    onSignIn: () -> Unit = {},
 ) {
     val container =
         sharedElements?.run {
@@ -85,60 +88,99 @@ fun AccountCard(
             val track =
                 if (selected) MaterialTheme.colorScheme.surfaceContainerLowest
                 else MaterialTheme.colorScheme.secondaryContainer
-            val primary = account.primary
-            val balance = account.balance
-            if (primary == null && balance != null) {
-                Text(
-                    text =
-                        stringResource(
-                            R.string.account_balance,
-                            formatBalance(balance, LocalLocale.current.platformLocale),
-                        ),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            } else if (account.allowances.isNotEmpty()) {
-                AllowanceRows(account, now, formatter, track, display)
-            } else if (primary == null) {
-                Text(
-                    text = stringResource(R.string.account_no_data),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // Stale numbers are faded; the call to action below them is not.
+            Column(
+                modifier = Modifier.stale(account.signInExpired),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CardMeters(account, now, formatter, track, display)
+            }
+            if (account.signInExpired) {
+                SignInExpiredRow(account.id, account.dataFrom, now, onSignIn)
             } else {
-                MeterRow(
-                    label = windowKindLabel(primary.kind),
-                    window = primary,
-                    wavy = account.needsAttention,
-                    trailing = primary.resetsAt?.let { formatter.short(it, now) },
-                    trackColor = track,
-                    display = display,
-                    draining = account.justReset,
-                )
-            }
-            account.session?.let { session ->
-                MeterRow(
-                    label = windowKindLabel(session.kind),
-                    window = session,
-                    wavy = false,
-                    showPace = false,
-                    trailing = session.resetsAt?.let { formatter.countdown(now, it) },
-                    trackColor = track,
-                    display = display,
-                )
-            }
-            account.pace?.let { PaceChip(it) }
-            account.error?.let {
-                Text(
-                    text = errorText(it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
+                account.error?.let {
+                    Text(
+                        text = errorText(it),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
     }
 }
 
+/** The balance or the bars, the session bar and the pace chip. */
+@Composable
+private fun CardMeters(
+    account: AccountSummary,
+    now: Instant,
+    formatter: ResetFormatter,
+    track: Color,
+    display: QuotaDisplay,
+) {
+    val primary = account.primary
+    val balance = account.balance
+    if (primary == null && balance != null) {
+        Text(
+            text =
+                stringResource(
+                    R.string.account_balance,
+                    formatBalance(balance, LocalLocale.current.platformLocale),
+                ),
+            style = MaterialTheme.typography.titleMedium,
+        )
+    } else if (account.allowances.isNotEmpty()) {
+        AllowanceRows(account, now, formatter, track, display)
+    } else if (primary == null) {
+        Text(
+            text = stringResource(R.string.account_no_data),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        MeterRow(
+            label = windowKindLabel(primary.kind),
+            window = primary,
+            wavy = account.needsAttention,
+            trailing = resetLabel(primary, now, account.signInExpired) { formatter.short(it, now) },
+            trackColor = track,
+            display = display,
+            draining = account.justReset,
+        )
+    }
+    account.session?.let { session ->
+        MeterRow(
+            label = windowKindLabel(session.kind),
+            window = session,
+            wavy = false,
+            showPace = false,
+            trailing =
+                resetLabel(session, now, account.signInExpired) { formatter.countdown(now, it) },
+            trackColor = track,
+            display = display,
+        )
+    }
+    account.pace?.let { PaceChip(it) }
+}
+
 fun accountCardTag(accountId: String): String = "account-card-$accountId"
+
+/**
+ * When [window] resets, as [format] says. A stale window whose reset time has passed says it has
+ * reset instead, because its numbers are from before that reset.
+ */
+@Composable
+private fun resetLabel(
+    window: WindowSummary,
+    now: Instant,
+    stale: Boolean,
+    format: (Instant) -> String,
+): String? {
+    val resetsAt = window.resetsAt ?: return null
+    return if (stale && !resetsAt.isAfter(now)) stringResource(R.string.stale_window_reset)
+    else format(resetsAt)
+}
 
 /** One row per allowance, named after it. Only the primary one can be wavy or drain. */
 @Composable
@@ -155,7 +197,7 @@ private fun AllowanceRows(
             label = window.label,
             window = window,
             wavy = isPrimary && account.needsAttention,
-            trailing = window.resetsAt?.let { formatter.short(it, now) },
+            trailing = resetLabel(window, now, account.signInExpired) { formatter.short(it, now) },
             trackColor = trackColor,
             display = display,
             draining = isPrimary && account.justReset,
@@ -203,7 +245,10 @@ private fun CardTop(
                 }
         }
         account.primary?.let { primary ->
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.stale(account.signInExpired),
+            ) {
                 AnimatedPercent(
                     percent = display.percent(primary.usedPercent),
                     draining = account.justReset,

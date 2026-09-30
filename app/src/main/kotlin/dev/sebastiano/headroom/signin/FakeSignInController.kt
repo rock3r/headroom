@@ -16,7 +16,7 @@ class FakeSignInController(initial: SignInState = SignInState.Idle) : SignInCont
 
     private var provider: Provider? = null
 
-    override fun start(provider: Provider) {
+    override fun start(provider: Provider, accountId: String?) {
         this.provider = provider
         mutableState.value = firstStep(provider)
     }

@@ -121,7 +121,7 @@ fun AccountsScreen(
             when (current) {
                 AccountsStep.List -> AccountList(state, actions)
                 AccountsStep.PickProvider -> ProviderPicker(actions)
-                is AccountsStep.SignIn -> SignInFlow(current.state, actions)
+                is AccountsStep.SignIn -> SignInFlow(current.state, actions, current.again)
             }
         }
     }

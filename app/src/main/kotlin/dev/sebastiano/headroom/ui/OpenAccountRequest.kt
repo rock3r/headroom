@@ -4,9 +4,15 @@ import androidx.compose.runtime.Immutable
 
 /**
  * A request to open one account's detail, for example from a widget tap. [serial] makes two taps on
- * the same account two requests.
+ * the same account two requests. With [signInAgain], it asks to start signing the account in again
+ * instead, for example from a sign-in warning.
  */
-@Immutable data class OpenAccountRequest(val accountId: String, val serial: Long)
+@Immutable
+data class OpenAccountRequest(
+    val accountId: String,
+    val serial: Long,
+    val signInAgain: Boolean = false,
+)
 
 /** What to do with an [OpenAccountRequest] given the accounts on screen. */
 enum class OpenAccountDecision {

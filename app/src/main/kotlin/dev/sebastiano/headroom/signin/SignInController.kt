@@ -14,8 +14,12 @@ import kotlinx.coroutines.flow.StateFlow
 interface SignInController {
     val state: StateFlow<SignInState>
 
-    /** Starts signing in to [provider]. The state moves to the provider's first step. */
-    fun start(provider: Provider)
+    /**
+     * Starts signing in to [provider]. The state moves to the provider's first step. With an
+     * [accountId], the sign-in is for that existing account, for example after its sign-in expired:
+     * it keeps its id, history, name and alerts instead of becoming a new account.
+     */
+    fun start(provider: Provider, accountId: String? = null)
 
     /** The code the user pasted from the browser, for when the automatic return did not work. */
     fun submitCode(code: String)
@@ -71,5 +75,7 @@ enum class SignInError {
     /** The code or the browser session timed out. */
     Expired,
     Network,
+    /** Signing an account in again, the user signed in to another account of the provider. */
+    DifferentAccount,
     Unknown,
 }

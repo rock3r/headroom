@@ -66,7 +66,20 @@ data class AccountSummary(
      * for the others. The card lists these in place of the primary window.
      */
     val allowances: List<WindowSummary> = emptyList(),
-)
+    /**
+     * The sign-in expired: the numbers are stale until the user signs in again. The screens fade
+     * them, never draw them wavy, and ask the user to sign in.
+     */
+    val signInExpired: Boolean = false,
+    /** When the numbers were fetched, or null before the first good sync. */
+    val dataFrom: Instant? = null,
+) {
+    /**
+     * The instant the numbers describe: now for fresh data, the last good sync for stale data. Pace
+     * and projections are worked out at this instant, so they match the numbers next to them.
+     */
+    fun asOf(now: Instant): Instant = if (signInExpired) dataFrom ?: now else now
+}
 
 @Immutable
 data class WindowSummary(

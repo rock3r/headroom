@@ -112,6 +112,7 @@ internal fun HomeScaffold(
     settingsReveal: PageReveal? = null,
     playEntrance: Boolean = false,
     onEntranceStart: () -> Unit = {},
+    onSignInAgain: (accountId: String) -> Unit = {},
 ) {
     val width = layoutWidth()
     var tab by rememberSaveable { mutableStateOf(HomeTab.Overview) }
@@ -184,6 +185,7 @@ internal fun HomeScaffold(
                             playEntrance = playEntrance,
                             onEntranceStart = onEntranceStart,
                             opener = opener,
+                            onSignInAgain = onSignInAgain,
                         )
                     HomeTab.Resets ->
                         ResetsScreen(
@@ -277,6 +279,7 @@ private fun OverviewPanes(
     playEntrance: Boolean,
     onEntranceStart: () -> Unit,
     opener: AccountOpener,
+    onSignInAgain: (accountId: String) -> Unit,
 ) {
     OpenDetailEffect(navigator, opener, onSelectAccount)
     val scope = rememberCoroutineScope()
@@ -333,6 +336,7 @@ private fun OverviewPanes(
                         sharedElements = shared,
                         playEntrance = playEntrance,
                         onEntranceStart = onEntranceStart,
+                        onSignInAgain = onSignInAgain,
                     )
                 }
             },
@@ -347,7 +351,13 @@ private fun OverviewPanes(
                 ) {
                     val current = detail ?: return@AnimatedPane
                     if (twoPanes) {
-                        DetailPane(current, formatter, onAlertChange, onChartWindowChange)
+                        DetailPane(
+                            current,
+                            formatter,
+                            onAlertChange,
+                            onChartWindowChange,
+                            onSignInAgain,
+                        )
                     } else {
                         val shared = rememberSharedElements(transitionScope, this, animate)
                         DetailScreen(
@@ -357,6 +367,7 @@ private fun OverviewPanes(
                             onChartWindowChange = onChartWindowChange,
                             onBack = { scope.launch { navigator.navigateBack() } },
                             sharedElements = shared,
+                            onSignInAgain = onSignInAgain,
                             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
                         )
                     }
@@ -469,6 +480,7 @@ private fun DetailPane(
     formatter: ResetFormatter,
     onAlertChange: (String, String, Boolean) -> Unit,
     onChartWindowChange: (String) -> Unit,
+    onSignInAgain: (accountId: String) -> Unit,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
@@ -495,6 +507,7 @@ private fun DetailPane(
             formatter = formatter,
             onAlertChange = onAlertChange,
             onChartWindowChange = onChartWindowChange,
+            onSignInAgain = onSignInAgain,
         )
     }
 }

@@ -178,7 +178,13 @@ class AppGraph(
                                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             )
                         }
-                    RealSignInController(steps, scope) { tokens ->
+                    RealSignInController(
+                        steps,
+                        scope,
+                        completeAgain = { accountId, tokens ->
+                            data.signInManager.reauthenticate(accountId, tokens)
+                        },
+                    ) { tokens ->
                         data.signInManager.complete(tokens)
                     }
                 }

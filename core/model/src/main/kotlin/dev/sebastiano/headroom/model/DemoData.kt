@@ -99,6 +99,15 @@ public object DemoData {
                 ),
             )
 
+    /**
+     * [accounts], with Claude's sign-in expired: its numbers are from its last good sync, two hours
+     * before [now]. For previews and pictures of the expired state.
+     */
+    public fun accountsWithExpiredSignIn(now: Instant): List<AccountState> {
+        val stale = accounts(now.minus(Duration.ofHours(2))).first()
+        return listOf(stale.copy(lastError = QuotaErrorKind.Auth)) + accounts(now).drop(1)
+    }
+
     private fun state(account: Account, plan: String, now: Instant, vararg windows: QuotaWindow) =
         AccountState(
             account,

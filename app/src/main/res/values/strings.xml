@@ -78,6 +78,21 @@
     <string name="account_error_parse">The provider changed its format. Showing the last numbers.</string>
     <string name="account_error_unknown">Could not update. Showing the last numbers.</string>
     <string name="account_no_data">No usage data yet.</string>
+    <!-- The compact call to action on an overview card whose sign-in expired. -->
+    <string name="stale_card_title">Sign-in expired</string>
+    <string name="stale_card_action">Sign in</string>
+    <!-- When a stale account's numbers are from, such as "Last updated 2 hours ago". -->
+    <string name="stale_last_updated">Last updated %1$s</string>
+    <string name="stale_never_updated">Not updated yet</string>
+    <!-- What a screen reader says about a stale account, such as "Sign-in expired, data from 2 hours ago". -->
+    <string name="stale_description">Sign-in expired, data from %1$s</string>
+    <string name="stale_description_no_data">Sign-in expired, no data yet</string>
+    <string name="stale_banner_title">Your %1$s sign-in expired</string>
+    <string name="stale_banner_body">Headroom can\'t update this account until you sign in again. The numbers below are the last it saw.</string>
+    <string name="stale_banner_action">Sign in again</string>
+    <!-- A stale window whose reset time has passed: its numbers are from before the reset. -->
+    <string name="stale_window_reset">Has reset</string>
+    <string name="stale_window_reset_long">Has reset since the last update</string>
     <string name="detail_plan_label">%1$s · %2$s</string>
     <string name="detail_balance">Balance</string>
     <!-- An amount used out of a window's limit, then its unit, such as "12 / 200 credits used". -->
@@ -337,6 +352,9 @@
     <string name="accounts_move_to_top">Move to top</string>
     <string name="accounts_moved">%1$s moved to position %2$d of %3$d</string>
     <string name="signin_title">Sign in to %1$s</string>
+    <string name="signin_title_again">Sign in to %1$s again</string>
+    <string name="signin_again_body">Sign in as %1$s. Headroom keeps this account\'s history, name and alerts.</string>
+    <string name="signin_error_different_account">You signed in to a different account. Sign in as %1$s to update this one.</string>
     <string name="signin_cancel">Cancel sign-in</string>
     <string name="signin_browser_body">Finish signing in on the page that opens in your browser. Headroom picks up the result by itself.</string>
     <string name="signin_browser_open">Open the sign-in page</string>

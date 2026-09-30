@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
@@ -47,6 +48,7 @@ import dev.sebastiano.headroom.designsystem.PaceChart
 import dev.sebastiano.headroom.designsystem.PaceChartModel
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
+import dev.sebastiano.headroom.designsystem.stale
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.WindowKind
@@ -55,11 +57,13 @@ import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.asFraction
 import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.SectionLabel
+import dev.sebastiano.headroom.ui.components.SignInExpiredBanner
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.components.UnknownQuotaInfo
 import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.percentDescription
 import dev.sebastiano.headroom.ui.components.quotaLabel
+import dev.sebastiano.headroom.ui.components.staleDescription
 import dev.sebastiano.headroom.ui.components.windowKindLabel
 import dev.sebastiano.headroom.ui.formatAmount
 import dev.sebastiano.headroom.ui.formatBalance
@@ -95,6 +99,7 @@ fun DetailScreen(
     onBack: (() -> Unit)? = null,
     sharedElements: SharedElements? = null,
     onChartWindowChange: (windowId: String) -> Unit = {},
+    onSignInAgain: (accountId: String) -> Unit = {},
 ) {
     val account = state.account
     val container =
@@ -125,26 +130,56 @@ fun DetailScreen(
             ) {
                 val content = Modifier.widthIn(max = 600.dp).fillMaxWidth()
                 DetailTopBar(account, onBack, sharedElements, content)
-                account.primary?.let { HeroRing(account, it, state.display, sharedElements) }
-                account.error?.let {
-                    Text(
-                        text = errorText(it),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
+                val stale = account.signInExpired
+                if (stale) {
+                    SignInExpiredBanner(
+                        provider = account.provider,
+                        dataFrom = account.dataFrom,
+                        now = state.now,
+                        onSignIn = { onSignInAgain(account.id) },
                         modifier = content,
                     )
                 }
-                WindowList(account, state.now, formatter, state.display, content)
+                // The ring, the windows and the chart are stale data: faded, and said so.
+                val staleText = if (stale) staleDescription(account.dataFrom, state.now) else null
+                account.primary?.let {
+                    HeroRing(
+                        account,
+                        it,
+                        state.display,
+                        sharedElements,
+                        Modifier.stale(stale).semantics {
+                            staleText?.let { text -> stateDescription = text }
+                        },
+                    )
+                }
+                if (!stale) {
+                    account.error?.let {
+                        Text(
+                            text = errorText(it),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = content,
+                        )
+                    }
+                }
+                WindowList(
+                    account,
+                    state.now,
+                    formatter,
+                    state.display,
+                    content.stale(stale),
+                )
                 state.chart?.let {
                     ChartCard(
                         chart = it,
-                        now = state.now,
+                        now = account.asOf(state.now),
                         formatter = formatter,
                         windows = state.chartWindows,
                         selectedWindowId = state.chartWindowId,
                         onWindowChange = onChartWindowChange,
                         display = state.display,
-                        modifier = content,
+                        modifier = content.stale(stale),
                     )
                 }
                 AlertSection(account, formatter, onAlertChange, content)
@@ -295,6 +330,8 @@ private fun WindowList(
                                 expiresAt?.let {
                                     stringResource(R.string.detail_expires_at, formatter.date(it))
                                 }
+                            resetsAt != null && account.signInExpired && !resetsAt.isAfter(now) ->
+                                stringResource(R.string.stale_window_reset_long)
                             resetsAt != null -> resetLine(window, resetsAt, now, formatter)
                             else -> null
                         }

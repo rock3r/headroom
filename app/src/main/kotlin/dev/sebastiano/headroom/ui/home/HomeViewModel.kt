@@ -192,7 +192,7 @@ class HomeViewModel(
                         DetailUiState(
                             now = now,
                             account = account,
-                            chart = chartSummary(window, points, now),
+                            chart = chartSummary(window, points, account.asOf(now)),
                             chartWindows = chartWindows,
                             chartWindowId = window.id,
                             display = display,

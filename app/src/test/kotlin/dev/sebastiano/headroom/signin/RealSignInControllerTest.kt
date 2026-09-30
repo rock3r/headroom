@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.signin
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.data.account.DifferentAccountException
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import java.io.IOException
@@ -318,5 +319,52 @@ class RealSignInControllerTest {
             testScheduler.advanceUntilIdle()
             controller.submitCode("code#state")
             assertEquals(listOf("code#state"), steps.browsers.last().pasted)
+        }
+
+    @Test
+    fun `signing an account in again stores the tokens for that account, also after a retry`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val steps = FakeSteps()
+            val again = mutableListOf<String>()
+            val controller =
+                RealSignInController(
+                    steps,
+                    backgroundScope,
+                    complete = { error("a new account must not be added") },
+                    completeAgain = { accountId, tokens ->
+                        again += accountId
+                        Account(accountId, tokens.provider, "sam@example.com")
+                    },
+                )
+            controller.start(Provider.Claude, accountId = "claude-1")
+            steps.browser!!.result.completeExceptionally(AuthException.Network("offline"))
+            controller.retry()
+            steps.browser!!.result.complete(tokens(Provider.Claude))
+
+            assertEquals(listOf("claude-1"), again)
+            assertEquals(
+                SignInState.Success(Provider.Claude, "sam@example.com"),
+                controller.state.value,
+            )
+        }
+
+    @Test
+    fun `a sign-in as another account than the one to sign in again fails and says so`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val steps = FakeSteps()
+            val controller =
+                RealSignInController(
+                    steps,
+                    backgroundScope,
+                    complete = { error("a new account must not be added") },
+                    completeAgain = { accountId, _ -> throw DifferentAccountException(accountId) },
+                )
+            controller.start(Provider.Claude, accountId = "claude-1")
+            steps.browser!!.result.complete(tokens(Provider.Claude))
+
+            assertEquals(
+                SignInState.Failed(Provider.Claude, SignInError.DifferentAccount),
+                controller.state.value,
+            )
         }
 }
