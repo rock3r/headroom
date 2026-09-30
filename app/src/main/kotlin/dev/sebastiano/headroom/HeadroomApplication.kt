@@ -155,6 +155,27 @@ open class HeadroomApplication :
         }
     }
 
+    /**
+     * Previews an expired sign-in with the demo accounts. Only the debug build's
+     * `DemoSignInExpiredReceiver` calls it. Claude's sign-in expires, its warning is posted, and
+     * the widgets redraw. With [clear], the demo accounts and the widgets go back to normal and the
+     * warning goes away.
+     */
+    internal fun previewExpiredSignIn(clear: Boolean) {
+        val now = Instant.now()
+        val accounts =
+            if (clear) DemoData.accounts(now) else DemoData.accountsWithExpiredSignIn(now)
+        graph.demoAccounts?.set(accounts)
+        val claude = accounts.first()
+        val notifier = dataGraph.signInNotifier
+        if (clear) {
+            notifier.cancel(claude.account.id)
+        } else {
+            notifier.notifyExpired(claude, showAccountName = false)
+        }
+        appScope.launch { widgetUpdater.updateAll(this@HeadroomApplication, accounts, now) }
+    }
+
     private suspend fun updateWidgets(accounts: List<AccountState>, look: WidgetLook) {
         widgetUpdater.updateAll(this, accounts, Instant.now(), look.display, look.palette)
     }

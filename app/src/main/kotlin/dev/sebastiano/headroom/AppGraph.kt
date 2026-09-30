@@ -91,6 +91,8 @@ class AppGraph(
     val statsDispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** The reset island: its accessibility service's state, and the Try button. */
     val resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
+    /** The demo accounts, so debug tools can show a scenario such as an expired sign-in. */
+    val demoAccounts: FakeQuotaRepository? = null,
 ) {
     val homeViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
@@ -158,10 +160,11 @@ class AppGraph(
         ): AppGraph {
             val realAccounts: QuotaRepository =
                 data?.repository ?: FakeQuotaRepository(clock, initial = emptyList())
+            val demoAccounts = FakeQuotaRepository(clock)
             val repository =
                 DemoModeQuotaRepository(
                     real = realAccounts,
-                    demo = FakeQuotaRepository(clock),
+                    demo = demoAccounts,
                     scope = scope,
                     simulatedLatency = demoLatency,
                 )
@@ -222,6 +225,7 @@ class AppGraph(
                         demo = DemoUsageHistory(DemoResetHistory, clock, zone),
                     ),
                 resetIsland = resetIsland,
+                demoAccounts = demoAccounts,
             )
         }
 

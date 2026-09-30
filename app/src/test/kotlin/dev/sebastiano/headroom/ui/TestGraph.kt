@@ -97,6 +97,7 @@ fun testGraph(
             ),
         statsDispatcher = statsDispatcher,
         resetIsland = resetIsland,
+        demoAccounts = demo,
     )
 }
 

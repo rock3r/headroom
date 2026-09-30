@@ -74,6 +74,25 @@ next reset, the widgets never show them.
   `scope.model` or `scope.surface`. Rows are classified by `kind`, never by label. A row is left
   out when a flat `seven_day_<name>` key reports the same model, so nothing shows twice.
 
+## Expired sign-in (prototype)
+
+An account whose last sync failed with `QuotaErrorKind.Auth` has an expired sign-in
+(`AccountState.isSignInExpired`). Its snapshot is kept, but it is stale.
+
+- The app and the widgets draw its numbers faded and pulled towards grey (`Modifier.stale` and
+  `StaleStyle` in `:core:designsystem`). They are never wavy, and pace is worked out at the time
+  of the last good sync.
+- It never leads the next reset, gets no reset alarms, and its resets are not listed as upcoming.
+- `SignInAlertingRepository` in `:core:data` runs `SignInAlertPolicy` after every refresh. The
+  first time an account expires, it posts a warning on the "Sign-in problems" channel. A good sync
+  or removing the account cancels it. A network error changes nothing.
+- The warning, the card's "Sign in" button and the detail's banner start the provider's normal
+  sign-in for that account. `SignInManager.reauthenticate` stores the new tokens under the same
+  account id, so the history, name and alert switches stay.
+- Debug builds preview it with demo data:
+  `adb shell am broadcast -n dev.sebastiano.headroom/.DemoSignInExpiredReceiver`
+  (add `--ez clear true` to undo).
+
 ## Demo mode
 
 `FakeQuotaRepository` in `:core:model` serves the demo accounts. The app uses it when no
