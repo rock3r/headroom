@@ -62,6 +62,9 @@ internal sealed class JetBrainsQuotaSource(
     /** The ids this source carries; they must never reach the log. */
     abstract val ids: List<String>
 
+    /** Opaque identity a later chat caller uses. Never logged. */
+    abstract val chatBinding: String
+
     class License(val licenseId: String, code: String?) :
         JetBrainsQuotaSource(
             windowId = "jb:license:${shortHash(licenseId)}",
@@ -71,6 +74,7 @@ internal sealed class JetBrainsQuotaSource(
                     .joinToString(" "),
         ) {
         override val ids: List<String> = listOf(licenseId)
+        override val chatBinding: String = "license:$licenseId"
     }
 
     class Workspace(val workspaceId: String, val orgId: String?, name: String) :
@@ -80,6 +84,7 @@ internal sealed class JetBrainsQuotaSource(
             logName = WORKSPACE_TYPE,
         ) {
         override val ids: List<String> = listOfNotNull(workspaceId, orgId)
+        override val chatBinding: String = "workspace:$workspaceId:${orgId.orEmpty()}"
     }
 }
 

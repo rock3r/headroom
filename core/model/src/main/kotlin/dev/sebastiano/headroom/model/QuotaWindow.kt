@@ -32,6 +32,11 @@ public data class QuotaWindow(
      * explanation, but it is [isInformational].
      */
     val isRecognised: Boolean = true,
+    /**
+     * Opaque identity a later chat caller needs to bill this window. JetBrains license and seat
+     * windows set it; other providers leave it null. It is not a token and must not be logged.
+     */
+    val binding: String? = null,
 ) {
     val remainingPercent: Double
         get() = (MAX_PERCENT - usedPercent).coerceIn(0.0, MAX_PERCENT)
