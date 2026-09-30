@@ -56,16 +56,19 @@
     <string name="window_daily">Daily</string>
     <string name="window_session">Session</string>
     <string name="window_other">Limit</string>
+    <string name="window_credit">Credit</string>
     <string name="used_weekly">weekly used</string>
     <string name="used_monthly">monthly used</string>
     <string name="used_daily">daily used</string>
     <string name="used_session">session used</string>
     <string name="used_other">used</string>
+    <string name="used_credit">credit used</string>
     <string name="left_weekly">weekly left</string>
     <string name="left_monthly">monthly left</string>
     <string name="left_daily">daily left</string>
     <string name="left_session">session left</string>
     <string name="left_other">left</string>
+    <string name="left_credit">credit left</string>
     <string name="percent_used">%1$d%% used</string>
     <string name="percent_left">%1$d%% left</string>
     <string name="account_error_auth">Sign-in expired. Sign in again to update.</string>
@@ -85,6 +88,15 @@
     <string name="detail_resets_in">Resets in %1$s</string>
     <string name="detail_resets_in_no_alert">Resets in %1$s · no alert</string>
     <string name="detail_resets_at">Resets %1$s</string>
+    <!-- When a one-time credit expires, such as "Expires 5 Nov 2026". -->
+    <string name="detail_expires_at">Expires %1$s</string>
+    <!-- Money spent out of a credit, such as "$102 of $250 used". -->
+    <string name="detail_credit_used">%1$s of %2$s used</string>
+    <!-- Money left out of a credit, such as "$148 left of $250". -->
+    <string name="detail_credit_left">%1$s left of %2$s</string>
+    <!-- The content description of the info button next to a quota Headroom does not know. -->
+    <string name="detail_unknown_quota_info">About this quota</string>
+    <string name="detail_unknown_quota_explanation">This is a new quota we don\'t recognise yet. Headroom shows it for your information, but doesn\'t know what it\'s for.</string>
     <string name="detail_chart_week">This week</string>
     <string name="detail_chart_month">This month</string>
     <string name="detail_chart_window">This window</string>

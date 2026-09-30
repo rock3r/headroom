@@ -21,12 +21,16 @@ class ResetFormatter(private val zone: ZoneId, locale: Locale, is24Hour: Boolean
     private val dayMonth = DateTimeFormatter.ofPattern("d MMM", locale).withZone(zone)
     private val full = DateTimeFormatter.ofPattern("EEE d MMM, $time", locale).withZone(zone)
     private val weekdayDate = DateTimeFormatter.ofPattern("EEE d MMM", locale)
+    private val dayMonthYear = DateTimeFormatter.ofPattern("d MMM yyyy", locale).withZone(zone)
     private val timeOfDay = DateTimeFormatter.ofPattern(time, locale)
 
     fun short(at: Instant, now: Instant): String =
         if (Duration.between(now, at) > NEAR) dayMonth.format(at) else weekdayTime.format(at)
 
     fun long(at: Instant): String = full.format(at)
+
+    /** A date with its year, for an expiry that can be months away: "5 Nov 2026". */
+    fun date(at: Instant): String = dayMonthYear.format(at)
 
     fun countdown(now: Instant, at: Instant): String = Countdown.format(Duration.between(now, at))
 

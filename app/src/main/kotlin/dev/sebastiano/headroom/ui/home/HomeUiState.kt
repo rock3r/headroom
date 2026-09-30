@@ -86,6 +86,10 @@ data class WindowSummary(
     val amountUnit: String? = null,
     /** Used percent at each past reset of this window, oldest first. */
     val pastResets: List<Double> = emptyList(),
+    /** When a [WindowKind.Credit] expires. Credits have no [resetsAt]. */
+    val expiresAt: Instant? = null,
+    /** False for a quota Headroom does not know. The detail explains it next to the label. */
+    val isRecognised: Boolean = true,
 )
 
 @Immutable

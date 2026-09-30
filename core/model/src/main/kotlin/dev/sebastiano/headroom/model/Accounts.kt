@@ -25,10 +25,14 @@ public data class AccountState(
     val lastError: QuotaErrorKind? = null,
     val isRefreshing: Boolean = false,
 ) {
-    /** The weekly window if there is one, otherwise the longest window. The UI leads with it. */
+    /**
+     * The weekly window if there is one, otherwise the longest window. The UI leads with it. Never
+     * a credit or an unknown window ([QuotaWindow.isInformational]).
+     */
     val primaryWindow: QuotaWindow?
         get() {
-            val windows = snapshot?.windows.orEmpty().filterNot { it.isUnlimited }
+            val windows =
+                snapshot?.windows.orEmpty().filterNot { it.isUnlimited || it.isInformational }
             return windows.firstOrNull { it.kind == WindowKind.Weekly }
                 ?: windows.firstOrNull { it.kind == WindowKind.Monthly }
                 ?: windows.maxByOrNull { it.length?.toMillis() ?: 0L }
@@ -36,7 +40,8 @@ public data class AccountState(
 
     /** The session (5-hour and similar) window, when the provider has one. */
     val sessionWindow: QuotaWindow?
-        get() = snapshot?.windows?.firstOrNull { it.kind == WindowKind.Session }
+        get() =
+            snapshot?.windows?.firstOrNull { it.kind == WindowKind.Session && !it.isInformational }
 }
 
 /** One point of a window's usage history, for the pace chart. */

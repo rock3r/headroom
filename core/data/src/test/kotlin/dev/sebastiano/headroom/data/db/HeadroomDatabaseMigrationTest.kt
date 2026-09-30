@@ -106,12 +106,46 @@ class HeadroomDatabaseMigrationTest {
             }
         }
 
+    @Test
+    fun `windows saved before credits and unknown windows existed are recognised, with no expiry`() =
+        runTest {
+            file.parentFile?.mkdirs()
+            SQLiteDatabase.openOrCreateDatabase(file, null).use { v4 ->
+                VERSION_1_SCHEMA.forEach(v4::execSQL)
+                v4.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+                v4.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+                v4.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+                v4.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+                v4.execSQL("ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+                v4.execSQL(
+                    "INSERT INTO accounts (id, provider, label) VALUES ('a1', 'claude', 'a1')"
+                )
+                v4.execSQL(
+                    "INSERT INTO windows (accountId, windowId, position, label, kind, " +
+                        "usedPercent, isUnlimited) " +
+                        "VALUES ('a1', 'seven_day', 0, 'Weekly', 'Weekly', 71.0, 0)"
+                )
+                v4.version = 4
+            }
+
+            val db = openCurrent()
+            try {
+                val window = db.quotaDao().observeAccounts().first().single().windows.single()
+                assertEquals("seven_day", window.windowId)
+                assertNull(window.expiresAtEpochMs)
+                assertEquals(true, window.isRecognised)
+            } finally {
+                db.close()
+            }
+        }
+
     private fun openCurrent(): HeadroomDatabase =
         Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
             .addMigrations(
                 HeadroomDatabase.MIGRATION_1_2,
                 HeadroomDatabase.MIGRATION_2_3,
                 HeadroomDatabase.MIGRATION_3_4,
+                HeadroomDatabase.MIGRATION_4_5,
             )
             .allowMainThreadQueries()
             .build()

@@ -126,6 +126,8 @@ private fun QuotaWindow.toSummary(
         limitAmount = limitAmount,
         amountUnit = amountUnit,
         pastResets = pastResets,
+        expiresAt = expiresAt,
+        isRecognised = isRecognised,
     )
 
 private fun AlertSwitches.isOn(accountId: String, window: QuotaWindow) =

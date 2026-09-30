@@ -7,8 +7,10 @@ import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -106,7 +108,170 @@ class ClaudeQuotaFetcherTest {
         val unknown = snapshot.windows.last()
         assertNull(unknown.length)
         assertNull(unknown.resetsAt)
+        assertFalse(unknown.isRecognised)
+        assertTrue(snapshot.windows.dropLast(1).all { it.isRecognised })
     }
+
+    @Test
+    fun `maps the cloud session credit to a credit that expires, with its dollars`() = runTest {
+        server.enqueueJson(fixture("claude/usage_credits.json"))
+        server.enqueueJson("{}")
+
+        val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+        val credit = snapshot.windows.single { it.id == "iguana_necktie" }
+        assertEquals("Cloud session credit", credit.label)
+        assertEquals(WindowKind.Credit, credit.kind)
+        assertEquals(40.8, credit.usedPercent)
+        assertNull(credit.resetsAt)
+        assertEquals(Instant.parse("2026-11-05T07:59:00Z"), credit.expiresAt)
+        assertNull(credit.length)
+        assertEquals(102.0, credit.usedAmount)
+        assertEquals(250.0, credit.limitAmount)
+        assertEquals("USD", credit.amountUnit)
+        assertTrue(credit.isRecognised)
+    }
+
+    @Test
+    fun `maps a credit without dollars to its percentage`() = runTest {
+        server.enqueueJson(fixture("claude/usage_credits.json"))
+        server.enqueueJson("{}")
+
+        val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+        val credit = snapshot.windows.single { it.id == "cinder_cove" }
+        assertEquals("Claude Code and Cowork credit", credit.label)
+        assertEquals(WindowKind.Credit, credit.kind)
+        assertEquals(15.0, credit.usedPercent)
+        assertNull(credit.resetsAt)
+        assertEquals(Instant.parse("2026-12-01T08:00:00Z"), credit.expiresAt)
+        assertNull(credit.usedAmount)
+        assertNull(credit.limitAmount)
+        assertNull(credit.amountUnit)
+        assertTrue(credit.isRecognised)
+    }
+
+    @Test
+    fun `works out a credit's percentage from its dollars when utilization is missing`() = runTest {
+        server.enqueueJson(
+            """{"iguana_necktie":{"utilization":null,"resets_at":null,""" +
+                """"limit_dollars":100,"used_dollars":25}}"""
+        )
+        server.enqueueJson("{}")
+
+        val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+        val credit = snapshot.windows.single()
+        assertEquals(25.0, credit.usedPercent)
+        assertNull(credit.expiresAt)
+    }
+
+    @Test
+    fun `keeps an unknown key without dollars as an unrecognised window`() = runTest {
+        server.enqueueJson(fixture("claude/usage_credits.json"))
+        server.enqueueJson("{}")
+
+        val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+        val unknown = snapshot.windows.single { it.id == "nimbus_quill" }
+        assertEquals("Nimbus quill", unknown.label)
+        assertEquals(WindowKind.Other, unknown.kind)
+        assertEquals(0.0, unknown.usedPercent)
+        assertNull(unknown.resetsAt)
+        assertNull(unknown.expiresAt)
+        assertNull(unknown.usedAmount)
+        assertFalse(unknown.isRecognised)
+    }
+
+    @Test
+    fun `maps an unknown key with a dollar limit to a generic credit`() = runTest {
+        server.enqueueJson(fixture("claude/usage_credits.json"))
+        server.enqueueJson("{}")
+
+        val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+        val credit = snapshot.windows.single { it.id == "harbor_lantern" }
+        assertEquals("Credit · Harbor lantern", credit.label)
+        assertEquals(WindowKind.Credit, credit.kind)
+        assertEquals(20.0, credit.usedPercent)
+        assertNull(credit.resetsAt)
+        assertEquals(Instant.parse("2027-01-15T00:00:00Z"), credit.expiresAt)
+        assertEquals(10.0, credit.usedAmount)
+        assertEquals(50.0, credit.limitAmount)
+        assertEquals("USD", credit.amountUnit)
+        assertFalse(credit.isRecognised)
+    }
+
+    @Test
+    fun `keeps the credits and unknown keys in the order the response lists them`() = runTest {
+        server.enqueueJson(fixture("claude/usage_credits.json"))
+        server.enqueueJson("{}")
+
+        val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+        assertEquals(
+            listOf(
+                "five_hour",
+                "seven_day",
+                "iguana_necktie",
+                "cinder_cove",
+                "nimbus_quill",
+                "harbor_lantern",
+            ),
+            snapshot.windows.map { it.id },
+        )
+    }
+
+    @Test
+    fun `takes every scoped weekly limit by its kind, after the all-models weekly window`() =
+        runTest {
+            server.enqueueJson(fixture("claude/usage_limits_scoped.json"))
+            server.enqueueJson("{}")
+
+            val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+            assertEquals(
+                listOf(
+                    "five_hour",
+                    "seven_day",
+                    "weekly_scoped_fable",
+                    "weekly_scoped_haiku",
+                    "weekly_scoped_claude_code",
+                    "seven_day_opus",
+                ),
+                snapshot.windows.map { it.id },
+            )
+            assertEquals(
+                listOf(
+                    "Session",
+                    "Weekly · all models",
+                    "Weekly · Fable",
+                    "Weekly · Haiku",
+                    "Weekly · Claude Code",
+                    "Weekly (Opus)",
+                ),
+                snapshot.windows.map { it.label },
+            )
+            val haiku = snapshot.windows.single { it.id == "weekly_scoped_haiku" }
+            assertEquals(WindowKind.Weekly, haiku.kind)
+            assertEquals(9.0, haiku.usedPercent)
+            assertEquals(Duration.ofDays(7), haiku.length)
+            assertEquals(Instant.parse("2026-10-07T10:00:00Z"), haiku.resetsAt)
+            assertTrue(haiku.isRecognised)
+        }
+
+    @Test
+    fun `a scoped limit never shows twice when a flat weekly key covers the same model`() =
+        runTest {
+            server.enqueueJson(fixture("claude/usage_limits_scoped.json"))
+            server.enqueueJson("{}")
+
+            val snapshot = assertIs<QuotaResult.Success>(fetcher.fetch(credentials())).snapshot
+
+            val opus = snapshot.windows.filter { it.label.contains("Opus") }
+            assertEquals(listOf("seven_day_opus"), opus.map { it.id })
+            assertEquals(1, snapshot.windows.count { it.label.contains("Haiku") })
+        }
 
     @Test
     fun `takes the plan label from the profile`() = runTest {

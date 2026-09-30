@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.data.reset
 
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
@@ -38,6 +39,31 @@ class ResetAlarmPlannerTest {
         assertEquals(false, alarms.any { it.windowId == "five_hour" || it.windowId == "primary" })
         // Monthly Copilot is allowed once the user enables it.
         assertEquals(true, alarms.any { it.accountId == "demo-copilot" })
+    }
+
+    @Test
+    fun `credits and unknown windows never get an alarm even when enabled`() {
+        val claude = accounts.first { it.account.id == "demo-claude" }
+        val weekly = claude.snapshot!!.windows.first { it.id == "seven_day" }
+        val credit =
+            weekly.copy(
+                id = "iguana_necktie",
+                kind = WindowKind.Credit,
+                resetsAt = null,
+                expiresAt = now.plus(Duration.ofDays(30)),
+            )
+        val unknown = weekly.copy(id = "nimbus_quill", isRecognised = false)
+        val withExtras =
+            claude.copy(
+                snapshot =
+                    claude.snapshot!!.copy(windows = claude.snapshot!!.windows + credit + unknown)
+            )
+
+        val alarms = ResetAlarmPlanner.plan(listOf(withExtras), now) { _, _ -> true }
+
+        assertEquals(false, alarms.any { it.windowId == "iguana_necktie" })
+        assertEquals(false, alarms.any { it.windowId == "nimbus_quill" })
+        assertEquals(true, alarms.any { it.windowId == "seven_day" })
     }
 
     @Test

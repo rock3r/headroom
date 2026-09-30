@@ -20,11 +20,29 @@ public data class QuotaWindow(
     val usedAmount: Double? = null,
     /** The window's limit, in [amountUnit], for providers that report amounts. */
     val limitAmount: Double? = null,
-    /** The unit of [usedAmount] and [limitAmount], for example `credits`. */
+    /** The unit of [usedAmount] and [limitAmount], for example `credits` or `USD`. */
     val amountUnit: String? = null,
+    /**
+     * When a [WindowKind.Credit] expires. A credit does not reset, so its [resetsAt] is null and
+     * this holds the date the provider reports instead.
+     */
+    val expiresAt: Instant? = null,
+    /**
+     * False when the provider sent a window the app does not know. The app shows it, with an
+     * explanation, but it is [isInformational].
+     */
+    val isRecognised: Boolean = true,
 ) {
     val remainingPercent: Double
         get() = (MAX_PERCENT - usedPercent).coerceIn(0.0, MAX_PERCENT)
+
+    /**
+     * True for credits and for windows the app does not recognise. The app shows them for
+     * information only: they never alert, never count as the next reset, never drive the pace and
+     * are never an account's primary window.
+     */
+    val isInformational: Boolean
+        get() = kind == WindowKind.Credit || !isRecognised
 }
 
 internal const val MAX_PERCENT = 100.0
@@ -35,7 +53,12 @@ public enum class WindowKind {
     Daily,
     Weekly,
     Monthly,
-    Other;
+    Other,
+    /**
+     * A one-time amount, such as a promotional credit. It expires on [QuotaWindow.expiresAt] and
+     * never resets. [fromLength] never returns it.
+     */
+    Credit;
 
     public companion object {
         private val SESSION_MAX = Duration.ofHours(12)

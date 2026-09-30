@@ -120,6 +120,7 @@ fun windowKindLabel(kind: WindowKind): String =
             WindowKind.Daily -> R.string.window_daily
             WindowKind.Session -> R.string.window_session
             WindowKind.Other -> R.string.window_other
+            WindowKind.Credit -> R.string.window_credit
         }
     )
 
@@ -136,6 +137,7 @@ fun quotaLabel(kind: WindowKind, display: QuotaDisplay): String =
                     WindowKind.Daily -> R.string.used_daily
                     WindowKind.Session -> R.string.used_session
                     WindowKind.Other -> R.string.used_other
+                    WindowKind.Credit -> R.string.used_credit
                 }
             QuotaDisplay.Left ->
                 when (kind) {
@@ -144,6 +146,7 @@ fun quotaLabel(kind: WindowKind, display: QuotaDisplay): String =
                     WindowKind.Daily -> R.string.left_daily
                     WindowKind.Session -> R.string.left_session
                     WindowKind.Other -> R.string.left_other
+                    WindowKind.Credit -> R.string.left_credit
                 }
         }
     )

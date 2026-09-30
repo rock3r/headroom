@@ -26,6 +26,13 @@ class ResetFormatterTest {
     }
 
     @Test
+    fun `an expiry date has the day, month and year in the local zone`() {
+        assertEquals("5 Nov 2026", formatter.date(Instant.parse("2026-11-05T07:59:00Z")))
+        val tokyo = ResetFormatter(java.time.ZoneId.of("Asia/Tokyo"), Locale.US, is24Hour = true)
+        assertEquals("6 Nov 2026", tokyo.date(Instant.parse("2026-11-05T20:00:00Z")))
+    }
+
+    @Test
     fun `twelve hour clocks get am and pm`() {
         val twelve = ResetFormatter(ZoneOffset.UTC, Locale.US, is24Hour = false)
         assertEquals("Tue 7:00 PM", twelve.short(Instant.parse("2026-09-29T19:00:00Z"), now))

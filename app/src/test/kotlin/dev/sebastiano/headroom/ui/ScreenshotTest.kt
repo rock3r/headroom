@@ -33,8 +33,10 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.model.ThemePalette
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.signin.SignInState
@@ -55,6 +57,7 @@ import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.addWidgetTag
 import dev.sebastiano.headroom.ui.stats.STATS_TAG
 import dev.sebastiano.headroom.widgets.WidgetStyle
+import java.time.Duration
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -198,6 +201,25 @@ class ScreenshotTest {
         rule.onNodeWithText("Session limits never send alerts.").performScrollTo()
         rule.mainClock.autoAdvance = false
         capture("detail-scrolled")
+    }
+
+    @Test
+    fun detailCredits() {
+        // Credits and unknown quotas come from a real sign-in, so these are demo accounts signed
+        // in for real, with a Claude cloud session credit, a credit with no dollar amounts, and a
+        // quota Headroom does not recognise.
+        val accounts =
+            DemoData.accounts(FIXED_NOW).map { state ->
+                if (state.account.id != "demo-claude") return@map state
+                val snapshot = state.snapshot!!
+                state.copy(snapshot = snapshot.copy(windows = snapshot.windows + creditWindows()))
+            }
+        launch(realAccounts = accounts)
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithTag(accountCardTag("demo-claude")).performClick()
+        rule.onNodeWithText("Claude Code and Cowork credit").performScrollTo()
+        rule.mainClock.autoAdvance = false
+        capture("detail-credits")
     }
 
     @Test
@@ -566,6 +588,41 @@ private const val REORDER_STEPS = 8
 private fun SemanticsNodeInteraction.clickWithoutPress() {
     performSemanticsAction(SemanticsActions.OnClick)
 }
+
+/** Fake credits and an unknown quota, as the Claude usage endpoint reports them. */
+private fun creditWindows(): List<QuotaWindow> =
+    listOf(
+        QuotaWindow(
+            id = "nimbus_quill",
+            label = "Nimbus quill",
+            kind = WindowKind.Other,
+            usedPercent = 0.0,
+            resetsAt = null,
+            length = null,
+            isRecognised = false,
+        ),
+        QuotaWindow(
+            id = "iguana_necktie",
+            label = "Cloud session credit",
+            kind = WindowKind.Credit,
+            usedPercent = 40.8,
+            resetsAt = null,
+            length = null,
+            usedAmount = 102.0,
+            limitAmount = 250.0,
+            amountUnit = "USD",
+            expiresAt = FIXED_NOW.plus(Duration.ofDays(39)),
+        ),
+        QuotaWindow(
+            id = "cinder_cove",
+            label = "Claude Code and Cowork credit",
+            kind = WindowKind.Credit,
+            usedPercent = 15.0,
+            resetsAt = null,
+            length = null,
+            expiresAt = FIXED_NOW.plus(Duration.ofDays(64)),
+        ),
+    )
 
 private fun backEvent(progress: Float) =
     BackEventCompat(0f, 0f, progress, BackEventCompat.EDGE_LEFT)

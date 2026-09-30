@@ -85,6 +85,7 @@ public class DataGraph(
                 HeadroomDatabase.MIGRATION_1_2,
                 HeadroomDatabase.MIGRATION_2_3,
                 HeadroomDatabase.MIGRATION_3_4,
+                HeadroomDatabase.MIGRATION_4_5,
             )
             .build()
 

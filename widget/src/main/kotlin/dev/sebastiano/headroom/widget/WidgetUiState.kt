@@ -39,7 +39,9 @@ public enum class GaugeWindow {
                 WindowKind.Daily -> Daily
                 WindowKind.Weekly -> Weekly
                 WindowKind.Monthly -> Monthly
-                WindowKind.Other -> Other
+                // Widgets show the primary and session windows, which are never credits.
+                WindowKind.Other,
+                WindowKind.Credit -> Other
             }
     }
 }

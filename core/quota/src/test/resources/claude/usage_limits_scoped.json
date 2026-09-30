@@ -1,0 +1,122 @@
+{
+  "five_hour": {
+    "utilization": 20.0,
+    "resets_at": "2026-10-01T17:00:00.000000+00:00"
+  },
+  "seven_day": {
+    "utilization": 44.0,
+    "resets_at": "2026-10-06T09:00:00.000000+00:00"
+  },
+  "seven_day_opus": {
+    "utilization": 18.0,
+    "resets_at": "2026-10-06T09:00:00.000000+00:00"
+  },
+  "limits": [
+    {
+      "group": "session",
+      "is_active": true,
+      "kind": "session",
+      "percent": 20.0,
+      "resets_at": "2026-10-01T17:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "display_name": "Weekly model"
+        }
+      }
+    },
+    {
+      "group": "weekly",
+      "is_active": true,
+      "kind": "weekly_all",
+      "percent": 44.0,
+      "resets_at": "2026-10-06T09:00:00.000000+00:00",
+      "scope": null
+    },
+    {
+      "group": "weekly",
+      "is_active": false,
+      "kind": "weekly_scoped",
+      "percent": 23.0,
+      "resets_at": "2026-10-06T09:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "display_name": "Fable",
+          "id": null
+        },
+        "surface": null
+      }
+    },
+    {
+      "group": "weekly",
+      "is_active": true,
+      "kind": "weekly_scoped",
+      "percent": 18.0,
+      "resets_at": "2026-10-06T09:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "display_name": "Opus"
+        }
+      }
+    },
+    {
+      "group": "weekly",
+      "is_active": true,
+      "kind": "weekly_scoped",
+      "percent": 9.0,
+      "resets_at": "2026-10-07T10:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "display_name": "Haiku"
+        }
+      }
+    },
+    {
+      "group": "weekly",
+      "is_active": true,
+      "kind": "weekly_scoped",
+      "percent": 31.0,
+      "resets_at": "2026-10-06T09:00:00.000000+00:00",
+      "scope": {
+        "model": null,
+        "surface": {
+          "display_name": "Claude Code"
+        }
+      }
+    },
+    {
+      "group": "weekly",
+      "is_active": true,
+      "kind": "weekly_scoped",
+      "percent": 9.0,
+      "resets_at": "2026-10-07T10:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "display_name": "Haiku"
+        }
+      }
+    },
+    {
+      "group": "weekly",
+      "is_active": true,
+      "kind": "weekly_scoped",
+      "percent": 5.0,
+      "resets_at": "2026-10-06T09:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "display_name": " "
+        }
+      }
+    },
+    {
+      "group": "weekly",
+      "is_active": true,
+      "kind": "weekly_scoped",
+      "resets_at": "2026-10-06T09:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "display_name": "No percent"
+        }
+      }
+    }
+  ]
+}

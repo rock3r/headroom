@@ -41,5 +41,27 @@ fun formatAmount(amount: Double, locale: Locale): String {
         .format(shown)
 }
 
+/**
+ * An amount of money in the currency [unit] names: "$102", or "$102.50" when it has cents. Falls
+ * back to [formatAmount] and the unit when [unit] is not a currency code.
+ */
+fun formatMoney(amount: Double, unit: String, locale: Locale): String {
+    val currency =
+        try {
+            Currency.getInstance(unit.uppercase(Locale.ROOT))
+        } catch (_: IllegalArgumentException) {
+            null
+        } ?: return "${formatAmount(amount, locale)} $unit"
+    val cents = if (amount % 1.0 == 0.0) 0 else AMOUNT_DECIMALS
+    return NumberFormat.getCurrencyInstance(locale)
+        .apply {
+            this.currency = currency
+            minimumFractionDigits = cents
+            maximumFractionDigits = cents
+            roundingMode = RoundingMode.HALF_UP
+        }
+        .format(amount)
+}
+
 private const val AMOUNT_DECIMALS = 2
 private const val SMALLEST_AMOUNT = 0.01

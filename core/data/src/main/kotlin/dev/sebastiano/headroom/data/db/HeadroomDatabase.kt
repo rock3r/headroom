@@ -8,7 +8,7 @@ import androidx.sqlite.execSQL
 
 @Database(
     entities = [AccountEntity::class, WindowEntity::class, UsagePointEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 internal abstract class HeadroomDatabase : RoomDatabase() {
@@ -49,6 +49,20 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                         "UPDATE accounts SET position = " +
                             "(SELECT COUNT(*) FROM accounts AS earlier " +
                             "WHERE earlier.rowid < accounts.rowid)"
+                    )
+                }
+            }
+
+        /**
+         * Version 5 adds when a credit expires, and whether the app recognises a window. Existing
+         * windows are all recognised and have no expiry.
+         */
+        val MIGRATION_4_5: Migration =
+            object : Migration(4, 5) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
+                    connection.execSQL(
+                        "ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1"
                     )
                 }
             }

@@ -51,6 +51,8 @@ internal fun WindowEntity.toDomain() =
         usedAmount = usedAmount,
         limitAmount = limitAmount,
         amountUnit = amountUnit,
+        expiresAt = expiresAtEpochMs?.let(Instant::ofEpochMilli),
+        isRecognised = isRecognised,
     )
 
 internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
@@ -68,4 +70,6 @@ internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
         usedAmount = usedAmount,
         limitAmount = limitAmount,
         amountUnit = amountUnit,
+        expiresAtEpochMs = expiresAt?.toEpochMilli(),
+        isRecognised = isRecognised,
     )

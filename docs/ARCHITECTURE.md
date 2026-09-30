@@ -33,6 +33,47 @@ themselves.
    alarm re-fetches that account and posts a notification only when the reset really happened
    (usage dropped, or `resets_at` moved forward by about a week).
 
+## Quota windows
+
+A `QuotaSnapshot` holds a list of `QuotaWindow`s. Each window has a `WindowKind`. The kind
+decides whether the window can alert, whether it has a pace, and which window an account leads
+with.
+
+| Kind | Meaning | Resets | Alerts |
+|---|---|---|---|
+| `Session`, `Daily` | Short windows, such as the 5-hour session | Yes | Never |
+| `Weekly` | Weekly limits | Yes | On by default |
+| `Monthly` | Monthly limits | Yes | Opt-in |
+| `Other` | A window of unknown length | Maybe | Never |
+| `Credit` | A one-time amount, such as a promotional credit | No, it expires | Never |
+
+A credit has no `resetsAt`. Its `expiresAt` holds the date it expires, and the detail screen says
+"Expires <date>". When the provider reports money, `usedAmount` and `limitAmount` hold it, with
+`amountUnit` set to a currency code such as `USD`.
+
+A window whose `isRecognised` is false is one the provider sent but Headroom does not know yet.
+The fetcher keeps it, with a label made from its key, so a new quota shows without an app update.
+The detail screen puts an info button next to its label, with a tooltip that explains it.
+
+Credits and unrecognised windows are *informational* (`QuotaWindow.isInformational`). They never
+alert (`ResetPolicy.canAlert`), never count as the next reset (`NextReset`), have no pace and
+never need attention (`Pace`), and are never an account's primary or session window
+(`AccountState`). Because the widgets only show the primary window, the session window and the
+next reset, the widgets never show them.
+
+### Claude usage
+
+`ClaudeQuotaFetcher` reads `GET /api/oauth/usage`. It maps the keys as follows.
+
+- Known keys such as `five_hour`, `seven_day` and `seven_day_*` are reset windows.
+- `iguana_necktie` is the Claude Code cloud session credit, and `cinder_cove` is the Claude Code
+  and Cowork credit. Both are credits. Their `resets_at` is the expiry date.
+- Any other object is unrecognised. With a non-null `limit_dollars` it is a credit, labelled
+  "Credit · <name>". Without one it is a window of kind `Other`.
+- Each `weekly_scoped` row of the `limits` array becomes a "Weekly · <name>" window, named after
+  `scope.model` or `scope.surface`. Rows are classified by `kind`, never by label. A row is left
+  out when a flat `seven_day_<name>` key reports the same model, so nothing shows twice.
+
 ## Demo mode
 
 `FakeQuotaRepository` in `:core:model` serves the demo accounts. The app uses it when no

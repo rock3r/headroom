@@ -283,6 +283,42 @@ class RoomQuotaRepositoryTest {
         }
 
     @Test
+    fun `a credit's expiry and an unknown window survive storage`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val credit =
+                dev.sebastiano.headroom.model.QuotaWindow(
+                    id = "iguana_necktie",
+                    label = "Cloud session credit",
+                    kind = dev.sebastiano.headroom.model.WindowKind.Credit,
+                    usedPercent = 40.8,
+                    resetsAt = null,
+                    length = null,
+                    usedAmount = 102.0,
+                    limitAmount = 250.0,
+                    amountUnit = "USD",
+                    expiresAt = now.plus(Duration.ofDays(40)),
+                )
+            val unknown =
+                dev.sebastiano.headroom.model.QuotaWindow(
+                    id = "nimbus_quill",
+                    label = "Nimbus quill",
+                    kind = dev.sebastiano.headroom.model.WindowKind.Other,
+                    usedPercent = 0.0,
+                    resetsAt = null,
+                    length = null,
+                    isRecognised = false,
+                )
+            val snapshot =
+                claude.snapshot!!.copy(windows = claude.snapshot!!.windows + credit + unknown)
+            val repo = repo({ QuotaResult.Success(snapshot) }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.refresh()
+            val stored = repo.current().single().snapshot!!.windows
+            assertEquals(credit, stored.single { it.id == credit.id })
+            assertEquals(unknown, stored.single { it.id == unknown.id })
+        }
+
+    @Test
     fun `accounts are listed in the order they were added`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)

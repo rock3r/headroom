@@ -11,7 +11,8 @@ public enum class PaceStatus {
 
 /**
  * Compares actual usage with "even pace": the share of the window that has elapsed. A window that
- * is 50% through and 60% used is 10 points over pace.
+ * is 50% through and 60% used is 10 points over pace. Credits and unknown windows
+ * ([QuotaWindow.isInformational]) have no pace and never need attention.
  */
 public object Pace {
     /** Points above or below pace that still count as "on pace". */
@@ -21,6 +22,7 @@ public object Pace {
     public const val NEARLY_FULL_PERCENT: Double = 85.0
 
     public fun expectedPercent(window: QuotaWindow, now: Instant): Double? {
+        if (window.isInformational) return null
         val resetsAt = window.resetsAt ?: return null
         val length = window.length ?: return null
         if (length.isZero || length.isNegative) return null
@@ -44,13 +46,15 @@ public object Pace {
 
     /** True when the window is over pace or nearly used up. The UI marks these as wavy. */
     public fun needsAttention(window: QuotaWindow, now: Instant): Boolean =
-        window.usedPercent >= NEARLY_FULL_PERCENT || status(window, now) == PaceStatus.Over
+        !window.isInformational &&
+            (window.usedPercent >= NEARLY_FULL_PERCENT || status(window, now) == PaceStatus.Over)
 
     /**
      * When the window reaches 100% if usage continues at the average rate so far, or null when that
      * happens only after the reset (or cannot be computed).
      */
     public fun projectedLimitAt(window: QuotaWindow, now: Instant): Instant? {
+        if (window.isInformational) return null
         val resetsAt = window.resetsAt ?: return null
         val length = window.length ?: return null
         val start = resetsAt.minus(length)

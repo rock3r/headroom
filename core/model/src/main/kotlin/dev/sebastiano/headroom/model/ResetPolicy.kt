@@ -4,12 +4,17 @@ import java.time.Duration
 
 /** Which windows may send a "your limit has reset" notification. */
 public object ResetPolicy {
-    /** Session and daily windows reset too often to be worth an alert. */
+    /**
+     * Session and daily windows reset too often to be worth an alert. Credits and unknown windows
+     * ([QuotaWindow.isInformational]) never alert.
+     */
     public fun canAlert(window: QuotaWindow): Boolean =
-        window.kind == WindowKind.Weekly || window.kind == WindowKind.Monthly
+        !window.isInformational &&
+            (window.kind == WindowKind.Weekly || window.kind == WindowKind.Monthly)
 
     /** Weekly windows alert unless the user turns them off. Monthly ones are opt-in. */
-    public fun alertsByDefault(window: QuotaWindow): Boolean = window.kind == WindowKind.Weekly
+    public fun alertsByDefault(window: QuotaWindow): Boolean =
+        canAlert(window) && window.kind == WindowKind.Weekly
 
     /** How long after a window's reset time the app checks that the reset happened. */
     public val CHECK_DELAY: Duration = Duration.ofSeconds(10)

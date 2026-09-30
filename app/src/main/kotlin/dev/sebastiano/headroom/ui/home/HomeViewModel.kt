@@ -258,13 +258,17 @@ class HomeViewModel(
             )
             .copy(sortLoaded = false)
 
-    /** Weekly and monthly windows with a known start can be drawn against even pace. */
+    /**
+     * Weekly and monthly windows with a known start can be drawn against even pace. Credits and
+     * unknown windows have no pace.
+     */
     private val QuotaWindow.isChartable: Boolean
         get() =
             (kind == WindowKind.Weekly || kind == WindowKind.Monthly) &&
                 resetsAt != null &&
                 length != null &&
-                !isUnlimited
+                !isUnlimited &&
+                !isInformational
 
     private data class Environment(
         val isDemo: Boolean,

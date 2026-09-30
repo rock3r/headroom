@@ -6,6 +6,8 @@ import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -296,6 +298,43 @@ class WidgetUiStateTest {
         assertEquals(Duration.ofMinutes(928), all.next?.remaining)
         assertEquals(GaugeWindow.Weekly, all.next?.window)
         assertEquals("demo-claude", onlyClaude.next?.accountId)
+    }
+
+    @Test
+    fun `credits and unknown quotas never become a gauge or the countdown`() {
+        val claude = demo.first { it.account.id == "demo-claude" }
+        val weekly = claude.snapshot!!.windows.first { it.id == "seven_day" }
+        val credit =
+            weekly.copy(
+                id = "iguana_necktie",
+                kind = WindowKind.Credit,
+                usedPercent = 99.0,
+                resetsAt = null,
+                length = null,
+                expiresAt = now.plus(Duration.ofMinutes(5)),
+            )
+        val unknown =
+            weekly.copy(
+                id = "nimbus_quill",
+                resetsAt = now.plus(Duration.ofMinutes(5)),
+                isRecognised = false,
+            )
+        fun claudeWith(vararg windows: QuotaWindow) =
+            listOf(claude.copy(snapshot = claude.snapshot!!.copy(windows = windows.toList())))
+        val bars = WidgetConfig(WidgetStyle.Bars, accountIds = listOf("demo-claude"))
+        val countdown = WidgetConfig(WidgetStyle.Countdown, accountIds = listOf("demo-claude"))
+
+        val onlyExtras = assertIs<WidgetUiState.Empty>(map(bars, claudeWith(credit, unknown)))
+        val gauge =
+            assertIs<WidgetUiState.Bars>(map(bars, claudeWith(credit, unknown, weekly)))
+                .gauges
+                .single()
+        val next =
+            assertIs<WidgetUiState.Countdown>(map(countdown, claudeWith(credit, unknown, weekly)))
+
+        assertEquals(EmptyReason.NoData, onlyExtras.reason)
+        assertEquals(weekly.usedPercent.toInt(), gauge.usedPercent)
+        assertEquals(weekly.resetsAt, next.next?.resetsAt)
     }
 
     @Test

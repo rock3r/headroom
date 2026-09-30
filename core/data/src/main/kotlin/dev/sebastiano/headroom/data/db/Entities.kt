@@ -50,6 +50,10 @@ internal data class WindowEntity(
     val usedAmount: Double? = null,
     val limitAmount: Double? = null,
     val amountUnit: String? = null,
+    /** When a credit expires. Null for every other window. */
+    val expiresAtEpochMs: Long? = null,
+    /** False for a window the provider sent that the app does not know. */
+    @ColumnInfo(defaultValue = "1") val isRecognised: Boolean = true,
 )
 
 @Entity(

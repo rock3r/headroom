@@ -56,12 +56,14 @@ import dev.sebastiano.headroom.ui.asFraction
 import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
+import dev.sebastiano.headroom.ui.components.UnknownQuotaInfo
 import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.percentDescription
 import dev.sebastiano.headroom.ui.components.quotaLabel
 import dev.sebastiano.headroom.ui.components.windowKindLabel
 import dev.sebastiano.headroom.ui.formatAmount
 import dev.sebastiano.headroom.ui.formatBalance
+import dev.sebastiano.headroom.ui.formatMoney
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.ChartSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
@@ -277,10 +279,28 @@ private fun WindowList(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = window.label, style = MaterialTheme.typography.titleSmall)
-                    window.resetsAt?.let { at ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = resetLine(window, at, now, formatter),
+                            text = window.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (!window.isRecognised) UnknownQuotaInfo()
+                    }
+                    val expiresAt = window.expiresAt
+                    val resetsAt = window.resetsAt
+                    val timeLine =
+                        when {
+                            window.kind == WindowKind.Credit ->
+                                expiresAt?.let {
+                                    stringResource(R.string.detail_expires_at, formatter.date(it))
+                                }
+                            resetsAt != null -> resetLine(window, resetsAt, now, formatter)
+                            else -> null
+                        }
+                    timeLine?.let {
+                        Text(
+                            text = it,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -324,13 +344,29 @@ private fun WindowList(
     }
 }
 
-/** "12 / 200 credits used", or what is left in left mode. Null when the window counts no amount. */
+/**
+ * "12 / 200 credits used", or what is left in left mode. A credit reads "$102 of $250 used", or
+ * "$148 left of $250". Null when the window counts no amount.
+ */
 @Composable
 private fun amountLine(window: WindowSummary, display: QuotaDisplay): String? {
     val used = window.usedAmount ?: return null
     val limit = window.limitAmount ?: return null
     val unit = window.amountUnit ?: return null
     val locale = LocalLocale.current.platformLocale
+    if (window.kind == WindowKind.Credit) {
+        val total = formatMoney(limit, unit, locale)
+        return when (display) {
+            QuotaDisplay.Used ->
+                stringResource(R.string.detail_credit_used, formatMoney(used, unit, locale), total)
+            QuotaDisplay.Left ->
+                stringResource(
+                    R.string.detail_credit_left,
+                    formatMoney((limit - used).coerceAtLeast(0.0), unit, locale),
+                    total,
+                )
+        }
+    }
     val (amount, format) =
         when (display) {
             QuotaDisplay.Used -> used to R.string.detail_amount_used
