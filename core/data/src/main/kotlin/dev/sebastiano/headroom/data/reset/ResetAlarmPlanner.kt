@@ -30,26 +30,30 @@ internal object ResetAlarmPlanner {
         accounts: List<AccountState>,
         now: Instant,
         isEnabled: (accountId: String, window: QuotaWindow) -> Boolean,
-    ): List<ResetAlarm> = accounts.flatMap { state ->
-        state.snapshot?.windows.orEmpty().mapNotNull { window ->
-            val resetsAt = window.resetsAt
-            val eligible =
-                resetsAt != null &&
-                    // Keep a window inside its grace seconds: its alarm has not fired yet.
-                    resetsAt.plus(GRACE).isAfter(now) &&
-                    ResetPolicy.canAlert(window) &&
-                    isEnabled(state.account.id, window)
-            if (eligible && resetsAt != null) {
-                ResetAlarm(
-                    accountId = state.account.id,
-                    windowId = window.id,
-                    triggerAt = resetsAt.plus(GRACE),
-                    expectedResetAt = resetsAt,
-                    usedBefore = window.usedPercent,
-                )
-            } else {
-                null
+    ): List<ResetAlarm> =
+        // An account whose sign-in expired has stale windows, and its check could not fetch.
+        accounts
+            .filterNot { it.isSignInExpired }
+            .flatMap { state ->
+                state.snapshot?.windows.orEmpty().mapNotNull { window ->
+                    val resetsAt = window.resetsAt
+                    val eligible =
+                        resetsAt != null &&
+                            // Keep a window inside its grace seconds: its alarm has not fired yet.
+                            resetsAt.plus(GRACE).isAfter(now) &&
+                            ResetPolicy.canAlert(window) &&
+                            isEnabled(state.account.id, window)
+                    if (eligible && resetsAt != null) {
+                        ResetAlarm(
+                            accountId = state.account.id,
+                            windowId = window.id,
+                            triggerAt = resetsAt.plus(GRACE),
+                            expectedResetAt = resetsAt,
+                            usedBefore = window.usedPercent,
+                        )
+                    } else {
+                        null
+                    }
+                }
             }
-        }
-    }
 }

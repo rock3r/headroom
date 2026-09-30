@@ -38,6 +38,13 @@ public data class AccountState(
                 ?: windows.maxByOrNull { it.length?.toMillis() ?: 0L }
         }
 
+    /**
+     * True when the last sync failed because the sign-in expired or was revoked. The user must sign
+     * in again. Until then [snapshot] is stale: it is the data of the last sync that worked.
+     */
+    val isSignInExpired: Boolean
+        get() = lastError == QuotaErrorKind.Auth
+
     /** The session (5-hour and similar) window, when the provider has one. */
     val sessionWindow: QuotaWindow?
         get() =
@@ -70,20 +77,31 @@ public interface AlertPreferences {
     public suspend fun setEnabled(accountId: String, windowId: String, enabled: Boolean)
 }
 
-/** The next reset the user cares about: the soonest weekly one, else the soonest of any kind. */
+/**
+ * The next reset the user cares about: the soonest weekly one, else the soonest of any kind.
+ * Accounts whose sign-in expired are left out.
+ */
 public data class NextReset(val account: Account, val window: QuotaWindow) {
     public companion object {
         public fun find(accounts: List<AccountState>, now: Instant): NextReset? {
-            val candidates = accounts.flatMap { state ->
-                state.snapshot?.windows.orEmpty().mapNotNull { window ->
-                    val resetsAt = window.resetsAt
-                    if (resetsAt != null && resetsAt.isAfter(now) && ResetPolicy.canAlert(window)) {
-                        Candidate(NextReset(state.account, window), resetsAt)
-                    } else {
-                        null
+            // A stale account's reset times are last known, not confirmed: they lead nothing.
+            val candidates =
+                accounts
+                    .filterNot { it.isSignInExpired }
+                    .flatMap { state ->
+                        state.snapshot?.windows.orEmpty().mapNotNull { window ->
+                            val resetsAt = window.resetsAt
+                            if (
+                                resetsAt != null &&
+                                    resetsAt.isAfter(now) &&
+                                    ResetPolicy.canAlert(window)
+                            ) {
+                                Candidate(NextReset(state.account, window), resetsAt)
+                            } else {
+                                null
+                            }
+                        }
                     }
-                }
-            }
             val soonestWeekly =
                 candidates
                     .filter { it.reset.window.kind == WindowKind.Weekly }

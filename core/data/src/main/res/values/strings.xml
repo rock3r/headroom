@@ -12,4 +12,11 @@
     <string name="reset_island_monthly">%1$s monthly limit reset</string>
     <string name="reset_action_open">Open</string>
     <string name="reset_action_mute">Mute %1$s</string>
+    <string name="sign_in_channel_name">Sign-in problems</string>
+    <string name="sign_in_channel_description">Tells you when an account\'s sign-in expired and Headroom can\'t update it until you sign in again.</string>
+    <string name="sign_in_expired_title">Sign in to %1$s again</string>
+    <string name="sign_in_expired_title_named">Sign in to %1$s again · %2$s</string>
+    <string name="sign_in_expired_body">Headroom can\'t update this account until you sign in.</string>
+    <string name="sign_in_expired_body_with_time">Headroom can\'t update this account until you sign in. The numbers you see are from %1$s.</string>
+    <string name="sign_in_expired_action">Sign in</string>
 </resources>

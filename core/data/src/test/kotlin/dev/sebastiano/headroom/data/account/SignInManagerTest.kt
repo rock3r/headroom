@@ -10,6 +10,7 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.UsagePoint
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,5 +83,69 @@ class SignInManagerTest {
         manager.signOut("new-id")
         assertNull(store.load("new-id"))
         assertEquals(emptyList(), accounts.state.value)
+    }
+
+    @Test
+    fun `signing in again keeps the account and its name, and replaces the credential`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        SignInManager(store, accounts) { "first" }
+            .complete(tokens.copy(providerAccountId = "org-1"))
+        accounts.state.value =
+            accounts.state.value.map { it.copy(account = it.account.copy(nickname = "Work")) }
+
+        val account =
+            SignInManager(store, accounts) { "second" }
+                .reauthenticate(
+                    "first",
+                    tokens.copy(accessToken = "fresh", providerAccountId = "org-1"),
+                )
+
+        assertEquals("first", account.id)
+        assertEquals("Work", account.nickname)
+        assertEquals("fresh", store.load("first")?.accessToken)
+        assertNull(store.load("second"))
+        assertEquals(listOf("first"), accounts.state.value.map { it.account.id })
+        assertEquals(listOf<String?>("first", "first"), accounts.refreshed)
+    }
+
+    @Test
+    fun `signing in again works when nothing is stored for the account any more`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        accounts.addAccount(Account("first", Provider.Claude, "sam@example.com"))
+
+        SignInManager(store, accounts) { "second" }.reauthenticate("first", tokens)
+
+        assertEquals("access", store.load("first")?.accessToken)
+        assertEquals(listOf("first"), accounts.state.value.map { it.account.id })
+    }
+
+    @Test
+    fun `signing in again as a different account is refused and changes nothing`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        SignInManager(store, accounts) { "first" }
+            .complete(tokens.copy(providerAccountId = "org-1"))
+
+        assertFailsWith<DifferentAccountException> {
+            SignInManager(store, accounts)
+                .reauthenticate(
+                    "first",
+                    tokens.copy(accessToken = "other", providerAccountId = "org-2"),
+                )
+        }
+        assertEquals("access", store.load("first")?.accessToken)
+    }
+
+    @Test
+    fun `signing in again to an account that was removed adds it as a new one`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+
+        val account = SignInManager(store, accounts) { "new-id" }.reauthenticate("gone", tokens)
+
+        assertEquals("new-id", account.id)
+        assertEquals(listOf("new-id"), accounts.state.value.map { it.account.id })
     }
 }

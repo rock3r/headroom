@@ -10,8 +10,13 @@ import androidx.work.WorkerFactory
 import dev.sebastiano.headroom.auth.AuthMethods
 import dev.sebastiano.headroom.auth.TokenStore
 import dev.sebastiano.headroom.data.account.AccountQuotaFetcher
+import dev.sebastiano.headroom.data.account.AndroidSignInNotifier
 import dev.sebastiano.headroom.data.account.EncryptedTokenStore
+import dev.sebastiano.headroom.data.account.SharedPreferencesSignInAlertLedger
+import dev.sebastiano.headroom.data.account.SignInAlertingRepository
+import dev.sebastiano.headroom.data.account.SignInAlerts
 import dev.sebastiano.headroom.data.account.SignInManager
+import dev.sebastiano.headroom.data.account.SignInNotifier
 import dev.sebastiano.headroom.data.account.TinkCredentialCipher
 import dev.sebastiano.headroom.data.db.HeadroomDatabase
 import dev.sebastiano.headroom.data.db.RoomQuotaRepository
@@ -111,19 +116,26 @@ public class DataGraph(
             scope,
         )
 
+    /** Shows and removes the warning that an account's sign-in expired. */
+    public val signInNotifier: SignInNotifier = AndroidSignInNotifier(appContext)
+
     public val repository: AccountsRepository =
-        object : AccountsRepository, QuotaRepository by roomRepository {
-            override suspend fun addAccount(account: Account) = roomRepository.addAccount(account)
+        SignInAlertingRepository(
+            object : AccountsRepository, QuotaRepository by roomRepository {
+                override suspend fun addAccount(account: Account) =
+                    roomRepository.addAccount(account)
 
-            override suspend fun removeAccount(accountId: String) =
-                roomRepository.removeAccount(accountId)
+                override suspend fun removeAccount(accountId: String) =
+                    roomRepository.removeAccount(accountId)
 
-            override suspend fun renameAccount(accountId: String, nickname: String?) =
-                roomRepository.renameAccount(accountId, nickname)
+                override suspend fun renameAccount(accountId: String, nickname: String?) =
+                    roomRepository.renameAccount(accountId, nickname)
 
-            override suspend fun reorderAccounts(orderedIds: List<String>) =
-                roomRepository.reorderAccounts(orderedIds)
-        }
+                override suspend fun reorderAccounts(orderedIds: List<String>) =
+                    roomRepository.reorderAccounts(orderedIds)
+            },
+            SignInAlerts(signInNotifier, SharedPreferencesSignInAlertLedger(appContext)),
+        )
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
 

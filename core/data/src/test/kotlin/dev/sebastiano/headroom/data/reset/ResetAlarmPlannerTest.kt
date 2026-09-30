@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.data.reset
 
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
@@ -24,6 +25,16 @@ class ResetAlarmPlannerTest {
         // Claude has two weekly windows, Codex one, Grok one; Copilot is monthly and off by
         // default.
         assertEquals(4, alarms.size)
+    }
+
+    @Test
+    fun `an account whose sign-in expired gets no alarm, as its data is stale`() {
+        val expired = accounts.map {
+            if (it.account.id == "demo-grok") it.copy(lastError = QuotaErrorKind.Auth) else it
+        }
+        val alarms = ResetAlarmPlanner.plan(expired, now, isEnabled = defaults)
+        assertEquals(false, alarms.any { it.accountId == "demo-grok" })
+        assertEquals(3, alarms.size)
     }
 
     @Test
