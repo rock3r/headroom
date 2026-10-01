@@ -142,3 +142,32 @@ camera cutout, shows the provider logo and one line, and shrinks back. It lives 
   pill is on screen. So `AndroidResetNotifier` posts the notification first, then awaits
   `ResetIsland.awaitIdle()`, which returns when the overlay window is gone. The worker's coroutine,
   and so the process, stays alive for that time (about five seconds).
+
+## XR headsets (Full Space)
+
+On an Android XR headset the app opens in Full Space
+(`android.window.PROPERTY_XR_ACTIVITY_START_MODE` in the manifest). It uses Jetpack Compose for XR
+from the `ui.spatial` package. Everywhere else, including a headset's Home Space,
+`isSpatialUiEnabled()` is false and the app is the same adaptive app as on any device.
+
+- `SpatialPanels` in `HeadroomApp` puts the window in a `SpatialMainPanel` and, beside it, a
+  `SpatialPanel` for the account detail. The user can move and resize both. It lives above the
+  pages, so the main panel stays still while Settings, Accounts and Licences replace the home.
+- The main panel takes the window's size, so `layoutWidth()` keeps picking the layout. The
+  activity handles its own size changes (`configChanges`), as `SpatialMainPanel` needs.
+- The Overview tab hands its detail to a `DetailPanelSlot` (`DetailPanelContent`) while it is
+  composed. The list fills the main panel, and opening an account only selects it. The Resets tab
+  opens accounts in the Overview, as it does in an expanded window. Resets, Stats and the other
+  pages have no detail panel.
+- `HomeNavigationOrbiter` replaces the floating toolbar or the navigation rail with an `Orbiter`
+  on the same edge of the main panel: the bottom when compact, the start otherwise
+  (`navigationEdge()`).
+
+Headsets run Android 14 and the app needs Android 16, so this is tested only with Robolectric
+and the fake XR runtime (`FullSpaceTest`). Two quirks of that setup:
+
+- An orbiter or a panel that leaves the composition keeps its semantics under Robolectric, so
+  tests check what is inside or outside the window (`APP_TAG`), or the subspace nodes, rather than
+  the absence of a node.
+- `Espresso.pressBack()` reaches another window. Tests call the activity's
+  `onBackPressedDispatcher` instead.
