@@ -76,6 +76,15 @@ Android 16 widget player.
   with when they are from and a button to sign in again. The new sign-in keeps the account's
   history, name and alerts. A notification says so once, and goes away when the account works
   again. Expired accounts never drive the next reset or reset alerts.
+- **Usage limit resets.** Some providers hand out resets that refill a limit early. Headroom shows
+  the ones each account has, with when each one expires. Codex and Grok resets can be used from a
+  bottom sheet that confirms the reset, refills the bars and shows what is left. Claude's resets
+  are shown for information only.
+- **Credits and new quotas.** One-time credits, such as Claude's cloud session credit, show how
+  much is used and when they expire. A quota Headroom does not recognise yet still shows, with a
+  note that says so.
+- **Quick Settings tile.** A tile opens Headroom from anywhere, and shows the next reset or the
+  quota closest to its limit.
 - **Reset alerts.** Headroom sets an alarm for each weekly window. When it fires, the app fetches
   the account again and notifies you only if the reset really happened. The notification pops up
   as a heads-up. Session and daily limits never alert; monthly ones can be turned on, and each
@@ -92,8 +101,8 @@ Android 16 widget player.
   background, and pick light, dark or the device's theme. The colours come from your wallpaper or
   from one of eight palettes, and a theme change spreads out from where you tapped. Reduced motion
   turns the moving transitions into short fades.
-- **Delights.** Optional touches you can turn off: a sheen with a trail of sparkles when new
-  numbers arrive, and confetti when a limit resets while the app is open. Each has a Try button.
+- **Delights.** Optional touches you can turn off: a rainbow sheen with a trail of sparkles when
+  new numbers arrive, and confetti when a limit resets while the app is open. Each has a Try button.
 - **Reset island (experimental).** A small black pill grows out of the camera cutout when a limit
   resets and Headroom is in the background. It is drawn by an accessibility service that reads
   nothing on screen, or, when a device policy blocks that, by an overlay the user allows with
@@ -173,6 +182,9 @@ More detail: [docs/TESTING.md](docs/TESTING.md), [docs/STATIC-ANALYSIS.md](docs/
 - Headroom has been used with real accounts on one Pixel phone only. The automated tests use
   recorded responses and a local test server, so a provider that changes its responses can break
   a fetcher before the tests notice.
+- Using a Codex or Grok reset follows those providers' own clients, but it has not been tried
+  with a real account yet. Each reset request is logged under the `HeadroomResets` tag, without
+  tokens or account details, so a problem can be traced with `adb logcat -s HeadroomResets`.
 - Remote Compose is still alpha. The widgets use a few of its restricted APIs for the live
   countdown, and pin one library version.
 - The widgets were checked in the Android 16 widget player under Robolectric, not yet on a device
