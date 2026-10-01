@@ -139,6 +139,32 @@ class HeadroomDatabaseMigrationTest {
             }
         }
 
+    @Test
+    fun `accounts saved before resets were stored have none`() = runTest {
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { v5 ->
+            VERSION_1_SCHEMA.forEach(v5::execSQL)
+            v5.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+            v5.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+            v5.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+            v5.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+            v5.execSQL("ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+            v5.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
+            v5.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
+            v5.execSQL("INSERT INTO accounts (id, provider, label) VALUES ('a1', 'grok', 'a1')")
+            v5.version = 5
+        }
+
+        val db = openCurrent()
+        try {
+            val account = db.quotaDao().observeAccounts().first().single().account
+            assertEquals("a1", account.id)
+            assertNull(account.resetsJson)
+        } finally {
+            db.close()
+        }
+    }
+
     private fun openCurrent(): HeadroomDatabase =
         Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
             .addMigrations(
@@ -146,6 +172,7 @@ class HeadroomDatabaseMigrationTest {
                 HeadroomDatabase.MIGRATION_2_3,
                 HeadroomDatabase.MIGRATION_3_4,
                 HeadroomDatabase.MIGRATION_4_5,
+                HeadroomDatabase.MIGRATION_5_6,
             )
             .allowMainThreadQueries()
             .build()

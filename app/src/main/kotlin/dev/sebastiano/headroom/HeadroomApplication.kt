@@ -19,6 +19,8 @@ import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ThemePalette
+import dev.sebastiano.headroom.tile.HeadroomTileService
+import dev.sebastiano.headroom.tile.TileSettings
 import dev.sebastiano.headroom.widget.HeadroomWidgetHost
 import dev.sebastiano.headroom.widget.WidgetConfigStore
 import dev.sebastiano.headroom.widget.WidgetUpdater
@@ -83,11 +85,20 @@ open class HeadroomApplication :
 
     val graph: AppGraph by lazy { createGraph() }
 
+    /** What the Quick Settings tile's subtitle shows. The tile service reads it. */
+    val tileSettings: TileSettings by lazy { TileSettings(this) }
+
     /** False in instrumented tests, which run on fakes and must not start background work. */
     protected open val usesDataLayer: Boolean = true
 
     protected open fun createGraph(): AppGraph =
-        AppGraph.create(this, scope = appScope, data = dataGraph, resetIsland = islandHub)
+        AppGraph.create(
+            this,
+            scope = appScope,
+            data = dataGraph,
+            resetIsland = islandHub,
+            tileSettings = tileSettings,
+        )
 
     override val widgetConfigStore: WidgetConfigStore by lazy {
         DataStoreWidgetConfigStore(
@@ -122,6 +133,15 @@ open class HeadroomApplication :
                 }
                 .debounce(WIDGET_UPDATE_DEBOUNCE_MS)
                 .collect { (accounts, look) -> updateWidgets(accounts, look) }
+        }
+        // The tile only redraws when asked: ask whenever what its subtitle shows may change.
+        appScope.launch {
+            combine(graph.quotaRepository.accounts, tileSettings.subtitle, widgetLook()) { _, _, _
+                    ->
+                    Unit
+                }
+                .debounce(WIDGET_UPDATE_DEBOUNCE_MS)
+                .collect { HeadroomTileService.requestUpdate(this@HeadroomApplication) }
         }
     }
 

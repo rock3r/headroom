@@ -12,9 +12,16 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
+import dev.sebastiano.headroom.model.ResetAvailability
+import dev.sebastiano.headroom.model.ResetPool
+import dev.sebastiano.headroom.model.ResetScope
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetcher
 import dev.sebastiano.headroom.quota.QuotaFetchers
+import dev.sebastiano.headroom.quota.ResetClients
+import dev.sebastiano.headroom.quota.ResetRead
+import dev.sebastiano.headroom.quota.ResetReader
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -207,5 +214,75 @@ class AccountQuotaFetcherTest {
             )
         val result = fetcher.fetch(Account("a1", Provider.Claude, "sam"))
         assertEquals(QuotaErrorKind.Unknown, assertIs<QuotaResult.Failure>(result).kind)
+    }
+
+    private class FixedReader(override val provider: Provider, private val read: ResetRead) :
+        ResetReader {
+        val seen = mutableListOf<ProviderCredentials>()
+
+        override suspend fun read(credentials: ProviderCredentials): ResetRead {
+            seen += credentials
+            return read
+        }
+    }
+
+    private val pool = ResetPool("grok", "Weekly limit reset", 2, ResetScope.of(WindowKind.Weekly))
+
+    @Test
+    fun `the resets are read in the same sync, with the same credential`() = runTest {
+        saveCredential("g1", Provider.Grok)
+        val reader = FixedReader(Provider.Grok, ResetRead.Known(ResetAvailability(listOf(pool))))
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Grok))),
+                ResetClients(readers = listOf(reader), redeemers = emptyList()),
+            )
+
+        val result = fetcher.fetch(Account("g1", Provider.Grok, "me"))
+
+        val snapshot = assertIs<QuotaResult.Success>(result).snapshot
+        assertEquals(ResetAvailability(listOf(pool)), snapshot.resets)
+        assertEquals(false, snapshot.resetsReadFailed)
+        assertEquals("access-g1", reader.seen.single().accessToken)
+    }
+
+    @Test
+    fun `resets that cannot be read never fail the sync`() = runTest {
+        saveCredential("g1", Provider.Grok)
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Grok))),
+                ResetClients(
+                    readers = listOf(FixedReader(Provider.Grok, ResetRead.Failed)),
+                    redeemers = emptyList(),
+                ),
+            )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(fetcher.fetch(Account("g1", Provider.Grok, "me")))
+                .snapshot
+
+        assertNull(snapshot.resets)
+        assertEquals(true, snapshot.resetsReadFailed)
+    }
+
+    @Test
+    fun `a provider without resets reads none`() = runTest {
+        saveCredential("k1", Provider.Kimi)
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Kimi))),
+                ResetClients.None,
+            )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(fetcher.fetch(Account("k1", Provider.Kimi, "me")))
+                .snapshot
+
+        assertNull(snapshot.resets)
+        assertEquals(false, snapshot.resetsReadFailed)
     }
 }

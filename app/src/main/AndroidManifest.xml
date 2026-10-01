@@ -67,6 +67,27 @@
                 android:resource="@xml/reset_island_service" />
         </service>
 
+        <!--
+            The Quick Settings tile: a tap opens Headroom. It is an active tile, so the system binds
+            it only when the app asks for an update (HeadroomTileService.requestUpdate).
+        -->
+        <service
+            android:name=".tile.HeadroomTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_headroom"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="false" />
+        </service>
+
         <!-- HeadroomApplication provides WorkManager's configuration, with the data layer's worker factory. -->
         <provider
             android:name="androidx.startup.InitializationProvider"

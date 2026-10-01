@@ -14,7 +14,9 @@ import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.HistoryResetHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
+import dev.sebastiano.headroom.appdata.RealOrDemoResetProvider
 import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
+import dev.sebastiano.headroom.appdata.ResetCenter
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
@@ -22,12 +24,21 @@ import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.ResetAttemptMemory
+import dev.sebastiano.headroom.model.ResetAttemptStore
+import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
+import dev.sebastiano.headroom.prototype.PrototypeTools
+import dev.sebastiano.headroom.prototype.prototypeTools
 import dev.sebastiano.headroom.signin.AuthSignInSteps
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
+import dev.sebastiano.headroom.tile.StatusBarTileAdder
+import dev.sebastiano.headroom.tile.TileAdder
+import dev.sebastiano.headroom.tile.TileSettings
 import dev.sebastiano.headroom.ui.accounts.AccountsViewModel
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
@@ -61,6 +72,9 @@ import kotlinx.coroutines.flow.map
  * - [usageHistory]: the Room history of each window, or demo history in demo mode, for the stats.
  * - [settings]: the data layer's DataStore settings, or settings in memory without it.
  * - [resetIsland]: whether the reset island's accessibility service is ready, and a way to show it.
+ * - [resetProvider]: reads and redeems usage limit resets. Prototype: fake data in debug builds,
+ *   none in release builds, until the per-provider clients exist.
+ * - [tileAdder]: asks the system to add the Quick Settings tile.
  */
 class AppGraph(
     val quotaRepository: QuotaRepository,
@@ -91,9 +105,31 @@ class AppGraph(
     val statsDispatcher: CoroutineDispatcher = Dispatchers.Default,
     /** The reset island: its accessibility service's state, and the Try button. */
     val resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
+    resetProvider: ResetProvider = NoResets,
+    /** Keeps the keys of unsettled redeem attempts across restarts. */
+    resetAttempts: ResetAttemptStore = ResetAttemptStore.None,
+    /** Where the resets are read in the background. */
+    resetScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    val tileAdder: TileAdder = TileAdder.Unavailable,
+    /** What the tile's subtitle shows, or null without a tile (tests). */
+    val tileSettings: TileSettings? = null,
+    /** Debug builds' prototype tools; null in release builds. */
+    val prototypes: PrototypeTools? = null,
     /** The demo accounts, so debug tools can show a scenario such as an expired sign-in. */
     val demoAccounts: FakeQuotaRepository? = null,
 ) {
+    /** The resets of every account, read through the reset provider. */
+    val resets: ResetCenter =
+        ResetCenter(
+            provider = resetProvider,
+            accounts = quotaRepository.accounts,
+            scope = resetScope,
+            refreshUsage = { accountId -> quotaRepository.refresh(accountId) },
+        )
+
+    /** The keys of unsettled redeem attempts, so a retry never uses a second reset. */
+    val resetMemory: ResetAttemptMemory = ResetAttemptMemory(clock, store = resetAttempts)
+
     val homeViewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
             HomeViewModel(
@@ -157,6 +193,7 @@ class AppGraph(
             tickInterval: Duration? = Duration.ofMinutes(1),
             data: DataGraph? = null,
             resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
+            tileSettings: TileSettings? = null,
         ): AppGraph {
             val realAccounts: QuotaRepository =
                 data?.repository ?: FakeQuotaRepository(clock, initial = emptyList())
@@ -225,6 +262,22 @@ class AppGraph(
                         demo = DemoUsageHistory(DemoResetHistory, clock, zone),
                     ),
                 resetIsland = resetIsland,
+                resetProvider =
+                    RealOrDemoResetProvider(
+                        isReal = { account ->
+                            realAccounts.accounts.value.any { it.account.id == account.id }
+                        },
+                        real = data?.resetProvider ?: NoResets,
+                        // Debug builds give the demo accounts fake resets; release builds, none.
+                        demo =
+                            prototypeTools?.resetProvider(clock(), demoAccounts::resetOnServer)
+                                ?: NoResets,
+                    ),
+                resetAttempts = data?.resetAttempts ?: ResetAttemptStore.None,
+                resetScope = scope,
+                tileAdder = StatusBarTileAdder(context.applicationContext),
+                tileSettings = tileSettings,
+                prototypes = prototypeTools,
                 demoAccounts = demoAccounts,
             )
         }

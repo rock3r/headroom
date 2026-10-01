@@ -18,19 +18,44 @@ public class FakeQuotaRepository(
 ) : QuotaRepository {
     private val state = MutableStateFlow(initial)
 
+    /** Resets the provider made on its side, by account id, that the next refresh reads. */
+    private val serverResets = mutableMapOf<String, ResetScope>()
+
     override val accounts: StateFlow<List<AccountState>> = state.asStateFlow()
 
     override suspend fun refresh(accountId: String?) {
         val now = clock()
         state.update { accounts ->
             accounts.map { account ->
-                if (accountId != null && account.account.id != accountId) {
-                    account
-                } else {
-                    account.bumped(now)
-                }
+                val id = account.account.id
+                if (accountId != null && id != accountId) return@map account
+                val reset = synchronized(serverResets) { serverResets.remove(id) }
+                if (reset != null) account.reset(reset, now) else account.bumped(now)
             }
         }
+    }
+
+    /**
+     * Simulates the provider resetting [accountId]'s limits in [scope] on its side, as a redeemed
+     * reset does. Nothing changes on screen until the next refresh reads it, as with a real
+     * provider.
+     */
+    public fun resetOnServer(accountId: String, scope: ResetScope) {
+        synchronized(serverResets) { serverResets[accountId] = scope }
+    }
+
+    private fun AccountState.reset(scope: ResetScope, now: Instant): AccountState {
+        val snapshot = snapshot ?: return this
+        val windows =
+            snapshot.windows.map { window ->
+                // A reset restores usage limits. Credits and quotas the app does not know stay.
+                if (!window.isInformational && scope.covers(window.id, window.kind)) {
+                    window.copy(usedPercent = 0.0)
+                } else {
+                    window
+                }
+            }
+        return copy(snapshot = snapshot.copy(windows = windows, fetchedAt = now), lastError = null)
     }
 
     override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> {

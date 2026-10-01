@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: the prototypes page. -->
+<resources>
+    <string name="settings_prototypes">Reset prototypes</string>
+    <string name="settings_prototypes_body">Debug builds only. Play every reset flow on fake data.</string>
+    <string name="prototypes_title">Reset prototypes</string>
+    <string name="prototypes_note">Debug build only. Every flow runs on fake data and makes no network calls. Tap a flow to open its sheet.</string>
+</resources>

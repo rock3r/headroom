@@ -104,7 +104,10 @@ class ResetTrackerTest {
         val reset = accounts.withGrok(used = 1.0, resetShift = Duration.ofDays(7))
         tracker.update(reset)
         // Grok's weekly reset was the soonest, so the next reset card was counting down to it.
-        assertEquals(listOf(ResetBurst("demo-grok", fromNextReset = true)), tracker.lastLiveResets)
+        assertEquals(
+            listOf(ResetBurst("demo-grok", fromNextReset = true, windowId = "weekly")),
+            tracker.lastLiveResets,
+        )
 
         tracker.update(reset.withGrok(used = 2.0))
         assertEquals(emptyList(), tracker.lastLiveResets)
@@ -117,7 +120,7 @@ class ResetTrackerTest {
         // Claude resets early, days before its reset time, while the card counts down to Grok's.
         tracker.update(accounts.withReset("demo-claude", used = 0.0))
         assertEquals(
-            listOf(ResetBurst("demo-claude", fromNextReset = false)),
+            listOf(ResetBurst("demo-claude", fromNextReset = false, windowId = "seven_day")),
             tracker.lastLiveResets,
         )
     }

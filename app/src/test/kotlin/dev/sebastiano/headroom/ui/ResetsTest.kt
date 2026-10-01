@@ -55,7 +55,7 @@ class ResetsTest {
                 ResetsScreen(
                     state = state,
                     formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true),
-                    onOpenAccount = { opened += it },
+                    onOpenAccount = { id, _ -> opened += id },
                     onAlertChange = { account, window, on ->
                         alertChanges += Triple(account, window, on)
                     },

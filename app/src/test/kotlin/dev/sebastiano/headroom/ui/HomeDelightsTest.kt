@@ -11,7 +11,9 @@ import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.ui.delights.CONFETTI_OVERLAY_TAG
+import dev.sebastiano.headroom.ui.delights.Delights
 import dev.sebastiano.headroom.ui.delights.DelightsHost
+import dev.sebastiano.headroom.ui.delights.LocalDelights
 import dev.sebastiano.headroom.ui.delights.SHIMMER_OVERLAY_TAG
 import java.time.Duration
 import java.time.Instant
@@ -34,11 +36,14 @@ class HomeDelightsTest {
     private val accounts = FakeQuotaRepository({ clock }, DemoData.accounts(FIXED_NOW))
     private val gated = GatedRepository(accounts)
 
+    private var delights: Delights? = null
+
     private fun show(shimmer: Boolean = true, confetti: Boolean = true) {
         rule.mainClock.autoAdvance = false
         rule.setContent {
             HeadroomTheme(dynamicColor = false) {
                 DelightsHost(refreshShimmer = shimmer, resetConfetti = confetti) {
+                    delights = LocalDelights.current
                     HeadroomApp(graph = testGraph(rule.activity, real = gated))
                 }
             }
@@ -78,6 +83,30 @@ class HomeDelightsTest {
     fun `a reset while the app is open bursts confetti`() {
         show()
         rule.onNodeWithTag(CONFETTI_OVERLAY_TAG).assertDoesNotExist()
+
+        rule.runOnIdle { accounts.set(accounts.accounts.value.withGrokReset()) }
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeByFrame()
+
+        rule.onNodeWithTag(CONFETTI_OVERLAY_TAG).assertExists()
+    }
+
+    @Test
+    fun `a reset that a surface in front already celebrated bursts nothing more`() {
+        show()
+        rule.runOnIdle { requireNotNull(delights).claimReset("demo-grok", "weekly") }
+
+        rule.runOnIdle { accounts.set(accounts.accounts.value.withGrokReset()) }
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeByFrame()
+
+        rule.onNodeWithTag(CONFETTI_OVERLAY_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a claim for another window leaves the reset its confetti`() {
+        show()
+        rule.runOnIdle { requireNotNull(delights).claimReset("demo-grok", "session") }
 
         rule.runOnIdle { accounts.set(accounts.accounts.value.withGrokReset()) }
         rule.mainClock.advanceTimeByFrame()

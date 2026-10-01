@@ -46,7 +46,10 @@ fun HomeDelights(home: HomeUiState, onBurstFinish: (String) -> Unit) {
                 home.accountsInYourOrder.firstOrNull { it.id == burst.accountId }?.provider
             val colors = confettiColors(provider)
             LaunchedEffect(delights, burst) {
-                delights.burstWhenShown(burst.anchors, colors)
+                // A surface in front, such as the redeem sheet, already celebrated this reset.
+                if (!delights.takeClaim(burst.accountId, burst.windowId)) {
+                    delights.burstWhenShown(burst.anchors, colors)
+                }
                 shown(burst.accountId)
             }
         }
@@ -58,7 +61,7 @@ private val ResetBurst.anchors: List<Any>
 
 /** The provider's colour, twice as often as each theme colour, then the theme's colours. */
 @Composable
-private fun confettiColors(provider: Provider?): List<Color> {
+internal fun confettiColors(provider: Provider?): List<Color> {
     val scheme = MaterialTheme.colorScheme
     val accent = provider?.let { providerColors(it).accent }
     return listOfNotNull(accent, accent, scheme.primary, scheme.secondary, scheme.tertiary)

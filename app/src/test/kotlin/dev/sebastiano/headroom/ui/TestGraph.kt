@@ -22,9 +22,12 @@ import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
+import dev.sebastiano.headroom.prototype.PrototypeTools
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
@@ -67,6 +70,8 @@ fun testGraph(
     settings: SettingsRepository = InMemorySettingsRepository(),
     statsDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
     resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
+    resetProvider: ResetProvider = NoResets,
+    prototypes: PrototypeTools? = null,
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
@@ -97,6 +102,9 @@ fun testGraph(
             ),
         statsDispatcher = statsDispatcher,
         resetIsland = resetIsland,
+        resetProvider = resetProvider,
+        resetScope = scope,
+        prototypes = prototypes,
         demoAccounts = demo,
     )
 }

@@ -49,6 +49,7 @@ import dev.sebastiano.headroom.designsystem.PaceChart
 import dev.sebastiano.headroom.designsystem.PaceChartModel
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
+import dev.sebastiano.headroom.designsystem.WorkingShimmer
 import dev.sebastiano.headroom.designsystem.stale
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ResetPolicy
@@ -74,6 +75,9 @@ import dev.sebastiano.headroom.ui.home.ChartSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.WindowSummary
 import dev.sebastiano.headroom.ui.overview.AnimatedPercent
+import dev.sebastiano.headroom.ui.resets.AccountResets
+import dev.sebastiano.headroom.ui.resets.ResetHandlers
+import dev.sebastiano.headroom.ui.resets.ResetsCard
 import java.time.Duration
 import java.time.Instant
 import java.time.format.TextStyle
@@ -100,14 +104,14 @@ fun DetailScreen(
     onBack: (() -> Unit)? = null,
     sharedElements: SharedElements? = null,
     onChartWindowChange: (windowId: String) -> Unit = {},
+    resets: AccountResets = AccountResets(),
+    resetHandlers: ResetHandlers = ResetHandlers(),
     onSignInAgain: (accountId: String) -> Unit = {},
 ) {
     val account = state.account
     val container =
         sharedElements?.run {
-            Modifier.sharedContainer(
-                transitionScope.rememberSharedContentState(SharedElements.cardKey(account.id))
-            )
+            Modifier.sharedContainer(transitionScope.rememberSharedContentState(card(account.id)))
         } ?: Modifier
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     Surface(
@@ -154,6 +158,7 @@ fun DetailScreen(
                         Modifier.stale(stale).semantics {
                             staleText?.let { text -> stateDescription = text }
                         },
+                        refreshing = !stale && resets.isRefreshing(account.id),
                     )
                 }
                 if (!stale) {
@@ -173,6 +178,7 @@ fun DetailScreen(
                     state.display,
                     content.stale(stale),
                 )
+                // The chart follows the windows it draws; the resets come after the usage.
                 state.chart?.let {
                     ChartCard(
                         chart = it,
@@ -183,6 +189,20 @@ fun DetailScreen(
                         onWindowChange = onChartWindowChange,
                         display = state.display,
                         modifier = content.stale(stale),
+                    )
+                }
+                // A stale account's resets are as old as its usage: faded with it, and with no
+                // action until the user signs in again.
+                resets.of(account.id)?.let { availability ->
+                    ResetsCard(
+                        provider = account.provider,
+                        availability = availability,
+                        formatter = formatter,
+                        onUse = { resetHandlers.onUse(account.id) },
+                        onAsk = { resetHandlers.onAsk(account.id) },
+                        redeemEnabled = resets.canRedeem(account.provider),
+                        stale = stale,
+                        modifier = content,
                     )
                 }
                 AlertSection(account, formatter, onAlertChange, content)
@@ -210,7 +230,7 @@ private fun DetailTopBar(
         val avatar =
             sharedElements?.run {
                 Modifier.sharedAvatar(
-                    transitionScope.rememberSharedContentState(SharedElements.avatarKey(account.id))
+                    transitionScope.rememberSharedContentState(avatar(account.id))
                 )
             } ?: Modifier
         ProviderAvatar(
@@ -244,37 +264,42 @@ private fun HeroRing(
     display: QuotaDisplay,
     sharedElements: SharedElements?,
     modifier: Modifier = Modifier,
+    refreshing: Boolean = false,
 ) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        QuotaRing(
-            progress = display.percent(primary.usedPercent).asFraction(),
-            innerProgress = account.session?.let { display.percent(it.usedPercent).asFraction() },
-            wavy = account.needsAttention,
-            modifier = Modifier.padding(top = 4.dp),
+        WorkingShimmer(
+            working = refreshing,
+            workingDescription = stringResource(R.string.redeem_bar_working),
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AnimatedPercent(
-                    percent = display.percent(primary.usedPercent),
-                    style = MaterialTheme.typography.displayMedium,
-                    display = display,
-                    modifier =
-                        sharedElements?.run {
-                            Modifier.sharedValue(
-                                transitionScope.rememberSharedContentState(
-                                    SharedElements.valueKey(account.id)
+            QuotaRing(
+                progress = display.percent(primary.usedPercent).asFraction(),
+                innerProgress =
+                    account.session?.let { display.percent(it.usedPercent).asFraction() },
+                wavy = account.needsAttention,
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    AnimatedPercent(
+                        percent = display.percent(primary.usedPercent),
+                        style = MaterialTheme.typography.displayMedium,
+                        display = display,
+                        modifier =
+                            sharedElements?.run {
+                                Modifier.sharedValue(
+                                    transitionScope.rememberSharedContentState(value(account.id))
                                 )
-                            )
-                        } ?: Modifier,
-                )
-                Text(
-                    text = quotaLabel(primary.kind, display),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                            } ?: Modifier,
+                    )
+                    Text(
+                        text = quotaLabel(primary.kind, display),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {

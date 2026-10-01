@@ -2,50 +2,35 @@ package dev.sebastiano.headroom.ui.delights
 
 import android.graphics.RuntimeShader
 import androidx.compose.foundation.Canvas
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toArgb
 
 /**
  * The refresh shimmer: a sheen of light sweeps across the screen and leaves a trail of sparkles.
  * - The front eases in and out, bends and wavers a little, and turns slightly as it travels. It
  *   travels during the first half of the time.
- * - The front is a thin, faint core in the `shine` colour, with a whisper of `tint` ahead of it, of
- *   `accent` behind it, and a soft glow. Every colour is washed toward white, so it only hints.
- * - Some cells of a jittered grid hold a four-pointed star. A star lights up when the front reaches
- *   it, drifts on the push the front gave it, slowing down, and twinkles as it shrinks and fades.
- *   After the front has gone, the last stars linger.
+ * - The front is iridescent: a thin, faint core, a whisper of light ahead of it and behind it, and
+ *   a soft glow. Its colour runs through the pastel spectrum across the front, changes a little
+ *   along it, and drifts as it travels: see [IRIDESCENCE].
+ * - Some cells of a jittered grid hold a four-pointed star, each in its own hue. A star lights up
+ *   when the front reaches it, drifts on the push the front gave it, slowing down, and twinkles as
+ *   it shrinks and fades, its hue shifting a little. After the front has gone, the last stars
+ *   linger.
  *
- * Uniforms: `size` in pixels, `progress` from 0 to 1, `strength` the highest opacity, `density` in
- * pixels per dp, `whiten` how far the colours are washed toward white, and the colours `shine` (the
- * core), `sparkle` (most stars), `tint` and `accent`.
+ * Uniforms: `size` in pixels, `progress` from 0 to 1, `density` in pixels per dp, and the shared
+ * light: see [DelightLight].
  */
 private const val SHIMMER_SHADER =
-    """
+    IRIDESCENCE +
+        """
 uniform float2 size;
 uniform float progress;
-uniform float strength;
 uniform float density;
-layout(color) uniform half4 shine;
-layout(color) uniform half4 sparkle;
-uniform float whiten;
-layout(color) uniform half4 tint;
-layout(color) uniform half4 accent;
 
 float hash(float2 p) {
     return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
-}
-
-// exp(-x²), squared by multiplication: pow() is undefined for a negative base.
-float bell(float x) {
-    return exp(-x * x);
 }
 
 // Cubic ease in and out: a slow start, a quick middle and a slow finish.
@@ -59,13 +44,6 @@ float ease(float t) {
 float easeInverse(float y) {
     if (y < 0.5) return pow(y * 0.25, 1.0 / 3.0);
     return 1.0 - pow(2.0 - 2.0 * y, 1.0 / 3.0) * 0.5;
-}
-
-// A four-pointed star of radius r: a small round core with two thin crossed rays.
-float star(float2 p, float r) {
-    float2 q = abs(p) / r;
-    float rays = bell(q.x * 6.0) * bell(q.y) + bell(q.y * 6.0) * bell(q.x);
-    return bell(length(p) / (r * 0.3)) + rays * 0.7;
 }
 
 // Where the front is along the sweep at a point, with its gentle bend.
@@ -90,17 +68,13 @@ half4 main(float2 coord) {
 
     // Positive ahead of the front, negative behind it.
     float d = bent(coord, sweep, normal, reach) - front;
-    // The colours only hint: each is washed toward white, less so on a light theme, where white
-    // would not show.
-    float3 softTint = mix(float3(tint.rgb), float3(1.0), whiten);
-    float3 softAccent = mix(float3(accent.rgb), float3(1.0), whiten);
+    // The spectrum runs across the front, changes a little along it, and drifts as it travels.
+    float3 colour = iris(d * 10.0 + across * 0.35 + progress * 0.4);
     float core = bell(d / 0.01) * 0.75;
     float ahead = bell((d - 0.024) / 0.015) * 0.18;
     float behind = bell((d + 0.024) / 0.015) * 0.18;
     float glow = bell(d / 0.07) * 0.07;
-    float3 glowColour = mix(softTint, softAccent, across);
-    float3 rgb = float3(shine.rgb) * core + softTint * ahead + softAccent * behind
-        + glowColour * glow;
+    float3 rgb = mix(colour, float3(1.0), whiteCore) * core + colour * (ahead + behind + glow);
     float weight = core + ahead + behind + glow;
 
     // Each star is born when the front reaches it. The birth time is worked out along the sweep at
@@ -129,12 +103,10 @@ half4 main(float2 coord) {
                 float twinkle =
                     0.6 + 0.4 * sin(progress * (40.0 + 30.0 * hash(cell + 2.9)) + h * 40.0);
                 float radius = (1.8 + 2.6 * hash(cell + 7.7)) * density * (0.6 + 0.4 * life);
-                float lit = star(coord - position, radius) * life * twinkle;
-                // Most stars shine in the sparkle colour; some take the tint or the accent.
-                float pick = hash(cell + 5.3);
-                float3 colour = pick < 0.7 ? float3(sparkle.rgb) : (pick < 0.85 ? softTint : softAccent);
-                rgb += colour * lit;
-                weight += lit;
+                // Each star has its own hue, which shifts a little as it twinkles.
+                float4 lit = star(coord - position, radius, hash(cell + 5.3) + age * 0.6);
+                rgb += lit.rgb * life * twinkle;
+                weight += lit.a * life * twinkle;
             }
         }
     }
@@ -148,39 +120,14 @@ half4 main(float2 coord) {
 /** Draws the shimmer at [progress], from 0 to 1, over the whole of [modifier]'s bounds. */
 @Composable
 internal fun RefreshShimmer(progress: () -> Float, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    val dark = scheme.surface.luminance() < DARK_SURFACE_LUMINANCE
-    val strength = if (dark) DARK_STRENGTH else LIGHT_STRENGTH
+    val light = delightLight()
     val shader = remember { RuntimeShader(SHIMMER_SHADER) }
     val brush = remember(shader) { ShaderBrush(shader) }
-    // On a dark theme the light is white. On a light one white would vanish into the surface, so
-    // the core is a pale wash of the primary colour and the stars are a softened primary.
-    val shine = if (dark) Color.White else lerp(scheme.primary, Color.White, LIGHT_SHINE_WHITENESS)
-    val sparkle =
-        if (dark) Color.White else lerp(scheme.primary, Color.White, LIGHT_SPARKLE_WHITENESS)
-    val whiten = if (dark) DARK_WHITEN else LIGHT_WHITEN
     Canvas(modifier = modifier) {
         shader.setFloatUniform("size", size.width, size.height)
         shader.setFloatUniform("progress", progress())
-        shader.setFloatUniform("strength", strength)
         shader.setFloatUniform("density", density)
-        shader.setColorUniform("shine", shine.toArgb())
-        shader.setColorUniform("sparkle", sparkle.toArgb())
-        shader.setFloatUniform("whiten", whiten)
-        shader.setColorUniform("tint", scheme.primary.toArgb())
-        shader.setColorUniform("accent", scheme.tertiary.toArgb())
-        // Adding light makes a dark theme glow; on a light theme it would vanish into the white.
-        drawRect(brush, blendMode = if (dark) BlendMode.Plus else BlendMode.SrcOver)
+        light.applyTo(shader)
+        drawRect(brush, blendMode = light.blendMode)
     }
 }
-
-private const val DARK_SURFACE_LUMINANCE = 0.5f
-/** The highest opacity, reached only in the thin core and the stars: bright, but brief. */
-private const val LIGHT_STRENGTH = 0.8f
-private const val DARK_STRENGTH = 0.7f
-/** On a light theme the shine is the primary colour, lightened this much toward white. */
-private const val LIGHT_SHINE_WHITENESS = 0.5f
-private const val LIGHT_SPARKLE_WHITENESS = 0f
-/** How far the tint and the accent are washed toward white. */
-private const val DARK_WHITEN = 0.65f
-private const val LIGHT_WHITEN = 0.1f

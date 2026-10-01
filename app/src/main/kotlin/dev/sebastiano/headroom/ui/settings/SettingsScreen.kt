@@ -56,6 +56,8 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.model.ThemeMode
 import dev.sebastiano.headroom.model.ThemePalette
+import dev.sebastiano.headroom.tile.TileAddResult
+import dev.sebastiano.headroom.tile.TileSubtitleMode
 import dev.sebastiano.headroom.tracing.tracedItem
 import dev.sebastiano.headroom.ui.CloseSettingsButton
 import dev.sebastiano.headroom.ui.PageReveal
@@ -98,7 +100,14 @@ data class SettingsActions(
     val onTryResetIsland: (Provider, String) -> Unit = { _, _ -> },
     /** Reads the accessibility settings again. Runs whenever the user comes back to the app. */
     val onRefreshResetIsland: () -> Unit = {},
+    /** Asks the system to add Headroom's Quick Settings tile. */
+    val onAddTile: () -> Unit = {},
+    val onTileSubtitleChange: (TileSubtitleMode) -> Unit = {},
+    /** Debug builds only: opens the reset prototypes. */
+    val onOpenPrototypes: () -> Unit = {},
 )
+
+const val ADD_TILE_TAG: String = "add-tile"
 
 /** What the reset island's row and its set-up need to know about the two ways to draw it. */
 data class ResetIslandUi(
@@ -129,6 +138,12 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     reveal: PageReveal? = null,
     resetIsland: ResetIslandUi = ResetIslandUi(),
+    /** The answer to the last request to add the tile, or null before one. */
+    tileStatus: TileAddResult? = null,
+    /** What the Quick Settings tile's subtitle shows. */
+    tileSubtitle: TileSubtitleMode = TileSubtitleMode.NextReset,
+    /** Debug builds' row that opens the prototypes page; null in release builds. */
+    debugEntry: (@Composable (Modifier) -> Unit)? = null,
 ) {
     // The set-up opens when the island is switched on with no way to draw it. A return from
     // one of the settings pages reads the state again.
@@ -143,7 +158,10 @@ fun SettingsScreen(
     // device. The section says so.
     val animate = animationsEnabled()
     Surface(modifier = modifier.fillMaxSize().testTag(SETTINGS_TAG)) {
-        PageScaffold(onClose = actions.onClose, reveal = reveal) {
+        PageScaffold(
+            onClose = actions.onClose,
+            reveal = reveal,
+        ) {
             val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().then(entrance)
             settingsRows(
                 state = state,
@@ -153,6 +171,9 @@ fun SettingsScreen(
                 animate = animate,
                 width = width,
                 onShowIslandSetup = { showIslandSetup = true },
+                tileStatus = tileStatus,
+                tileSubtitle = tileSubtitle,
+                debugEntry = debugEntry,
             )
         }
         if (showIslandSetup) {
@@ -183,6 +204,9 @@ private fun LazyListScope.settingsRows(
     animate: Boolean,
     width: Modifier,
     onShowIslandSetup: () -> Unit,
+    tileStatus: TileAddResult?,
+    tileSubtitle: TileSubtitleMode,
+    debugEntry: (@Composable (Modifier) -> Unit)?,
 ) {
     val block = width.padding(top = BLOCK_GAP)
     tracedItem("Settings: SectionLabel accounts") {
@@ -282,6 +306,28 @@ private fun LazyListScope.settingsRows(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = block.padding(horizontal = 6.dp),
         )
+    }
+    tracedItem("Settings: SectionLabel quick settings") {
+        SectionLabel(stringResource(R.string.settings_quick_settings), block)
+    }
+    val subtitles = TileSubtitleMode.entries
+    tracedItem("Settings: TileRow") {
+        TileRow(tileStatus, actions.onAddTile, count = subtitles.size + 1, modifier = block)
+    }
+    subtitles.forEachIndexed { index, mode ->
+        tracedItem("Settings: TileSubtitleRow", key = "tile-${mode.name}") {
+            TileSubtitleRow(
+                mode = mode,
+                selected = mode == tileSubtitle,
+                onSelect = { actions.onTileSubtitleChange(mode) },
+                index = index + 1,
+                count = subtitles.size + 1,
+                modifier = width,
+            )
+        }
+    }
+    if (debugEntry != null) {
+        tracedItem("Settings: debug entry") { debugEntry(block) }
     }
     tracedItem("Settings: SectionLabel about") {
         SectionLabel(stringResource(R.string.settings_about), block)
