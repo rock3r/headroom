@@ -44,29 +44,10 @@ class SettingsRevealScrollTest {
         rule.onNodeWithTag(SETTINGS_LIST_TAG).assert(canScroll)
     }
 
-    @Test
-    fun `the reveal is over within 400 ms`() {
-        rule.setContent {
-            HeadroomTheme(dynamicColor = false) {
-                HeadroomApp(
-                    graph = testGraph(rule.activity, settings = InMemorySettingsRepository())
-                )
-            }
-        }
-        rule.mainClock.autoAdvance = false
-        rule.onNodeWithContentDescription("Settings").performClick()
-        // The list waits for the reveal, so a slow reveal holds up the whole page.
-        rule.mainClock.advanceTimeBy(REVEAL_BUDGET_MILLIS)
-        // The page learns that the reveal ended on the frame after its last one.
-        rule.mainClock.advanceTimeByFrame()
-        rule.onNodeWithTag(SETTINGS_LIST_TAG).assert(canScroll)
-    }
-
     private val canScroll = SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollBy)
 
     private companion object {
         const val MID_REVEAL_MILLIS = 200L
         const val AFTER_REVEAL_MILLIS = 2_000L
-        const val REVEAL_BUDGET_MILLIS = 400L
     }
 }

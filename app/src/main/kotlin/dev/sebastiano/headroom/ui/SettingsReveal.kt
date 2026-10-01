@@ -80,18 +80,28 @@ class PageReveal(
     val revealing: Boolean,
     val animate: Boolean,
     val scrubbing: Boolean,
+    /** True while Settings opens, false while it closes. */
+    val opening: Boolean = true,
 ) {
     /** The spec for the reveal's spatial parts: the radius, the shared bounds and the turn. */
     @Composable
     @ReadOnlyComposable
     fun <T> spatialSpec(): FiniteAnimationSpec<T> =
-        if (scrubbing) HeadroomMotion.scrubSpec() else HeadroomMotion.pageRevealSpec()
+        when {
+            scrubbing -> HeadroomMotion.scrubSpec()
+            opening -> HeadroomMotion.pageOpenSpec()
+            else -> HeadroomMotion.pageCloseSpec()
+        }
 
     /** The spec for the shared elements' fades. */
     @Composable
     @ReadOnlyComposable
     fun <T> effectsSpec(): FiniteAnimationSpec<T> =
-        if (scrubbing) HeadroomMotion.scrubSpec() else HeadroomMotion.pageRevealSpec()
+        when {
+            scrubbing -> HeadroomMotion.scrubSpec()
+            opening -> HeadroomMotion.pageOpenSpec()
+            else -> HeadroomMotion.pageCloseSpec()
+        }
 }
 
 /**
@@ -105,7 +115,7 @@ internal fun Modifier.revealContentEntrance(page: PageReveal?): Modifier {
     val offset = with(LocalDensity.current) { CONTENT_DROP.toPx() }
     // The content waits a moment, so the circle leads and the content follows it in.
     val delay = if (page.scrubbing) 0 else CONTENT_DELAY_MILLIS
-    val enterSpec = HeadroomMotion.pageRevealSpec<Float>(delay)
+    val enterSpec = HeadroomMotion.pageOpenSpec<Float>(delayMillis = delay)
     val exitSpec = page.effectsSpec<Float>()
     // One pair of values, made here once and shared by every row that uses this modifier. A lazy
     // list composes a row when it scrolls into view; with animateEnterExit, each row composed

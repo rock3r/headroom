@@ -336,9 +336,10 @@ private fun Pages(
             }
         ) { current ->
             val scope = this
+            val opening = transition.targetState == Page.Settings
             val pageReveal =
-                remember(reveal, scope, revealing, animate, scrubbing) {
-                    PageReveal(reveal, scope, revealing, animate, scrubbing)
+                remember(reveal, scope, revealing, animate, scrubbing, opening) {
+                    PageReveal(reveal, scope, revealing, animate, scrubbing, opening)
                 }
             val clip = rememberRevealClip(pageReveal, enabled = current == Page.Settings)
             Box(modifier = Modifier.revealClip(clip)) { content(current, pageReveal) }
@@ -433,6 +434,8 @@ private fun rememberPageTransition(
         pages.scrubbing = true
         try {
             gesture.collect { event -> pages.state.seekTo(event.progress, target) }
+            // The finger has let go: the rest plays at the closing pace, not following a finger.
+            pages.scrubbing = false
             onBack(target)
         } catch (cancelled: CancellationException) {
             // The gesture's coroutine is cancelled; settle back from a live scope.
