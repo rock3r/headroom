@@ -211,14 +211,18 @@ internal class ZCodeResetApi(
         }
     }
 
-    /** The unexpired cards of [key], soonest expiry first, or null when the list is unreadable. */
+    /**
+     * The unexpired cards of [key], soonest expiry first. Null when the list or any card in it is
+     * unreadable: a count that skipped a card would replace the stored one with too few.
+     */
     private fun expiries(data: JsonObject, key: String): List<Instant>? {
         val cards = data[key] as? JsonArray ?: return null
+        val expiries = cards.map { card ->
+            (card as? JsonObject)?.let { instantOf(it, "expire_at") }
+        }
+        if (expiries.any { it == null }) return null
         val now = clock.instant()
-        return cards
-            .mapNotNull { (it as? JsonObject)?.let { card -> instantOf(card, "expire_at") } }
-            .filter { it.isAfter(now) }
-            .sorted()
+        return expiries.filterNotNull().filter { it.isAfter(now) }.sorted()
     }
 
     /** ZCode sends times in epoch milliseconds; seconds are read as seconds. */

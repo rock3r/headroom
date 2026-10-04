@@ -237,4 +237,19 @@ class SignInManagerTest {
         assertNull(store.load("z1"))
         assertNull(store.load(ZCodeCredential.idFor("z1")))
     }
+
+    @Test
+    fun `a ZCode sign-in that finishes after its account was removed is dropped`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        val manager = SignInManager(store, accounts) { "z1" }
+        manager.complete(zCodeTokens.copy(kind = CredentialKind.ApiKey, accessToken = "api-key"))
+        manager.signOut("z1")
+        accounts.refreshed.clear()
+
+        manager.signInToZCode("z1", zCodeTokens)
+
+        assertNull(store.load(ZCodeCredential.idFor("z1")))
+        assertEquals(emptyList<String?>(), accounts.refreshed)
+    }
 }

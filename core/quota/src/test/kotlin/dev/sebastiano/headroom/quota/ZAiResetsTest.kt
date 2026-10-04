@@ -147,6 +147,23 @@ class ZAiResetsTest {
     }
 
     @Test
+    fun `a card that cannot be read fails the read, so no reset is lost from the count`() =
+        runTest {
+            listOf(
+                    """[{"expire_at":1775390400000},{}]""",
+                    """[{"expire_at":1775390400000},{"expire_at":"soon"}]""",
+                    """[{"expire_at":1775390400000},42]""",
+                )
+                .forEach { fiveHour ->
+                    server.enqueueJson(
+                        """{"code":0,"data":{"available_five_hour_resets":$fiveHour,""" +
+                            """"available_week_resets":[]}}"""
+                    )
+                    assertEquals(ResetRead.Failed, resets.read(credentials()), fiveHour)
+                }
+        }
+
+    @Test
     fun `other failures are failed reads`() = runTest {
         server.enqueueStatus(500)
         assertEquals(ResetRead.Failed, resets.read(credentials()))
