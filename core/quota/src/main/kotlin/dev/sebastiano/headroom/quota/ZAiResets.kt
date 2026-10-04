@@ -32,20 +32,22 @@ import java.util.UUID
  * answer to the last card's `use` was lost, the pool is empty, and only the server can say whether
  * the key worked. Such a key is forgotten only on a definite "no" to its first `use`: `used:
  * false`, or HTTP 401 or 403. A later "no" cannot speak for an earlier try that lost its answer.
- * The keys live in memory only.
+ * The keys are saved in [reachedUseStore] before `use` goes out, so a retry after the app was
+ * stopped still reaches `use`.
  */
 internal class ZAiResets(
     httpClient: QuotaHttpClient,
     private val clock: Clock,
     log: ResetLog,
     zCodeHost: String = ZCODE_HOST,
+    reachedUseStore: AttemptTargetStore = AttemptTargetStore.None,
 ) : ResetReader, ResetRedeemer, ResetAsker {
     override val provider: Provider = Provider.ZAi
 
     private val api = ZCodeResetApi(httpClient, clock, log, zCodeHost)
 
     /** The attempt keys, per pool, that reached `use` and may have used a card. */
-    private val reachedUse = AttemptTargets()
+    private val reachedUse = AttemptTargets(reachedUseStore)
 
     private val holds = AskHolds()
 

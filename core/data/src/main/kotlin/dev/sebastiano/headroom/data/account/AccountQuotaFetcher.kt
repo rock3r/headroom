@@ -25,8 +25,9 @@ import kotlinx.coroutines.coroutineScope
  * it read last.
  *
  * A Z.AI account's resets need its ZCode sign-in, which is saved next to its API key under
- * [ZCodeCredential.idFor] its id. The credentials carry it as [ProviderCredentials.zCode],
- * refreshed when needed; a ZCode sign-in that does not work never fails the usage fetch.
+ * [ZCodeCredential.idFor] its id. The reset read's credentials carry it as
+ * [ProviderCredentials.zCode], refreshed when needed, while the usage fetch runs with the API key
+ * alone: a ZCode sign-in that does not work, or is slow to refresh, never fails or delays it.
  */
 public class AccountQuotaFetcher(
     private val credentials: CredentialProvider,
@@ -49,11 +50,14 @@ public class AccountQuotaFetcher(
                 // The token store could not read or write the credential.
                 return QuotaResult.Failure(QuotaErrorKind.Unknown, failure.message.orEmpty())
             }
-        val providerCredentials = credential.toProviderCredentials(zCodeSignIn(account))
         val reader = resets.reader(account.provider)
         return coroutineScope {
-            val resetRead = reader?.let { async { it.read(providerCredentials) } }
-            when (val result = fetcher.fetch(providerCredentials)) {
+            // Only the reset read needs the ZCode sign-in, so a slow refresh of it never holds up
+            // the usage.
+            val resetRead = reader?.let {
+                async { it.read(credential.toProviderCredentials(zCodeSignIn(account))) }
+            }
+            when (val result = fetcher.fetch(credential.toProviderCredentials(zCode = null))) {
                 is QuotaResult.Success -> {
                     val read = resetRead?.await()
                     QuotaResult.Success(

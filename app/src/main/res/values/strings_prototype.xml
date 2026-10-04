@@ -142,6 +142,7 @@
     <string name="redeem_throttled_body">%1$s asked Headroom to slow down. Try again in a while.</string>
     <string name="redeem_ask_failed_title">Could not ask</string>
     <string name="redeem_ask_failed_body">Headroom could not reach %1$s. Try again later.</string>
+    <string name="redeem_ask_sign_in_again_body">%1$s no longer accepts your sign-in. Sign in again, then ask again.</string>
     <string name="redeem_sign_in_title">Sign in to %1$s</string>
     <string name="redeem_sign_in_body">%1$s resets need a separate sign-in to %2$s. Your API key cannot see or use resets.</string>
     <string name="redeem_sign_in_button">Sign in to %1$s</string>

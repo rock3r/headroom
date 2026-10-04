@@ -8,6 +8,8 @@ import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import java.io.IOException
 import java.util.UUID
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * A sign-in to refresh an account finished as another account of the provider. Nothing was saved.
@@ -21,6 +23,9 @@ public class SignInManager(
     private val accounts: AccountsRepository,
     private val newAccountId: () -> String = { UUID.randomUUID().toString() },
 ) {
+    /** Keeps a ZCode sign-in from saving while a sign-out runs. */
+    private val zCodeLock = Mutex()
+
     public suspend fun complete(tokens: TokenSet): Account {
         val account =
             Account(newAccountId(), tokens.provider, tokens.label ?: tokens.provider.displayName)
@@ -64,31 +69,33 @@ public class SignInManager(
      * Stores the ZCode sign-in of the Z.AI account [accountId], which its resets need, next to its
      * API key. It replaces an earlier ZCode sign-in, then refreshes the account so its resets show.
      * A sign-in that finishes after the account was removed is dropped: nothing would sign it out.
+     * It never runs at the same time as [signOut], so a sign-out cannot miss the credential it
+     * saves.
      *
      * @throws IOException when the token store keeps refusing the save.
      */
     public suspend fun signInToZCode(accountId: String, tokens: TokenSet) {
-        if (!exists(accountId)) return
+        val saved = zCodeLock.withLock { saveZCode(accountId, tokens) }
+        if (saved) accounts.refresh(accountId)
+    }
+
+    /** Saves the ZCode sign-in; false when the account is gone and nothing was saved. */
+    private suspend fun saveZCode(accountId: String, tokens: TokenSet): Boolean {
+        if (accounts.current().none { it.account.id == accountId }) return false
         val credential = tokens.toCredential(ZCodeCredential.idFor(accountId))
         repeat(SAVE_ATTEMPTS) {
             val current = store.load(credential.accountId)
-            if (store.save(credential, expectedRevision = current?.revision) != null) {
-                // The account may have been removed while this saved.
-                if (!exists(accountId)) store.delete(credential.accountId)
-                else accounts.refresh(accountId)
-                return
-            }
+            if (store.save(credential, expectedRevision = current?.revision) != null) return true
         }
         throw IOException("Could not save the ZCode sign-in of account $accountId")
     }
 
-    private suspend fun exists(accountId: String): Boolean =
-        accounts.current().any { it.account.id == accountId }
-
     public suspend fun signOut(accountId: String) {
-        store.delete(accountId)
-        store.delete(ZCodeCredential.idFor(accountId))
-        accounts.removeAccount(accountId)
+        zCodeLock.withLock {
+            store.delete(accountId)
+            store.delete(ZCodeCredential.idFor(accountId))
+            accounts.removeAccount(accountId)
+        }
     }
 
     /**

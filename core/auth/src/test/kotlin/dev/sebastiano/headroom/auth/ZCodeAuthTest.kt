@@ -95,6 +95,19 @@ class ZCodeAuthTest {
     }
 
     @Test
+    fun `a flow that has already expired times out at once, without polling`() = runTest {
+        val expired = initBody().replace("${now.epochSecond + 600}", "${now.epochSecond - 30}")
+        server.enqueue(MockResponse(code = 200, body = expired))
+        val flow = DeviceCodeFlow(zCode, Clock.fixed(now, ZoneOffset.UTC)) {}
+
+        val prompt = flow.start()
+
+        assertEquals(now, prompt.expiresAt)
+        assertFailsWith<AuthException.TimedOut> { flow.awaitTokens(prompt) }
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
     fun `a sign-in page that is not https is refused`() = runTest {
         server.enqueue(MockResponse(code = 200, body = initBody("http://chat.z.ai/authorize")))
         assertFailsWith<AuthException.InvalidResponse> { zCode.requestCode() }

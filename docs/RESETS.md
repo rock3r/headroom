@@ -104,7 +104,9 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   check is skipped for an attempt key that already reached `use`: when the answer to the last
   card's `use` was lost, the pool is empty, and only the server can say whether the key worked.
   Such a key is forgotten only on a definite "no" to its first `use`: a JSON `used: false`, or
-  HTTP 401 or 403. These keys live in memory only.
+  HTTP 401 or 403. `SharedPreferencesAttemptTargetStore` writes these keys to disk before `use`
+  goes out, so a retry after the app was stopped still reaches `use`. It stores the latest 16 keys
+  with their pools, and no token.
 - After a card is used, `history/read` clears ZCode's "unread" mark. It is best effort: a failure
   is logged and the reset still counts as done. The mark is shared by all of the user's plans, so
   the call sends no body and no target scope.
@@ -115,6 +117,8 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   (or code 429) means the account asked too often. As ZCode does, Headroom then holds asks per
   ZCode sign-in: until `next_try_at` but at least 5 minutes, 10 minutes when no time is named, and
   10 minutes after a 429. An ask before then is answered without a call. A failure holds nothing.
+  HTTP 401 or 403 means the ZCode sign-in no longer works: the sheet then offers "Sign in again",
+  which starts the ZCode sign-in, as it does for a refused `use`.
 - Team plans are not supported. The scoped calls send `Bigmodel-Target-Type: PERSONAL`; a team
   plan sends `TEAM` with `Bigmodel-Organization` and `Bigmodel-Project`, which Headroom does not
   look up.
@@ -136,7 +140,8 @@ a device-code flow with no code to show:
 1. `POST https://zcode.z.ai/api/v1/oauth/cli/init` with `Authorization: Bearer <poll token>` (32
    random bytes, in hex) and `{"provider":"zai"}`. The answer gives `flow_id`, the `chat.z.ai`
    page to open (refused unless it is `https`), `expires_at`, `poll_interval_sec`, and maybe its
-   own `poll_token`, which then replaces the client's.
+   own `poll_token`, which then replaces the client's. An `expires_at` that has already passed
+   ends the sign-in at once, as timed out, without polling.
 2. The app opens that page in a browser tab and polls `GET …/oauth/cli/poll/{flow_id}`. `pending`
    keeps polling, and so do HTTP 408, 429 and 5xx. `failed`, or another 4xx, ends the sign-in. A
    `ready` answer carries the ZCode JWT (`token`) and a Z.AI OAuth token (`zai.access_token`).
@@ -146,15 +151,19 @@ a device-code flow with no code to show:
 The credential keeps the business token as its access token and both long-lived tokens, as JSON
 (`ZCodeTokens`), as its refresh token. `SignInManager.signInToZCode` saves it in the same token store
 as the account's API key, under `ZCodeCredential.idFor(accountId)` (the account id plus `#zcode`).
-Signing the account out removes both. The Z.AI refresher in `AuthMethods.refreshers` mints a new
-business token when it expires; the API key itself never expires, so the refresher never sees it.
+Signing the account out removes both. A ZCode sign-in and a sign-out never run at the same time, so
+a ZCode sign-in that finishes during a sign-out cannot leave its credential behind. The Z.AI
+refresher in `AuthMethods.refreshers` mints a new business token when it expires; the API key
+itself never expires, so the refresher never sees it.
 When the login call refuses the Z.AI token, the user must sign in to ZCode again.
 
-`AccountQuotaFetcher` adds the ZCode sign-in to a Z.AI account's credentials
-(`ProviderCredentials.zCode`): ready, missing, or unavailable (for example offline). A ZCode
-sign-in that does not work never fails the usage fetch. In the app, `ZCodeSignIn` runs one sign-in
-at a time from the redeem sheet. The sheet says while it waits for the browser, says why it
-failed, and closes once the user signed in; the account is refreshed so its resets show.
+`AccountQuotaFetcher` adds the ZCode sign-in to the credentials of a Z.AI account's reset read
+(`ProviderCredentials.zCode`): ready, missing, or unavailable (for example offline). It resolves
+the sign-in inside the reset read, in parallel with the usage fetch, which only needs the API key.
+A ZCode sign-in that does not work never fails the usage fetch, and a slow refresh never delays it.
+In the app, `ZCodeSignIn` runs one sign-in at a time from the redeem sheet. The sheet says while it
+waits for the browser, says why it failed, and closes once the user signed in; the account is
+refreshed so its resets show.
 
 ## Using a reset
 

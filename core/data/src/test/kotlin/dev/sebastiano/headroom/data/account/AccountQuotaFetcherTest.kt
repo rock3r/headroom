@@ -31,6 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 
 class AccountQuotaFetcherTest {
@@ -306,41 +307,55 @@ class AccountQuotaFetcherTest {
 
     private val zAiAccount = Account("z1", Provider.ZAi, "sam")
 
+    private val zAiResets = FixedReader(Provider.ZAi, ResetRead.Known(null))
+
+    private fun zAiFetcherFor(
+        zAi: QuotaFetcher,
+        refreshers: Map<Provider, TokenRefresher> = emptyMap(),
+    ) =
+        AccountQuotaFetcher(
+            CredentialProvider(store, refreshers),
+            QuotaFetchers(listOf(zAi)),
+            ResetClients(readers = listOf(zAiResets), redeemers = emptyList()),
+        )
+
     @Test
     fun `Z_AI usage uses the API key, and its resets the ZCode sign-in`() = runTest {
         val zAi = RecordingFetcher(Provider.ZAi)
         saveCredential("z1", Provider.ZAi)
         saveZCode("z1", expiresAt = null)
 
-        fetcherFor(zAi).fetch(zAiAccount)
+        zAiFetcherFor(zAi).fetch(zAiAccount)
 
-        val credentials = zAi.seen.single()
-        assertEquals("access-z1", credentials.accessToken)
-        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business"), credentials.zCode)
+        val usage = zAi.seen.single()
+        assertEquals("access-z1", usage.accessToken)
+        assertNull(usage.zCode)
+        val resets = zAiResets.seen.single()
+        assertEquals("access-z1", resets.accessToken)
+        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business"), resets.zCode)
     }
 
     @Test
     fun `a Z_AI account without a ZCode sign-in says so`() = runTest {
-        val zAi = RecordingFetcher(Provider.ZAi)
         saveCredential("z1", Provider.ZAi)
 
-        fetcherFor(zAi).fetch(zAiAccount)
+        zAiFetcherFor(RecordingFetcher(Provider.ZAi)).fetch(zAiAccount)
 
-        assertEquals(ZCodeSignIn.Missing, zAi.seen.single().zCode)
+        assertEquals(ZCodeSignIn.Missing, zAiResets.seen.single().zCode)
     }
 
     @Test
     fun `an expired ZCode sign-in is refreshed first`() = runTest {
-        val zAi = RecordingFetcher(Provider.ZAi)
         saveCredential("z1", Provider.ZAi)
         saveZCode("z1", expiresAt = Instant.EPOCH)
         val refresher = TokenRefresher { old ->
             TokenSet(Provider.ZAi, CredentialKind.OAuth, "business-2", old.refreshToken, null)
         }
 
-        fetcherFor(zAi, refreshers = mapOf(Provider.ZAi to refresher)).fetch(zAiAccount)
+        zAiFetcherFor(RecordingFetcher(Provider.ZAi), mapOf(Provider.ZAi to refresher))
+            .fetch(zAiAccount)
 
-        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business-2"), zAi.seen.single().zCode)
+        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business-2"), zAiResets.seen.single().zCode)
     }
 
     @Test
@@ -352,11 +367,40 @@ class AccountQuotaFetcherTest {
                 AuthException.Rejected(401, null, "revoked") to ZCodeSignIn.Missing,
             )
             .forEach { (failure, expected) ->
-                val zAi = RecordingFetcher(Provider.ZAi)
+                zAiResets.seen.clear()
                 val refresher = TokenRefresher { throw failure }
-                fetcherFor(zAi, refreshers = mapOf(Provider.ZAi to refresher)).fetch(zAiAccount)
-                assertEquals(expected, zAi.seen.single().zCode)
+                zAiFetcherFor(RecordingFetcher(Provider.ZAi), mapOf(Provider.ZAi to refresher))
+                    .fetch(zAiAccount)
+                assertEquals(expected, zAiResets.seen.single().zCode)
             }
+    }
+
+    @Test
+    fun `a slow ZCode refresh does not hold up the usage`() = runTest {
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = Instant.EPOCH)
+        val refresher = TokenRefresher {
+            delay(ZCODE_TIMEOUT_MS)
+            throw AuthException.TimedOut("token endpoint unreachable")
+        }
+        var usageFetchedAt: Long? = null
+        val zAi =
+            object : QuotaFetcher {
+                override val provider = Provider.ZAi
+
+                override suspend fun fetch(credentials: ProviderCredentials): QuotaResult {
+                    usageFetchedAt = testScheduler.currentTime
+                    return QuotaResult.Success(
+                        QuotaSnapshot(provider, "z", "Pro", emptyList(), Instant.EPOCH)
+                    )
+                }
+            }
+
+        val result = zAiFetcherFor(zAi, mapOf(Provider.ZAi to refresher)).fetch(zAiAccount)
+
+        assertEquals(0L, usageFetchedAt)
+        assertIs<QuotaResult.Success>(result)
+        assertEquals(ZCodeSignIn.Unavailable, zAiResets.seen.single().zCode)
     }
 
     @Test
@@ -365,5 +409,9 @@ class AccountQuotaFetcherTest {
         saveCredential("a1", Provider.Claude)
         fetcherFor(claude).fetch(Account("a1", Provider.Claude, "sam"))
         assertNull(claude.seen.single().zCode)
+    }
+
+    private companion object {
+        const val ZCODE_TIMEOUT_MS = 30_000L
     }
 }
