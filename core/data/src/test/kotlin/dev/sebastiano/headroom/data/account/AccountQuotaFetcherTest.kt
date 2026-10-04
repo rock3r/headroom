@@ -7,6 +7,9 @@ import dev.sebastiano.headroom.auth.CredentialProvider
 import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.TokenRefresher
+import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.auth.ZCodeCredential
+import dev.sebastiano.headroom.auth.ZCodeTokens
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
@@ -22,6 +25,7 @@ import dev.sebastiano.headroom.quota.QuotaFetchers
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetRead
 import dev.sebastiano.headroom.quota.ResetReader
+import dev.sebastiano.headroom.quota.ZCodeSignIn
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -284,5 +288,82 @@ class AccountQuotaFetcherTest {
 
         assertNull(snapshot.resets)
         assertEquals(false, snapshot.resetsReadFailed)
+    }
+
+    private suspend fun saveZCode(accountId: String, expiresAt: Instant?) {
+        store.save(
+            StoredCredential(
+                Provider.ZAi,
+                ZCodeCredential.idFor(accountId),
+                CredentialKind.OAuth,
+                "business",
+                ZCodeTokens("zai-oauth", "zcode-jwt").encode(),
+                expiresAt,
+            ),
+            expectedRevision = null,
+        )
+    }
+
+    private val zAiAccount = Account("z1", Provider.ZAi, "sam")
+
+    @Test
+    fun `Z_AI usage uses the API key, and its resets the ZCode sign-in`() = runTest {
+        val zAi = RecordingFetcher(Provider.ZAi)
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = null)
+
+        fetcherFor(zAi).fetch(zAiAccount)
+
+        val credentials = zAi.seen.single()
+        assertEquals("access-z1", credentials.accessToken)
+        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business"), credentials.zCode)
+    }
+
+    @Test
+    fun `a Z_AI account without a ZCode sign-in says so`() = runTest {
+        val zAi = RecordingFetcher(Provider.ZAi)
+        saveCredential("z1", Provider.ZAi)
+
+        fetcherFor(zAi).fetch(zAiAccount)
+
+        assertEquals(ZCodeSignIn.Missing, zAi.seen.single().zCode)
+    }
+
+    @Test
+    fun `an expired ZCode sign-in is refreshed first`() = runTest {
+        val zAi = RecordingFetcher(Provider.ZAi)
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = Instant.EPOCH)
+        val refresher = TokenRefresher { old ->
+            TokenSet(Provider.ZAi, CredentialKind.OAuth, "business-2", old.refreshToken, null)
+        }
+
+        fetcherFor(zAi, refreshers = mapOf(Provider.ZAi to refresher)).fetch(zAiAccount)
+
+        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business-2"), zAi.seen.single().zCode)
+    }
+
+    @Test
+    fun `a ZCode refresh that fails leaves the sign-in unavailable or missing`() = runTest {
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = Instant.EPOCH)
+        listOf(
+                AuthException.Network("offline") to ZCodeSignIn.Unavailable,
+                AuthException.Rejected(401, null, "revoked") to ZCodeSignIn.Missing,
+            )
+            .forEach { (failure, expected) ->
+                val zAi = RecordingFetcher(Provider.ZAi)
+                val refresher = TokenRefresher { throw failure }
+                fetcherFor(zAi, refreshers = mapOf(Provider.ZAi to refresher)).fetch(zAiAccount)
+                assertEquals(expected, zAi.seen.single().zCode)
+            }
+    }
+
+    @Test
+    fun `other providers carry no ZCode sign-in`() = runTest {
+        val claude = RecordingFetcher(Provider.Claude)
+        saveCredential("a1", Provider.Claude)
+        fetcherFor(claude).fetch(Account("a1", Provider.Claude, "sam"))
+        assertNull(claude.seen.single().zCode)
     }
 }

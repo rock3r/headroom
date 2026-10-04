@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -10,11 +11,16 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.model.RedeemIntent
 import dev.sebastiano.headroom.prototype.PrototypeEnv
 import dev.sebastiano.headroom.prototype.PrototypeTools
+import dev.sebastiano.headroom.signin.ZCodeSignIn
+import dev.sebastiano.headroom.signin.ZCodeSignInState
+import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
@@ -24,7 +30,9 @@ import dev.sebastiano.headroom.ui.resets.ResetHandlers
 
 /**
  * The redeem sheet over the app, while [sheet] asks for it. [onSignInAgain] opens the accounts
- * screen, for an account whose sign-in the provider no longer accepts.
+ * screen, for an account whose sign-in the provider no longer accepts. A real Z.AI account can sign
+ * in to ZCode from the sheet: its page opens in a browser tab, and the sheet closes once the user
+ * signed in there.
  */
 @Composable
 internal fun ResetSheetHost(
@@ -44,6 +52,17 @@ internal fun ResetSheetHost(
         SideEffect { sheet.request = null }
         return
     }
+    val isDemo by graph.isDemo.collectAsStateWithLifecycle()
+    val zCode = graph.zCodeSignIn?.takeIf { !isDemo }
+    val signIn = zCodeSignInFor(zCode, request.accountId)
+    val context = LocalContext.current
+    // Once per change: the page opens when this sheet's sign-in starts waiting for the browser.
+    DisposableEffect(signIn) {
+        if (signIn is ZCodeSignInState.Waiting) {
+            signInTabIntent(context).launchUrl(context, signIn.url.toUri())
+        }
+        onDispose {}
+    }
     RedeemSheet(
         account = account.account,
         summary = summary,
@@ -59,7 +78,22 @@ internal fun ResetSheetHost(
             onSignInAgain()
         },
         refreshing = resets.isRefreshing(request.accountId),
+        onSignIn = zCode?.let { { it.start(request.accountId) } },
+        signIn = signIn,
     )
+}
+
+/**
+ * How the ZCode sign-in of [accountId] is going, once it changed while this sheet was open. A
+ * sign-in that was already waiting or done when the sheet opened shows as idle, so opening the
+ * sheet again neither opens its page again nor closes the sheet.
+ */
+@Composable
+private fun zCodeSignInFor(zCode: ZCodeSignIn?, accountId: String): ZCodeSignInState {
+    zCode ?: return ZCodeSignInState.Idle
+    val atOpen = remember(zCode, accountId) { zCode.state.value }
+    val state by zCode.state.collectAsStateWithLifecycle()
+    return if (state.accountId == accountId && state != atOpen) state else ZCodeSignInState.Idle
 }
 
 /**

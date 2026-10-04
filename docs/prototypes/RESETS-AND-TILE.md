@@ -7,8 +7,9 @@ recordings and GIFs it mentions were made for the review and are not in the repo
 
 > This page records the prototype. The feature that shipped is described in
 > [docs/RESETS.md](../RESETS.md). It differs from the prototype: Codex and Grok resets can be used,
-> Claude's are shown for information only, and Z.AI resets are not shown. The experimental setting
-> and its notes were removed, so the parts of this page about them no longer apply.
+> and Claude's are shown for information only. Z.AI resets show after a ZCode sign-in and can be
+> used too. The experimental setting and its notes were removed, so the parts of this page about
+> them no longer apply.
 
 ## How to try it
 

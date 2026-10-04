@@ -161,7 +161,9 @@ public class DataGraph(
      */
     public val resetProvider: ResetProvider =
         SyncedResetProvider(
-            accounts = { repository.accounts.value },
+            // What storage holds now: right after a refresh, accounts.value may still be the old
+            // one.
+            accounts = { repository.current() },
             fetcher = accountFetcher,
             clients = resetClients,
             log = resetLog,

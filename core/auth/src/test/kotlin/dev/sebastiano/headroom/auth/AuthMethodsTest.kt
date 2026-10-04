@@ -69,7 +69,7 @@ class AuthMethodsTest {
     }
 
     @Test
-    fun `every OAuth provider can refresh and API key providers cannot`() {
+    fun `every OAuth provider can refresh, and Z_AI only its ZCode sign-in`() {
         assertEquals(
             setOf(
                 Provider.Claude,
@@ -78,9 +78,11 @@ class AuthMethodsTest {
                 Provider.Grok,
                 Provider.Kimi,
                 Provider.JetBrains,
+                Provider.ZAi,
             ),
             methods.refreshers.keys,
         )
+        assertEquals(Provider.ZAi, methods.zCodeSignIn.provider)
     }
 
     @Test

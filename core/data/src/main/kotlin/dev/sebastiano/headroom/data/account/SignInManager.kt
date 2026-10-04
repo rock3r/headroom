@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.account
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.auth.TokenStore
+import dev.sebastiano.headroom.auth.ZCodeCredential
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import java.io.IOException
@@ -59,8 +60,34 @@ public class SignInManager(
         throw IOException("Could not save the new sign-in of account $accountId")
     }
 
+    /**
+     * Stores the ZCode sign-in of the Z.AI account [accountId], which its resets need, next to its
+     * API key. It replaces an earlier ZCode sign-in, then refreshes the account so its resets show.
+     * A sign-in that finishes after the account was removed is dropped: nothing would sign it out.
+     *
+     * @throws IOException when the token store keeps refusing the save.
+     */
+    public suspend fun signInToZCode(accountId: String, tokens: TokenSet) {
+        if (!exists(accountId)) return
+        val credential = tokens.toCredential(ZCodeCredential.idFor(accountId))
+        repeat(SAVE_ATTEMPTS) {
+            val current = store.load(credential.accountId)
+            if (store.save(credential, expectedRevision = current?.revision) != null) {
+                // The account may have been removed while this saved.
+                if (!exists(accountId)) store.delete(credential.accountId)
+                else accounts.refresh(accountId)
+                return
+            }
+        }
+        throw IOException("Could not save the ZCode sign-in of account $accountId")
+    }
+
+    private suspend fun exists(accountId: String): Boolean =
+        accounts.current().any { it.account.id == accountId }
+
     public suspend fun signOut(accountId: String) {
         store.delete(accountId)
+        store.delete(ZCodeCredential.idFor(accountId))
         accounts.removeAccount(accountId)
     }
 
