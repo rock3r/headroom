@@ -4,7 +4,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -103,13 +102,13 @@ class RedeemSheetMomentsScreenshotTest {
         }
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         state = account.afterReset(from.pool)
         refreshing = false
         repeat(REFILL_FRAMES) {
             rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onNodeWithTag(SHEET_FRAME_TAG).captureRoboImage(prototypeScreenshot(name))
     }
@@ -149,7 +148,7 @@ class RedeemSheetMomentsScreenshotTest {
         }
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         state = account.afterReset(pool)
         refreshing = false
@@ -158,7 +157,7 @@ class RedeemSheetMomentsScreenshotTest {
             while (elapsed < GLOSS_FIRST_MILLIS + index * GLOSS_FRAME_MILLIS) {
                 rule.mainClock.advanceTimeBy(FRAME_MILLIS)
                 elapsed += FRAME_MILLIS
-                rule.onRoot().captureToImage()
+                rule.onRoot().drawFrame()
             }
             rule
                 .onNodeWithTag(SHEET_FRAME_TAG)
@@ -326,7 +325,7 @@ internal fun recordSheet(
     }
     repeat(PROTOTYPE_SETTLE_STEPS) {
         rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-        rule.onRoot().captureToImage()
+        rule.onRoot().drawFrame()
     }
     val target = if (wholeScreen) rule.onRoot() else rule.onNodeWithTag(SHEET_FRAME_TAG)
     target.captureRoboImage(prototypeScreenshot(name))

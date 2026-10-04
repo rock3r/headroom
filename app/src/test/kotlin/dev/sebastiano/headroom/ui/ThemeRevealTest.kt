@@ -42,7 +42,7 @@ class ThemeRevealTest {
             }
         }
         // Robolectric only draws for a capture; on a device every frame is drawn.
-        rule.onRoot().captureToImage()
+        rule.onRoot().drawFrame()
     }
 
     @Test

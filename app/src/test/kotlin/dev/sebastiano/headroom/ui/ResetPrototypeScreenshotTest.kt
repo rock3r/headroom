@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -104,7 +103,7 @@ class ResetPrototypeScreenshotTest {
     private fun capture(name: String) {
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onRoot().captureRoboImage(prototypeScreenshot(name))
     }
@@ -139,7 +138,7 @@ class ResetPrototypeScreenshotTest {
         }
         repeat(REFRESHING_FRAMES) {
             rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onNodeWithTag(CARD_TAG).captureRoboImage(prototypeScreenshot(name))
     }
@@ -162,7 +161,7 @@ class ResetPrototypeScreenshotTest {
         rule.onNodeWithContentDescription("Resets").clickNow()
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         fun frames(phase: String) {
             repeat(TRANSITION_FRAMES) { index ->
@@ -281,7 +280,7 @@ class ResetPrototypeScreenshotTest {
         }
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onNodeWithTag(CARD_TAG).captureRoboImage(prototypeScreenshot(name))
     }
