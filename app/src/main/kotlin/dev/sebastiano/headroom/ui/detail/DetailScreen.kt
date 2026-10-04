@@ -283,9 +283,18 @@ private fun HeroRing(
                 modifier = Modifier.padding(top = 4.dp),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val percent = display.percent(primary.usedPercent)
+                    val large = MaterialTheme.typography.displayMedium
                     AnimatedPercent(
-                        percent = display.percent(primary.usedPercent),
-                        style = MaterialTheme.typography.displayMedium,
+                        percent = percent,
+                        // "100%" in the large style is wider than the inner ring: three digits
+                        // take a smaller size, so the number stays as wide as two digits do.
+                        style =
+                            if (percent.roundToInt() >= THREE_DIGITS) {
+                                large.copy(fontSize = large.fontSize * THREE_DIGIT_SCALE)
+                            } else {
+                                large
+                            },
                         display = display,
                         modifier =
                             sharedElements?.run {
@@ -310,6 +319,12 @@ private fun HeroRing(
         }
     }
 }
+
+/** The hero ring's number has three digits from here. */
+private const val THREE_DIGITS = 100
+
+/** How much smaller the hero ring's number is with three digits. */
+private const val THREE_DIGIT_SCALE = 0.72f
 
 @Composable
 private fun LegendItem(label: String, color: Color) {
