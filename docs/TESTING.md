@@ -51,6 +51,11 @@ Roborazzi records screenshots of the main screens from Robolectric with
 in the Android 16 widget player and saves it. Both are used for the README. They are not compared
 in CI, because font rendering differs between machines.
 
+Robolectric draws only when a test asks. A test that draws frames just to move animations along
+calls `drawFrame()` on a node rather than dropping the result of `captureToImage()`. Under native
+graphics a picture's pixels live outside the Java heap and the garbage collector does not count
+them, so dropped pictures pile up: thousands of them ran CI runners out of memory (issue #6).
+
 ### Widgets
 
 Widget tests play every captured document in Robolectric's copy of the Android 16 widget player
