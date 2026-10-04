@@ -106,7 +106,8 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   Such a key is forgotten only on a definite "no" to its first `use`: a JSON `used: false`, or
   HTTP 401 or 403. `SharedPreferencesAttemptTargetStore` writes these keys to disk before `use`
   goes out, so a retry after the app was stopped still reaches `use`. It stores the latest 16 keys
-  with their pools, and no token.
+  with their pools, and no token. When that write fails, `use` is not sent and the redeem fails, so
+  it can be retried with the same key.
 - After a card is used, `history/read` clears ZCode's "unread" mark. It is best effort: a failure
   is logged and the reset still counts as done. The mark is shared by all of the user's plans, so
   the call sends no body and no target scope.

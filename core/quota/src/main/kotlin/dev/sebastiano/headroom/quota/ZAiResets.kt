@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
+import java.io.IOException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -33,7 +34,7 @@ import java.util.UUID
  * the key worked. Such a key is forgotten only on a definite "no" to its first `use`: `used:
  * false`, or HTTP 401 or 403. A later "no" cannot speak for an earlier try that lost its answer.
  * The keys are saved in [reachedUseStore] before `use` goes out, so a retry after the app was
- * stopped still reaches `use`.
+ * stopped still reaches `use`. When the save fails, nothing is sent and the redeem fails.
  */
 internal class ZAiResets(
     httpClient: QuotaHttpClient,
@@ -83,7 +84,12 @@ internal class ZAiResets(
         val attempt = "$attemptKey|$poolId"
         val isReplay = reachedUse[attempt] != null
         if (available == 0 && !isReplay) return RedeemOutcome.NoCredit
-        reachedUse.remember(attempt, poolId)
+        try {
+            reachedUse.remember(attempt, poolId)
+        } catch (_: IOException) {
+            // Without the mark, a retry after a restart could not tell that this key reached use.
+            return RedeemOutcome.Failed(QuotaErrorKind.Unknown)
+        }
         val outcome = api.use(signIn, type, attemptKey, isReplay)
         when {
             outcome == ZCodeUse.Used -> api.markHistoryRead(signIn)

@@ -140,6 +140,7 @@ public interface AttemptTargetStore {
     /** The targets by attempt key, oldest first. */
     public fun load(): Map<String, String>
 
+    /** @throws IOException when the targets could not be saved. */
     public fun save(targets: Map<String, String>)
 
     public companion object {
@@ -164,17 +165,30 @@ internal class AttemptTargets(private val store: AttemptTargetStore = AttemptTar
 
     @Synchronized operator fun get(attemptKey: String): String? = targets[attemptKey]
 
+    /** @throws IOException when [store] could not save it. Nothing is remembered then. */
     @Synchronized
     fun remember(attemptKey: String, target: String) {
-        targets.remove(attemptKey)
-        targets[attemptKey] = target
-        while (targets.size > MAX_ENTRIES) targets.remove(targets.keys.first())
-        store.save(targets.toMap())
+        val updated = LinkedHashMap(targets)
+        updated.remove(attemptKey)
+        updated[attemptKey] = target
+        while (updated.size > MAX_ENTRIES) updated.remove(updated.keys.first())
+        store.save(updated)
+        targets.clear()
+        targets.putAll(updated)
     }
 
+    /**
+     * Forgets [attemptKey]. Saving that is best effort: a key left in [store] only makes a later
+     * retry of it ask the server again.
+     */
     @Synchronized
     fun forget(attemptKey: String) {
-        if (targets.remove(attemptKey) != null) store.save(targets.toMap())
+        if (targets.remove(attemptKey) == null) return
+        try {
+            store.save(targets.toMap())
+        } catch (_: IOException) {
+            // See above: the stale key is harmless.
+        }
     }
 
     private companion object {

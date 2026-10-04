@@ -324,6 +324,22 @@ class ZAiResetsTest {
         }
 
     @Test
+    fun `a key whose mark cannot be saved never reaches use`() = runTest {
+        val failing =
+            object : AttemptTargetStore {
+                override fun load(): Map<String, String> = emptyMap()
+
+                override fun save(targets: Map<String, String>) =
+                    throw java.io.IOException("disk full")
+            }
+        resets = zAiResets(failing)
+        server.enqueueJson(fixture("zai/reset_status.json"))
+
+        assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Unknown), redeem())
+        assertEquals(listOf("/api/v1/coding-plan/reset/status"), requests().map { it.target })
+    }
+
+    @Test
     fun `a definite no is forgotten on disk too`() = runTest {
         val disk = MemoryAttemptTargetStore()
         resets = zAiResets(disk)

@@ -2,8 +2,8 @@ package dev.sebastiano.headroom.data.reset
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.core.content.edit
 import dev.sebastiano.headroom.quota.AttemptTargetStore
+import java.io.IOException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -33,7 +33,8 @@ public class SharedPreferencesAttemptTargetStore(
 
     override fun save(targets: Map<String, String>) {
         // Written at once: the mark must be on disk before the use call goes out.
-        prefs.edit(commit = true) { putString(KEY, Json.encodeToString(serializer, targets)) }
+        val written = prefs.edit().putString(KEY, Json.encodeToString(serializer, targets)).commit()
+        if (!written) throw IOException("Could not write the Z.AI reset attempt keys")
     }
 
     public companion object {
