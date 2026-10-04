@@ -317,14 +317,20 @@ fun AnimatedPercent(
     display: QuotaDisplay = QuotaDisplay.Used,
     seen: SeenValues? = null,
     seenKey: String = "percent",
+    /** The style while the number shows three digits, as it does at 100%. */
+    threeDigitStyle: androidx.compose.ui.text.TextStyle = style,
 ) {
     val animated = animatedValue(percent.toFloat(), draining, display, seen, seenKey)
+    val shown = animated.roundToInt()
     Text(
-        text = stringResource(R.string.percent, animated.roundToInt()),
-        style = style,
+        text = stringResource(R.string.percent, shown),
+        style = if (shown >= THREE_DIGITS) threeDigitStyle else style,
         modifier = modifier,
     )
 }
+
+/** A percentage has three digits from here. */
+private const val THREE_DIGITS = 100
 
 @Composable
 private fun MeterRow(

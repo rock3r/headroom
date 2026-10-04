@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.WindowKind
 import java.io.IOException
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -122,6 +123,8 @@ internal class ZCodeResetApi(
                 method = "POST",
                 headers = headers(signIn, scoped = false),
                 body = "",
+                // The card is already used: a slow answer must not hold up the success.
+                timeout = HISTORY_READ_TIMEOUT,
             )
         call.done(send(call, request).summary)
     }
@@ -277,6 +280,7 @@ internal class ZCodeResetApi(
         const val DEPENDENCY_FAILED = 2007L
         const val MILLIS_THRESHOLD = 1_000_000_000_000L
         const val NEXT_TRY_AT = "next_try_at"
+        val HISTORY_READ_TIMEOUT: Duration = Duration.ofSeconds(5)
         val HTTP_STATUSES_FIRST = setOf(HTTP_UNAUTHORIZED, HTTP_FORBIDDEN, HTTP_TOO_MANY_REQUESTS)
     }
 }

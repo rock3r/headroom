@@ -204,6 +204,24 @@ class ZCodeAuthTest {
     }
 
     @Test
+    fun `a short-lived business token is never kept past its expiry`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = """{"code":0,"data":{"access_token":"brief","expires_in":10}}""",
+            )
+        )
+        val bundle = ZCodeTokens("zai-oauth", "zcode-jwt").encode()
+        val old =
+            TokenSet(Provider.ZAi, CredentialKind.OAuth, "stale", bundle, now).toCredential("z")
+
+        val tokens = zCode.refresh(old)
+
+        // Refreshed half-way through its 10 seconds, never after them.
+        assertEquals(now.plusSeconds(5), tokens.expiresAt)
+    }
+
+    @Test
     fun `a refused business token exchange asks for a new sign-in`() = runTest {
         server.enqueue(MockResponse(code = 200, body = """{"code":401,"msg":"expired"}"""))
         val bundle = ZCodeTokens("zai-oauth", "zcode-jwt").encode()

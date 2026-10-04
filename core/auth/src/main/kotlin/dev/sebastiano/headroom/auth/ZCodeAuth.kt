@@ -161,7 +161,8 @@ internal class ZCodeAuth(
             kind = CredentialKind.OAuth,
             accessToken = business,
             refreshToken = tokens.encode(),
-            expiresAt = maxOf(expiryWithSkew(now, lifetime, EXPIRY_MARGIN), now.plus(MIN_LIFETIME)),
+            // Refreshed a little early, and never kept past the lifetime Z.AI reports.
+            expiresAt = expiryWithSkew(now, lifetime, EXPIRY_MARGIN),
             label = label,
         )
     }
@@ -195,7 +196,6 @@ internal class ZCodeAuth(
         private const val POLL_TOKEN_BYTES = 32
         private val RETRYABLE_STATUSES = setOf(408, 429)
         private val EXPIRY_MARGIN: Duration = Duration.ofMinutes(5)
-        private val MIN_LIFETIME: Duration = Duration.ofSeconds(30)
 
         private fun randomPollToken(): String {
             val bytes = ByteArray(POLL_TOKEN_BYTES).also(SecureRandom()::nextBytes)

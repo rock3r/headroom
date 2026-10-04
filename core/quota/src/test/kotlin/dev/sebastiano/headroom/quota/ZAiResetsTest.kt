@@ -226,6 +226,28 @@ class ZAiResetsTest {
     }
 
     @Test
+    fun `the history read cannot hold up a reset that worked for long`() = runTest {
+        val http = FakeQuotaHttpClient { request ->
+            val body =
+                when {
+                    request.url.endsWith("/status") -> fixture("zai/reset_status.json")
+                    request.url.endsWith("/use") -> used()
+                    else -> ok
+                }
+            QuotaHttpResponse(statusCode = 200, body = body)
+        }
+        val fake = ZAiResets(http, clock, log, zCodeHost = "https://zcode.test")
+
+        assertEquals(
+            RedeemOutcome.Success(resetsLeft = 1),
+            fake.redeem(credentials(), "five_hour", "key-1"),
+        )
+
+        val history = http.requests.single { it.url.endsWith("/history/read") }
+        assertEquals(Duration.ofSeconds(5), history.timeout)
+    }
+
+    @Test
     fun `a failed history read does not undo the reset`() = runTest {
         server.enqueueJson(fixture("zai/reset_status.json"))
         server.enqueueJson(used())
