@@ -15,8 +15,10 @@ import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetRead
 import dev.sebastiano.headroom.quota.ZCodeSignIn
 import java.io.IOException
+import java.time.Duration
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Fetches one account's quota with a credential that is valid now, refreshing it if needed. For
@@ -27,7 +29,8 @@ import kotlinx.coroutines.coroutineScope
  * A Z.AI account's resets need its ZCode sign-in, which is saved next to its API key under
  * [ZCodeCredential.idFor] its id. The reset read's credentials carry it as
  * [ProviderCredentials.zCode], refreshed when needed, while the usage fetch runs with the API key
- * alone: a ZCode sign-in that does not work, or is slow to refresh, never fails or delays it.
+ * alone. A ZCode sign-in that does not work never fails the usage fetch, and a sync waits for it at
+ * most [ZCODE_SIGN_IN_WAIT].
  */
 public class AccountQuotaFetcher(
     private val credentials: CredentialProvider,
@@ -52,10 +55,10 @@ public class AccountQuotaFetcher(
             }
         val reader = resets.reader(account.provider)
         return coroutineScope {
-            // Only the reset read needs the ZCode sign-in, so a slow refresh of it never holds up
-            // the usage.
+            // Only the reset read needs the ZCode sign-in. A sync waits for it only so long, so a
+            // token endpoint that does not answer never holds up the usage.
             val resetRead = reader?.let {
-                async { it.read(credential.toProviderCredentials(zCodeSignIn(account))) }
+                async { it.read(credential.toProviderCredentials(syncZCodeSignIn(account))) }
             }
             when (val result = fetcher.fetch(credential.toProviderCredentials(zCode = null))) {
                 is QuotaResult.Success -> {
@@ -85,6 +88,13 @@ public class AccountQuotaFetcher(
      */
     internal suspend fun providerCredentials(account: Account): ProviderCredentials =
         validCredential(account).toProviderCredentials(zCodeSignIn(account))
+
+    /** [zCodeSignIn] for a sync: unavailable when it takes longer than [ZCODE_SIGN_IN_WAIT]. */
+    private suspend fun syncZCodeSignIn(account: Account): ZCodeSignIn? {
+        if (account.provider != Provider.ZAi) return null
+        return withTimeoutOrNull(ZCODE_SIGN_IN_WAIT.toMillis()) { zCodeSignIn(account) }
+            ?: ZCodeSignIn.Unavailable
+    }
 
     /** The ZCode sign-in of a Z.AI account, refreshed when needed. Null for other providers. */
     private suspend fun zCodeSignIn(account: Account): ZCodeSignIn? {
@@ -138,4 +148,13 @@ public class AccountQuotaFetcher(
             is AuthException.SignInFailed -> QuotaErrorKind.Auth
             is AuthException.InvalidResponse -> QuotaErrorKind.Parse
         }
+
+    public companion object {
+        /**
+         * How long a sync waits for the ZCode sign-in, refresh included. A token endpoint that
+         * answers does so well within it. Past it, the sync reads no resets and keeps the stored
+         * ones.
+         */
+        public val ZCODE_SIGN_IN_WAIT: Duration = Duration.ofSeconds(5)
+    }
 }

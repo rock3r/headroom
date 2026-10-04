@@ -160,7 +160,9 @@ When the login call refuses the Z.AI token, the user must sign in to ZCode again
 `AccountQuotaFetcher` adds the ZCode sign-in to the credentials of a Z.AI account's reset read
 (`ProviderCredentials.zCode`): ready, missing, or unavailable (for example offline). It resolves
 the sign-in inside the reset read, in parallel with the usage fetch, which only needs the API key.
-A ZCode sign-in that does not work never fails the usage fetch, and a slow refresh never delays it.
+A ZCode sign-in that does not work never fails the usage fetch. A sync waits at most 5 seconds for
+it (`ZCODE_SIGN_IN_WAIT`), refresh included; past that, the sync reads no resets and keeps the
+stored ones, so a token endpoint that does not answer never holds up the usage.
 In the app, `ZCodeSignIn` runs one sign-in at a time from the redeem sheet. The sheet says while it
 waits for the browser, says why it failed, and closes once the user signed in; the account is
 refreshed so its resets show.

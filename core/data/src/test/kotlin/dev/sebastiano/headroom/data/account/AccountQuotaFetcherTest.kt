@@ -250,6 +250,7 @@ class AccountQuotaFetcherTest {
         assertEquals(ResetAvailability(listOf(pool)), snapshot.resets)
         assertEquals(false, snapshot.resetsReadFailed)
         assertEquals("access-g1", reader.seen.single().accessToken)
+        assertNull(reader.seen.single().zCode)
     }
 
     @Test
@@ -399,6 +400,8 @@ class AccountQuotaFetcherTest {
         val result = zAiFetcherFor(zAi, mapOf(Provider.ZAi to refresher)).fetch(zAiAccount)
 
         assertEquals(0L, usageFetchedAt)
+        // The sync gives up on the ZCode sign-in long before the refresh's own timeout.
+        assertEquals(AccountQuotaFetcher.ZCODE_SIGN_IN_WAIT.toMillis(), testScheduler.currentTime)
         assertIs<QuotaResult.Success>(result)
         assertEquals(ZCodeSignIn.Unavailable, zAiResets.seen.single().zCode)
     }
