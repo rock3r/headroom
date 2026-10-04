@@ -25,7 +25,11 @@ import java.io.IOException
  * ([dev.sebastiano.headroom.model.canRedeemResets]).
  */
 public class SyncedResetProvider(
-    private val accounts: () -> List<AccountState>,
+    /**
+     * The accounts as storage holds them now, such as
+     * [dev.sebastiano.headroom.model.QuotaRepository.current].
+     */
+    private val accounts: suspend () -> List<AccountState>,
     private val fetcher: AccountQuotaFetcher,
     private val clients: ResetClients,
     private val log: ResetLog = ResetLog.None,

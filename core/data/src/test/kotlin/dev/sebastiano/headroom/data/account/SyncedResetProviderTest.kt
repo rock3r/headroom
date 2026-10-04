@@ -205,4 +205,28 @@ class SyncedResetProviderTest {
     fun `asking without a working sign-in fails for the sign-in`() = runTest {
         assertEquals(AskOutcome.Failed(QuotaErrorKind.Auth), provider.askForMore(zAi))
     }
+
+    @Test
+    fun `the resets are read from committed storage, so a sync that just ended shows`() = runTest {
+        var committed = emptyList<AccountState>()
+        val fromStorage =
+            SyncedResetProvider(
+                // Like QuotaRepository.current(): a suspending read of what the sync stored.
+                accounts = {
+                    kotlinx.coroutines.yield()
+                    committed
+                },
+                fetcher =
+                    AccountQuotaFetcher(
+                        CredentialProvider(store, emptyMap()),
+                        QuotaFetchers(emptyList()),
+                    ),
+                clients = ResetClients(emptyList(), emptyList()),
+            )
+        assertNull(fromStorage.availability(codex))
+
+        committed = states
+
+        assertEquals(ResetAvailability(listOf(pool)), fromStorage.availability(codex))
+    }
 }
