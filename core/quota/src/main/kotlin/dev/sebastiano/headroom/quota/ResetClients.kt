@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.quota
 
+import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
@@ -39,10 +40,19 @@ public interface ResetRedeemer {
     ): RedeemOutcome
 }
 
-/** The reset readers and redeemers of every provider that has resets. */
+/** Asks a provider for another reset, as Z.AI's reset cards. It never throws for HTTP problems. */
+public interface ResetAsker {
+    public val provider: Provider
+
+    /** Only runs when the user asks: it is never polled. */
+    public suspend fun ask(credentials: ProviderCredentials): AskOutcome
+}
+
+/** The reset readers, redeemers and askers of every provider that has resets. */
 public class ResetClients(
     private val readers: List<ResetReader>,
     private val redeemers: List<ResetRedeemer>,
+    private val askers: List<ResetAsker> = emptyList(),
 ) {
     public fun reader(provider: Provider): ResetReader? = readers.firstOrNull {
         it.provider == provider
@@ -52,13 +62,19 @@ public class ResetClients(
         it.provider == provider
     }
 
+    public fun asker(provider: Provider): ResetAsker? = askers.firstOrNull {
+        it.provider == provider
+    }
+
     public companion object {
         /** No resets at all, for tests and builds without them. */
         public val None: ResetClients = ResetClients(emptyList(), emptyList())
 
         /**
-         * Codex and Grok resets are read and used; Claude's grants are only read. Z.AI resets need
-         * a separate sign-in that Headroom does not have yet, so they are not read.
+         * Codex, Grok and Z.AI resets are read and used, and Z.AI can be asked for more; Claude's
+         * grants are only read. Z.AI resets need the account's ZCode sign-in
+         * ([ProviderCredentials.zCode]). Whether the app offers a redeem is its own decision
+         * ([dev.sebastiano.headroom.model.canRedeemResets]).
          */
         public fun create(
             httpClient: QuotaHttpClient = OkHttpQuotaHttpClient(),
@@ -67,9 +83,11 @@ public class ResetClients(
         ): ResetClients {
             val codex = CodexResets(httpClient, clock, log)
             val grok = GrokResets(httpClient, clock, log)
+            val zAi = ZAiResets(httpClient, clock, log)
             return ResetClients(
-                readers = listOf(codex, grok, ClaudeResets(httpClient, clock, log)),
-                redeemers = listOf(codex, grok),
+                readers = listOf(codex, grok, ClaudeResets(httpClient, clock, log), zAi),
+                redeemers = listOf(codex, grok, zAi),
+                askers = listOf(zAi),
             )
         }
     }
@@ -128,6 +146,11 @@ internal class AttemptTargets {
         targets.remove(attemptKey)
         targets[attemptKey] = target
         while (targets.size > MAX_ENTRIES) targets.remove(targets.keys.first())
+    }
+
+    @Synchronized
+    fun forget(attemptKey: String) {
+        targets.remove(attemptKey)
     }
 
     private companion object {

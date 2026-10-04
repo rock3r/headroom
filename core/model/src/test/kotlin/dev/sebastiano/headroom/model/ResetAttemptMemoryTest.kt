@@ -3,7 +3,6 @@ package dev.sebastiano.headroom.model
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
@@ -81,11 +80,8 @@ class ResetAttemptMemoryTest {
     }
 
     @Test
-    fun `only Codex and Grok resets can be redeemed`() {
-        assertTrue(Provider.Codex.canRedeemResets)
-        assertTrue(Provider.Grok.canRedeemResets)
-        Provider.entries
-            .filterNot { it == Provider.Codex || it == Provider.Grok }
-            .forEach { assertFalse(it.canRedeemResets, "$it") }
+    fun `Codex, Grok and Z_AI resets can be redeemed`() {
+        val redeemable = setOf(Provider.Codex, Provider.Grok, Provider.ZAi)
+        Provider.entries.forEach { assertEquals(it in redeemable, it.canRedeemResets, "$it") }
     }
 }

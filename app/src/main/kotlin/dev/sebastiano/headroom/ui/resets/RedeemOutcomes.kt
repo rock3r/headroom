@@ -23,7 +23,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -350,12 +353,12 @@ private fun answerLook(
 }
 
 /**
- * The provider needs its own sign-in before resets can be seen or used, as Z.AI's ZCode. The
- * prototype's button only says that sign-in is not built yet.
+ * The provider needs its own sign-in before resets can be seen or used, as Z.AI's ZCode. The button
+ * starts it in the browser; [signInNote] says how it is going.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun SignIn(summary: AccountSummary, signInNote: Boolean, actions: RedeemActions) {
+internal fun SignIn(summary: AccountSummary, signInNote: String?, actions: RedeemActions) {
     val service = ResetCopy.signInService(summary.provider)
     val animate = animationsEnabled()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -378,7 +381,7 @@ internal fun SignIn(summary: AccountSummary, signInNote: Boolean, actions: Redee
         // The note opens its space, gap included, on the sheet's spring, so the sheet grows
         // smoothly instead of jumping by the note's height.
         AnimatedVisibility(
-            visible = signInNote,
+            visible = signInNote != null,
             enter =
                 if (animate) {
                     fadeIn(effects) + expandVertically(spatial, Alignment.Top, clip = false)
@@ -386,8 +389,11 @@ internal fun SignIn(summary: AccountSummary, signInNote: Boolean, actions: Redee
                     fadeIn(effects)
                 },
         ) {
+            // The last line stays while the note fades out.
+            val last = remember { mutableStateOf("") }
+            SideEffect { if (signInNote != null) last.value = signInNote }
             Text(
-                text = stringResource(R.string.redeem_sign_in_stub),
+                text = signInNote ?: last.value,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier =

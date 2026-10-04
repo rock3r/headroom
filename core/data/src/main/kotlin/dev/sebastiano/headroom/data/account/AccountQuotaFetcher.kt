@@ -3,6 +3,8 @@ package dev.sebastiano.headroom.data.account
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialProvider
 import dev.sebastiano.headroom.auth.StoredCredential
+import dev.sebastiano.headroom.auth.ZCodeCredential
+import dev.sebastiano.headroom.auth.ZCodeTokens
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
@@ -11,6 +13,7 @@ import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetchers
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetRead
+import dev.sebastiano.headroom.quota.ZCodeSignIn
 import java.io.IOException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -20,6 +23,10 @@ import kotlinx.coroutines.coroutineScope
  * providers with resets, it reads them in parallel with the usage and adds them to the snapshot. A
  * reset read that fails never fails the fetch: the snapshot says so, and the app keeps the resets
  * it read last.
+ *
+ * A Z.AI account's resets need its ZCode sign-in, which is saved next to its API key under
+ * [ZCodeCredential.idFor] its id. The credentials carry it as [ProviderCredentials.zCode],
+ * refreshed when needed; a ZCode sign-in that does not work never fails the usage fetch.
  */
 public class AccountQuotaFetcher(
     private val credentials: CredentialProvider,
@@ -42,7 +49,7 @@ public class AccountQuotaFetcher(
                 // The token store could not read or write the credential.
                 return QuotaResult.Failure(QuotaErrorKind.Unknown, failure.message.orEmpty())
             }
-        val providerCredentials = credential.toProviderCredentials()
+        val providerCredentials = credential.toProviderCredentials(zCodeSignIn(account))
         val reader = resets.reader(account.provider)
         return coroutineScope {
             val resetRead = reader?.let { async { it.read(providerCredentials) } }
@@ -73,12 +80,36 @@ public class AccountQuotaFetcher(
      * @throws IOException when the token store cannot be read or written.
      */
     internal suspend fun providerCredentials(account: Account): ProviderCredentials =
-        validCredential(account).toProviderCredentials()
+        validCredential(account).toProviderCredentials(zCodeSignIn(account))
+
+    /** The ZCode sign-in of a Z.AI account, refreshed when needed. Null for other providers. */
+    private suspend fun zCodeSignIn(account: Account): ZCodeSignIn? {
+        if (account.provider != Provider.ZAi) return null
+        return try {
+            val credential = credentials.validCredential(ZCodeCredential.idFor(account.id))
+            val tokens = credential.refreshToken?.let(ZCodeTokens::decode)
+            if (tokens == null) ZCodeSignIn.Missing
+            else ZCodeSignIn.Ready(tokens.zCodeJwt, credential.accessToken)
+        } catch (failure: AuthException) {
+            when (failure) {
+                is AuthException.NotSignedIn,
+                is AuthException.SignInExpired,
+                is AuthException.SignInFailed -> ZCodeSignIn.Missing
+                is AuthException.Rejected ->
+                    if (failure.requiresSignIn) ZCodeSignIn.Missing else ZCodeSignIn.Unavailable
+                is AuthException.Network,
+                is AuthException.TimedOut,
+                is AuthException.InvalidResponse -> ZCodeSignIn.Unavailable
+            }
+        } catch (_: IOException) {
+            ZCodeSignIn.Unavailable
+        }
+    }
 
     private suspend fun validCredential(account: Account): StoredCredential =
         credentials.validCredential(account.id)
 
-    private fun StoredCredential.toProviderCredentials() =
+    private fun StoredCredential.toProviderCredentials(zCode: ZCodeSignIn?) =
         ProviderCredentials(
             // Copilot's usage endpoint takes the long-lived GitHub token, not the Copilot token.
             accessToken =
@@ -89,6 +120,7 @@ public class AccountQuotaFetcher(
             idToken = if (provider == Provider.JetBrains) jetBrainsIdToken else null,
             // JetBrains switches the refresh token's audience to list the account's AI licenses.
             refreshToken = if (provider == Provider.JetBrains) refreshToken else null,
+            zCode = zCode,
         )
 
     private fun AuthException.toErrorKind(): QuotaErrorKind =

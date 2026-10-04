@@ -103,6 +103,13 @@ class ResetCenter(
         }
     }
 
+    /**
+     * Asks for another reset. A granted one only shows in the resets after the account's next sync,
+     * so a grant refreshes the account before this returns: "Use it now" then finds it.
+     */
     override suspend fun askForMore(account: Account): AskOutcome =
-        provider.askForMore(account).also { refresh(account) }
+        provider.askForMore(account).also { outcome ->
+            if (outcome is AskOutcome.Granted) refreshUsage(account.id)
+            refresh(account)
+        }
 }

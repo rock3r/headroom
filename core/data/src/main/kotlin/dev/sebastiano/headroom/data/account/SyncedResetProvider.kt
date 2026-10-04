@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.account
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.ResetAttemptKey
@@ -18,9 +19,10 @@ import java.io.IOException
 /**
  * The resets of the signed-in accounts. Their availability comes from the last sync, which reads it
  * with the usage and stores it with the snapshot; this class makes no call to read it. Redeeming
- * goes to the provider's [dev.sebastiano.headroom.quota.ResetRedeemer], with a credential that
- * works now, and only for the providers whose resets Headroom can use
- * ([dev.sebastiano.headroom.model.Provider.canRedeemResets]).
+ * goes to the provider's [dev.sebastiano.headroom.quota.ResetRedeemer], and asking for another
+ * reset to its [dev.sebastiano.headroom.quota.ResetAsker], with a credential that works now. Both
+ * only run for the providers whose resets Headroom can use
+ * ([dev.sebastiano.headroom.model.canRedeemResets]).
  */
 public class SyncedResetProvider(
     private val accounts: () -> List<AccountState>,
@@ -36,8 +38,7 @@ public class SyncedResetProvider(
         poolId: String,
         attemptKey: ResetAttemptKey,
     ): RedeemOutcome {
-        val redeemer =
-            clients.redeemer(account.provider)?.takeIf { account.provider.canRedeemResets }
+        val redeemer = clients.redeemer(account.provider)?.takeIf { redeems(account) }
         val outcome =
             if (redeemer == null) {
                 RedeemOutcome.Unsupported
@@ -54,6 +55,27 @@ public class SyncedResetProvider(
         )
         return outcome
     }
+
+    override suspend fun askForMore(account: Account): AskOutcome {
+        val asker =
+            clients.asker(account.provider)?.takeIf { redeems(account) }
+                ?: return AskOutcome.Unsupported
+        val outcome =
+            when (val credentials = credentialsOf(account)) {
+                is Credentials.Ready -> asker.ask(credentials.value)
+                is Credentials.Missing ->
+                    when (val missing = credentials.outcome) {
+                        is RedeemOutcome.Failed -> AskOutcome.Failed(missing.kind)
+                        else -> AskOutcome.Failed(QuotaErrorKind.Auth)
+                    }
+            }
+        log.debug(
+            "${account.provider.id} ask account ${ResetLogRedaction.shortHash(account.id)}: $outcome"
+        )
+        return outcome
+    }
+
+    private fun redeems(account: Account): Boolean = account.provider.canRedeemResets
 
     private suspend fun credentialsOf(account: Account): Credentials =
         try {

@@ -6,7 +6,9 @@ import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.ResetAttemptKey
@@ -16,6 +18,7 @@ import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetchers
+import dev.sebastiano.headroom.quota.ResetAsker
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
 import dev.sebastiano.headroom.quota.ResetRedeemer
@@ -57,8 +60,20 @@ class SyncedResetProviderTest {
         }
     }
 
+    private class RecordingAsker(override val provider: Provider) : ResetAsker {
+        val calls = mutableListOf<ProviderCredentials>()
+
+        override suspend fun ask(credentials: ProviderCredentials): AskOutcome {
+            calls += credentials
+            return AskOutcome.Granted(poolId = null)
+        }
+    }
+
     private val codexRedeemer = RecordingRedeemer(Provider.Codex)
     private val claudeRedeemer = RecordingRedeemer(Provider.Claude)
+    private val zAiRedeemer = RecordingRedeemer(Provider.ZAi)
+    private val zAiAsker = RecordingAsker(Provider.ZAi)
+    private val zAi = Account("z1", Provider.ZAi, "me")
 
     private val states: List<AccountState> =
         listOf(
@@ -84,7 +99,12 @@ class SyncedResetProviderTest {
                     CredentialProvider(store, emptyMap()),
                     QuotaFetchers(emptyList()),
                 ),
-            clients = ResetClients(emptyList(), listOf(codexRedeemer, claudeRedeemer)),
+            clients =
+                ResetClients(
+                    emptyList(),
+                    listOf(codexRedeemer, claudeRedeemer, zAiRedeemer),
+                    listOf(zAiAsker),
+                ),
             log = log,
         )
 
@@ -154,5 +174,35 @@ class SyncedResetProviderTest {
         val line = lines.single()
         assertTrue("key-1" in line && "codex" in line && "Success" in line, line)
         assertTrue(lines.none { "secret-token" in it || " c1 " in it || "=c1" in it })
+    }
+
+    @Test
+    fun `a Z_AI redeem uses the account's credential and the pool`() = runTest {
+        signIn(zAi)
+
+        assertEquals(
+            RedeemOutcome.Success(resetsLeft = 1),
+            provider.redeem(zAi, "five_hour", ResetAttemptKey("key-2")),
+        )
+        assertEquals("five_hour", zAiRedeemer.calls.single().second)
+    }
+
+    @Test
+    fun `asking for a Z_AI reset card uses the account's credential`() = runTest {
+        signIn(zAi)
+
+        assertEquals(AskOutcome.Granted(poolId = null), provider.askForMore(zAi))
+        assertEquals("secret-token", zAiAsker.calls.single().accessToken)
+    }
+
+    @Test
+    fun `providers without an asker cannot ask`() = runTest {
+        signIn(codex)
+        assertEquals(AskOutcome.Unsupported, provider.askForMore(codex))
+    }
+
+    @Test
+    fun `asking without a working sign-in fails for the sign-in`() = runTest {
+        assertEquals(AskOutcome.Failed(QuotaErrorKind.Auth), provider.askForMore(zAi))
     }
 }

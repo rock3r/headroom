@@ -143,9 +143,13 @@
     <string name="redeem_ask_failed_title">Could not ask</string>
     <string name="redeem_ask_failed_body">Headroom could not reach %1$s. Try again later.</string>
     <string name="redeem_sign_in_title">Sign in to %1$s</string>
-    <string name="redeem_sign_in_body">%1$s resets need a separate sign-in to %2$s. The API key Headroom uses today cannot see or use resets.</string>
+    <string name="redeem_sign_in_body">%1$s resets need a separate sign-in to %2$s. Your API key cannot see or use resets.</string>
     <string name="redeem_sign_in_button">Sign in to %1$s</string>
     <string name="redeem_sign_in_stub">This prototype does not sign in yet.</string>
+    <string name="redeem_sign_in_waiting">Sign in to %1$s in your browser. Headroom carries on when you are done.</string>
+    <string name="redeem_sign_in_failed">The sign-in to %1$s did not work. Try again.</string>
+    <string name="redeem_sign_in_network">Headroom could not reach %1$s. Check your connection and try again.</string>
+    <string name="redeem_sign_in_expired">The sign-in to %1$s took too long. Try again.</string>
     <string name="redeem_usage_description">%1$s: %2$s</string>
 
     <!-- The Quick Settings tile -->

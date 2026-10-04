@@ -36,11 +36,11 @@ public data class ResetScope(
 }
 
 /**
- * True for the providers whose resets Headroom can use: Codex and Grok. Other providers' resets,
- * such as Claude's grants, are shown for information only, with no action.
+ * True for the providers whose resets Headroom can use: Codex, Grok and Z.AI. Other providers'
+ * resets, such as Claude's grants, are shown for information only, with no action.
  */
 public val Provider.canRedeemResets: Boolean
-    get() = this == Provider.Codex || this == Provider.Grok
+    get() = this == Provider.Codex || this == Provider.Grok || this == Provider.ZAi
 
 /** Whether a pool's reset can be used now, and if not, why not. */
 public enum class ResetPoolStatus {

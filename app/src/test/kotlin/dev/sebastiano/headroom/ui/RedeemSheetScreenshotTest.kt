@@ -271,7 +271,7 @@ data class SheetShot(
     val display: QuotaDisplay = QuotaDisplay.Used,
     val palette: ThemePalette = ThemePalette.Wallpaper,
     val canAskForMore: Boolean = false,
-    val signInNote: Boolean = false,
+    val signInNote: String? = null,
     /** The usage is still being refreshed after a success. */
     val refreshing: Boolean = false,
     val reduceMotion: Boolean = false,
@@ -397,7 +397,12 @@ internal fun sheetShots(): List<SheetShot> {
         ),
         SheetShot("zai-ask-throttled", zai, RedeemStep.Answered(AskOutcome.Throttled)),
         SheetShot("zai-sign-in", zai, RedeemStep.SignInRequired),
-        SheetShot("zai-sign-in-tapped", zai, RedeemStep.SignInRequired, signInNote = true),
+        SheetShot(
+            "zai-sign-in-tapped",
+            zai,
+            RedeemStep.SignInRequired,
+            signInNote = "Sign in to ZCode in your browser. Headroom carries on when you are done.",
+        ),
         SheetShot("claude-confirm", claude, RedeemStep.Confirm(grant, false)),
         SheetShot("claude-resetting", claude, RedeemStep.Resetting(grant)),
         SheetShot(

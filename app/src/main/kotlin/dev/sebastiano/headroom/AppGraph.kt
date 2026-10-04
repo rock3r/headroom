@@ -20,6 +20,7 @@ import dev.sebastiano.headroom.appdata.ResetCenter
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
+import dev.sebastiano.headroom.data.reset.AndroidResetLog
 import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
@@ -36,6 +37,7 @@ import dev.sebastiano.headroom.signin.AuthSignInSteps
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
+import dev.sebastiano.headroom.signin.ZCodeSignIn
 import dev.sebastiano.headroom.tile.StatusBarTileAdder
 import dev.sebastiano.headroom.tile.TileAdder
 import dev.sebastiano.headroom.tile.TileSettings
@@ -117,6 +119,8 @@ class AppGraph(
     val prototypes: PrototypeTools? = null,
     /** The demo accounts, so debug tools can show a scenario such as an expired sign-in. */
     val demoAccounts: FakeQuotaRepository? = null,
+    /** The ZCode sign-in that Z.AI resets need; null without the data layer. */
+    val zCodeSignIn: ZCodeSignIn? = null,
 ) {
     /** The resets of every account, read through the reset provider. */
     val resets: ResetCenter =
@@ -205,19 +209,21 @@ class AppGraph(
                     scope = scope,
                     simulatedLatency = demoLatency,
                 )
+            // The app's task is under the browser tab, so this start is allowed; MainActivity is
+            // singleTask, so it clears the tab above it.
+            val bringAppToFront = {
+                context.startActivity(
+                    Intent(context, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+            val steps = data?.let {
+                AuthSignInSteps(it.authMethods, bringAppToFront = bringAppToFront)
+            }
             val signInController =
-                if (data == null) {
+                if (data == null || steps == null) {
                     FakeSignInController()
                 } else {
-                    val steps =
-                        AuthSignInSteps(data.authMethods) {
-                            // The app's task is under the browser tab, so this start is allowed;
-                            // MainActivity is singleTask, so it clears the tab above it.
-                            context.startActivity(
-                                Intent(context, MainActivity::class.java)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }
                     RealSignInController(
                         steps,
                         scope,
@@ -279,6 +285,16 @@ class AppGraph(
                 tileSettings = tileSettings,
                 prototypes = prototypeTools,
                 demoAccounts = demoAccounts,
+                zCodeSignIn =
+                    if (data == null || steps == null) null
+                    else
+                        ZCodeSignIn(
+                            start = steps::startZCode,
+                            save = data.signInManager::signInToZCode,
+                            scope = scope,
+                            returnToApp = bringAppToFront,
+                            log = AndroidResetLog::debug,
+                        ),
             )
         }
 
