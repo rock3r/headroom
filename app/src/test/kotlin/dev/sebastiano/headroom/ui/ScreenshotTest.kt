@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
@@ -118,7 +117,7 @@ class ScreenshotTest {
         // animation is drawn, so draw every step until transitions and sweeps have settled.
         repeat(SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
     }
 
@@ -388,7 +387,7 @@ class ScreenshotTest {
         // A finger moves over several frames; each frame brings a little more progress.
         repeat(BACK_STEPS) { step ->
             rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
             val progress = BACK_PROGRESS * (step + 1) / BACK_STEPS
             rule.runOnUiThread { dispatcher.dispatchOnBackProgressed(backEvent(progress)) }
         }
