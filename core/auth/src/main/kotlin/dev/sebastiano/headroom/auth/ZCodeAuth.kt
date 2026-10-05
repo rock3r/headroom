@@ -61,11 +61,12 @@ internal class ZCodeAuth(
                 "$context returned a sign-in page that is not https"
             )
         }
+        // A time that has already passed stays an expiry, so the sign-in times out at once rather
+        // than polling a flow that cannot work.
         val expiresIn =
             data.long("expires_at")?.let { at ->
-                Duration.between(clock.instant(), Instant.ofEpochSecond(at)).takeIf {
-                    !it.isNegative && !it.isZero
-                }
+                Duration.between(clock.instant(), Instant.ofEpochSecond(at))
+                    .coerceAtLeast(Duration.ZERO)
             }
         return DeviceCodeGrant(
             userCode = "",

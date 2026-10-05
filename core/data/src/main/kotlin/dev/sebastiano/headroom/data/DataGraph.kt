@@ -31,6 +31,7 @@ import dev.sebastiano.headroom.data.reset.ResetAlarmPlanner
 import dev.sebastiano.headroom.data.reset.ResetCheckWorker
 import dev.sebastiano.headroom.data.reset.ResetChecker
 import dev.sebastiano.headroom.data.reset.ResetIsland
+import dev.sebastiano.headroom.data.reset.SharedPreferencesAttemptTargetStore
 import dev.sebastiano.headroom.data.reset.SharedPreferencesResetAttemptStore
 import dev.sebastiano.headroom.data.reset.SharedPreferencesResetLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
@@ -94,7 +95,11 @@ public class DataGraph(
     /** Where the reset clients write what they ask and get: logcat, under `HeadroomResets`. */
     resetLog: ResetLog = AndroidResetLog,
     /** Reads and uses the usage-limit resets of the providers that have them. */
-    resetClients: ResetClients = ResetClients.create(log = resetLog),
+    resetClients: ResetClients =
+        ResetClients.create(
+            log = resetLog,
+            zAiReachedUse = SharedPreferencesAttemptTargetStore(context),
+        ),
 ) {
     private val appContext = context.applicationContext
 

@@ -48,6 +48,20 @@ class ZAiResetsTest {
         server.close()
     }
 
+    private fun zAiResets(reachedUse: AttemptTargetStore) =
+        ZAiResets(OkHttpQuotaHttpClient(), clock, log, server.baseUrl(), reachedUse)
+
+    /** A store that outlives the [ZAiResets] that write to it, as a file does. */
+    private class MemoryAttemptTargetStore : AttemptTargetStore {
+        private var saved = emptyMap<String, String>()
+
+        override fun load(): Map<String, String> = saved
+
+        override fun save(targets: Map<String, String>) {
+            saved = targets.toMap()
+        }
+    }
+
     private fun credentials(zCode: ZCodeSignIn? = ZCodeSignIn.Ready("zcode-jwt", "business")) =
         ProviderCredentials(accessToken = "zai-api-key", zCode = zCode)
 
@@ -292,6 +306,53 @@ class ZAiResetsTest {
     }
 
     @Test
+    fun `a key that reached use is retried after a restart, even once the pool is empty`() =
+        runTest {
+            val disk = MemoryAttemptTargetStore()
+            resets = zAiResets(disk)
+            server.enqueueJson(fixture("zai/reset_status.json"))
+            server.enqueueStatus(502)
+            assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Unknown), redeem())
+
+            // The process was stopped: only what was saved is left.
+            resets = zAiResets(disk)
+            server.enqueueJson(fixture("zai/reset_status_week_only.json"))
+            server.enqueueJson(used())
+            server.enqueueJson(ok)
+            assertEquals(RedeemOutcome.Success(resetsLeft = 0), redeem())
+            assertEquals("/api/v1/coding-plan/reset/use", requests()[3].target)
+        }
+
+    @Test
+    fun `a key whose mark cannot be saved never reaches use`() = runTest {
+        val failing =
+            object : AttemptTargetStore {
+                override fun load(): Map<String, String> = emptyMap()
+
+                override fun save(targets: Map<String, String>) =
+                    throw java.io.IOException("disk full")
+            }
+        resets = zAiResets(failing)
+        server.enqueueJson(fixture("zai/reset_status.json"))
+
+        assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Unknown), redeem())
+        assertEquals(listOf("/api/v1/coding-plan/reset/status"), requests().map { it.target })
+    }
+
+    @Test
+    fun `a definite no is forgotten on disk too`() = runTest {
+        val disk = MemoryAttemptTargetStore()
+        resets = zAiResets(disk)
+        server.enqueueJson(fixture("zai/reset_status.json"))
+        server.enqueueJson(used("false"))
+        redeem()
+
+        resets = zAiResets(disk)
+        server.enqueueJson(fixture("zai/reset_status_week_only.json"))
+        assertEquals(RedeemOutcome.NoCredit, redeem())
+    }
+
+    @Test
     fun `a retried key with resets still visible cannot say how many are left`() = runTest {
         server.enqueueJson(fixture("zai/reset_status.json"))
         server.enqueueJson("""{"code":0,"data":{}}""")
@@ -498,6 +559,14 @@ class ZAiResetsTest {
         assertEquals(AskOutcome.Failed(QuotaErrorKind.Unknown), resets.ask(credentials()))
         server.enqueueJson("""{"code":0,"data":{"granted":true}}""")
         assertEquals(AskOutcome.Granted(null), resets.ask(credentials()))
+    }
+
+    @Test
+    fun `a refused ask asks for a new ZCode sign-in`() = runTest {
+        listOf(401, 403).forEach { status ->
+            server.enqueueStatus(status)
+            assertEquals(AskOutcome.Failed(QuotaErrorKind.Auth), resets.ask(credentials()))
+        }
     }
 
     @Test

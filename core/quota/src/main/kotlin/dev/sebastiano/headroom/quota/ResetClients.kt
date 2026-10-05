@@ -80,10 +80,12 @@ public class ResetClients(
             httpClient: QuotaHttpClient = OkHttpQuotaHttpClient(),
             clock: Clock = Clock.systemUTC(),
             log: ResetLog = ResetLog.None,
+            /** Where Z.AI keeps the attempt keys that reached `use`, across restarts. */
+            zAiReachedUse: AttemptTargetStore = AttemptTargetStore.None,
         ): ResetClients {
             val codex = CodexResets(httpClient, clock, log)
             val grok = GrokResets(httpClient, clock, log)
-            val zAi = ZAiResets(httpClient, clock, log)
+            val zAi = ZAiResets(httpClient, clock, log, reachedUseStore = zAiReachedUse)
             return ResetClients(
                 readers = listOf(codex, grok, ClaudeResets(httpClient, clock, log), zAi),
                 redeemers = listOf(codex, grok, zAi),
@@ -132,25 +134,61 @@ internal class ResetCall(
 }
 
 /**
- * Remembers what each attempt key addressed (the credit or token it redeems), so a retry of that
- * attempt addresses the same one. It lives in memory and holds the latest [MAX_ENTRIES] keys: an
- * entry only matters while its attempt can still be retried.
+ * Keeps what [AttemptTargets] remembers across process restarts. Reads and writes must be quick.
  */
-internal class AttemptTargets {
-    private val targets = LinkedHashMap<String, String>()
+public interface AttemptTargetStore {
+    /** The targets by attempt key, oldest first. */
+    public fun load(): Map<String, String>
+
+    /** @throws IOException when the targets could not be saved. */
+    public fun save(targets: Map<String, String>)
+
+    public companion object {
+        /** Keeps nothing: the targets live only as long as the process. */
+        public val None: AttemptTargetStore =
+            object : AttemptTargetStore {
+                override fun load(): Map<String, String> = emptyMap()
+
+                override fun save(targets: Map<String, String>) = Unit
+            }
+    }
+}
+
+/**
+ * Remembers what each attempt key addressed (the credit or token it redeems), so a retry of that
+ * attempt addresses the same one. It holds the latest [MAX_ENTRIES] keys: an entry only matters
+ * while its attempt can still be retried. It lives in memory, and in [store] when one is given: the
+ * store is read once, and written before [remember] returns.
+ */
+internal class AttemptTargets(private val store: AttemptTargetStore = AttemptTargetStore.None) {
+    private val targets: LinkedHashMap<String, String> by lazy { LinkedHashMap(store.load()) }
 
     @Synchronized operator fun get(attemptKey: String): String? = targets[attemptKey]
 
+    /** @throws IOException when [store] could not save it. Nothing is remembered then. */
     @Synchronized
     fun remember(attemptKey: String, target: String) {
-        targets.remove(attemptKey)
-        targets[attemptKey] = target
-        while (targets.size > MAX_ENTRIES) targets.remove(targets.keys.first())
+        val updated = LinkedHashMap(targets)
+        updated.remove(attemptKey)
+        updated[attemptKey] = target
+        while (updated.size > MAX_ENTRIES) updated.remove(updated.keys.first())
+        store.save(updated)
+        targets.clear()
+        targets.putAll(updated)
     }
 
+    /**
+     * Forgets [attemptKey]. Saving that is best effort: a key left in [store] only makes a later
+     * retry of it ask the server again.
+     */
     @Synchronized
     fun forget(attemptKey: String) {
-        targets.remove(attemptKey)
+        if (targets.remove(attemptKey) == null) return
+        try {
+            store.save(targets.toMap())
+        } catch (_: IOException) {
+            // See above: the stale key is harmless.
+        }
     }
 
     private companion object {

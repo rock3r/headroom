@@ -131,7 +131,8 @@ internal class ZCodeResetApi(
 
     /**
      * `POST …/opportunity`: asks Z.AI to issue a card, idempotent on [askKey]. A decline
-     * (code 3301) names the earliest time to ask again; HTTP 429 means the account asked too often.
+     * (code 3301) names the earliest time to ask again; HTTP 429 means the account asked too often,
+     * and HTTP 401 or 403 that the ZCode sign-in no longer works.
      */
     suspend fun opportunity(signIn: ZCodeSignIn.Ready, askKey: String): ZCodeAsk {
         val call = ResetCall(log, Provider.ZAi, "ask", opportunityUrl)
@@ -158,8 +159,13 @@ internal class ZCodeResetApi(
                         else -> ZCodeAsk(AskOutcome.Failed(QuotaErrorKind.Unknown))
                     }
                 is Envelope.Http ->
-                    if (answer.status == HTTP_TOO_MANY_REQUESTS) ZCodeAsk(AskOutcome.Throttled)
-                    else ZCodeAsk(AskOutcome.Failed(QuotaErrorKind.Unknown))
+                    when (answer.status) {
+                        // The ZCode sign-in no longer works: only a new one can ask.
+                        HTTP_UNAUTHORIZED,
+                        HTTP_FORBIDDEN -> ZCodeAsk(AskOutcome.Failed(QuotaErrorKind.Auth))
+                        HTTP_TOO_MANY_REQUESTS -> ZCodeAsk(AskOutcome.Throttled)
+                        else -> ZCodeAsk(AskOutcome.Failed(QuotaErrorKind.Unknown))
+                    }
                 Envelope.Unreachable ->
                     ZCodeAsk(AskOutcome.Failed(QuotaErrorKind.Network), passing = true)
                 is Envelope.Malformed -> ZCodeAsk(AskOutcome.Failed(QuotaErrorKind.Parse))
