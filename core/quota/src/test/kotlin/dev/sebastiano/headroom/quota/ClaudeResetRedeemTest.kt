@@ -299,6 +299,21 @@ class ClaudeResetRedeemTest {
     }
 
     @Test
+    fun `a try that sent nothing keeps no count, so a reset used elsewhere is not this one`() =
+        runTest {
+            // The first try reads the count, then fails before the send.
+            profile = MockResponse(code = 500)
+            redeem()
+            // The grant is used elsewhere. The retry sends, and the answer is lost.
+            status = jsonResponse(fixture("claude/usage_cedar_ember.json").replaceLaunchWeekLeft(0))
+            profile = jsonResponse(fixture("claude/profile_max_20x.json"))
+            answer("unavailable")
+            redeem()
+
+            assertEquals(RedeemOutcome.Unconfirmed, resets.check(credentials(), "launch_week", KEY))
+        }
+
+    @Test
     fun `a check that finds the grant unchanged is still unconfirmed`() = runTest {
         answer("unavailable")
         redeem()

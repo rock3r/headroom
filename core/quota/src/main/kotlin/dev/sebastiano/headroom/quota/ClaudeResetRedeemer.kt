@@ -42,15 +42,16 @@ internal class ClaudeResetRedeemer(
         attemptKey: String,
     ): RedeemOutcome {
         // Without the count from before the first send, a check could never settle an
-        // unconfirmed answer, so nothing is sent until it is known.
+        // unconfirmed answer, so nothing is sent until it is known. It is kept only once the
+        // reset is about to go out: a try that sent nothing must not leave a count behind.
+        var countToKeep: Int? = null
         if (leftBefore[attemptKey] == null) {
             when (val read = grantsLeft(credentials, attemptKey)) {
                 is GrantsRead.Failed -> return read.outcome
                 is GrantsRead.Known -> {
                     if (poolId !in read.left) return RedeemOutcome.Ineligible
-                    val left =
+                    countToKeep =
                         read.left[poolId] ?: return RedeemOutcome.Failed(QuotaErrorKind.Parse)
-                    leftBefore.remember(attemptKey, left.toString())
                 }
             }
         }
@@ -59,6 +60,7 @@ internal class ClaudeResetRedeemer(
                 is Organization.Found -> found.uuid
                 is Organization.Missing -> return found.outcome
             }
+        countToKeep?.let { leftBefore.remember(attemptKey, it.toString()) }
         // The log names the path without the organization, which identifies the account.
         val call = ResetCall(log, provider, "use", "$baseUrl$REDEEM_PATH_FOR_LOG")
         val response =
