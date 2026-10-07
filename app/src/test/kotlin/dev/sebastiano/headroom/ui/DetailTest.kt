@@ -42,6 +42,18 @@ class DetailTest {
     }
 
     @Test
+    fun `an account's details open at the top, even after scrolling them before`() {
+        openClaude()
+        rule.onNodeWithTag(alertSwitchTag("demo-claude", "seven_day")).performScrollTo()
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
+
+        rule.onNodeWithTag(accountCardTag("demo-codex")).performClick()
+
+        rule.onNode(indicatorsIn(DETAIL_TAG), true).assertIsDisplayed()
+        rule.onNodeWithText("ChatGPT Codex").assertIsDisplayed()
+    }
+
+    @Test
     fun `the hero ring shows the weekly window and is wavy because Claude is over pace`() {
         openClaude()
         rule

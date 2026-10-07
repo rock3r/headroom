@@ -56,6 +56,7 @@ import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.delights.NEXT_RESET_ANCHOR
 import dev.sebastiano.headroom.ui.delights.delightAnchor
 import dev.sebastiano.headroom.ui.home.HomeUiState
+import dev.sebastiano.headroom.ui.resets.AccountResets
 import java.time.Duration
 import java.time.Instant
 
@@ -86,6 +87,8 @@ fun OverviewScreen(
     settingsReveal: PageReveal? = null,
     playEntrance: Boolean = false,
     onEntranceStart: () -> Unit = {},
+    resets: AccountResets = AccountResets(),
+    seen: SeenValues? = null,
     onSignInAgain: (accountId: String) -> Unit = {},
 ) {
     // Cards composed from now on (on scroll, or on coming back) appear without an entrance.
@@ -176,6 +179,8 @@ fun OverviewScreen(
                                 selected = account.id == selectedAccountId,
                                 sharedElements = sharedElements,
                                 display = state.display,
+                                refreshing = resets.isRefreshing(account.id),
+                                seen = seen,
                                 onSignIn = { onSignInAgain(account.id) },
                             )
                         }

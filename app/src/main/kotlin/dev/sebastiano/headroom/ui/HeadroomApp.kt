@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,8 @@ import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
+import dev.sebastiano.headroom.tile.TileAddResult
+import dev.sebastiano.headroom.tile.TileSubtitleMode
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
 import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
@@ -60,6 +63,7 @@ import dev.sebastiano.headroom.ui.settings.ResetIslandUi
 import dev.sebastiano.headroom.ui.settings.SettingsAccounts
 import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
+import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import dev.sebastiano.headroom.ui.stats.StatsScreen
 import dev.sebastiano.headroom.ui.stats.StatsViewModel
@@ -84,11 +88,11 @@ fun HeadroomApp(
     settingsViewModel: SettingsViewModel = viewModel(factory = graph.settingsViewModelFactory),
     statsViewModel: StatsViewModel = viewModel(factory = graph.statsViewModelFactory),
 ) {
-    val home by homeViewModel.state.collectAsStateWithLifecycle()
-    val detail by homeViewModel.detail.collectAsStateWithLifecycle()
+    val live by homeViewModel.state.collectAsStateWithLifecycle()
+    val liveDetail by homeViewModel.detail.collectAsStateWithLifecycle()
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
-    val resetIsland = graph.resetIsland.collectUi()
+    val resets = collectResets(graph)
     val formatter = rememberResetFormatter(graph.zone)
     val snackbar = remember { SnackbarHostState() }
     val addWidget = rememberWidgetAdder(graph.widgetPinner, snackbar)
@@ -97,6 +101,8 @@ fun HeadroomApp(
     var accountsFromSettings by rememberSaveable { mutableStateOf(false) }
     // The cards' entrance plays on the first open only, not on returning to the overview.
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
+    val sheet = rememberSaveable(saver = ResetSheetState.Saver) { ResetSheetState() }
+    val (home, detail) = holdUnderSheet(live, liveDetail, sheet.request?.accountId)
     // A widget tap leaves the page on top, unless the user is in the middle of signing in.
     val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
     val requests = rememberPendingRequest(openAccountRequest, home, onConsumeOpenAccount)
@@ -109,6 +115,11 @@ fun HeadroomApp(
             page = if (again) Page.Accounts else Page.Home
         }
 
+    val openPage: (Page) -> Unit = { next ->
+        if (next == Page.Accounts) accountsFromSettings = true
+        page = next
+    }
+    val settingsActions = settingsActions(settingsViewModel, addWidget, graph.resetIsland, openPage)
     val accountsActions =
         accountsActions(accountsViewModel) {
                 page = if (accountsFromSettings) Page.Settings else Page.Home
@@ -127,23 +138,9 @@ fun HeadroomApp(
         ) { current, reveal ->
             when (current) {
                 Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
-                Page.Settings ->
-                    SettingsScreen(
-                        state = settings,
-                        accounts =
-                            SettingsAccounts(
-                                home.accountsInYourOrder.map { it.provider },
-                                home.isDemo,
-                            ),
-                        actions =
-                            settingsActions(settingsViewModel, addWidget, graph.resetIsland) { next
-                                ->
-                                if (next == Page.Accounts) accountsFromSettings = true
-                                page = next
-                            },
-                        reveal = reveal,
-                        resetIsland = resetIsland,
-                    )
+                Page.Settings -> SettingsPage(graph, settings, home, settingsActions, reveal)
+                Page.Prototypes ->
+                    PrototypesPage(graph, home, formatter, onBack = { page = Page.Settings })
                 Page.Licences -> LicencesScreen(onBack = { page = Page.Settings })
                 Page.Home ->
                     HomeScaffold(
@@ -173,6 +170,8 @@ fun HeadroomApp(
                             page = Page.Home
                             requests.handle(openNow?.serial)
                         },
+                        resets = resets,
+                        resetHandlers = sheet.handlers(),
                         stats = { bottomPadding ->
                             // Collected only while the tab shows: no stats work off screen.
                             val stats by statsViewModel.state.collectAsStateWithLifecycle()
@@ -184,6 +183,37 @@ fun HeadroomApp(
         AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
     HomeDelights(home = home, onBurstFinish = homeViewModel::onResetBurstShown)
+    ResetSheetHost(sheet, graph, live, resets, formatter) {
+        accountsFromSettings = false
+        page = Page.Accounts
+    }
+}
+
+/** Settings, with the Quick Settings tile's row and the debug build's prototypes entry. */
+@Composable
+private fun SettingsPage(
+    graph: AppGraph,
+    settings: SettingsUiState,
+    home: HomeUiState,
+    actions: SettingsActions,
+    reveal: PageReveal,
+) {
+    var tileStatus by rememberSaveable { mutableStateOf<TileAddResult?>(null) }
+    val tileSubtitle = graph.tileSettings?.subtitle?.collectAsStateWithLifecycle()?.value
+    SettingsScreen(
+        state = settings,
+        accounts = SettingsAccounts(home.accountsInYourOrder.map { it.provider }, home.isDemo),
+        actions =
+            actions.copy(
+                onAddTile = { graph.tileAdder.request { tileStatus = it } },
+                onTileSubtitleChange = { graph.tileSettings?.setSubtitle(it) },
+            ),
+        reveal = reveal,
+        resetIsland = graph.resetIsland.collectUi(),
+        tileStatus = tileStatus,
+        tileSubtitle = tileSubtitle ?: TileSubtitleMode.NextReset,
+        debugEntry = graph.prototypes?.settingsEntry { actions.onOpenPrototypes() },
+    )
 }
 
 private const val ENTER_SCALE = 0.96f
@@ -336,9 +366,10 @@ private fun Pages(
             }
         ) { current ->
             val scope = this
+            val opening = transition.targetState == Page.Settings
             val pageReveal =
-                remember(reveal, scope, revealing, animate, scrubbing) {
-                    PageReveal(reveal, scope, revealing, animate, scrubbing)
+                remember(reveal, scope, revealing, animate, scrubbing, opening) {
+                    PageReveal(reveal, scope, revealing, animate, scrubbing, opening)
                 }
             val clip = rememberRevealClip(pageReveal, enabled = current == Page.Settings)
             Box(modifier = Modifier.revealClip(clip)) { content(current, pageReveal) }
@@ -385,6 +416,7 @@ private fun settingsActions(
         onResetIslandChange = viewModel::setResetIsland,
         onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
         onRefreshResetIsland = resetIsland::refresh,
+        onOpenPrototypes = { onNavigate(Page.Prototypes) },
     )
 
 /** These actions, with copying to the clipboard and opening links in a browser tab wired up. */
@@ -433,6 +465,8 @@ private fun rememberPageTransition(
         pages.scrubbing = true
         try {
             gesture.collect { event -> pages.state.seekTo(event.progress, target) }
+            // The finger has let go: the rest plays at the closing pace, not following a finger.
+            pages.scrubbing = false
             onBack(target)
         } catch (cancelled: CancellationException) {
             // The gesture's coroutine is cancelled; settle back from a live scope.
@@ -451,7 +485,9 @@ private enum class Page {
     Home,
     Accounts,
     Settings,
-    Licences;
+    Licences,
+    /** Debug builds only: the reset prototypes. */
+    Prototypes;
 
     val back: Page?
         get() =
@@ -459,7 +495,8 @@ private enum class Page {
                 Home -> null
                 Accounts,
                 Settings -> Home
-                Licences -> Settings
+                Licences,
+                Prototypes -> Settings
             }
 }
 

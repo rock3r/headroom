@@ -67,8 +67,12 @@ public class AuthMethods(
     private val codex = CodexOAuth(http, clock)
     private val copilot = CopilotDeviceAuth(http)
     private val kimi = KimiDeviceAuth(http, clock)
+    private val zCode = ZCodeAuth(http, clock)
 
-    /** The refreshers of every OAuth provider. API key providers have none. */
+    /**
+     * The refreshers of every OAuth provider. API key providers have none, so the Z.AI refresher
+     * only ever refreshes a ZCode sign-in: the API key never expires.
+     */
     public val refreshers: Map<Provider, TokenRefresher> =
         mapOf(
             Provider.Claude to claude,
@@ -77,7 +81,16 @@ public class AuthMethods(
             Provider.Codex to codex,
             Provider.Copilot to copilot,
             Provider.Kimi to kimi,
+            Provider.ZAi to zCode,
         )
+
+    /**
+     * The ZCode sign-in of a Z.AI account, which its resets need. It shows no code: the user signs
+     * in on [DeviceCodePrompt.browserUri] and the flow polls until they did. Save its tokens under
+     * [ZCodeCredential.idFor] the account's id.
+     */
+    public val zCodeSignIn: DeviceCodeFlow
+        get() = DeviceCodeFlow(zCode, clock)
 
     public fun forProvider(provider: Provider): AuthMethod =
         when (provider) {

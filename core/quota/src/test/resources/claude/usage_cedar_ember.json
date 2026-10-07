@@ -1,0 +1,83 @@
+{
+  "five_hour": { "utilization": 100.0, "resets_at": "2026-04-03T14:00:00.000000+00:00" },
+  "seven_day": { "utilization": 71.0, "resets_at": "2026-04-08T10:00:00.000000+00:00" },
+  "seven_day_opus": { "utilization": 52.0, "resets_at": "2026-04-08T10:00:00.000000+00:00" },
+  "cedar_ember": {
+    "eligible": true,
+    "ineligible_reason": null,
+    "at_limit": true,
+    "exhausted": ["five_hour"],
+    "grants": [
+      {
+        "id": "launch_week",
+        "label": "Launch week",
+        "resets_total": 2,
+        "resets_left": 1,
+        "starts_at": "2026-03-30T00:00:00Z",
+        "ends_at": "2026-04-15T00:00:00Z",
+        "clears": ["five_hour", "seven_day"],
+        "paused": false,
+        "usable_now": true,
+        "use_requires_limit": true,
+        "percent_used": { "five_hour": 100, "seven_day": 71 },
+        "blocking": []
+      },
+      {
+        "id": "team_bonus",
+        "label": "Team bonus",
+        "resets_total": 3,
+        "resets_left": 3,
+        "starts_at": null,
+        "ends_at": null,
+        "clears": ["seven_day_opus"],
+        "paused": false,
+        "usable_now": false,
+        "use_requires_limit": true,
+        "percent_used": {},
+        "blocking": ["five_hour"]
+      },
+      {
+        "id": "anytime",
+        "label": "Flexible reset",
+        "resets_total": 1,
+        "resets_left": 1,
+        "ends_at": "2026-04-20T00:00:00Z",
+        "clears": ["seven_day"],
+        "paused": true,
+        "usable_now": false,
+        "use_requires_limit": false,
+        "percent_used": {},
+        "blocking": []
+      },
+      {
+        "id": "old_grant",
+        "label": "Expired",
+        "resets_total": 1,
+        "resets_left": 1,
+        "ends_at": "2026-04-01T00:00:00Z",
+        "clears": ["seven_day"],
+        "paused": false,
+        "usable_now": true,
+        "use_requires_limit": false,
+        "percent_used": {},
+        "blocking": []
+      },
+      {
+        "id": "spent",
+        "label": "Spent",
+        "resets_total": 1,
+        "resets_left": 0,
+        "ends_at": "2026-04-20T00:00:00Z",
+        "clears": ["five_hour"],
+        "paused": false,
+        "usable_now": false,
+        "use_requires_limit": true,
+        "percent_used": {},
+        "blocking": []
+      }
+    ],
+    "next_grant_id": "launch_week",
+    "weekly_resets_at": "2026-04-08T10:00:00Z",
+    "cooldown_until": null
+  }
+}

@@ -244,6 +244,13 @@ class AuthSignInSteps(
     override fun apiKeyTokens(provider: Provider, key: String): TokenSet =
         (methods.forProvider(provider) as AuthMethod.ApiKey).tokens(key)
 
+    /** Starts the ZCode sign-in that a Z.AI account's resets need. It shows no code. */
+    suspend fun startZCode(): DeviceSession {
+        val flow = methods.zCodeSignIn
+        val prompt = flow.start()
+        return DeviceAdapter(prompt) { flow.awaitTokens(prompt) }
+    }
+
     private class BrowserAdapter(private val signIn: BrowserSignIn) : BrowserSession {
         override val authorizeUrl: String = signIn.authorizeUrl
 

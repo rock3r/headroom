@@ -6,7 +6,6 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -74,7 +73,7 @@ class NextResetCardTest {
         repeat(FRAMES_TO_MIDWAY) { rule.mainClock.advanceTimeByFrame() }
         rule.onNodeWithTag(NEXT_RESET_CARD_TAG).assert(rippling)
         // Draw the card mid-ripple: the shader must compile and apply without crashing.
-        rule.onRoot().captureToImage()
+        rule.onRoot().drawFrame()
         rule.mainClock.advanceTimeBy(SETTLED_MILLIS)
         rule.onNodeWithTag(NEXT_RESET_CARD_TAG).assert(notRippling)
     }

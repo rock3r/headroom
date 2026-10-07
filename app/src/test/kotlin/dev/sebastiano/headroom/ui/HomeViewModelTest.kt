@@ -354,7 +354,7 @@ class HomeViewModelTest {
             repository.set(repository.accounts.value.withGrokReset())
             runCurrent()
             assertEquals(
-                listOf(ResetBurst("demo-grok", fromNextReset = true)),
+                listOf(ResetBurst("demo-grok", fromNextReset = true, windowId = "weekly")),
                 viewModel.state.value.resetBursts,
             )
 

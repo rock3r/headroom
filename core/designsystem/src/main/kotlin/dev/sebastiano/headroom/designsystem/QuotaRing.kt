@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.designsystem
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -39,7 +40,8 @@ import kotlin.math.sin
  * The detail screen's hero ring: [progress] on the outer ring (the weekly window) and an optional
  * [innerProgress] (the session window). Both sweep in from zero when the ring first appears, on a
  * critically damped spring, so the arc never passes its value. Only the outer ring can be wavy, and
- * only when the ring is large enough for the wave to read as a wave.
+ * only when the ring is large enough for the wave to read as a wave. [animationSpec] moves both
+ * arcs to a new value; a reset passes [HeadroomMotion.resetDrainSpec].
  */
 @Composable
 fun QuotaRing(
@@ -52,10 +54,11 @@ fun QuotaRing(
     color: Color = MaterialTheme.colorScheme.primary,
     innerColor: Color = MaterialTheme.colorScheme.tertiary,
     trackColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    animationSpec: FiniteAnimationSpec<Float> = HeadroomMotion.dataSpec(),
     content: @Composable BoxScope.() -> Unit = {},
 ) {
     val animate = animationsEnabled()
-    val spec = HeadroomMotion.dataSpec<Float>()
+    val spec = animationSpec
     val outerTarget = progress.coerceIn(0f, 1f)
     val innerTarget = innerProgress?.coerceIn(0f, 1f) ?: 0f
     val outer = remember { Animatable(if (animate) 0f else outerTarget) }

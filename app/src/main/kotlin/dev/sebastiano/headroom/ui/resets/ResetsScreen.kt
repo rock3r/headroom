@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconToggleButton
@@ -42,6 +43,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.ui.ResetFormatter
+import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.SectionLabel
@@ -56,19 +58,31 @@ fun resetRowTag(accountId: String, windowId: String): String = "reset-row-$accou
 
 fun resetAlertTag(accountId: String, windowId: String): String = "reset-alert-$accountId-$windowId"
 
+/** The origin of a detail opened from an "Available resets" row. */
+private const val AVAILABLE_ORIGIN = "available"
+
+/** The origin of a detail opened from the upcoming reset of the window [windowId]. */
+private fun upcomingOrigin(windowId: String): String = "upcoming-$windowId"
+
 /**
  * Upcoming resets with their alert switches, and how full each window was when it reset: how much
- * was used, or how much was left, as the state's display says. Tapping a reset opens its account.
+ * was used, or how much was left, as the state's display says. Tapping a reset opens its account,
+ * with the origin of the row it was tapped in: see [SharedElements.origin].
  */
 @Composable
 fun ResetsScreen(
     state: HomeUiState,
     formatter: ResetFormatter,
-    onOpenAccount: (String) -> Unit,
+    onOpenAccount: (accountId: String, origin: String) -> Unit,
     onAlertChange: (accountId: String, windowId: String, enabled: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     bottomPadding: Dp = 0.dp,
+    resets: AccountResets = AccountResets(),
+    resetHandlers: ResetHandlers = ResetHandlers(),
+    /** The scopes a row shares with the detail it opens, or null when nothing is shared. */
+    sharedElements: SharedElements? = null,
 ) {
+    val available = availableResets(state, resets)
     // A stale account's resets get no alert, so they are not listed as upcoming.
     val upcoming =
         state.accounts
@@ -115,6 +129,14 @@ fun ResetsScreen(
                     modifier = width,
                 )
             }
+            availableResets(
+                available,
+                formatter,
+                resetHandlers,
+                onOpen = { onOpenAccount(it, AVAILABLE_ORIGIN) },
+                sharedElements = sharedElements?.from(AVAILABLE_ORIGIN),
+                width = width,
+            )
             if (upcoming.isEmpty()) {
                 item {
                     Text(
@@ -125,23 +147,13 @@ fun ResetsScreen(
                 }
                 return@LazyColumn
             }
-            item { SectionLabel(stringResource(R.string.resets_upcoming), width) }
-            item {
-                ListCard(width) {
-                    upcoming.forEachIndexed { index, (account, window) ->
-                        if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-                        UpcomingRow(
-                            account = account,
-                            window = window,
-                            title = windowTitle(account, window, sharedNames),
-                            state = state,
-                            formatter = formatter,
-                            onOpen = { onOpenAccount(account.id) },
-                            onAlertChange = { onAlertChange(account.id, window.id, it) },
-                        )
-                    }
-                }
-            }
+            upcomingResets(
+                upcoming,
+                UpcomingContext(state, formatter, sharedNames, sharedElements),
+                onOpenAccount,
+                onAlertChange,
+                width,
+            )
             item {
                 SectionLabel(
                     stringResource(
@@ -186,6 +198,85 @@ private fun historyWindows(
         }
 }
 
+/** The accounts that hold resets the sheet can offer, in the user's order. */
+private fun availableResets(state: HomeUiState, resets: AccountResets): List<AvailableReset> =
+    // An expired sign-in's resets are as old as its usage: none is offered until it signs in again.
+    state.accountsInYourOrder
+        .filterNot { it.signInExpired }
+        .mapNotNull { account ->
+            resets
+                .of(account.id)
+                ?.takeIf { it.usablePools.isNotEmpty() }
+                ?.let {
+                    AvailableReset(
+                        accountId = account.id,
+                        provider = account.provider,
+                        name = account.name,
+                        availability = it,
+                        redeemEnabled = resets.canRedeem(account.provider),
+                    )
+                }
+        }
+
+/** What every upcoming row reads. */
+private class UpcomingContext(
+    val state: HomeUiState,
+    val formatter: ResetFormatter,
+    val sharedNames: Set<String>,
+    val sharedElements: SharedElements?,
+)
+
+/** The "Upcoming" section: each window that can alert, soonest reset first. */
+private fun LazyListScope.upcomingResets(
+    upcoming: List<Pair<AccountSummary, WindowSummary>>,
+    context: UpcomingContext,
+    onOpenAccount: (accountId: String, origin: String) -> Unit,
+    onAlertChange: (accountId: String, windowId: String, enabled: Boolean) -> Unit,
+    width: Modifier,
+) {
+    item { SectionLabel(stringResource(R.string.resets_upcoming), width) }
+    item {
+        ListCard(width) {
+            upcoming.forEachIndexed { index, (account, window) ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
+                UpcomingRow(
+                    account = account,
+                    window = window,
+                    title = windowTitle(account, window, context.sharedNames),
+                    state = context.state,
+                    formatter = context.formatter,
+                    onOpen = { onOpenAccount(account.id, upcomingOrigin(window.id)) },
+                    onAlertChange = { onAlertChange(account.id, window.id, it) },
+                    sharedElements = context.sharedElements?.from(upcomingOrigin(window.id)),
+                )
+            }
+        }
+    }
+}
+
+/** The "Available resets" section, when an account holds any. */
+private fun LazyListScope.availableResets(
+    available: List<AvailableReset>,
+    formatter: ResetFormatter,
+    handlers: ResetHandlers,
+    onOpen: (accountId: String) -> Unit,
+    sharedElements: SharedElements?,
+    width: Modifier,
+) {
+    if (available.isEmpty()) return
+    item { SectionLabel(stringResource(R.string.resets_available_section), width) }
+    item {
+        AvailableResetsCard(
+            entries = available,
+            formatter = formatter,
+            onUse = handlers.onUse,
+            onOpen = onOpen,
+            sharedElements = sharedElements,
+            modifier = width,
+        )
+    }
+}
+
 /**
  * "Account · window". When another account has the same name, the account's label (such as its
  * email address) tells the two apart.
@@ -215,11 +306,13 @@ private fun UpcomingRow(
     formatter: ResetFormatter,
     onOpen: () -> Unit,
     onAlertChange: (Boolean) -> Unit,
+    sharedElements: SharedElements?,
 ) {
     val at = window.resetsAt ?: return
     Row(
         modifier =
             Modifier.fillMaxWidth()
+                .sharedRow(sharedElements, account.id)
                 .testTag(resetRowTag(account.id, window.id))
                 .clickable(
                     onClickLabel = stringResource(R.string.resets_open_details),
@@ -229,7 +322,11 @@ private fun UpcomingRow(
                 .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProviderAvatar(provider = account.provider, size = 30.dp)
+        ProviderAvatar(
+            provider = account.provider,
+            size = 30.dp,
+            modifier = Modifier.sharedRowAvatar(sharedElements, account.id),
+        )
         Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(text = title, style = MaterialTheme.typography.titleSmall)
             Text(

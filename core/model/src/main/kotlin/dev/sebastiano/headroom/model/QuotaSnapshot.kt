@@ -11,6 +11,16 @@ public data class QuotaSnapshot(
     val fetchedAt: Instant,
     /** A remaining balance, for providers that report one instead of (or besides) a percentage. */
     val balance: QuotaBalance? = null,
+    /**
+     * The usage-limit resets the account holds, read in the same sync. Null when the provider has
+     * no resets for this account.
+     */
+    val resets: ResetAvailability? = null,
+    /**
+     * True when the sync could not read the resets. The usage is still new; the app keeps showing
+     * the resets it read last, rather than none.
+     */
+    val resetsReadFailed: Boolean = false,
 )
 
 /** An amount left to spend, such as AI credits. */

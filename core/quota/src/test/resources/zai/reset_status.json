@@ -1,0 +1,17 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "available_five_hour_resets": [
+      { "expire_at": 1775649600000 },
+      { "expire_at": 1775390400000 },
+      { "expire_at": 1775131200000 }
+    ],
+    "available_week_resets": [
+      { "expire_at": 1775995200 }
+    ],
+    "latest_five_hour_reset_history": null,
+    "latest_week_reset_history": null,
+    "has_unread_history": false
+  }
+}

@@ -45,6 +45,34 @@ class OkHttpQuotaHttpClientTest {
     }
 
     @Test
+    fun `sends a binary body and reads the binary response`() = runTest {
+        val answer = byteArrayOf(0, 0, 0, 0, 2, 0x52, 0x00)
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .addHeader("Content-Type", "application/grpc-web+proto")
+                .body(okio.Buffer().write(answer))
+                .build()
+        )
+        val sent = byteArrayOf(0, 0, 0, 0, 0)
+
+        val response =
+            client.execute(
+                QuotaHttpRequest(
+                    url = server.url("/svc/Method").toString(),
+                    method = "POST",
+                    headers = mapOf("Content-Type" to "application/grpc-web+proto"),
+                    binaryBody = BinaryBody(sent),
+                )
+            )
+
+        val recorded = server.takeRequest()
+        assertEquals("application/grpc-web+proto", recorded.headers["Content-Type"])
+        assertEquals(sent.toList(), recorded.body?.toByteArray()?.toList())
+        assertEquals(answer.toList(), response.binaryBody?.bytes?.toList())
+    }
+
+    @Test
     fun `returns the status code, headers and body`() = runTest {
         server.enqueue(
             MockResponse.Builder()

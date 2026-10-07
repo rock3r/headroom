@@ -12,6 +12,10 @@ import androidx.compose.ui.Modifier
  * The scopes a card and the detail screen share for the container transform. It exists only in
  * single-pane layouts; in the two-pane layout the card and the detail are both on screen, and the
  * detail fades through instead.
+ *
+ * [origin] tells apart the places one account can be opened from on the same screen, such as the
+ * Resets tab's rows: the detail and the row it was opened from share keys with the same origin, so
+ * the other rows of that account stay out of the transform.
  */
 @Stable
 class SharedElements(
@@ -20,7 +24,31 @@ class SharedElements(
     private val containerTransform: BoundsTransform,
     private val valueTransform: BoundsTransform,
     private val containerClip: OverlayClip,
+    val origin: String = "",
 ) {
+    /** These scopes, for elements opened from [origin]. */
+    fun from(origin: String): SharedElements =
+        SharedElements(
+            transitionScope,
+            visibilityScope,
+            containerTransform,
+            valueTransform,
+            containerClip,
+            origin,
+        )
+
+    /** The key of [accountId]'s container, from this [origin]. */
+    fun card(accountId: String): String = cardKey(accountId) + originSuffix
+
+    /** The key of [accountId]'s avatar, from this [origin]. */
+    fun avatar(accountId: String): String = avatarKey(accountId) + originSuffix
+
+    /** The key of [accountId]'s percentage, from this [origin]. */
+    fun value(accountId: String): String = valueKey(accountId) + originSuffix
+
+    private val originSuffix: String
+        get() = if (origin.isEmpty()) "" else "@$origin"
+
     /** The card or detail container: a container transform on the expressive spatial spring. */
     fun Modifier.sharedContainer(state: SharedContentState): Modifier =
         with(transitionScope) {

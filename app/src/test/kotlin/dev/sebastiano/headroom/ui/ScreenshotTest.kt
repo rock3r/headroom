@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
@@ -118,7 +117,7 @@ class ScreenshotTest {
         // animation is drawn, so draw every step until transitions and sweeps have settled.
         repeat(SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
     }
 
@@ -395,7 +394,7 @@ class ScreenshotTest {
         // A finger moves over several frames; each frame brings a little more progress.
         repeat(BACK_STEPS) { step ->
             rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
             val progress = BACK_PROGRESS * (step + 1) / BACK_STEPS
             rule.runOnUiThread { dispatcher.dispatchOnBackProgressed(backEvent(progress)) }
         }
@@ -456,6 +455,26 @@ class ScreenshotTest {
         rule.runOnIdle { requireNotNull(delights).playShimmer() }
         captureMidway("refresh-shimmer-dark", SHIMMER_MIDWAY_MILLIS)
     }
+
+    /**
+     * Frames of the whole shimmer, for review: written to `app/build/shimmer`, not to the docs,
+     * which get a strip made from them.
+     */
+    private fun shimmerFrames(name: String, dark: Boolean) {
+        launch(dark = dark)
+        settle()
+        rule.runOnIdle { requireNotNull(delights).playShimmer() }
+        repeat(SHIMMER_FRAMES) { index ->
+            rule.mainClock.advanceTimeBy(SHIMMER_FRAME_MILLIS)
+            rule
+                .onRoot()
+                .captureRoboImage("build/shimmer/$name-${index.toString().padStart(2, '0')}.png")
+        }
+    }
+
+    @Test fun shimmerFramesLight() = shimmerFrames("light", dark = false)
+
+    @Test fun shimmerFramesDark() = shimmerFrames("dark", dark = true)
 
     @Test
     fun resetConfetti() {
@@ -575,6 +594,9 @@ private const val FRAME_MILLIS = 16L
 private const val REVEAL_MIDWAY_MILLIS = 192L
 /** Part-way through the shimmer, while its band crosses the middle of the screen. */
 private const val SHIMMER_MIDWAY_MILLIS = 640L
+/** The shimmer's frames for review: 16 of them, 128 ms apart, cover most of its 2.4 seconds. */
+private const val SHIMMER_FRAMES = 16
+private const val SHIMMER_FRAME_MILLIS = 128L
 /** Part-way through a confetti burst, while the pieces are high and spread out. */
 private const val CONFETTI_MIDWAY_MILLIS = 400L
 /** A quarter of the way through the next reset card's ripple, while its rings are strong. */

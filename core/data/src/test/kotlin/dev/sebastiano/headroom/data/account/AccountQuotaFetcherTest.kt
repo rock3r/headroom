@@ -7,19 +7,31 @@ import dev.sebastiano.headroom.auth.CredentialProvider
 import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.TokenRefresher
+import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.auth.ZCodeCredential
+import dev.sebastiano.headroom.auth.ZCodeTokens
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
+import dev.sebastiano.headroom.model.ResetAvailability
+import dev.sebastiano.headroom.model.ResetPool
+import dev.sebastiano.headroom.model.ResetScope
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetcher
 import dev.sebastiano.headroom.quota.QuotaFetchers
+import dev.sebastiano.headroom.quota.ResetClients
+import dev.sebastiano.headroom.quota.ResetRead
+import dev.sebastiano.headroom.quota.ResetReader
+import dev.sebastiano.headroom.quota.ZCodeSignIn
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 
 class AccountQuotaFetcherTest {
@@ -207,5 +219,202 @@ class AccountQuotaFetcherTest {
             )
         val result = fetcher.fetch(Account("a1", Provider.Claude, "sam"))
         assertEquals(QuotaErrorKind.Unknown, assertIs<QuotaResult.Failure>(result).kind)
+    }
+
+    private class FixedReader(override val provider: Provider, private val read: ResetRead) :
+        ResetReader {
+        val seen = mutableListOf<ProviderCredentials>()
+
+        override suspend fun read(credentials: ProviderCredentials): ResetRead {
+            seen += credentials
+            return read
+        }
+    }
+
+    private val pool = ResetPool("grok", "Weekly limit reset", 2, ResetScope.of(WindowKind.Weekly))
+
+    @Test
+    fun `the resets are read in the same sync, with the same credential`() = runTest {
+        saveCredential("g1", Provider.Grok)
+        val reader = FixedReader(Provider.Grok, ResetRead.Known(ResetAvailability(listOf(pool))))
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Grok))),
+                ResetClients(readers = listOf(reader), redeemers = emptyList()),
+            )
+
+        val result = fetcher.fetch(Account("g1", Provider.Grok, "me"))
+
+        val snapshot = assertIs<QuotaResult.Success>(result).snapshot
+        assertEquals(ResetAvailability(listOf(pool)), snapshot.resets)
+        assertEquals(false, snapshot.resetsReadFailed)
+        assertEquals("access-g1", reader.seen.single().accessToken)
+        assertNull(reader.seen.single().zCode)
+    }
+
+    @Test
+    fun `resets that cannot be read never fail the sync`() = runTest {
+        saveCredential("g1", Provider.Grok)
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Grok))),
+                ResetClients(
+                    readers = listOf(FixedReader(Provider.Grok, ResetRead.Failed)),
+                    redeemers = emptyList(),
+                ),
+            )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(fetcher.fetch(Account("g1", Provider.Grok, "me")))
+                .snapshot
+
+        assertNull(snapshot.resets)
+        assertEquals(true, snapshot.resetsReadFailed)
+    }
+
+    @Test
+    fun `a provider without resets reads none`() = runTest {
+        saveCredential("k1", Provider.Kimi)
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Kimi))),
+                ResetClients.None,
+            )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(fetcher.fetch(Account("k1", Provider.Kimi, "me")))
+                .snapshot
+
+        assertNull(snapshot.resets)
+        assertEquals(false, snapshot.resetsReadFailed)
+    }
+
+    private suspend fun saveZCode(accountId: String, expiresAt: Instant?) {
+        store.save(
+            StoredCredential(
+                Provider.ZAi,
+                ZCodeCredential.idFor(accountId),
+                CredentialKind.OAuth,
+                "business",
+                ZCodeTokens("zai-oauth", "zcode-jwt").encode(),
+                expiresAt,
+            ),
+            expectedRevision = null,
+        )
+    }
+
+    private val zAiAccount = Account("z1", Provider.ZAi, "sam")
+
+    private val zAiResets = FixedReader(Provider.ZAi, ResetRead.Known(null))
+
+    private fun zAiFetcherFor(
+        zAi: QuotaFetcher,
+        refreshers: Map<Provider, TokenRefresher> = emptyMap(),
+    ) =
+        AccountQuotaFetcher(
+            CredentialProvider(store, refreshers),
+            QuotaFetchers(listOf(zAi)),
+            ResetClients(readers = listOf(zAiResets), redeemers = emptyList()),
+        )
+
+    @Test
+    fun `Z_AI usage uses the API key, and its resets the ZCode sign-in`() = runTest {
+        val zAi = RecordingFetcher(Provider.ZAi)
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = null)
+
+        zAiFetcherFor(zAi).fetch(zAiAccount)
+
+        val usage = zAi.seen.single()
+        assertEquals("access-z1", usage.accessToken)
+        assertNull(usage.zCode)
+        val resets = zAiResets.seen.single()
+        assertEquals("access-z1", resets.accessToken)
+        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business"), resets.zCode)
+    }
+
+    @Test
+    fun `a Z_AI account without a ZCode sign-in says so`() = runTest {
+        saveCredential("z1", Provider.ZAi)
+
+        zAiFetcherFor(RecordingFetcher(Provider.ZAi)).fetch(zAiAccount)
+
+        assertEquals(ZCodeSignIn.Missing, zAiResets.seen.single().zCode)
+    }
+
+    @Test
+    fun `an expired ZCode sign-in is refreshed first`() = runTest {
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = Instant.EPOCH)
+        val refresher = TokenRefresher { old ->
+            TokenSet(Provider.ZAi, CredentialKind.OAuth, "business-2", old.refreshToken, null)
+        }
+
+        zAiFetcherFor(RecordingFetcher(Provider.ZAi), mapOf(Provider.ZAi to refresher))
+            .fetch(zAiAccount)
+
+        assertEquals(ZCodeSignIn.Ready("zcode-jwt", "business-2"), zAiResets.seen.single().zCode)
+    }
+
+    @Test
+    fun `a ZCode refresh that fails leaves the sign-in unavailable or missing`() = runTest {
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = Instant.EPOCH)
+        listOf(
+                AuthException.Network("offline") to ZCodeSignIn.Unavailable,
+                AuthException.Rejected(401, null, "revoked") to ZCodeSignIn.Missing,
+            )
+            .forEach { (failure, expected) ->
+                zAiResets.seen.clear()
+                val refresher = TokenRefresher { throw failure }
+                zAiFetcherFor(RecordingFetcher(Provider.ZAi), mapOf(Provider.ZAi to refresher))
+                    .fetch(zAiAccount)
+                assertEquals(expected, zAiResets.seen.single().zCode)
+            }
+    }
+
+    @Test
+    fun `a slow ZCode refresh does not hold up the usage`() = runTest {
+        saveCredential("z1", Provider.ZAi)
+        saveZCode("z1", expiresAt = Instant.EPOCH)
+        val refresher = TokenRefresher {
+            delay(ZCODE_TIMEOUT_MS)
+            throw AuthException.TimedOut("token endpoint unreachable")
+        }
+        var usageFetchedAt: Long? = null
+        val zAi =
+            object : QuotaFetcher {
+                override val provider = Provider.ZAi
+
+                override suspend fun fetch(credentials: ProviderCredentials): QuotaResult {
+                    usageFetchedAt = testScheduler.currentTime
+                    return QuotaResult.Success(
+                        QuotaSnapshot(provider, "z", "Pro", emptyList(), Instant.EPOCH)
+                    )
+                }
+            }
+
+        val result = zAiFetcherFor(zAi, mapOf(Provider.ZAi to refresher)).fetch(zAiAccount)
+
+        assertEquals(0L, usageFetchedAt)
+        // The sync gives up on the ZCode sign-in long before the refresh's own timeout.
+        assertEquals(AccountQuotaFetcher.ZCODE_SIGN_IN_WAIT.toMillis(), testScheduler.currentTime)
+        assertIs<QuotaResult.Success>(result)
+        assertEquals(ZCodeSignIn.Unavailable, zAiResets.seen.single().zCode)
+    }
+
+    @Test
+    fun `other providers carry no ZCode sign-in`() = runTest {
+        val claude = RecordingFetcher(Provider.Claude)
+        saveCredential("a1", Provider.Claude)
+        fetcherFor(claude).fetch(Account("a1", Provider.Claude, "sam"))
+        assertNull(claude.seen.single().zCode)
+    }
+
+    private companion object {
+        const val ZCODE_TIMEOUT_MS = 30_000L
     }
 }

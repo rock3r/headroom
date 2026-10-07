@@ -8,7 +8,7 @@ import androidx.sqlite.execSQL
 
 @Database(
     entities = [AccountEntity::class, WindowEntity::class, UsagePointEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 internal abstract class HeadroomDatabase : RoomDatabase() {
@@ -64,6 +64,17 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                     connection.execSQL(
                         "ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1"
                     )
+                }
+            }
+
+        /**
+         * Version 6 stores the usage-limit resets read in the last sync. Existing accounts have
+         * none.
+         */
+        val MIGRATION_5_6: Migration =
+            object : Migration(5, 6) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
                 }
             }
     }

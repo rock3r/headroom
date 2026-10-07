@@ -78,8 +78,12 @@ import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.overview.OverviewScreen
+import dev.sebastiano.headroom.ui.overview.SeenValues
+import dev.sebastiano.headroom.ui.resets.AccountResets
+import dev.sebastiano.headroom.ui.resets.ResetHandlers
 import dev.sebastiano.headroom.ui.resets.ResetsScreen
 import kotlin.math.floor
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 const val TOOLBAR_TAG: String = "floating-toolbar"
@@ -90,6 +94,9 @@ const val REFRESH_TAG: String = "refresh"
  * full screen. Medium: a navigation rail and two columns of cards. Expanded: the rail, and the list
  * and the detail side by side. The list and detail panes use [NavigableListDetailPaneScaffold],
  * which also handles predictive back.
+ *
+ * The Overview and Resets tabs each have their own list and detail: an account opened from the
+ * Resets tab opens there, so back returns to the Resets tab.
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
@@ -112,22 +119,28 @@ internal fun HomeScaffold(
     settingsReveal: PageReveal? = null,
     playEntrance: Boolean = false,
     onEntranceStart: () -> Unit = {},
+    resets: AccountResets = AccountResets(),
+    resetHandlers: ResetHandlers = ResetHandlers(),
     onSignInAgain: (accountId: String) -> Unit = {},
 ) {
     val width = layoutWidth()
     var tab by rememberSaveable { mutableStateOf(HomeTab.Overview) }
-    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
-    val scope = rememberCoroutineScope()
-    val detailOnly =
-        navigator.scaffoldValue[ListDetailPaneScaffoldRole.List] == PaneAdaptedValue.Hidden
+    val tabs = rememberTabNavigators()
     val selectTab: (HomeTab) -> Unit = { next ->
-        if (next != tab && tab == HomeTab.Overview && detailOnly) {
-            scope.launch { navigator.navigateBack() }
-        }
+        if (next != tab) tabs.leave(tab)
         tab = next
     }
     val opener =
         rememberAccountOpener(openAccountRequest, onConsumeOpenAccount) { tab = HomeTab.Overview }
+    val details =
+        DetailActions(
+            formatter,
+            onAlertChange,
+            onChartWindowChange,
+            resets,
+            resetHandlers,
+            onSignInAgain,
+        )
     val suiteType =
         if (width == LayoutWidth.Compact) NavigationSuiteType.None
         else NavigationSuiteType.WideNavigationRailCollapsed
@@ -169,15 +182,13 @@ internal fun HomeScaffold(
                 when (current) {
                     HomeTab.Overview ->
                         OverviewPanes(
-                            navigator = navigator,
+                            navigator = tabs.overview,
                             width = width,
                             home = home,
                             detail = detail,
-                            formatter = formatter,
+                            details = details,
                             onRefresh = onRefresh,
                             onSelectAccount = onSelectAccount,
-                            onAlertChange = onAlertChange,
-                            onChartWindowChange = onChartWindowChange,
                             onSortChange = onSortChange,
                             onAllResets = { selectTab(HomeTab.Resets) },
                             onOpenAccounts = onOpenAccounts,
@@ -187,21 +198,23 @@ internal fun HomeScaffold(
                             playEntrance = playEntrance,
                             onEntranceStart = onEntranceStart,
                             opener = opener,
-                            onSignInAgain = onSignInAgain,
                         )
                     HomeTab.Resets ->
-                        ResetsScreen(
-                            state = home,
-                            formatter = formatter,
-                            onOpenAccount = opener::open,
-                            onAlertChange = onAlertChange,
+                        ResetsTab(
+                            navigator = tabs.resets,
+                            width = width,
+                            home = home,
+                            detail = detail,
+                            details = details,
+                            onSelectAccount = onSelectAccount,
+                            opener = opener,
                             bottomPadding = bottomPadding,
                         )
                     HomeTab.Stats -> stats(bottomPadding)
                 }
             }
             ToolbarSlot(
-                visible = compact && !(tab == HomeTab.Overview && detailOnly),
+                visible = compact && !tabs.showsDetailOnly(tab),
                 animate = animate,
                 modifier =
                     Modifier.align(Alignment.BottomCenter)
@@ -212,6 +225,41 @@ internal fun HomeScaffold(
             }
         }
     }
+}
+
+/** The list-detail navigators of the tabs that open account details: Overview and Resets. */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Stable
+private class TabNavigators(
+    val overview: ThreePaneScaffoldNavigator<String>,
+    val resets: ThreePaneScaffoldNavigator<String>,
+    private val scope: CoroutineScope,
+) {
+    fun of(tab: HomeTab): ThreePaneScaffoldNavigator<String>? =
+        when (tab) {
+            HomeTab.Overview -> overview
+            HomeTab.Resets -> resets
+            HomeTab.Stats -> null
+        }
+
+    /** True when [tab] shows an account detail full screen, with its list hidden. */
+    fun showsDetailOnly(tab: HomeTab): Boolean =
+        of(tab)?.scaffoldValue?.get(ListDetailPaneScaffoldRole.List) == PaneAdaptedValue.Hidden
+
+    /** Leaving a tab closes the detail it shows full screen, so the tab opens on its list. */
+    fun leave(tab: HomeTab) {
+        val navigator = of(tab) ?: return
+        if (showsDetailOnly(tab)) scope.launch { navigator.navigateBack() }
+    }
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+private fun rememberTabNavigators(): TabNavigators {
+    val overview = rememberListDetailPaneScaffoldNavigator<String>()
+    val resets = rememberListDetailPaneScaffoldNavigator<String>()
+    val scope = rememberCoroutineScope()
+    return remember(overview, resets, scope) { TabNavigators(overview, resets, scope) }
 }
 
 /** The floating toolbar slides up into view, or only fades when motion is reduced. */
@@ -267,11 +315,9 @@ private fun OverviewPanes(
     width: LayoutWidth,
     home: HomeUiState,
     detail: DetailUiState?,
-    formatter: ResetFormatter,
+    details: DetailActions,
     onRefresh: () -> Unit,
     onSelectAccount: (String) -> Unit,
-    onAlertChange: (String, String, Boolean) -> Unit,
-    onChartWindowChange: (String) -> Unit,
     onSortChange: (OverviewSort) -> Unit,
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
@@ -281,9 +327,124 @@ private fun OverviewPanes(
     playEntrance: Boolean,
     onEntranceStart: () -> Unit,
     opener: AccountOpener,
-    onSignInAgain: (accountId: String) -> Unit,
 ) {
     OpenDetailEffect(navigator, opener, onSelectAccount)
+    val scope = rememberCoroutineScope()
+    // Outlives the cards, which leave while the detail is full screen: see SeenValues.
+    val seen = remember { SeenValues() }
+    ListDetailPanes(navigator = navigator, width = width, detail = detail, details = details) {
+        shared,
+        twoPanes ->
+        OverviewScreen(
+            state = home,
+            formatter = details.formatter,
+            onRefresh = onRefresh,
+            onOpenAccount = { id ->
+                onSelectAccount(id)
+                scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, id) }
+            },
+            onNextResetAlertChange = { enabled ->
+                home.nextReset?.let { details.onAlertChange(it.accountId, it.windowId, enabled) }
+            },
+            onAllResets = onAllResets,
+            onOpenAccounts = onOpenAccounts,
+            onOpenSettings = onOpenSettings,
+            onSortChange = onSortChange,
+            settingsReveal = settingsReveal,
+            columns = if (width == LayoutWidth.Medium) 2 else 1,
+            selectedAccountId = if (twoPanes) detail?.account?.id else null,
+            bottomPadding = bottomPadding,
+            sharedElements = shared,
+            playEntrance = playEntrance,
+            onEntranceStart = onEntranceStart,
+            resets = details.resets,
+            seen = seen,
+            onSignInAgain = details.onSignInAgain,
+        )
+    }
+}
+
+/**
+ * The Resets tab. Two panes show the detail beside the Overview's list with no back step, so a wide
+ * Resets tab opens accounts there. One pane opens them in this tab, so back returns here, and the
+ * detail grows out of the row it was opened from.
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+private fun ResetsTab(
+    navigator: ThreePaneScaffoldNavigator<String>,
+    width: LayoutWidth,
+    home: HomeUiState,
+    detail: DetailUiState?,
+    details: DetailActions,
+    onSelectAccount: (String) -> Unit,
+    opener: AccountOpener,
+    bottomPadding: androidx.compose.ui.unit.Dp,
+) {
+    if (width == LayoutWidth.Expanded) {
+        ResetsScreen(
+            state = home,
+            formatter = details.formatter,
+            onOpenAccount = { id, _ -> opener.open(id) },
+            onAlertChange = details.onAlertChange,
+            bottomPadding = bottomPadding,
+            resets = details.resets,
+            resetHandlers = details.resetHandlers,
+        )
+        return
+    }
+    val scope = rememberCoroutineScope()
+    // Which row the detail opened from, so it can grow out of that row and shrink back.
+    var origin by rememberSaveable { mutableStateOf("") }
+    ListDetailPanes(
+        navigator = navigator,
+        width = width,
+        detail = detail,
+        details = details,
+        detailOrigin = origin,
+    ) { shared, _ ->
+        ResetsScreen(
+            state = home,
+            formatter = details.formatter,
+            onOpenAccount = { id, from ->
+                origin = from
+                onSelectAccount(id)
+                scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, id) }
+            },
+            onAlertChange = details.onAlertChange,
+            bottomPadding = bottomPadding,
+            resets = details.resets,
+            resetHandlers = details.resetHandlers,
+            sharedElements = shared,
+        )
+    }
+}
+
+/** What the account detail needs, the same from every tab that opens it. */
+private class DetailActions(
+    val formatter: ResetFormatter,
+    val onAlertChange: (String, String, Boolean) -> Unit,
+    val onChartWindowChange: (String) -> Unit,
+    val resets: AccountResets,
+    val resetHandlers: ResetHandlers,
+    val onSignInAgain: (accountId: String) -> Unit,
+)
+
+/**
+ * A tab's list and the account detail, in a [NavigableListDetailPaneScaffold] driven by
+ * [navigator]. In a single pane the detail grows out of the list item it was opened from: [list]
+ * receives the shared scopes, and the detail uses them from [detailOrigin].
+ */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+private fun ListDetailPanes(
+    navigator: ThreePaneScaffoldNavigator<String>,
+    width: LayoutWidth,
+    detail: DetailUiState?,
+    details: DetailActions,
+    detailOrigin: String = "",
+    list: @Composable (shared: SharedElements?, twoPanes: Boolean) -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val twoPanes = width == LayoutWidth.Expanded
     // The navigator can move while this tab is off screen, for example when a widget opens an
@@ -311,34 +472,9 @@ private fun OverviewPanes(
                         if (animate) motionDataProvider.calculateDefaultExitTransition(paneRole)
                         else fadeOut(fast),
                 ) {
-                    val shared = rememberSharedElements(transitionScope, this, !twoPanes && animate)
-                    OverviewScreen(
-                        state = home,
-                        formatter = formatter,
-                        onRefresh = onRefresh,
-                        onOpenAccount = { id ->
-                            onSelectAccount(id)
-                            scope.launch {
-                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, id)
-                            }
-                        },
-                        onNextResetAlertChange = { enabled ->
-                            home.nextReset?.let {
-                                onAlertChange(it.accountId, it.windowId, enabled)
-                            }
-                        },
-                        onAllResets = onAllResets,
-                        onOpenAccounts = onOpenAccounts,
-                        onOpenSettings = onOpenSettings,
-                        onSortChange = onSortChange,
-                        settingsReveal = settingsReveal,
-                        columns = if (width == LayoutWidth.Medium) 2 else 1,
-                        selectedAccountId = if (twoPanes) detail?.account?.id else null,
-                        bottomPadding = bottomPadding,
-                        sharedElements = shared,
-                        playEntrance = playEntrance,
-                        onEntranceStart = onEntranceStart,
-                        onSignInAgain = onSignInAgain,
+                    list(
+                        rememberSharedElements(transitionScope, this, !twoPanes && animate),
+                        twoPanes,
                     )
                 }
             },
@@ -355,22 +491,26 @@ private fun OverviewPanes(
                     if (twoPanes) {
                         DetailPane(
                             current,
-                            formatter,
-                            onAlertChange,
-                            onChartWindowChange,
-                            onSignInAgain,
+                            details.formatter,
+                            details.onAlertChange,
+                            details.onChartWindowChange,
+                            details.resets,
+                            details.resetHandlers,
+                            details.onSignInAgain,
                         )
                     } else {
                         val shared = rememberSharedElements(transitionScope, this, animate)
                         DetailScreen(
                             state = current,
-                            formatter = formatter,
-                            onAlertChange = onAlertChange,
-                            onChartWindowChange = onChartWindowChange,
+                            formatter = details.formatter,
+                            onAlertChange = details.onAlertChange,
+                            onChartWindowChange = details.onChartWindowChange,
                             onBack = { scope.launch { navigator.navigateBack() } },
-                            sharedElements = shared,
-                            onSignInAgain = onSignInAgain,
+                            sharedElements = shared?.from(detailOrigin),
+                            onSignInAgain = details.onSignInAgain,
                             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+                            resets = details.resets,
+                            resetHandlers = details.resetHandlers,
                         )
                     }
                 }
@@ -425,9 +565,8 @@ private fun OpenAccountEffect(
 }
 
 /**
- * The account whose detail opens next. A widget tap and a tap on the Resets tab both open an
- * account through it: [open] switches to the Overview tab, and [OpenDetailEffect] then shows the
- * detail.
+ * The account whose detail opens next, from a widget tap, a sign-in warning, or the wide Resets
+ * tab: [open] switches to the Overview tab, and [OpenDetailEffect] then shows the detail.
  */
 @Stable
 internal class AccountOpener(private val onShowOverview: () -> Unit) {
@@ -486,6 +625,8 @@ private fun DetailPane(
     formatter: ResetFormatter,
     onAlertChange: (String, String, Boolean) -> Unit,
     onChartWindowChange: (String) -> Unit,
+    resets: AccountResets,
+    resetHandlers: ResetHandlers,
     onSignInAgain: (accountId: String) -> Unit,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -513,6 +654,8 @@ private fun DetailPane(
             formatter = formatter,
             onAlertChange = onAlertChange,
             onChartWindowChange = onChartWindowChange,
+            resets = resets,
+            resetHandlers = resetHandlers,
             onSignInAgain = onSignInAgain,
         )
     }

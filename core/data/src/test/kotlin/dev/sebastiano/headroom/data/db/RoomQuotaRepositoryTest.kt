@@ -7,6 +7,12 @@ import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.model.ResetAvailability
+import dev.sebastiano.headroom.model.ResetPool
+import dev.sebastiano.headroom.model.ResetPoolStatus
+import dev.sebastiano.headroom.model.ResetScope
+import dev.sebastiano.headroom.model.ResetTiming
+import dev.sebastiano.headroom.model.WindowKind
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.AfterTest
@@ -77,6 +83,59 @@ class RoomQuotaRepositoryTest {
             assertEquals("Max 20x", state.snapshot!!.planLabel)
             val history = repo.history(claude.account.id, "seven_day").first()
             assertEquals(listOf(71.0), history.map { it.usedPercent })
+        }
+
+    private val resets =
+        ResetAvailability(
+            listOf(
+                ResetPool(
+                    id = "grant",
+                    label = "Launch week",
+                    available = 1,
+                    scope = ResetScope.ofWindows("five_hour", "seven_day"),
+                    expiries = listOf(now.plus(Duration.ofDays(3))),
+                    total = 2,
+                    status = ResetPoolStatus.Queued,
+                    timing = ResetTiming.AnyTime,
+                ),
+                ResetPool("other", "Other", 0, ResetScope.of(WindowKind.Weekly)),
+            ),
+            requiresSignIn = false,
+            canAskForMore = true,
+            ineligibleReason = null,
+        )
+
+    @Test
+    fun `a sync stores the resets with the snapshot`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo =
+                repo(
+                    { QuotaResult.Success(claude.snapshot!!.copy(resets = resets)) },
+                    backgroundScope,
+                )
+            repo.addAccount(claude.account)
+            repo.refresh()
+
+            val state = repo.accounts.first { it.firstOrNull()?.snapshot != null }.single()
+            assertEquals(resets, state.snapshot!!.resets)
+            assertEquals(resets, repo.current().single().snapshot!!.resets)
+        }
+
+    @Test
+    fun `resets that could not be read keep the last ones, and none clears them`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var snapshot = claude.snapshot!!.copy(resets = resets)
+            val repo = repo({ QuotaResult.Success(snapshot) }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.refresh()
+
+            snapshot = claude.snapshot!!.copy(resets = null, resetsReadFailed = true)
+            repo.refresh()
+            assertEquals(resets, repo.current().single().snapshot!!.resets)
+
+            snapshot = claude.snapshot!!.copy(resets = null)
+            repo.refresh()
+            assertNull(repo.current().single().snapshot!!.resets)
         }
 
     @Test

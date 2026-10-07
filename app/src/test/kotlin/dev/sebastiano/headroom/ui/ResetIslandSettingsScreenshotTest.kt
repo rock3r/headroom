@@ -1,7 +1,6 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -53,7 +52,7 @@ class ResetIslandSettingsScreenshotTest {
         rule.mainClock.autoAdvance = false
         repeat(SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onRoot().captureRoboImage(screenshot(name))
     }

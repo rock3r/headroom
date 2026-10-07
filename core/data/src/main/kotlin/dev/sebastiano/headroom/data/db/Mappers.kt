@@ -27,6 +27,7 @@ internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
                 account.balanceAmount?.let { amount ->
                     QuotaBalance(amount, account.balanceUnit.orEmpty())
                 },
+            resets = account.resetsJson?.let(ResetsCodec::decode),
         )
     }
     return AccountState(

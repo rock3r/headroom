@@ -100,6 +100,14 @@ it.
   `adb shell am broadcast -n dev.sebastiano.headroom/.DemoSignInExpiredReceiver`
   (add `--ez clear true` to undo).
 
+## Usage-limit resets
+
+Each sync reads the resets of Codex, Grok, Claude and Z.AI accounts next to the usage, and Room
+stores them with the snapshot. Codex, Grok and Z.AI resets can be used; Claude's are shown only. Z.AI resets need a second sign-in, to ZCode,
+which `:core:auth` runs and stores next to the account's API key. The reset clients live in
+`:core:quota`, the sync and storage in `:core:data`, and the screens in `:app`. See
+[RESETS.md](RESETS.md), which also says how to read their logs.
+
 ## Demo mode
 
 `FakeQuotaRepository` in `:core:model` serves the demo accounts. The app uses it when no

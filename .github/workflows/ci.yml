@@ -37,8 +37,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      # Logs memory, swap and disk every 30 seconds next to the build, so a runner that dies
+      # mid-job still leaves a record of what it was short of. See issue #6.
       - name: Run check
-        run: ./gradlew check --continue
+        run: |
+          scripts/ci-resources.sh 30 &
+          resources=$!
+          trap 'kill "$resources"' EXIT
+          ./gradlew check --continue
 
       - name: Upload reports
         if: always()

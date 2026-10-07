@@ -10,9 +10,13 @@ import java.time.Instant
 /**
  * A reset the app saw happen while it was open, for the reset confetti. [fromNextReset] is true
  * when the next reset card was counting down to it, so the confetti bursts from that card rather
- * than from the account's own card.
+ * than from the account's own card. [windowId] is the window that reset.
  */
-data class ResetBurst(val accountId: String, val fromNextReset: Boolean)
+data class ResetBurst(
+    val accountId: String,
+    val fromNextReset: Boolean,
+    val windowId: String? = null,
+)
 
 /**
  * Notices weekly resets that happen while the app is open, so the overview can mark the account
@@ -48,7 +52,12 @@ class ResetTracker(private val sessionStart: Instant = Instant.MIN) {
                 justReset += id
                 if (before.fetchedAt?.let { it >= sessionStart } == true) {
                     val seenAt = state.snapshot?.fetchedAt
-                    live += ResetBurst(id, fromNextReset = wasNextReset(id, before.window, seenAt))
+                    live +=
+                        ResetBurst(
+                            id,
+                            fromNextReset = wasNextReset(id, before.window, seenAt),
+                            windowId = window.id,
+                        )
                 }
             }
             lastSeen[id] = Seen(window, state.snapshot?.fetchedAt)

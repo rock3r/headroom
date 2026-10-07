@@ -15,7 +15,13 @@ internal data class DeviceCodeGrant(
     val interval: Duration,
     /** Null when the provider does not say; the flow then allows 15 minutes. */
     val expiresIn: Duration?,
-)
+    /** The secret that authorizes the polls, for providers that use one (ZCode). */
+    val pollToken: String? = null,
+) {
+    override fun toString(): String =
+        "DeviceCodeGrant(userCode=$userCode, verificationUri=$verificationUri, " +
+            "interval=$interval, expiresIn=$expiresIn)"
+}
 
 /** One answer to a device-code poll. Failures are thrown as [AuthException]s instead. */
 internal sealed interface DevicePoll {

@@ -51,7 +51,12 @@ const val NEXT_RESET_ANCHOR: String = "next-reset"
  * is not reduced; otherwise asking for it does nothing.
  */
 @Stable
-class Delights internal constructor(private val scope: CoroutineScope) {
+class Delights
+internal constructor(
+    private val scope: CoroutineScope,
+    /** Shared with every host inside this one, so a claim anywhere counts everywhere. */
+    internal val claims: ResetClaims = ResetClaims(),
+) {
     internal var shimmerOn by mutableStateOf(false)
     internal var confettiOn by mutableStateOf(false)
     internal var density = 1f
@@ -127,6 +132,20 @@ class Delights internal constructor(private val scope: CoroutineScope) {
         burstFrom(anchors, colors)
     }
 
+    /**
+     * Records that the surface in front has celebrated [accountId]'s reset of [windowId]. Only the
+     * front-most surface plays a reset's confetti: a surface behind it that sees the same reset
+     * later, such as the overview card behind the redeem sheet, finds the claim and stays quiet. A
+     * reset that nothing claimed, such as one a normal sync brings, still plays everywhere.
+     */
+    fun claimReset(accountId: String, windowId: String) {
+        claims.claim(accountId, windowId)
+    }
+
+    /** True, once, when [accountId]'s reset of [windowId] was claimed: see [claimReset]. */
+    internal fun takeClaim(accountId: String, windowId: String?): Boolean =
+        windowId != null && claims.take(accountId, windowId)
+
     /** True when the shimmer would play: it is switched on and motion is not reduced. */
     val canShimmer: Boolean
         get() = shimmerOn
@@ -160,6 +179,29 @@ class Delights internal constructor(private val scope: CoroutineScope) {
     }
 }
 
+/**
+ * The resets whose confetti a surface already played, by account and window. A claim lasts
+ * [LIFETIME_MILLIS], long enough for the data behind the surface to catch up, and is used once.
+ */
+internal class ResetClaims(private val clock: () -> Long = System::currentTimeMillis) {
+    private val claimed = mutableMapOf<Pair<String, String>, Long>()
+
+    @Synchronized
+    fun claim(accountId: String, windowId: String) {
+        claimed[accountId to windowId] = clock()
+    }
+
+    @Synchronized
+    fun take(accountId: String, windowId: String): Boolean {
+        val at = claimed.remove(accountId to windowId) ?: return false
+        return clock() - at < LIFETIME_MILLIS
+    }
+
+    private companion object {
+        const val LIFETIME_MILLIS = 5 * 60 * 1_000L
+    }
+}
+
 /** How long a confetti burst stays on screen. */
 internal const val CONFETTI_MILLIS = 2_000
 
@@ -182,7 +224,9 @@ fun DelightsHost(
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val delights = remember(scope) { Delights(scope) }
+    // A host inside another one, such as the redeem sheet's, shares its claims.
+    val parent = LocalDelights.current
+    val delights = remember(scope, parent) { Delights(scope, parent?.claims ?: ResetClaims()) }
     val animate = animationsEnabled()
     val density = LocalDensity.current.density
     SideEffect {

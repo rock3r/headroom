@@ -17,26 +17,34 @@ import dev.sebastiano.headroom.data.account.SignInAlertingRepository
 import dev.sebastiano.headroom.data.account.SignInAlerts
 import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.data.account.SignInNotifier
+import dev.sebastiano.headroom.data.account.SyncedResetProvider
 import dev.sebastiano.headroom.data.account.TinkCredentialCipher
 import dev.sebastiano.headroom.data.db.HeadroomDatabase
 import dev.sebastiano.headroom.data.db.RoomQuotaRepository
 import dev.sebastiano.headroom.data.prefs.DataStoreAlertPreferences
 import dev.sebastiano.headroom.data.prefs.DataStoreSettingsRepository
 import dev.sebastiano.headroom.data.reset.AlarmResetScheduler
+import dev.sebastiano.headroom.data.reset.AndroidResetLog
 import dev.sebastiano.headroom.data.reset.AndroidResetNotifier
 import dev.sebastiano.headroom.data.reset.ResetAlarm
 import dev.sebastiano.headroom.data.reset.ResetAlarmPlanner
 import dev.sebastiano.headroom.data.reset.ResetCheckWorker
 import dev.sebastiano.headroom.data.reset.ResetChecker
 import dev.sebastiano.headroom.data.reset.ResetIsland
+import dev.sebastiano.headroom.data.reset.SharedPreferencesAttemptTargetStore
+import dev.sebastiano.headroom.data.reset.SharedPreferencesResetAttemptStore
 import dev.sebastiano.headroom.data.reset.SharedPreferencesResetLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
 import dev.sebastiano.headroom.data.sync.SyncWorker
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.ResetAttemptStore
+import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.quota.QuotaFetchers
+import dev.sebastiano.headroom.quota.ResetClients
+import dev.sebastiano.headroom.quota.ResetLog
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -84,6 +92,19 @@ public class DataGraph(
         QuotaFetchers.create(jetBrainsLog = { Log.i(JETBRAINS_LOG_TAG, it) }),
     /** Shows a reset on the screen, when the app allows it. The default never shows. */
     resetIsland: ResetIsland = ResetIsland.None,
+    /** Where the reset clients write what they ask and get: logcat, under `HeadroomResets`. */
+    resetLog: ResetLog = AndroidResetLog,
+    /** Reads and uses the usage-limit resets of the providers that have them. */
+    resetClients: ResetClients =
+        ResetClients.create(
+            log = resetLog,
+            zAiReachedUse = SharedPreferencesAttemptTargetStore(context),
+            grokPinnedTokens =
+                SharedPreferencesAttemptTargetStore(
+                    context,
+                    key = SharedPreferencesAttemptTargetStore.GROK_PINNED_TOKENS,
+                ),
+        ),
 ) {
     private val appContext = context.applicationContext
 
@@ -94,6 +115,7 @@ public class DataGraph(
                 HeadroomDatabase.MIGRATION_2_3,
                 HeadroomDatabase.MIGRATION_3_4,
                 HeadroomDatabase.MIGRATION_4_5,
+                HeadroomDatabase.MIGRATION_5_6,
             )
             .build()
 
@@ -108,7 +130,7 @@ public class DataGraph(
         }
 
     private val accountFetcher =
-        AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers)
+        AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers, resetClients)
 
     private val roomRepository =
         RoomQuotaRepository(
@@ -142,6 +164,23 @@ public class DataGraph(
             },
             SignInAlerts(signInNotifier, SharedPreferencesSignInAlertLedger(appContext)),
         )
+
+    /**
+     * The resets of the signed-in accounts: read by each sync and stored with the snapshot, and
+     * used through the providers' reset clients.
+     */
+    public val resetProvider: ResetProvider =
+        SyncedResetProvider(
+            // What storage holds now: right after a refresh, accounts.value may still be the old
+            // one.
+            accounts = { repository.current() },
+            fetcher = accountFetcher,
+            clients = resetClients,
+            log = resetLog,
+        )
+
+    /** Keeps the keys of unsettled redeem attempts across restarts. */
+    public val resetAttempts: ResetAttemptStore = SharedPreferencesResetAttemptStore(appContext)
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
 

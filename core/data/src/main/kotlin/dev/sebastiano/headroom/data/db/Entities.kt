@@ -21,6 +21,8 @@ internal data class AccountEntity(
     val nickname: String? = null,
     /** Where the user put the account in their list. Lists read accounts in this order. */
     @ColumnInfo(defaultValue = "0") val position: Int = 0,
+    /** The resets read in the last sync that could read them, as JSON: see [ResetsCodec]. */
+    val resetsJson: String? = null,
 )
 
 @Entity(

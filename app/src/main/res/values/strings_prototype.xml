@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Prototype for 1.1: usage limit resets and the Quick Settings tile. See docs/prototypes/RESETS-AND-TILE.md. -->
+<resources>
+
+    <!-- Resets: how many, as "2 (+5)": available now, and queued behind them -->
+    <string name="resets_count_queued">%1$d (+%2$d)</string>
+    <plurals name="resets_count_now_description">
+        <item quantity="one">%d reset available now</item>
+        <item quantity="other">%d resets available now</item>
+    </plurals>
+    <plurals name="resets_count_queued_description">
+        <item quantity="one">%d more queued</item>
+        <item quantity="other">%d more queued</item>
+    </plurals>
+    <string name="resets_count_description">%1$s, %2$s</string>
+    <string name="resets_count_explain">Explain the count</string>
+    <!-- We have not confirmed when queued grants unlock, so the tooltip says "should". -->
+    <string name="resets_count_tooltip">%1$s. %2$s</string>
+    <plurals name="resets_count_tooltip_queued">
+        <item quantity="one">%d more is queued: it should unlock after these are used.</item>
+        <item quantity="other">%d more are queued: they should unlock after these are used.</item>
+    </plurals>
+    <string name="resets_card_available">Available now</string>
+    <string name="resets_none_title">No resets available</string>
+    <string name="resets_none_body">New resets show here when %1$s gives them out.</string>
+    <string name="resets_sign_in_title">Want to see your resets?</string>
+
+    <!-- Resets: the card on the account detail -->
+    <string name="resets_card_title">Resets</string>
+    <plurals name="resets_pool_available">
+        <item quantity="one">%d available</item>
+        <item quantity="other">%d available</item>
+    </plurals>
+    <string name="resets_pool_none">None right now</string>
+    <string name="resets_pool_expires">The first one expires %1$s</string>
+    <plurals name="resets_expires_at">
+        <item quantity="one">Expires %2$s</item>
+        <item quantity="other">%1$d expire %2$s</item>
+    </plurals>
+    <plurals name="resets_no_expiry">
+        <item quantity="one">No expiry</item>
+        <item quantity="other">%d with no expiry</item>
+    </plurals>
+    <plurals name="resets_expiry_more">
+        <item quantity="one">and %d more</item>
+        <item quantity="other">and %d more</item>
+    </plurals>
+    <string name="resets_use">Use a reset</string>
+    <string name="resets_ask">Ask for a reset card</string>
+    <string name="resets_sign_in_needed">%1$s resets need a separate sign-in to %2$s.</string>
+
+    <!-- Resets: the section on the Resets tab -->
+    <string name="resets_available_section">Available resets</string>
+    <string name="resets_available_row_name">%1$s ·</string>
+    <string name="resets_available_use">Use</string>
+    <string name="resets_available_use_description">Use a reset on %1$s</string>
+
+    <!-- Resets: what each provider's reset restores. Each provider supplies its own line. -->
+    <string name="reset_scope_codex">Resets your current 5-hour and weekly limits.</string>
+    <string name="reset_scope_codex_monthly">Resets your monthly limit.</string>
+    <string name="reset_scope_grok">Resets your current weekly usage pool.</string>
+    <string name="reset_scope_zai_five_hour">Resets your current 5-hour limit.</string>
+    <string name="reset_scope_zai_week">Resets your current weekly limit.</string>
+    <string name="reset_scope_unknown">Resets your current usage limits.</string>
+    <!-- Claude says which windows each grant refills: "Refills your 5-hour session and your weekly limit." -->
+    <string name="reset_scope_refills">Refills %1$s.</string>
+    <string name="reset_scope_and">%1$s and %2$s</string>
+    <string name="reset_clears_five_hour">your 5-hour session</string>
+    <string name="reset_clears_seven_day">your weekly limit</string>
+    <string name="reset_clears_seven_day_opus">your weekly Opus limit</string>
+    <string name="reset_clears_seven_day_sonnet">your weekly Sonnet limit</string>
+    <string name="reset_clears_other">your %1$s limit</string>
+    <string name="reset_note_week_day_stays">Your weekly limit still resets on its usual day.</string>
+
+    <!-- Resets: the state of a pool that cannot be used now -->
+    <string name="resets_pool_queued">Queued</string>
+    <string name="resets_pool_paused">Paused</string>
+    <string name="resets_pool_waiting">At a limit only</string>
+    <string name="resets_pool_of_total">%1$d of %2$d</string>
+    <plurals name="resets_pool_of_total_description">
+        <item quantity="one">%1$d of %2$d reset left</item>
+        <item quantity="other">%1$d of %2$d resets left</item>
+    </plurals>
+    <string name="resets_queued_note">Queued resets become usable after the ones before them.</string>
+    <string name="resets_waiting_note">You can use this reset once you reach a limit. You are not at a limit now.</string>
+
+    <!-- Resets: the redeem sheet -->
+    <string name="redeem_sheet_label">Resets for %1$s</string>
+    <string name="redeem_choose_title">Which limit do you want to reset?</string>
+    <string name="redeem_choose_pool">%1$s · %2$s</string>
+    <plurals name="redeem_confirm_title">
+        <item quantity="one">Use this reset?</item>
+        <item quantity="other">Use 1 of your %d resets?</item>
+    </plurals>
+    <string name="redeem_confirm_soonest">Headroom uses the reset that expires first, on %1$s.</string>
+    <string name="redeem_any_time">You can use this reset before you reach a limit. It cannot be undone.</string>
+    <string name="redeem_use">Use a reset</string>
+    <string name="redeem_not_now">Not now</string>
+    <string name="redeem_back">Back</string>
+    <string name="redeem_resetting">Resetting your usage…</string>
+    <string name="redeem_updating">Updating your usage…</string>
+    <string name="redeem_bar_working">Updating</string>
+    <string name="redeem_success_title">Usage reset</string>
+    <plurals name="redeem_success_left">
+        <item quantity="one">%d reset left.</item>
+        <item quantity="other">%d resets left.</item>
+    </plurals>
+    <string name="redeem_success_none_left">No resets left.</string>
+    <string name="redeem_nothing_title">Nothing to reset</string>
+    <string name="redeem_nothing_body">Your usage is already low, so no reset was used.</string>
+    <string name="redeem_no_credit_title">No resets left</string>
+    <string name="redeem_no_credit_body">You have no resets to use right now.</string>
+    <string name="redeem_failed_title">Could not reset</string>
+    <string name="redeem_failed_body">Headroom could not reach %1$s. Trying again is safe: it can never use two resets for one try.</string>
+    <string name="redeem_cooldown_title">Another reset is running</string>
+    <string name="redeem_cooldown_body">A reset was just started for this account, so nothing was used. Check your usage in a moment.</string>
+    <string name="redeem_ineligible_title">Reset no longer available</string>
+    <string name="redeem_ineligible_body">This reset cannot be used any more. Nothing was used.</string>
+    <string name="redeem_unconfirmed_title">Not confirmed yet</string>
+    <string name="redeem_unconfirmed_body">%1$s did not confirm the reset. It may have worked. Check again to find out. Headroom will not send it a second time.</string>
+    <string name="redeem_check_again">Check again</string>
+    <string name="redeem_checking">Checking again…</string>
+    <string name="redeem_rate_limited_title">Too many requests</string>
+    <string name="redeem_rate_limited_body">%1$s asked Headroom to slow down. Nothing was used.</string>
+    <string name="redeem_rate_limited_retry">Try again after %1$s.</string>
+    <string name="redeem_sign_in_again_title">Sign in again</string>
+    <string name="redeem_sign_in_again_body">%1$s no longer accepts your sign-in. Sign in again, then try the reset.</string>
+    <string name="redeem_unsupported_title">Resets are not available</string>
+    <string name="redeem_unsupported_body">This account cannot use resets.</string>
+    <string name="redeem_try_again">Try again</string>
+    <string name="redeem_close">Close</string>
+    <string name="redeem_done">Done</string>
+    <string name="redeem_asking">Asking %1$s for a reset card…</string>
+    <string name="redeem_granted_title">You got a reset card</string>
+    <string name="redeem_granted_body">You can use it now, or keep it for later.</string>
+    <string name="redeem_use_now">Use it now</string>
+    <string name="redeem_later">Later</string>
+    <string name="redeem_not_yet_title">No reset card yet</string>
+    <string name="redeem_not_yet_body">%1$s gives reset cards off-peak, and only once your usage is high enough.</string>
+    <string name="redeem_not_yet_retry">Ask again after %1$s.</string>
+    <string name="redeem_throttled_title">Too many requests</string>
+    <string name="redeem_throttled_body">%1$s asked Headroom to slow down. Try again in a while.</string>
+    <string name="redeem_ask_failed_title">Could not ask</string>
+    <string name="redeem_ask_failed_body">Headroom could not reach %1$s. Try again later.</string>
+    <string name="redeem_ask_sign_in_again_body">%1$s no longer accepts your sign-in. Sign in again, then ask again.</string>
+    <string name="redeem_sign_in_title">Sign in to %1$s</string>
+    <string name="redeem_sign_in_body">%1$s resets need a separate sign-in to %2$s. Your API key cannot see or use resets.</string>
+    <string name="redeem_sign_in_button">Sign in to %1$s</string>
+    <string name="redeem_sign_in_stub">This prototype does not sign in yet.</string>
+    <string name="redeem_sign_in_waiting">Sign in to %1$s in your browser. Headroom carries on when you are done.</string>
+    <string name="redeem_sign_in_failed">The sign-in to %1$s did not work. Try again.</string>
+    <string name="redeem_sign_in_network">Headroom could not reach %1$s. Check your connection and try again.</string>
+    <string name="redeem_sign_in_expired">The sign-in to %1$s took too long. Try again.</string>
+    <string name="redeem_usage_description">%1$s: %2$s</string>
+
+    <!-- The Quick Settings tile -->
+    <string name="tile_label">Headroom</string>
+    <string name="tile_subtitle">%1$s · %2$s</string>
+    <string name="tile_subtitle_reset_in">in %1$s</string>
+    <string name="tile_subtitle_empty">Open Headroom</string>
+    <string name="settings_tile_next_reset">Show the next reset</string>
+    <string name="settings_tile_next_reset_body">For example, \"Claude · in 2d 4h\"</string>
+    <string name="settings_tile_tightest">Show the tightest quota</string>
+    <string name="settings_tile_tightest_body">For example, \"Grok · 88% used\"</string>
+    <string name="settings_quick_settings">Quick Settings</string>
+    <string name="settings_tile_add">Add to Quick Settings</string>
+    <string name="settings_tile_body">Open Headroom from the Quick Settings panel.</string>
+    <string name="settings_tile_added">Added</string>
+    <string name="settings_tile_already_added">Already added</string>
+    <string name="settings_tile_not_added">Not added</string>
+    <string name="settings_tile_failed">Could not add the tile. Add it by editing your Quick Settings.</string>
+</resources>

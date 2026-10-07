@@ -10,6 +10,7 @@ import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -32,7 +33,10 @@ public class OkHttpQuotaHttpClient(
 
     private fun QuotaHttpRequest.toOkHttpRequest(): Request {
         val httpUrl = url.toHttpUrlOrNull() ?: throw IOException("Malformed request URL")
-        val requestBody = body?.toRequestBody()
+        val contentType = headers.entries.firstOrNull { it.key.equals("Content-Type", true) }
+        val requestBody =
+            binaryBody?.bytes?.toRequestBody(contentType?.value?.toMediaTypeOrNull())
+                ?: body?.toRequestBody()
         return Request.Builder()
             .url(httpUrl)
             .headers(Headers.Builder().apply { headers.forEach { (k, v) -> add(k, v) } }.build())
@@ -62,15 +66,18 @@ public class OkHttpQuotaHttpClient(
         )
     }
 
-    private fun Response.toQuotaHttpResponse(): QuotaHttpResponse =
-        QuotaHttpResponse(
+    private fun Response.toQuotaHttpResponse(): QuotaHttpResponse {
+        val bytes = body.bytes()
+        return QuotaHttpResponse(
             statusCode = code,
             headers =
                 headers.names().associate { name ->
                     name.lowercase() to headers.values(name).joinToString(", ")
                 },
-            body = body.string(),
+            body = String(bytes, Charsets.UTF_8),
+            binaryBody = BinaryBody(bytes),
         )
+    }
 
     private companion object {
         val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(30)

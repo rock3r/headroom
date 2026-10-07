@@ -34,7 +34,7 @@ public class ClaudeQuotaFetcher(
                         "Authorization" to bearer(credentials.accessToken),
                         "Accept" to "application/json",
                         "anthropic-beta" to BETA_HEADER,
-                        "User-Agent" to USER_AGENT,
+                        "User-Agent" to ClaudeCodeIdentity.USER_AGENT,
                         "x-app" to X_APP,
                     ),
             )
@@ -222,7 +222,6 @@ public class ClaudeQuotaFetcher(
         const val USAGE_PATH = "/api/oauth/usage"
         const val PROFILE_PATH = "/api/oauth/profile"
         const val BETA_HEADER = "claude-code-20250219,oauth-2025-04-20"
-        const val USER_AGENT = "claude-cli/2.1.281"
         const val X_APP = "cli"
         val PROFILE_TIMEOUT: Duration = Duration.ofSeconds(5)
 

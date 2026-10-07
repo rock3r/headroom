@@ -28,6 +28,7 @@ object HeadroomIcons {
     @DrawableRes val PersonAdd: Int = R.drawable.ic_person_add
     @DrawableRes val PieChart: Int = R.drawable.ic_pie_chart
     @DrawableRes val PieChartFilled: Int = R.drawable.ic_pie_chart_filled
+    @DrawableRes val Replay: Int = R.drawable.ic_replay
     @DrawableRes val SettingsFilled: Int = R.drawable.ic_settings_filled
     @DrawableRes val Sort: Int = R.drawable.ic_sort
     @DrawableRes val Sync: Int = R.drawable.ic_sync
