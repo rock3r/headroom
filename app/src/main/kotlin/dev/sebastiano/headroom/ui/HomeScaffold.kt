@@ -534,6 +534,7 @@ private fun HomeNavigationItems(
                 )
             },
             label = { Text(stringResource(item.label)) },
+            modifier = Modifier.testTag(navigationItemTag(item)),
             navigationSuiteType = suiteType,
         )
     }
@@ -736,7 +737,7 @@ internal fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit, inToolbar
     } else {
         FloatingActionButton(
             onClick = onClick,
-            modifier = modifier,
+            modifier = Modifier.padding(horizontal = RailItemHorizontalPadding).then(modifier),
             containerColor = container,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             content = content,
@@ -773,5 +774,9 @@ private const val TURN_MILLIS = 900
 
 private val CardShape = RoundedCornerShape(24.dp)
 private val ToolbarClearance = 96.dp
+
+/** Matches the horizontal padding of the rail items, so the refresh button centres over them. */
+private val RailItemHorizontalPadding = 20.dp
+
 private const val FADE_THROUGH_SCALE = 0.96f
 private const val PANE_SCALE = 0.98f
