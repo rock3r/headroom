@@ -150,13 +150,11 @@ internal fun HomeScaffold(
         navigationSuiteType = suiteType,
         primaryActionContent = {
             if (width != LayoutWidth.Compact) {
-                Box(Modifier.padding(horizontal = 20.dp)) {
-                    RefreshButton(
-                        refreshing = home.isRefreshing,
-                        onRefresh = onRefresh,
-                        inToolbar = false,
-                    )
-                }
+                RefreshButton(
+                    refreshing = home.isRefreshing,
+                    onRefresh = onRefresh,
+                    inToolbar = false,
+                )
             }
         },
         modifier = modifier,
@@ -542,9 +540,6 @@ private fun HomeNavigationItems(
     }
 }
 
-/** The stable test tag for a navigation destination, e.g. "nav-item-overview". */
-internal fun navigationItemTag(item: HomeTab): String = "nav-item-${item.name.lowercase()}"
-
 /**
  * Opens the requested account. The caller passes only requests for accounts on screen; see
  * [decideOpenAccount].
@@ -742,7 +737,7 @@ internal fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit, inToolbar
     } else {
         FloatingActionButton(
             onClick = onClick,
-            modifier = modifier,
+            modifier = Modifier.padding(horizontal = RailItemHorizontalPadding).then(modifier),
             containerColor = container,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             content = content,
@@ -779,5 +774,9 @@ private const val TURN_MILLIS = 900
 
 private val CardShape = RoundedCornerShape(24.dp)
 private val ToolbarClearance = 96.dp
+
+/** Matches the horizontal padding of the rail items, so the refresh button centres over them. */
+private val RailItemHorizontalPadding = 20.dp
+
 private const val FADE_THROUGH_SCALE = 0.96f
 private const val PANE_SCALE = 0.98f
