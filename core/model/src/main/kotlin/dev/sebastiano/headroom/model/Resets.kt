@@ -36,11 +36,26 @@ public data class ResetScope(
 }
 
 /**
- * True for the providers whose resets Headroom can use: Codex, Grok and Z.AI. Other providers'
- * resets, such as Claude's grants, are shown for information only, with no action.
+ * True for the providers whose resets Headroom can use with these [settings]: Codex, Grok and Z.AI
+ * always, and Claude once the user turns on [AppSettings.redeemClaudeResets]. Other providers'
+ * resets, and Claude's grants until then, are shown for information only, with no action.
  */
-public val Provider.canRedeemResets: Boolean
-    get() = this == Provider.Codex || this == Provider.Grok || this == Provider.ZAi
+public fun Provider.canRedeemResets(settings: AppSettings): Boolean =
+    when (this) {
+        Provider.Codex,
+        Provider.Grok,
+        Provider.ZAi -> true
+        Provider.Claude -> settings.redeemClaudeResets
+        else -> false
+    }
+
+/**
+ * True for the providers whose redeem is experimental: Claude's. Its API is not public and was
+ * never tried with a real account, so the user turns it on in Settings, and the confirmation says
+ * it is experimental.
+ */
+public val Provider.redeemsResetsExperimentally: Boolean
+    get() = this == Provider.Claude
 
 /** Whether a pool's reset can be used now, and if not, why not. */
 public enum class ResetPoolStatus {

@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.sebastiano.headroom.AppGraph
+import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.RedeemIntent
 import dev.sebastiano.headroom.prototype.PrototypeEnv
 import dev.sebastiano.headroom.prototype.PrototypeTools
@@ -160,12 +161,16 @@ internal class ResetSheetState(request: ResetSheetRequest? = null) {
     }
 }
 
-/** The resets of every account, and which accounts are refreshing after a reset. */
+/**
+ * The resets of every account, which accounts are refreshing after a reset, and the settings that
+ * decide whether Claude's resets can be used.
+ */
 @Composable
 internal fun collectResets(graph: AppGraph): AccountResets {
     val availability by graph.resets.availability.collectAsStateWithLifecycle()
     val refreshing by graph.resets.refreshing.collectAsStateWithLifecycle()
-    return AccountResets(availability, refreshing)
+    val settings by graph.settings.settings.collectAsStateWithLifecycle(AppSettings())
+    return AccountResets(availability, refreshing, settings)
 }
 
 /** The debug build's prototypes page. Release builds have no tools, so the page stays empty. */

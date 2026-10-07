@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.account
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
@@ -20,9 +21,9 @@ import java.io.IOException
  * The resets of the signed-in accounts. Their availability comes from the last sync, which reads it
  * with the usage and stores it with the snapshot; this class makes no call to read it. Redeeming
  * goes to the provider's [dev.sebastiano.headroom.quota.ResetRedeemer], and asking for another
- * reset to its [dev.sebastiano.headroom.quota.ResetAsker], with a credential that works now. Both
- * only run for the providers whose resets Headroom can use
- * ([dev.sebastiano.headroom.model.canRedeemResets]).
+ * reset to its [dev.sebastiano.headroom.quota.ResetAsker], with a credential that works now, and so
+ * does a check of an unconfirmed redeem. They only run for the providers whose resets Headroom can
+ * use with the user's [settings] ([dev.sebastiano.headroom.model.canRedeemResets]).
  */
 public class SyncedResetProvider(
     /**
@@ -30,6 +31,8 @@ public class SyncedResetProvider(
      * [dev.sebastiano.headroom.model.QuotaRepository.current].
      */
     private val accounts: suspend () -> List<AccountState>,
+    /** The user's settings now: Claude's resets are only used once the user turns that on. */
+    private val settings: suspend () -> AppSettings = { AppSettings() },
     private val fetcher: AccountQuotaFetcher,
     private val clients: ResetClients,
     private val log: ResetLog = ResetLog.None,
@@ -60,6 +63,28 @@ public class SyncedResetProvider(
         return outcome
     }
 
+    override suspend fun check(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+    ): RedeemOutcome {
+        val redeemer =
+            clients.redeemer(account.provider)?.takeIf { redeems(account) }
+                ?: return RedeemOutcome.Unconfirmed
+        // Without a credential the status cannot be read, so the attempt stays unconfirmed and
+        // keeps its key.
+        val outcome =
+            when (val credentials = credentialsOf(account)) {
+                is Credentials.Ready -> redeemer.check(credentials.value, poolId, attemptKey.value)
+                is Credentials.Missing -> RedeemOutcome.Unconfirmed
+            }
+        log.debug(
+            "${account.provider.id} check account ${ResetLogRedaction.shortHash(account.id)} " +
+                "pool $poolId key ${attemptKey.value}: $outcome"
+        )
+        return outcome
+    }
+
     override suspend fun askForMore(account: Account): AskOutcome {
         val asker =
             clients.asker(account.provider)?.takeIf { redeems(account) }
@@ -79,7 +104,8 @@ public class SyncedResetProvider(
         return outcome
     }
 
-    private fun redeems(account: Account): Boolean = account.provider.canRedeemResets
+    private suspend fun redeems(account: Account): Boolean =
+        account.provider.canRedeemResets(settings())
 
     private suspend fun credentialsOf(account: Account): Credentials =
         try {

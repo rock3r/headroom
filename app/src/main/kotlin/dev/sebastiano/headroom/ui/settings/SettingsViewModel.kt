@@ -29,6 +29,7 @@ data class SettingsUiState(
     val refreshShimmer: Boolean = true,
     val resetConfetti: Boolean = true,
     val resetIsland: Boolean = false,
+    val redeemClaudeResets: Boolean = false,
 )
 
 /** Reads the settings from the [settings] repository and stores the user's choices in it. */
@@ -75,6 +76,10 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
         viewModelScope.launch { settings.setResetIsland(enabled) }
     }
 
+    fun setRedeemClaudeResets(enabled: Boolean) {
+        viewModelScope.launch { settings.setRedeemClaudeResets(enabled) }
+    }
+
     private fun AppSettings.toUiState(appVersion: String) =
         SettingsUiState(
             quotaDisplay,
@@ -86,6 +91,7 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
             refreshShimmer,
             resetConfetti,
             resetIsland,
+            redeemClaudeResets,
         )
 
     private companion object {

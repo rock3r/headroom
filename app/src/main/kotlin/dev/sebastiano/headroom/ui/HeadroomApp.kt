@@ -414,6 +414,7 @@ private fun settingsActions(
         onRefreshShimmerChange = viewModel::setRefreshShimmer,
         onResetConfettiChange = viewModel::setResetConfetti,
         onResetIslandChange = viewModel::setResetIsland,
+        onRedeemClaudeResetsChange = viewModel::setRedeemClaudeResets,
         onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
         onRefreshResetIsland = resetIsland::refresh,
         onOpenPrototypes = { onNavigate(Page.Prototypes) },

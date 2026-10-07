@@ -17,7 +17,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
@@ -139,9 +138,15 @@ class SettingsTest {
             .performScrollToNode(hasTestTag(syncFrequencyTag(SyncFrequency.Minutes15)))
         rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Minutes15)).assertIsSelected()
 
-        rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Hours3)).performScrollTo().performClick()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasTestTag(syncFrequencyTag(SyncFrequency.Hours3)))
+        rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Hours3)).performClick()
 
         rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Hours3)).assertIsSelected()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasTestTag(syncFrequencyTag(SyncFrequency.Minutes15)))
         rule.onNodeWithTag(syncFrequencyTag(SyncFrequency.Minutes15)).assertIsNotSelected()
         assertEquals(SyncFrequency.Hours3, settings.settings.value.syncFrequency)
     }

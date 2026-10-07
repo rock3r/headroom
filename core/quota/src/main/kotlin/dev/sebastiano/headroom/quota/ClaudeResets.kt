@@ -20,7 +20,7 @@ import kotlinx.serialization.json.jsonObject
 
 /**
  * Claude's saved usage-limit resets (the `cedar_ember` program: "Reset for free" on claude.ai).
- * Headroom only reads them: using one is not supported.
+ * [ClaudeResetRedeemer] uses them.
  *
  * `GET /api/oauth/usage?cedar_ember=1&skip_spend=1` fills the `cedar_ember` block of the usage
  * answer. The server only fills it for the Claude Code client, so the request carries its identity:
@@ -32,28 +32,14 @@ internal class ClaudeResets(
     private val clock: Clock,
     private val log: ResetLog,
     private val baseUrl: String = DEFAULT_BASE_URL,
-) : ResetReader {
+) : ResetReader, ResetRedeemer by ClaudeResetRedeemer(httpClient, clock, log, baseUrl) {
     override val provider: Provider = Provider.Claude
 
     override suspend fun read(credentials: ProviderCredentials): ResetRead {
-        val url = "$baseUrl$STATUS_PATH"
-        val call = ResetCall(log, provider, "list", url)
+        val call = ResetCall(log, provider, "list", "$baseUrl$STATUS_PATH")
         val response =
             try {
-                call.send(
-                    httpClient,
-                    QuotaHttpRequest(
-                        url = url,
-                        headers =
-                            mapOf(
-                                "Authorization" to bearer(credentials.accessToken),
-                                "anthropic-beta" to BETA_HEADER,
-                                "User-Agent" to USER_AGENT,
-                                "Accept" to "application/json",
-                                "Content-Type" to "application/json",
-                            ),
-                    ),
-                )
+                call.send(httpClient, claudeStatusRequest(baseUrl, credentials))
             } catch (_: IOException) {
                 return ResetRead.Failed
             }
@@ -168,11 +154,27 @@ internal class ClaudeResets(
     /** The parsed block; [availability] is null when the account is outside the program. */
     private class Program(val availability: ResetAvailability?)
 
-    private companion object {
-        const val DEFAULT_BASE_URL = "https://api.anthropic.com"
-        const val STATUS_PATH = "/api/oauth/usage?cedar_ember=1&skip_spend=1"
-        const val PROGRAM_KEY = "cedar_ember"
-        const val BETA_HEADER = "oauth-2025-04-20"
-        const val USER_AGENT = "claude-cli/2.1.281 (external, cli)"
+    companion object {
+        const val DEFAULT_BASE_URL: String = "https://api.anthropic.com"
+        const val STATUS_PATH: String = "/api/oauth/usage?cedar_ember=1&skip_spend=1"
+        const val PROGRAM_KEY: String = "cedar_ember"
+        private const val BETA_HEADER = "oauth-2025-04-20"
+        private const val USER_AGENT = "claude-cli/2.1.281 (external, cli)"
+
+        /** The headers of every call to the Claude Code endpoints: its token and its identity. */
+        fun headers(credentials: ProviderCredentials): Map<String, String> =
+            mapOf(
+                "Authorization" to bearer(credentials.accessToken),
+                "anthropic-beta" to BETA_HEADER,
+                "User-Agent" to USER_AGENT,
+                "Accept" to "application/json",
+            )
     }
 }
+
+/** The status request: the usage answer, with the `cedar_ember` block filled in. */
+internal fun claudeStatusRequest(baseUrl: String, credentials: ProviderCredentials) =
+    QuotaHttpRequest(
+        url = "$baseUrl${ClaudeResets.STATUS_PATH}",
+        headers = ClaudeResets.headers(credentials) + ("Content-Type" to "application/json"),
+    )

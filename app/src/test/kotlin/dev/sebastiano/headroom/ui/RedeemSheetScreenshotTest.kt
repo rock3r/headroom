@@ -430,6 +430,11 @@ internal fun sheetShots(): List<SheetShot> {
         ),
         SheetShot("claude-cooldown", claude, RedeemStep.Finished(grant, RedeemOutcome.Cooldown)),
         SheetShot(
+            "claude-not-limited",
+            claude,
+            RedeemStep.Finished(grant, RedeemOutcome.NothingToReset),
+        ),
+        SheetShot(
             "claude-unconfirmed",
             claude,
             RedeemStep.Finished(grant, RedeemOutcome.Unconfirmed),

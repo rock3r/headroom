@@ -38,6 +38,16 @@ public interface ResetRedeemer {
         poolId: String,
         attemptKey: String,
     ): RedeemOutcome
+
+    /**
+     * Reads the status again after an [RedeemOutcome.Unconfirmed] redeem with [attemptKey], and
+     * says what it did. It never sends the reset again.
+     */
+    public suspend fun check(
+        credentials: ProviderCredentials,
+        poolId: String,
+        attemptKey: String,
+    ): RedeemOutcome = RedeemOutcome.Unconfirmed
 }
 
 /** Asks a provider for another reset, as Z.AI's reset cards. It never throws for HTTP problems. */
@@ -71,10 +81,11 @@ public class ResetClients(
         public val None: ResetClients = ResetClients(emptyList(), emptyList())
 
         /**
-         * Codex, Grok and Z.AI resets are read and used, and Z.AI can be asked for more; Claude's
-         * grants are only read. Z.AI resets need the account's ZCode sign-in
-         * ([ProviderCredentials.zCode]). Whether the app offers a redeem is its own decision
-         * ([dev.sebastiano.headroom.model.canRedeemResets]).
+         * Codex, Grok, Claude and Z.AI resets are read and used, and Z.AI can be asked for more.
+         * Z.AI resets need the account's ZCode sign-in ([ProviderCredentials.zCode]). Whether the
+         * app offers a redeem is its own decision
+         * ([dev.sebastiano.headroom.model.canRedeemResets]): Claude's only once the user turns it
+         * on.
          */
         public fun create(
             httpClient: QuotaHttpClient = OkHttpQuotaHttpClient(),
@@ -86,9 +97,10 @@ public class ResetClients(
             val codex = CodexResets(httpClient, clock, log)
             val grok = GrokResets(httpClient, clock, log)
             val zAi = ZAiResets(httpClient, clock, log, reachedUseStore = zAiReachedUse)
+            val claude = ClaudeResets(httpClient, clock, log)
             return ResetClients(
-                readers = listOf(codex, grok, ClaudeResets(httpClient, clock, log), zAi),
-                redeemers = listOf(codex, grok, zAi),
+                readers = listOf(codex, grok, claude, zAi),
+                redeemers = listOf(codex, grok, claude, zAi),
                 askers = listOf(zAi),
             )
         }

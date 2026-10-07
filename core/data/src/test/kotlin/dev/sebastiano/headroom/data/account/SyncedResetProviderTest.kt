@@ -6,6 +6,7 @@ import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
@@ -49,6 +50,16 @@ class SyncedResetProviderTest {
 
     private class RecordingRedeemer(override val provider: Provider) : ResetRedeemer {
         val calls = mutableListOf<Triple<ProviderCredentials, String, String>>()
+        val checks = mutableListOf<Triple<ProviderCredentials, String, String>>()
+
+        override suspend fun check(
+            credentials: ProviderCredentials,
+            poolId: String,
+            attemptKey: String,
+        ): RedeemOutcome {
+            checks += Triple(credentials, poolId, attemptKey)
+            return RedeemOutcome.Success(resetsLeft = 0, replayed = true)
+        }
 
         override suspend fun redeem(
             credentials: ProviderCredentials,
@@ -91,9 +102,12 @@ class SyncedResetProviderTest {
             AccountState(claude, null),
         )
 
+    private var settings = AppSettings()
+
     private val provider =
         SyncedResetProvider(
             accounts = { states },
+            settings = { settings },
             fetcher =
                 AccountQuotaFetcher(
                     CredentialProvider(store, emptyMap()),
@@ -142,13 +156,54 @@ class SyncedResetProviderTest {
     }
 
     @Test
-    fun `Claude resets cannot be used`() = runTest {
+    fun `Claude resets cannot be used until the user turns it on`() = runTest {
         signIn(claude)
 
         val outcome = provider.redeem(claude, "grant", ResetAttemptKey("key-1"))
 
         assertEquals(RedeemOutcome.Unsupported, outcome)
+        assertEquals(
+            RedeemOutcome.Unconfirmed,
+            provider.check(claude, "grant", ResetAttemptKey("key-1")),
+        )
         assertTrue(claudeRedeemer.calls.isEmpty())
+        assertTrue(claudeRedeemer.checks.isEmpty())
+    }
+
+    @Test
+    fun `once turned on, a Claude redeem uses the account's credential and the grant`() = runTest {
+        signIn(claude)
+        settings = AppSettings(redeemClaudeResets = true)
+
+        val outcome = provider.redeem(claude, "grant", ResetAttemptKey("key-1"))
+
+        assertEquals(RedeemOutcome.Success(resetsLeft = 1), outcome)
+        val (credentials, poolId, key) = claudeRedeemer.calls.single()
+        assertEquals("secret-token", credentials.accessToken)
+        assertEquals("grant", poolId)
+        assertEquals("key-1", key)
+    }
+
+    @Test
+    fun `a check reads what an unconfirmed attempt did, with the same key`() = runTest {
+        signIn(claude)
+        settings = AppSettings(redeemClaudeResets = true)
+
+        val outcome = provider.check(claude, "grant", ResetAttemptKey("key-1"))
+
+        assertEquals(RedeemOutcome.Success(resetsLeft = 0, replayed = true), outcome)
+        assertEquals("key-1", claudeRedeemer.checks.single().third)
+        assertTrue(claudeRedeemer.calls.isEmpty())
+    }
+
+    @Test
+    fun `a check without a working sign-in stays unconfirmed`() = runTest {
+        settings = AppSettings(redeemClaudeResets = true)
+
+        assertEquals(
+            RedeemOutcome.Unconfirmed,
+            provider.check(claude, "grant", ResetAttemptKey("key-1")),
+        )
     }
 
     @Test
