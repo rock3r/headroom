@@ -3,7 +3,11 @@
   "local_gate": "./gradlew check",
   "expected_skipped_checks": [],
   "required_checks": [
-    "Check (tests, detekt, ktfmt, lint)",
+    "Static analysis (lint, detekt, ktfmt)",
+    "Unit tests (libraries)",
+    "App unit tests (redeem-screenshots)",
+    "App unit tests (screenshots)",
+    "App unit tests (unit)",
     "End-to-end tests (emulator, fake data)"
   ],
   "retry_eligible_workflow_keywords": [

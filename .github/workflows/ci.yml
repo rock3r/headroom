@@ -26,10 +26,12 @@ jobs:
         uses: actions/checkout@v6
 
       # Docs-only changes still run static analysis so the checks report. Tests and e2e skip.
+      # `every` is required: the default `some` treats `**` as a match and ignores the exclusions.
       - name: Filter paths
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          predicate-quantifier: every
           filters: |
             tests:
               - "**"
