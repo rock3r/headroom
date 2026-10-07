@@ -104,8 +104,9 @@ was measured.
 - A grant with `use_requires_limit: false` can be used at any time. The confirmation says that
   this cannot be undone.
 - A redeem reads the status first and notes the grant's `resets_left`, but only before the first
-  send of an attempt key. It then reads the organization from the profile. If the profile cannot be
-  read, nothing is sent and the redeem fails, so it can be tried again with the same key.
+  send of an attempt key. It then reads the organization from the profile. If either cannot be read,
+  nothing is sent and the redeem fails, so it can be tried again with the same key. A grant the
+  status no longer lists is ineligible, and nothing is sent.
 - `request_id` is the attempt key. Claude only accepts `^[A-Za-z0-9_-]{1,64}$`; the attempt keys are
   UUIDs, which match. A key that does not match is sent as its SHA-256 in hex, so every try of one
   attempt still sends the same id.

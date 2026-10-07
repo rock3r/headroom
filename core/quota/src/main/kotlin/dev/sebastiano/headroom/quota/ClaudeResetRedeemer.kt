@@ -9,6 +9,7 @@ import java.time.Clock
 import java.time.Instant
 import java.util.Locale
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
@@ -40,9 +41,15 @@ internal class ClaudeResetRedeemer(
         poolId: String,
         attemptKey: String,
     ): RedeemOutcome {
+        // Without the count from before the first send, a check could never settle an
+        // unconfirmed answer, so nothing is sent until it is known.
         if (leftBefore[attemptKey] == null) {
-            grantsLeft(credentials, attemptKey)?.get(poolId)?.let {
-                leftBefore.remember(attemptKey, it.toString())
+            when (val read = grantsLeft(credentials, attemptKey)) {
+                is GrantsRead.Failed -> return read.outcome
+                is GrantsRead.Known -> {
+                    val left = read.left[poolId] ?: return RedeemOutcome.Ineligible
+                    leftBefore.remember(attemptKey, left.toString())
+                }
             }
         }
         val organization =
@@ -113,33 +120,41 @@ internal class ClaudeResetRedeemer(
         attemptKey: String,
     ): RedeemOutcome {
         val before = leftBefore[attemptKey]?.toIntOrNull() ?: return RedeemOutcome.Unconfirmed
-        val now =
-            grantsLeft(credentials, attemptKey)?.get(poolId) ?: return RedeemOutcome.Unconfirmed
+        val read = grantsLeft(credentials, attemptKey) as? GrantsRead.Known
+        val now = read?.left?.get(poolId) ?: return RedeemOutcome.Unconfirmed
         return if (now < before) RedeemOutcome.Success(resetsLeft = now, replayed = true)
         else RedeemOutcome.Unconfirmed
     }
 
-    /** Each grant's `resets_left`, spent grants included, or null when it cannot be read. */
+    /** Each grant's `resets_left`, spent grants included, or why they could not be read. */
     private suspend fun grantsLeft(
         credentials: ProviderCredentials,
         attemptKey: String,
-    ): Map<String, Int>? {
+    ): GrantsRead {
         val call = ResetCall(log, provider, "list", "$baseUrl${ClaudeResets.STATUS_PATH}")
         val response =
             try {
                 call.send(httpClient, claudeStatusRequest(baseUrl, credentials))
             } catch (_: IOException) {
-                return null
+                return GrantsRead.Failed(RedeemOutcome.Failed(QuotaErrorKind.Network))
             }
         if (response.statusCode != HTTP_OK) {
             call.done("HTTP ${response.statusCode}, for key $attemptKey")
-            return null
+            return GrantsRead.Failed(
+                redeemFailureFor(response.statusCode, retryAfter(response.headers, now()))
+            )
         }
         val left = parseOrNull {
             val block =
                 quotaJson.parseToJsonElement(response.body).jsonObject[ClaudeResets.PROGRAM_KEY]
-            ((block as? JsonObject)?.get("grants") as? JsonArray)
-                .orEmpty()
+            val grants =
+                when (val element = (block as? JsonObject)?.get("grants")) {
+                    null,
+                    is JsonNull -> JsonArray(emptyList())
+                    is JsonArray -> element
+                    else -> throw IllegalArgumentException("grants is not a list")
+                }
+            grants
                 .mapNotNull { element ->
                     val grant = element.jsonObject
                     grant.nonBlankStringOrNull("id")?.let {
@@ -149,7 +164,11 @@ internal class ClaudeResetRedeemer(
                 .toMap()
         }
         call.done("HTTP 200, ${left?.size ?: "unreadable"} grants, for key $attemptKey")
-        return left
+        if (left == null) {
+            call.unreadable("${ClaudeResets.PROGRAM_KEY}.grants[].id/resets_left", response.body)
+            return GrantsRead.Failed(RedeemOutcome.Failed(QuotaErrorKind.Parse))
+        }
+        return GrantsRead.Known(left)
     }
 
     /** The organization the account belongs to, from the OAuth profile. */
@@ -222,6 +241,12 @@ internal class ClaudeResetRedeemer(
     private fun JsonObject.intOrNull(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
 
     private class RedeemAnswer(val result: String, val left: Int?, val reason: String?)
+
+    private sealed interface GrantsRead {
+        class Known(val left: Map<String, Int>) : GrantsRead
+
+        class Failed(val outcome: RedeemOutcome) : GrantsRead
+    }
 
     private sealed interface Organization {
         class Found(val uuid: String) : Organization

@@ -192,6 +192,47 @@ class ClaudeResetRedeemTest {
     }
 
     @Test
+    fun `without the grant's count before the send, nothing is sent`() = runTest {
+        status = MockResponse(code = 500)
+        assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Unknown), redeem())
+
+        status = jsonResponse("""{"cedar_ember":{"grants":"nope"}}""")
+        assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Parse), redeem())
+
+        assertTrue(redeemRequests().isEmpty())
+    }
+
+    @Test
+    fun `a status that asks for a sign-in asks the user to sign in again`() = runTest {
+        status = MockResponse(code = 401)
+
+        assertEquals(RedeemOutcome.SignInAgain, redeem())
+        assertTrue(redeemRequests().isEmpty())
+    }
+
+    @Test
+    fun `a grant the status no longer lists cannot be used, and nothing is sent`() = runTest {
+        assertEquals(RedeemOutcome.Ineligible, redeem(grant = "gone"))
+        assertTrue(redeemRequests().isEmpty())
+    }
+
+    @Test
+    fun `a retry keeps the count from before the first send`() = runTest {
+        answer("unavailable")
+        redeem()
+        // The first send worked after all: the retry reads one reset fewer, and is answered as a
+        // replay. The check still compares with the count from before the first send.
+        status = jsonResponse(fixture("claude/usage_cedar_ember.json").replaceLaunchWeekLeft(0))
+        answer("unavailable")
+        redeem()
+
+        assertEquals(
+            RedeemOutcome.Success(resetsLeft = 0, replayed = true),
+            resets.check(credentials(), "launch_week", KEY),
+        )
+    }
+
+    @Test
     fun `a profile that asks for a sign-in asks the user to sign in again`() = runTest {
         profile = MockResponse(code = 401)
 
