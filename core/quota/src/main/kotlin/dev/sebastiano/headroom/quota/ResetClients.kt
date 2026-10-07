@@ -93,9 +93,11 @@ public class ResetClients(
             log: ResetLog = ResetLog.None,
             /** Where Z.AI keeps the attempt keys that reached `use`, across restarts. */
             zAiReachedUse: AttemptTargetStore = AttemptTargetStore.None,
+            /** Where Grok keeps the token each attempt key addresses, across restarts. */
+            grokPinnedTokens: AttemptTargetStore = AttemptTargetStore.None,
         ): ResetClients {
             val codex = CodexResets(httpClient, clock, log)
-            val grok = GrokResets(httpClient, clock, log)
+            val grok = GrokResets(httpClient, clock, log, pinnedStore = grokPinnedTokens)
             val zAi = ZAiResets(httpClient, clock, log, reachedUseStore = zAiReachedUse)
             val claude = ClaudeResets(httpClient, clock, log)
             return ResetClients(

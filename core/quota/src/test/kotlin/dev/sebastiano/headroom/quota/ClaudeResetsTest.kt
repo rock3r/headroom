@@ -51,7 +51,10 @@ class ClaudeResetsTest {
         assertEquals("/api/oauth/usage?cedar_ember=1&skip_spend=1", request.target)
         assertEquals("Bearer test-access-token", request.headers["Authorization"])
         assertEquals("oauth-2025-04-20", request.headers["anthropic-beta"])
-        assertEquals("claude-cli/2.1.281 (external, cli)", request.headers["User-Agent"])
+        assertEquals(
+            "claude-cli/${ClaudeCodeIdentity.VERSION} (external, cli)",
+            request.headers["User-Agent"],
+        )
     }
 
     @Test
@@ -123,6 +126,29 @@ class ClaudeResetsTest {
             assertTrue(availability.pools.isEmpty(), it)
             assertTrue(availability.ineligibleReason!!.isNotBlank(), it)
         }
+    }
+
+    @Test
+    fun `logs the reason Claude gives for an account outside the program`() = runTest {
+        listOf("cli_version", "surface", "tier").forEach {
+            availability(
+                cedarEmber(""""cedar_ember":{"eligible":false,"ineligible_reason":"$it"}""")
+            )
+
+            assertTrue(log.debugs.last().contains("ineligible $it"), log.debugs.last())
+        }
+        assertTrue(log.all.none { "test-access-token" in it })
+    }
+
+    @Test
+    fun `logs a strange ineligible reason without its text`() = runTest {
+        val reason = "user@example.com eyJhbGciOiJIUzI1NiJ9.e30.sig"
+        availability(
+            cedarEmber(""""cedar_ember":{"eligible":false,"ineligible_reason":"$reason"}""")
+        )
+
+        assertTrue(log.debugs.last().contains("ineligible other"), log.debugs.last())
+        assertTrue(log.all.none { "example.com" in it || "eyJ" in it })
     }
 
     @Test

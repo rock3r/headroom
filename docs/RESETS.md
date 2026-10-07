@@ -50,7 +50,7 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
 | Codex | Use a credit | `POST …/wham/rate-limit-reset-credits/consume` with `{"redeem_request_id": <attempt key>, "credit_id": <soonest-expiring credit>}` | The same, plus `Content-Type: application/json` |
 | Grok | List tokens | `POST https://grok.com/prod_mc_billing.ConsumerUiSvc/GetRemainingResets`, an empty protobuf message in a gRPC-web frame | `Authorization: Bearer <xAI OAuth token>`, `Content-Type: application/grpc-web+proto`, `Accept: application/grpc-web+proto`, `X-Grpc-Web: 1`, `TE: trailers` |
 | Grok | Use a token | `POST https://grok.com/prod_mc_billing.ConsumerUiSvc/RedeemReset` with `token_id` (field 10) | The same |
-| Claude | List grants | `GET https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1` | `Authorization: Bearer <Claude OAuth token>`, `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-cli/2.1.281 (external, cli)` |
+| Claude | List grants | `GET https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1` | `Authorization: Bearer <Claude OAuth token>`, `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-cli/<version> (external, cli)` |
 | Claude | Read the organization | `GET https://api.anthropic.com/api/oauth/profile`, for `organization.uuid` | `Authorization: Bearer <Claude OAuth token>` |
 | Claude | Use a grant | `POST https://api.anthropic.com/api/organizations/{organization}/reset_rate_limits` with `{"program":"cedar_ember","grant_id":<grant>,"request_id":<attempt key>}` | As for the list, plus `Content-Type: application/json` |
 | Z.AI | List cards | `GET https://zcode.z.ai/api/v1/coding-plan/reset/status` | `Authorization: Bearer <ZCode JWT>`, `X-Bigmodel-Authorization: <Z.AI business token>`, `Bigmodel-Target-Type: PERSONAL` |
@@ -78,6 +78,10 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   with `token_id` (10) and `validity_end` (30, a Timestamp).
 - The redeem call has no idempotency key of its own. Headroom pins the token to the attempt key.
   When a retry finds its pinned token gone, the earlier try worked.
+- `SharedPreferencesAttemptTargetStore` writes the pin to disk before the redeem goes out, so a
+  retry after the app was stopped addresses the same token. It stores the latest 16 attempt keys
+  with their token ids, and no access token. When that write fails, the redeem is not sent and
+  fails, so it can be retried with the same key.
 - gRPC status 16 or 7, or HTTP 401 or 403, asks the user to sign in again. Status 8 or HTTP 429 is
   rate limiting.
 
@@ -89,8 +93,14 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   queued, so the count reads "1 (+3)". A paused grant is paused.
 - An account outside the program shows no resets. The reasons `tier`, `seat` and `tenure` show a
   short explanation instead.
-- The server fills the block only for the Claude Code client, so the call carries its User-Agent.
-  If Claude starts answering `surface` or `cli_version`, the User-Agent needs a newer version.
+- The server fills the block only for recent Claude Code clients, so the call carries their
+  User-Agent. `ClaudeCodeIdentity.VERSION` in `:core:quota` holds the version for every Claude
+  request. `scripts/update-claude-code-version.sh` sets it to the latest published Claude Code,
+  and each release runs it (see [RELEASING.md](RELEASING.md)).
+- When the account is outside the program, the `HeadroomResets` log line names the server's
+  reason, for example `ineligible cli_version`. The reasons `surface` and `cli_version` mean the
+  version is too old: run the script. A reason that is not a short code is logged as `other`, so
+  the log never carries the server's text.
 
 Using a grant is experimental. The endpoint and its answers come from research; nobody has tried
 them with a real account yet, so this section describes what Headroom sends and expects, not what
@@ -211,8 +221,9 @@ refreshed so its resets show.
   `SharedPreferencesResetAttemptStore` writes it to disk before the call goes out, so it survives
   the app being stopped. It stores the account id, the pool, the key and the time. It stores no
   token. Like every app file, it is excluded from backup and device transfer.
-- The pinned credit or token lives in memory only. After a restart, a retry of the same Codex key
-  is still safe, because the server answers `already_redeemed`.
+- Codex pins its credit in memory only. After a restart, a retry of the same Codex key is still
+  safe, because the server answers `already_redeemed`. Grok pins its token on disk (see Grok
+  above), because its server has no idempotency key.
 - After a reset works, `ResetCenter` waits 2 seconds (`ResetRefresh.DELAY`), then refreshes the
   account. The refill animation plays from the new usage.
 - An account whose sign-in expired shows its resets faded, with no action.

@@ -10,18 +10,23 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 /**
- * Keeps the Z.AI attempt keys that reached `use` in private shared preferences, so a retry after
- * the app was stopped still reaches `use`. Each entry is an attempt key and its pool: no token.
- * Like every app file, it is excluded from backup and device transfer.
+ * Keeps the targets of a provider's redeem attempts in private shared preferences, under [key], so
+ * a retry after the app was stopped addresses the same target:
+ * - [ZAI_REACHED_USE]: the Z.AI attempt keys that reached `use`, each with its pool.
+ * - [GROK_PINNED_TOKENS]: the Grok attempt keys, each with the id of the reset token it redeems.
+ *
+ * Each entry is an attempt key and an id: no access token or other credential. Like every app file,
+ * it is excluded from backup and device transfer.
  */
 public class SharedPreferencesAttemptTargetStore(
     context: Context,
     private val prefs: SharedPreferences = context.getSharedPreferences(FILE, Context.MODE_PRIVATE),
+    private val key: String = ZAI_REACHED_USE,
 ) : AttemptTargetStore {
     private val serializer = MapSerializer(String.serializer(), String.serializer())
 
     override fun load(): Map<String, String> {
-        val text = prefs.getString(KEY, null) ?: return emptyMap()
+        val text = prefs.getString(key, null) ?: return emptyMap()
         return try {
             Json.decodeFromString(serializer, text)
         } catch (_: SerializationException) {
@@ -32,13 +37,14 @@ public class SharedPreferencesAttemptTargetStore(
     }
 
     override fun save(targets: Map<String, String>) {
-        // Written at once: the mark must be on disk before the use call goes out.
-        val written = prefs.edit().putString(KEY, Json.encodeToString(serializer, targets)).commit()
-        if (!written) throw IOException("Could not write the Z.AI reset attempt keys")
+        // Written at once: the target must be on disk before the redeem call goes out.
+        val written = prefs.edit().putString(key, Json.encodeToString(serializer, targets)).commit()
+        if (!written) throw IOException("Could not write the reset attempt targets ($key)")
     }
 
     public companion object {
         public const val FILE: String = "reset_attempt_targets"
-        public const val KEY: String = "zai_reached_use"
+        public const val ZAI_REACHED_USE: String = "zai_reached_use"
+        public const val GROK_PINNED_TOKENS: String = "grok_pinned_tokens"
     }
 }

@@ -47,7 +47,7 @@ class ClaudeQuotaFetcherTest {
         assertEquals("Bearer test-access-token", usage.headers["Authorization"])
         assertEquals("application/json", usage.headers["Accept"])
         assertEquals("claude-code-20250219,oauth-2025-04-20", usage.headers["anthropic-beta"])
-        assertEquals("claude-cli/2.1.281", usage.headers["User-Agent"])
+        assertEquals("claude-cli/${ClaudeCodeIdentity.VERSION}", usage.headers["User-Agent"])
         assertEquals("cli", usage.headers["x-app"])
         val profile = server.takeRequest()
         assertEquals("/api/oauth/profile", profile.target)
