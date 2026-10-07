@@ -8,49 +8,129 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Check (tests, detekt, ktfmt, lint)
+  changes:
+    name: Path filter
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    timeout-minutes: 5
+    outputs:
+      tests: ${{ steps.filter.outputs.tests }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
+      # Docs-only changes still run static analysis so the checks report. Tests and e2e skip.
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@v3
         with:
-          distribution: temurin
-          java-version: "21"
+          filters: |
+            tests:
+              - "**"
+              - "!docs/**"
+              - "!**/*.md"
+              - "!LICENSE"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+  static-analysis:
+    name: Static analysis (lint, detekt, ktfmt)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
         with:
-          packages: "platforms;android-37.0 build-tools;37.0.0"
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v5
-
-      # Logs memory, swap and disk every 30 seconds next to the build, so a runner that dies
-      # mid-job still leaves a record of what it was short of. See issue #6.
-      - name: Run check
+      - name: Run static analysis
         run: |
           scripts/ci-resources.sh 30 &
           resources=$!
           trap 'kill "$resources"' EXIT
-          ./gradlew check --continue
+          ./gradlew check -x test -x testDebugUnitTest --continue
 
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: check-reports
+          name: static-analysis-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          retention-days: 7
+
+  unit-tests:
+    name: Unit tests (libraries)
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
+        with:
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Run library unit tests
+        run: |
+          scripts/ci-resources.sh 30 &
+          resources=$!
+          trap 'kill "$resources"' EXIT
+          ./gradlew test -x :app:test -x :app:testDebugUnitTest --continue
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: library-unit-test-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          retention-days: 7
+
+  app-unit-tests:
+    name: App unit tests (${{ matrix.shard }})
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # Partition of every :app unit test. Filters live in build-logic (headroom.appTestShard).
+        shard: [redeem-screenshots, screenshots, unit]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
+        with:
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Run app unit tests
+        run: |
+          scripts/ci-resources.sh 30 &
+          resources=$!
+          trap 'kill "$resources"' EXIT
+          ./gradlew :app:test -Pheadroom.appTestShard=${{ matrix.shard }} --continue
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: app-unit-test-reports-${{ matrix.shard }}
           path: |
             **/build/reports/
             **/build/test-results/
@@ -58,6 +138,8 @@ jobs:
 
   e2e:
     name: End-to-end tests (emulator, fake data)
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -71,24 +153,40 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
         with:
-          distribution: temurin
-          java-version: "21"
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # System image plus emulator binary, not the AVD. Gradle managed devices recreate the AVD
+      # and leave lock files, so a snapshot restore is not clean. These two packages are the
+      # minutes of sdkmanager download.
+      - name: Restore emulator and API 37 system image
+        id: gmd-cache
+        uses: actions/cache/restore@v4
         with:
-          packages: "platforms;android-37.0 build-tools;37.0.0"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v5
+          path: |
+            ${{ env.ANDROID_HOME }}/emulator
+            ${{ env.ANDROID_HOME }}/system-images/android-37
+            ${{ env.ANDROID_HOME }}/system-images/android-37.0
+          key: gmd-api37-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('app/build.gradle.kts') }}
+          restore-keys: |
+            gmd-api37-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Run end-to-end tests on a managed device
         run: >
           ./gradlew :app:pixel9api37DebugAndroidTest
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+
+      - name: Save emulator and API 37 system image
+        if: always() && steps.gmd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/emulator
+            ${{ env.ANDROID_HOME }}/system-images/android-37
+            ${{ env.ANDROID_HOME }}/system-images/android-37.0
+          key: gmd-api37-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('app/build.gradle.kts') }}
 
       - name: Upload e2e reports
         if: always()
