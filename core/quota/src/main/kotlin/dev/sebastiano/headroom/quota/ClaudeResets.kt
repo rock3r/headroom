@@ -110,24 +110,34 @@ internal class ClaudeResets(
             total = grant.int("resets_total"),
             scope = scope(grant),
             expiries = endsAt?.let { List(left) { _ -> it } }.orEmpty(),
-            status = status(grant, id, next, requiresLimit),
+            status = status(grant, id, next, requiresLimit, now),
             timing = if (requiresLimit) ResetTiming.AtLimit else ResetTiming.AnyTime,
         )
     }
 
-    /** The grant the server spends next is usable; the others wait behind it. */
+    /**
+     * The grant the server spends next is usable once it has started and the server says
+     * `usable_now`; the others wait behind it. A grant that needs a limit and is not usable waits
+     * for one. Any other grant that is not usable now is not usable yet.
+     */
     private fun status(
         grant: JsonObject,
         id: String,
         next: String?,
         requiresLimit: Boolean,
-    ): ResetPoolStatus =
-        when {
+        now: Instant,
+    ): ResetPoolStatus {
+        val startsAt = grant.nonBlankStringOrNull("starts_at")?.let(::parseInstantOrNull)
+        val usableNow = grant.boolean("usable_now") == true
+        return when {
             grant.boolean("paused") == true -> ResetPoolStatus.Paused
             next != null && id != next -> ResetPoolStatus.Queued
-            grant.boolean("usable_now") != true && requiresLimit -> ResetPoolStatus.WaitingForLimit
+            startsAt?.isAfter(now) == true -> ResetPoolStatus.NotUsableYet
+            !usableNow && requiresLimit -> ResetPoolStatus.WaitingForLimit
+            !usableNow -> ResetPoolStatus.NotUsableYet
             else -> ResetPoolStatus.Ready
         }
+    }
 
     /** The windows the grant refills, by the usage answer's own window ids. */
     private fun scope(grant: JsonObject): ResetScope {

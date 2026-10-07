@@ -103,6 +103,32 @@ class ClaudeResetsTest {
     }
 
     @Test
+    fun `the next grant that works at any time but is not usable now is not usable yet`() =
+        runTest {
+            val body =
+                cedarEmber(
+                    """"cedar_ember":{"eligible":true,"next_grant_id":"g","grants":[
+                    {"id":"g","label":"G","resets_total":1,"resets_left":1,"clears":["seven_day"],
+                    "paused":false,"usable_now":false,"use_requires_limit":false}]}"""
+                )
+
+            assertEquals(ResetPoolStatus.NotUsableYet, availability(body)!!.pools.single().status)
+        }
+
+    @Test
+    fun `a grant that has not started is not usable yet, even when it needs a limit`() = runTest {
+        val body =
+            cedarEmber(
+                """"cedar_ember":{"eligible":true,"next_grant_id":"g","grants":[
+                {"id":"g","label":"G","resets_total":1,"resets_left":1,"clears":["seven_day"],
+                "starts_at":"2026-04-04T00:00:00Z","paused":false,"usable_now":true,
+                "use_requires_limit":true}]}"""
+            )
+
+        assertEquals(ResetPoolStatus.NotUsableYet, availability(body)!!.pools.single().status)
+    }
+
+    @Test
     fun `an account the program does not cover has no resets`() = runTest {
         assertNull(availability(cedarEmber(""""cedar_ember":null""")))
         assertNull(availability("""{"five_hour":{"utilization":10.0}}"""))

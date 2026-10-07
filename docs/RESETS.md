@@ -110,7 +110,9 @@ was measured.
   before `ends_at`. The sheet only offers that grant (`ResetPoolStatus.Ready`). A grant with
   `use_requires_limit: true` that is not `usable_now` shows as "At a limit only": the confirm button
   is off and the sheet says why. At a limit, the grant's `clears` must include the limit that was
-  hit; Headroom relies on the server's `usable_now` for that.
+  hit; Headroom relies on the server's `usable_now` for that. Any other grant that is not
+  `usable_now`, or whose `starts_at` is still to come, shows as "Not yet" (`NotUsableYet`): the
+  button is off, and the sheet says that Claude does not allow it yet.
 - A grant with `use_requires_limit: false` can be used at any time. The confirmation says that
   this cannot be undone.
 - A redeem reads the status first and notes the grant's `resets_left`, but only before the first

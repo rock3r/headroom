@@ -67,6 +67,11 @@ public enum class ResetPoolStatus {
     Queued,
     /** The provider paused it. */
     Paused,
+    /**
+     * The provider does not allow it now, for a reason other than a limit: for example, it has not
+     * started yet.
+     */
+    NotUsableYet,
 }
 
 /** When a reset may be used. Null on a pool means the provider does not say. */
@@ -102,11 +107,16 @@ public data class ResetPool(
     val canUseNow: Boolean
         get() = available > 0 && status == ResetPoolStatus.Ready
 
-    /** True when the redeem sheet offers this pool: now, or once a limit is reached. */
+    /**
+     * True when the redeem sheet offers this pool: to use now, or to say why it cannot be used yet,
+     * as for a reset that waits for a limit.
+     */
     val isOffered: Boolean
         get() =
             available > 0 &&
-                (status == ResetPoolStatus.Ready || status == ResetPoolStatus.WaitingForLimit)
+                (status == ResetPoolStatus.Ready ||
+                    status == ResetPoolStatus.WaitingForLimit ||
+                    status == ResetPoolStatus.NotUsableYet)
 }
 
 /** The resets one account can use now, and what else the provider offers. */

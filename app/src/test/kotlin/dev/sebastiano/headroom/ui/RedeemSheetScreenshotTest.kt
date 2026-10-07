@@ -346,6 +346,7 @@ internal fun sheetShots(): List<SheetShot> {
     val grant = ResetScenarios.claudeGrants(now).pools.first()
     val anyTime = ResetScenarios.claudeAnyTime(now).pools.single()
     val waiting = ResetScenarios.claudeWaiting(now).pools.single()
+    val notYet = ResetScenarios.claudeNotUsableYet(now).pools.single()
     return listOf(
         SheetShot("codex-confirm", codex, RedeemStep.Confirm(codexPool, false)),
         SheetShot("codex-resetting", codex, RedeemStep.Resetting(codexPool)),
@@ -454,6 +455,11 @@ internal fun sheetShots(): List<SheetShot> {
             "claude-needs-limit",
             claude,
             RedeemStep.Confirm(waiting, false),
+        ),
+        SheetShot(
+            "claude-not-usable-yet",
+            claude,
+            RedeemStep.Confirm(notYet, false),
         ),
         SheetShot(
             "claude-rate-limited",

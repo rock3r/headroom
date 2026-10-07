@@ -174,6 +174,9 @@ internal fun Confirm(
         if (pool.status == ResetPoolStatus.WaitingForLimit) {
             Warning(stringResource(R.string.resets_waiting_note))
         }
+        if (pool.status == ResetPoolStatus.NotUsableYet) {
+            Warning(stringResource(R.string.resets_not_yet_note, summary.provider.displayName))
+        }
         ButtonRow {
             TextButton(onClick = if (step.canGoBack) actions.onBack else actions.onClose) {
                 Text(

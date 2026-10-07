@@ -82,6 +82,16 @@ class ClaudeRedeemConfirmTest {
     }
 
     @Test
+    fun `a grant Claude does not allow yet is off, and says why`() {
+        confirm(claude, ResetScenarios.claudeNotUsableYet(FIXED_NOW))
+
+        rule
+            .onNodeWithText("Claude does not let you use this reset yet", substring = true)
+            .assertIsDisplayed()
+        rule.onNodeWithTag(REDEEM_CONFIRM_TAG).assertIsNotEnabled()
+    }
+
+    @Test
     fun `a grant that needs a limit is off away from one, and says why`() {
         confirm(claude, ResetScenarios.claudeWaiting(FIXED_NOW))
 
