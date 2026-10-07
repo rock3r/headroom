@@ -28,6 +28,32 @@ class SharedPreferencesAttemptTargetStoreTest {
     }
 
     @Test
+    fun `each key keeps its own targets in the same file`() {
+        val zAi = SharedPreferencesAttemptTargetStore(context)
+        val grok =
+            SharedPreferencesAttemptTargetStore(
+                context,
+                key = SharedPreferencesAttemptTargetStore.GROK_PINNED_TOKENS,
+            )
+
+        zAi.save(mapOf("key-1|week" to "week"))
+        grok.save(mapOf("key-2" to "tok-soon"))
+
+        assertEquals(
+            mapOf("key-1|week" to "week"),
+            SharedPreferencesAttemptTargetStore(context).load(),
+        )
+        assertEquals(
+            mapOf("key-2" to "tok-soon"),
+            SharedPreferencesAttemptTargetStore(
+                    context,
+                    key = SharedPreferencesAttemptTargetStore.GROK_PINNED_TOKENS,
+                )
+                .load(),
+        )
+    }
+
+    @Test
     fun `a write that does not reach the disk fails the save`() {
         val real =
             context.getSharedPreferences(
@@ -71,7 +97,9 @@ class SharedPreferencesAttemptTargetStoreTest {
     fun `an unreadable file reads as no targets`() {
         context
             .getSharedPreferences(SharedPreferencesAttemptTargetStore.FILE, Context.MODE_PRIVATE)
-            .edit(commit = true) { putString(SharedPreferencesAttemptTargetStore.KEY, "not json") }
+            .edit(commit = true) {
+                putString(SharedPreferencesAttemptTargetStore.ZAI_REACHED_USE, "not json")
+            }
 
         assertTrue(SharedPreferencesAttemptTargetStore(context).load().isEmpty())
     }

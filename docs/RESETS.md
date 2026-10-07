@@ -73,6 +73,10 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   with `token_id` (10) and `validity_end` (30, a Timestamp).
 - The redeem call has no idempotency key of its own. Headroom pins the token to the attempt key.
   When a retry finds its pinned token gone, the earlier try worked.
+- `SharedPreferencesAttemptTargetStore` writes the pin to disk before the redeem goes out, so a
+  retry after the app was stopped addresses the same token. It stores the latest 16 attempt keys
+  with their token ids, and no access token. When that write fails, the redeem is not sent and
+  fails, so it can be retried with the same key.
 - gRPC status 16 or 7, or HTTP 401 or 403, asks the user to sign in again. Status 8 or HTTP 429 is
   rate limiting.
 
@@ -175,8 +179,9 @@ refreshed so its resets show.
   `SharedPreferencesResetAttemptStore` writes it to disk before the call goes out, so it survives
   the app being stopped. It stores the account id, the pool, the key and the time. It stores no
   token. Like every app file, it is excluded from backup and device transfer.
-- The pinned credit or token lives in memory only. After a restart, a retry of the same Codex key
-  is still safe, because the server answers `already_redeemed`.
+- Codex pins its credit in memory only. After a restart, a retry of the same Codex key is still
+  safe, because the server answers `already_redeemed`. Grok pins its token on disk (see Grok
+  above), because its server has no idempotency key.
 - After a reset works, `ResetCenter` waits 2 seconds (`ResetRefresh.DELAY`), then refreshes the
   account. The refill animation plays from the new usage.
 - An account whose sign-in expired shows its resets faded, with no action.

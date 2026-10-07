@@ -158,6 +158,83 @@ class GrokResetsTest {
         }
     }
 
+    private fun grokResets(pinned: AttemptTargetStore) =
+        GrokResets(OkHttpQuotaHttpClient(), FIXED_CLOCK, log, server.baseUrl(), pinned)
+
+    private fun redeemBodies(): List<List<Byte>> =
+        requests()
+            .filter { it.target.endsWith("RedeemReset") }
+            .map { it.body?.toByteArray()?.toList().orEmpty() }
+
+    @Test
+    fun `a retry after a restart whose token is gone spends no second token`() = runTest {
+        val disk = MemoryAttemptTargetStore()
+        resets = grokResets(disk)
+        server.enqueue(grpcAnswer(listOf(later, soon)))
+        server.enqueue(MockResponse(code = 502))
+        assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Unknown), redeem())
+
+        // The process was stopped: only what was saved is left. The first try had worked.
+        resets = grokResets(disk)
+        server.enqueue(grpcAnswer(listOf(later)))
+
+        assertEquals(RedeemOutcome.Success(resetsLeft = 1, replayed = true), redeem())
+        assertEquals(
+            listOf(GrpcWeb.dataFrame(GrokResetProto.redeemRequest("tok-soon")).toList()),
+            redeemBodies(),
+        )
+    }
+
+    @Test
+    fun `a retry after a restart addresses the token it pinned`() = runTest {
+        val disk = MemoryAttemptTargetStore()
+        resets = grokResets(disk)
+        server.enqueue(grpcAnswer(listOf(later, soon)))
+        server.enqueue(MockResponse(code = 502))
+        redeem()
+
+        // The first try did not work, and a token that expires sooner was added meanwhile.
+        val sooner = GrokResetToken("tok-sooner", Instant.parse("2026-04-04T00:00:00Z"))
+        resets = grokResets(disk)
+        server.enqueue(grpcAnswer(listOf(later, soon, sooner)))
+        server.enqueue(grpcAnswer(listOf(later, sooner)))
+
+        assertEquals(RedeemOutcome.Success(resetsLeft = 2), redeem())
+        val soonRequest = GrpcWeb.dataFrame(GrokResetProto.redeemRequest("tok-soon")).toList()
+        assertEquals(listOf(soonRequest, soonRequest), redeemBodies())
+    }
+
+    @Test
+    fun `the saved pin holds only the attempt key and the token id`() = runTest {
+        val disk = MemoryAttemptTargetStore()
+        resets = grokResets(disk)
+        server.enqueue(grpcAnswer(listOf(later, soon)))
+        server.enqueue(MockResponse(code = 502))
+
+        redeem()
+
+        assertEquals(mapOf("key-1" to "tok-soon"), disk.saved)
+    }
+
+    @Test
+    fun `a pin that cannot be saved never sends the redeem`() = runTest {
+        val failing =
+            object : AttemptTargetStore {
+                override fun load(): Map<String, String> = emptyMap()
+
+                override fun save(targets: Map<String, String>) =
+                    throw java.io.IOException("disk full")
+            }
+        resets = grokResets(failing)
+        server.enqueue(grpcAnswer(listOf(later, soon)))
+
+        assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Unknown), redeem())
+        assertEquals(
+            listOf("/prod_mc_billing.ConsumerUiSvc/GetRemainingResets"),
+            requests().map { it.target },
+        )
+    }
+
     @Test
     fun `maps the failures of a redeem`() = runTest {
         val expected =

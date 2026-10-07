@@ -60,3 +60,15 @@ internal class FakeQuotaHttpClient(private val respond: (QuotaHttpRequest) -> Qu
         return respond(request)
     }
 }
+
+/** An [AttemptTargetStore] that outlives the reset clients that write to it, as a file does. */
+internal class MemoryAttemptTargetStore : AttemptTargetStore {
+    var saved: Map<String, String> = emptyMap()
+        private set
+
+    override fun load(): Map<String, String> = saved
+
+    override fun save(targets: Map<String, String>) {
+        saved = targets.toMap()
+    }
+}

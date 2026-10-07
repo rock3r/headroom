@@ -99,6 +99,11 @@ public class DataGraph(
         ResetClients.create(
             log = resetLog,
             zAiReachedUse = SharedPreferencesAttemptTargetStore(context),
+            grokPinnedTokens =
+                SharedPreferencesAttemptTargetStore(
+                    context,
+                    key = SharedPreferencesAttemptTargetStore.GROK_PINNED_TOKENS,
+                ),
         ),
 ) {
     private val appContext = context.applicationContext

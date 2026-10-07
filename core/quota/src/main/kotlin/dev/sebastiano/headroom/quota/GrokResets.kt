@@ -20,17 +20,21 @@ import java.time.Instant
  *   the tokens still redeemable.
  *
  * The redeem call has no idempotency key of its own, so the token is pinned per attempt key: a
- * retry addresses the same token, and when that token is gone the earlier attempt worked.
+ * retry addresses the same token, and when that token is gone the earlier attempt worked. The pins
+ * are saved in [pinnedStore] before the redeem goes out, so this holds after the app was stopped
+ * too. A pin is the attempt key and the token id only. When the save fails, nothing is sent and the
+ * redeem fails.
  */
 internal class GrokResets(
     private val httpClient: QuotaHttpClient,
     private val clock: Clock,
     private val log: ResetLog,
     private val baseUrl: String = DEFAULT_BASE_URL,
+    pinnedStore: AttemptTargetStore = AttemptTargetStore.None,
 ) : ResetReader, ResetRedeemer {
     override val provider: Provider = Provider.Grok
 
-    private val pinnedTokens = AttemptTargets()
+    private val pinnedTokens = AttemptTargets(pinnedStore)
 
     override suspend fun read(credentials: ProviderCredentials): ResetRead =
         when (val listed = list(credentials, attemptKey = null)) {
@@ -59,7 +63,12 @@ internal class GrokResets(
                 RedeemOutcome.NoCredit
             }
         }
-        pinnedTokens.remember(attemptKey, token.id)
+        try {
+            pinnedTokens.remember(attemptKey, token.id)
+        } catch (_: IOException) {
+            // Without the pin, a retry after a restart could address a second token.
+            return RedeemOutcome.Failed(QuotaErrorKind.Unknown)
+        }
         return when (
             val answer =
                 call(

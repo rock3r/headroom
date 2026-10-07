@@ -51,17 +51,6 @@ class ZAiResetsTest {
     private fun zAiResets(reachedUse: AttemptTargetStore) =
         ZAiResets(OkHttpQuotaHttpClient(), clock, log, server.baseUrl(), reachedUse)
 
-    /** A store that outlives the [ZAiResets] that write to it, as a file does. */
-    private class MemoryAttemptTargetStore : AttemptTargetStore {
-        private var saved = emptyMap<String, String>()
-
-        override fun load(): Map<String, String> = saved
-
-        override fun save(targets: Map<String, String>) {
-            saved = targets.toMap()
-        }
-    }
-
     private fun credentials(zCode: ZCodeSignIn? = ZCodeSignIn.Ready("zcode-jwt", "business")) =
         ProviderCredentials(accessToken = "zai-api-key", zCode = zCode)
 
