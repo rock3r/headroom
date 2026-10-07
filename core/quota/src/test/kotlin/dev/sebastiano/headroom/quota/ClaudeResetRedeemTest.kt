@@ -348,6 +348,18 @@ class ClaudeResetRedeemTest {
         assertTrue(log.all.none { "test-access-token" in it })
     }
 
+    @Test
+    fun `the log names only short result and reason codes`() = runTest {
+        redeem =
+            jsonResponse(
+                """{"result":"failed for user@example.com","reason":"Org 1234 has no seat left"}"""
+            )
+        redeem()
+
+        assertTrue(log.debugs.any { "result other, reason other" in it }, log.debugs.toString())
+        assertTrue(log.all.none { "example.com" in it || "1234" in it })
+    }
+
     private fun String.replaceLaunchWeekLeft(left: Int): String =
         replaceFirst("\"resets_left\": 1", "\"resets_left\": $left")
 

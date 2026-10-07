@@ -90,7 +90,8 @@ internal class ClaudeResetRedeemer(
             }
         }
         call.done(
-            "HTTP ${response.statusCode}, result ${answer?.result}, reason ${answer?.reason}, " +
+            "HTTP ${response.statusCode}, result ${loggable(answer?.result)}, " +
+                "reason ${loggable(answer?.reason)}, " +
                 "left ${answer?.left}, grant $poolId, key $attemptKey"
         )
         if (answer == null) {
@@ -243,6 +244,17 @@ internal class ClaudeResetRedeemer(
 
     private fun now(): Instant = clock.instant()
 
+    /**
+     * A code from Claude's answer as the log may show it: a short code, or `other` for any other
+     * text, which could carry an email or an id.
+     */
+    private fun loggable(code: String?): String =
+        when {
+            code == null -> "none"
+            LOGGABLE_CODE.matches(code) -> code
+            else -> "other"
+        }
+
     private fun JsonObject.intOrNull(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
 
     private class RedeemAnswer(val result: String, val left: Int?, val reason: String?)
@@ -265,5 +277,6 @@ internal class ClaudeResetRedeemer(
         val HTTP_SUCCESS = 200..299
         val REQUEST_ID = Regex("^[A-Za-z0-9_-]{1,64}$")
         val ORGANIZATION_ID = Regex("^[A-Za-z0-9-]{1,64}$")
+        val LOGGABLE_CODE = Regex("[a-z0-9_]{1,40}")
     }
 }

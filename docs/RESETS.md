@@ -134,6 +134,8 @@ was measured.
   answers `already_used` if the earlier try worked.
 - The log names the redeem path as `/api/organizations/{organization}/reset_rate_limits`: the
   organization identifies the account, so it is never logged.
+  The answer's `result` and `reason` are logged only when they are short codes; any other text is
+  logged as `other`.
 
 ### Z.AI
 

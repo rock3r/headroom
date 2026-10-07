@@ -136,9 +136,18 @@ public data class ResetAvailability(
     val total: Int
         get() = pools.filter { it.status != ResetPoolStatus.Paused }.sumOf { it.available }
 
-    /** How many resets the account can use now, or once it reaches a limit. */
+    /**
+     * How many resets the account can use now, or once it reaches a limit. A reset the provider
+     * does not allow yet is not counted.
+     */
     val availableNow: Int
-        get() = usablePools.sumOf { it.available }
+        get() =
+            pools
+                .filter {
+                    it.status == ResetPoolStatus.Ready ||
+                        it.status == ResetPoolStatus.WaitingForLimit
+                }
+                .sumOf { it.available }
 
     /** How many resets wait behind the ones available now. */
     val queued: Int

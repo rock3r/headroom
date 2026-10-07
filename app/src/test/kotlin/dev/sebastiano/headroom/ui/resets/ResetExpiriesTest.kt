@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.ui.resets
 
+import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetPoolStatus
@@ -111,5 +112,20 @@ class ResetExpiriesTest {
         assertFalse(paused.hasFooter)
         assertTrue(ResetAvailability(emptyList(), canAskForMore = true).hasFooter)
         assertEquals(1, footerNotes(queued).size)
+    }
+
+    @Test
+    fun `a reset that is not usable yet is neither available now nor waiting for a limit`() {
+        val notYet =
+            ResetAvailability(listOf(pool(1, emptyList(), status = ResetPoolStatus.NotUsableYet)))
+        val waiting =
+            ResetAvailability(
+                listOf(pool(2, emptyList(), status = ResetPoolStatus.WaitingForLimit))
+            )
+
+        assertEquals(0, notYet.availableNow)
+        assertEquals(2, waiting.availableNow)
+        assertFalse(R.string.resets_waiting_note in footerNotes(notYet))
+        assertTrue(R.string.resets_waiting_note in footerNotes(waiting))
     }
 }
