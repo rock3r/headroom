@@ -46,6 +46,7 @@ class DataStoreSettingsRepositoryTest {
         settings.setRefreshShimmer(false)
         settings.setResetConfetti(false)
         settings.setResetIsland(true)
+        settings.setRedeemClaudeResets(true)
         assertEquals(
             AppSettings(
                 QuotaDisplay.Left,
@@ -57,6 +58,7 @@ class DataStoreSettingsRepositoryTest {
                 refreshShimmer = false,
                 resetConfetti = false,
                 resetIsland = true,
+                redeemClaudeResets = true,
             ),
             DataStoreSettingsRepository(store).settings.first(),
         )
@@ -83,6 +85,17 @@ class DataStoreSettingsRepositoryTest {
     }
 
     @Test
+    fun `redeeming Claude resets is off by default and stays as the user sets it`() = runTest {
+        val store = store()
+        val settings = DataStoreSettingsRepository(store)
+        assertEquals(false, settings.settings.first().redeemClaudeResets)
+        settings.setRedeemClaudeResets(true)
+        assertEquals(true, DataStoreSettingsRepository(store).settings.first().redeemClaudeResets)
+        settings.setRedeemClaudeResets(false)
+        assertEquals(false, DataStoreSettingsRepository(store).settings.first().redeemClaudeResets)
+    }
+
+    @Test
     fun `an unknown stored value falls back to the default`() = runTest {
         val store = store()
         store.edit {
@@ -95,6 +108,7 @@ class DataStoreSettingsRepositoryTest {
             it[stringPreferencesKey("refresh_shimmer")] = "Sometimes"
             it[stringPreferencesKey("reset_confetti")] = "Maybe"
             it[stringPreferencesKey("reset_island")] = "Perhaps"
+            it[stringPreferencesKey("redeem_claude_resets")] = "Sure"
         }
         assertEquals(AppSettings(), DataStoreSettingsRepository(store).settings.first())
     }

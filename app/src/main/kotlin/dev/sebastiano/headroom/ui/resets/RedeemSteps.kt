@@ -42,6 +42,7 @@ import dev.sebastiano.headroom.model.RedeemStep
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetTiming
+import dev.sebastiano.headroom.model.redeemsResetsExperimentally
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.asFraction
 import dev.sebastiano.headroom.ui.components.percentDescription
@@ -144,6 +145,7 @@ internal fun Confirm(
 ) {
     val pool = step.pool
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (summary.provider.redeemsResetsExperimentally) ExperimentalLabel()
         StepTitle(
             pluralStringResource(R.plurals.redeem_confirm_title, pool.available, pool.available)
         )
@@ -172,6 +174,9 @@ internal fun Confirm(
         if (pool.status == ResetPoolStatus.WaitingForLimit) {
             Warning(stringResource(R.string.resets_waiting_note))
         }
+        if (pool.status == ResetPoolStatus.NotUsableYet) {
+            Warning(stringResource(R.string.resets_not_yet_note, summary.provider.displayName))
+        }
         ButtonRow {
             TextButton(onClick = if (step.canGoBack) actions.onBack else actions.onClose) {
                 Text(
@@ -197,6 +202,22 @@ internal fun Confirm(
                 )
             }
         }
+    }
+}
+
+/** Says that using this provider's resets is experimental: see [redeemsResetsExperimentally]. */
+@Composable
+private fun ExperimentalLabel() {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Text(
+            text = stringResource(R.string.redeem_experimental),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+        )
     }
 }
 

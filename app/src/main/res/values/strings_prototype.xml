@@ -76,6 +76,7 @@
     <string name="resets_pool_queued">Queued</string>
     <string name="resets_pool_paused">Paused</string>
     <string name="resets_pool_waiting">At a limit only</string>
+    <string name="resets_pool_not_yet">Not yet</string>
     <string name="resets_pool_of_total">%1$d of %2$d</string>
     <plurals name="resets_pool_of_total_description">
         <item quantity="one">%1$d of %2$d reset left</item>
@@ -83,6 +84,7 @@
     </plurals>
     <string name="resets_queued_note">Queued resets become usable after the ones before them.</string>
     <string name="resets_waiting_note">You can use this reset once you reach a limit. You are not at a limit now.</string>
+    <string name="resets_not_yet_note">%1$s does not let you use this reset yet. Try again later.</string>
 
     <!-- Resets: the redeem sheet -->
     <string name="redeem_sheet_label">Resets for %1$s</string>
@@ -93,6 +95,7 @@
         <item quantity="other">Use 1 of your %d resets?</item>
     </plurals>
     <string name="redeem_confirm_soonest">Headroom uses the reset that expires first, on %1$s.</string>
+    <string name="redeem_experimental">Experimental</string>
     <string name="redeem_any_time">You can use this reset before you reach a limit. It cannot be undone.</string>
     <string name="redeem_use">Use a reset</string>
     <string name="redeem_not_now">Not now</string>

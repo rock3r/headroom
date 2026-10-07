@@ -187,6 +187,13 @@ object ResetScenarios {
                 FakeResetScript(claudeWaiting(now)),
             ),
             ResetScenario(
+                "claude-not-usable-yet",
+                "Claude · not usable yet",
+                "Claude does not allow the grant yet: the button is off, with the reason.",
+                claude,
+                FakeResetScript(claudeNotUsableYet(now)),
+            ),
+            ResetScenario(
                 "claude-rate-limited",
                 "Claude · rate limited",
                 "HTTP 429: nothing is used; Try again keeps the key.",
@@ -292,6 +299,14 @@ object ResetScenarios {
                 )
             )
         )
+
+    /** A grant that works at any time, but that Claude does not allow yet. */
+    fun claudeNotUsableYet(now: Instant): ResetAvailability =
+        claudeAnyTime(now).let { availability ->
+            availability.copy(
+                pools = availability.pools.map { it.copy(status = ResetPoolStatus.NotUsableYet) }
+            )
+        }
 
     fun claudeWaiting(now: Instant): ResetAvailability =
         ResetAvailability(

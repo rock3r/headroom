@@ -66,7 +66,8 @@ internal fun footerNotes(availability: ResetAvailability): List<Int> {
     val offered = availability.usablePools
     return listOfNotNull(
         R.string.resets_waiting_note.takeIf { _ ->
-            offered.isNotEmpty() && offered.none { pool -> pool.canUseNow }
+            offered.none { pool -> pool.canUseNow } &&
+                offered.any { pool -> pool.status == ResetPoolStatus.WaitingForLimit }
         },
         R.string.resets_queued_note.takeIf { _ ->
             availability.pools.any { pool -> pool.status == ResetPoolStatus.Queued }

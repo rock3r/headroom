@@ -165,15 +165,19 @@ public class DataGraph(
             SignInAlerts(signInNotifier, SharedPreferencesSignInAlertLedger(appContext)),
         )
 
+    /** The user's app settings: used or left, and how often to sync in the background. */
+    public val settings: SettingsRepository = DataStoreSettingsRepository(settingsStore)
+
     /**
      * The resets of the signed-in accounts: read by each sync and stored with the snapshot, and
-     * used through the providers' reset clients.
+     * used through the providers' reset clients, when the user's [settings] allow it.
      */
     public val resetProvider: ResetProvider =
         SyncedResetProvider(
             // What storage holds now: right after a refresh, accounts.value may still be the old
             // one.
             accounts = { repository.current() },
+            settings = { settings.settings.first() },
             fetcher = accountFetcher,
             clients = resetClients,
             log = resetLog,
@@ -183,9 +187,6 @@ public class DataGraph(
     public val resetAttempts: ResetAttemptStore = SharedPreferencesResetAttemptStore(appContext)
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
-
-    /** The user's app settings: used or left, and how often to sync in the background. */
-    public val settings: SettingsRepository = DataStoreSettingsRepository(settingsStore)
 
     /** Turns finished sign-ins into accounts, and signs accounts out. */
     public val signInManager: SignInManager = SignInManager(tokenStore, repository)

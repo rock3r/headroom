@@ -2,17 +2,20 @@
 
 Some providers give subscribers resets: a reset refills a usage limit before its normal reset time.
 Headroom shows the resets of Codex, Grok, Claude and Z.AI accounts. It can use Codex, Grok and Z.AI
-resets, and ask Z.AI for more. Claude's resets are shown for information only.
+resets, and ask Z.AI for more. It can use Claude's resets only when the user turns on "Redeem Claude
+resets (experimental)" in Settings. Until then, Claude's resets are shown for information only.
 
 | Provider | Shows resets | Can use a reset | Notes |
 |---|---|---|---|
 | ChatGPT Codex | Yes | Yes | |
 | Grok | Yes | Yes | |
-| Claude | Yes | No | The owner decided to show Claude's grants only, for now. |
+| Claude | Yes | Experimental, off by default | The user turns it on in Settings. Never tried with a real account. |
 | Z.AI | After a ZCode sign-in | Yes | Z.AI resets need a separate ZCode sign-in. |
 
-`Provider.canRedeemResets` in `:core:model` is the one place that says which providers can use
-resets. The UI and `SyncedResetProvider` both read it.
+`Provider.canRedeemResets(settings)` in `:core:model` is the one place that says which providers can
+use resets. The UI and `SyncedResetProvider` both read it, with the user's current settings.
+`Provider.redeemsResetsExperimentally` says which redeems are experimental: Claude's. Its
+confirmation step shows an "Experimental" label.
 
 ## How the resets are read
 
@@ -39,7 +42,7 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
 | ChatGPT Codex | List and consume: the consume answered `reset`, and the list then had one credit fewer (3 to 2). |
 | Z.AI | Sign-in, status, ask and use: see [Z.AI](#zai). |
 | Grok | Not yet: the account had no reset token. |
-| Claude | Reading the grants only. Claude resets cannot be used. |
+| Claude | Reading the grants only. Using a grant was never tried: see [Claude](#claude). |
 
 | Provider | Call | Request | Headers |
 |---|---|---|---|
@@ -48,6 +51,8 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
 | Grok | List tokens | `POST https://grok.com/prod_mc_billing.ConsumerUiSvc/GetRemainingResets`, an empty protobuf message in a gRPC-web frame | `Authorization: Bearer <xAI OAuth token>`, `Content-Type: application/grpc-web+proto`, `Accept: application/grpc-web+proto`, `X-Grpc-Web: 1`, `TE: trailers` |
 | Grok | Use a token | `POST https://grok.com/prod_mc_billing.ConsumerUiSvc/RedeemReset` with `token_id` (field 10) | The same |
 | Claude | List grants | `GET https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1` | `Authorization: Bearer <Claude OAuth token>`, `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-cli/<version> (external, cli)` |
+| Claude | Read the organization | `GET https://api.anthropic.com/api/oauth/profile`, for `organization.uuid` | `Authorization: Bearer <Claude OAuth token>` |
+| Claude | Use a grant | `POST https://api.anthropic.com/api/organizations/{organization}/reset_rate_limits` with `{"program":"cedar_ember","grant_id":<grant>,"request_id":<attempt key>}` | As for the list, plus `Content-Type: application/json` |
 | Z.AI | List cards | `GET https://zcode.z.ai/api/v1/coding-plan/reset/status` | `Authorization: Bearer <ZCode JWT>`, `X-Bigmodel-Authorization: <Z.AI business token>`, `Bigmodel-Target-Type: PERSONAL` |
 | Z.AI | Use a card | `POST …/coding-plan/reset/use` with `{"idempotency_key": <attempt key>, "reset_type": "FIVE_HOUR" \| "WEEK"}` | The same, plus `Content-Type: application/json` |
 | Z.AI | Mark history read | `POST …/coding-plan/reset/history/read` with no body | `Authorization` and `X-Bigmodel-Authorization` only: no target scope |
@@ -96,6 +101,41 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   reason, for example `ineligible cli_version`. The reasons `surface` and `cli_version` mean the
   version is too old: run the script. A reason that is not a short code is logged as `other`, so
   the log never carries the server's text.
+
+Using a grant is experimental. The endpoint and its answers come from research; nobody has tried
+them with a real account yet, so this section describes what Headroom sends and expects, not what
+was measured.
+
+- Only the grant named by `next_grant_id` can be used, while it is `usable_now`, not `paused`, and
+  before `ends_at`. The sheet only offers that grant (`ResetPoolStatus.Ready`). A grant with
+  `use_requires_limit: true` that is not `usable_now` shows as "At a limit only": the confirm button
+  is off and the sheet says why. At a limit, the grant's `clears` must include the limit that was
+  hit; Headroom relies on the server's `usable_now` for that. Any other grant that is not
+  `usable_now`, or whose `starts_at` is still to come, shows as "Not yet" (`NotUsableYet`): the
+  button is off, and the sheet says that Claude does not allow it yet.
+- A grant with `use_requires_limit: false` can be used at any time. The confirmation says that
+  this cannot be undone.
+- A redeem reads the status first and notes the grant's `resets_left`, but only before the first
+  send of an attempt key. It then reads the organization from the profile. If either cannot be read,
+  nothing is sent and the redeem fails, so it can be tried again with the same key. A grant the
+  status no longer lists is ineligible, and nothing is sent.
+- `request_id` is the attempt key. Claude only accepts `^[A-Za-z0-9_-]{1,64}$`; the attempt keys are
+  UUIDs, which match. A key that does not match is sent as its SHA-256 in hex, so every try of one
+  attempt still sends the same id.
+- Answers (`result`): `reset` is a success, with `resets_left`. `already_used` is a success of an
+  earlier try with the same `request_id`. `not_limited` used nothing, because nothing was used yet.
+  `cooldown` and `ineligible` used nothing. `unavailable` is unconfirmed: Headroom keeps the key and
+  offers "Check again". A `result` Headroom does not know keeps the key, so "Try again" can send it
+  again. HTTP 429 is rate limiting, and HTTP 401 or 403 asks the user to sign in again.
+- "Check again" reads the status and never sends the reset again. The reset worked when the grant
+  now has fewer `resets_left` than before the first send. Anything else stays unconfirmed. The
+  `resets_left` noted before the send lives in memory only, so after a restart a check stays
+  unconfirmed; a new confirmation within 10 minutes sends the same `request_id`, and Claude then
+  answers `already_used` if the earlier try worked.
+- The log names the redeem path as `/api/organizations/{organization}/reset_rate_limits`: the
+  organization identifies the account, so it is never logged.
+  The answer's `result` and `reason` are logged only when they are short codes; any other text is
+  logged as `other`.
 
 ### Z.AI
 

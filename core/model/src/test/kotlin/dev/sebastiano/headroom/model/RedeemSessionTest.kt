@@ -182,6 +182,18 @@ class RedeemSessionTest {
     }
 
     @Test
+    fun `a reset the provider does not allow yet is offered but cannot be confirmed`() = runTest {
+        val notYet = fiveHour.copy(status = ResetPoolStatus.NotUsableYet)
+        val provider = ScriptedProvider()
+        val session = session(ResetAvailability(listOf(notYet)), provider)
+        assertEquals(RedeemStep.Confirm(notYet, canGoBack = false), session.step.value)
+
+        session.confirm()
+
+        assertEquals(emptyList(), provider.redeems)
+    }
+
+    @Test
     fun `queued pools are never offered`() {
         val queued = week.copy(status = ResetPoolStatus.Queued)
         val session = session(ResetAvailability(listOf(fiveHour, queued)))

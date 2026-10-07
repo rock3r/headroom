@@ -36,11 +36,26 @@ public data class ResetScope(
 }
 
 /**
- * True for the providers whose resets Headroom can use: Codex, Grok and Z.AI. Other providers'
- * resets, such as Claude's grants, are shown for information only, with no action.
+ * True for the providers whose resets Headroom can use with these [settings]: Codex, Grok and Z.AI
+ * always, and Claude once the user turns on [AppSettings.redeemClaudeResets]. Other providers'
+ * resets, and Claude's grants until then, are shown for information only, with no action.
  */
-public val Provider.canRedeemResets: Boolean
-    get() = this == Provider.Codex || this == Provider.Grok || this == Provider.ZAi
+public fun Provider.canRedeemResets(settings: AppSettings): Boolean =
+    when (this) {
+        Provider.Codex,
+        Provider.Grok,
+        Provider.ZAi -> true
+        Provider.Claude -> settings.redeemClaudeResets
+        else -> false
+    }
+
+/**
+ * True for the providers whose redeem is experimental: Claude's. Its API is not public and was
+ * never tried with a real account, so the user turns it on in Settings, and the confirmation says
+ * it is experimental.
+ */
+public val Provider.redeemsResetsExperimentally: Boolean
+    get() = this == Provider.Claude
 
 /** Whether a pool's reset can be used now, and if not, why not. */
 public enum class ResetPoolStatus {
@@ -52,6 +67,11 @@ public enum class ResetPoolStatus {
     Queued,
     /** The provider paused it. */
     Paused,
+    /**
+     * The provider does not allow it now, for a reason other than a limit: for example, it has not
+     * started yet.
+     */
+    NotUsableYet,
 }
 
 /** When a reset may be used. Null on a pool means the provider does not say. */
@@ -87,11 +107,16 @@ public data class ResetPool(
     val canUseNow: Boolean
         get() = available > 0 && status == ResetPoolStatus.Ready
 
-    /** True when the redeem sheet offers this pool: now, or once a limit is reached. */
+    /**
+     * True when the redeem sheet offers this pool: to use now, or to say why it cannot be used yet,
+     * as for a reset that waits for a limit.
+     */
     val isOffered: Boolean
         get() =
             available > 0 &&
-                (status == ResetPoolStatus.Ready || status == ResetPoolStatus.WaitingForLimit)
+                (status == ResetPoolStatus.Ready ||
+                    status == ResetPoolStatus.WaitingForLimit ||
+                    status == ResetPoolStatus.NotUsableYet)
 }
 
 /** The resets one account can use now, and what else the provider offers. */
@@ -111,9 +136,18 @@ public data class ResetAvailability(
     val total: Int
         get() = pools.filter { it.status != ResetPoolStatus.Paused }.sumOf { it.available }
 
-    /** How many resets the account can use now, or once it reaches a limit. */
+    /**
+     * How many resets the account can use now, or once it reaches a limit. A reset the provider
+     * does not allow yet is not counted.
+     */
     val availableNow: Int
-        get() = usablePools.sumOf { it.available }
+        get() =
+            pools
+                .filter {
+                    it.status == ResetPoolStatus.Ready ||
+                        it.status == ResetPoolStatus.WaitingForLimit
+                }
+                .sumOf { it.available }
 
     /** How many resets wait behind the ones available now. */
     val queued: Int
