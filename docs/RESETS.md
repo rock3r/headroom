@@ -47,7 +47,7 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
 | Codex | Use a credit | `POST …/wham/rate-limit-reset-credits/consume` with `{"redeem_request_id": <attempt key>, "credit_id": <soonest-expiring credit>}` | The same, plus `Content-Type: application/json` |
 | Grok | List tokens | `POST https://grok.com/prod_mc_billing.ConsumerUiSvc/GetRemainingResets`, an empty protobuf message in a gRPC-web frame | `Authorization: Bearer <xAI OAuth token>`, `Content-Type: application/grpc-web+proto`, `Accept: application/grpc-web+proto`, `X-Grpc-Web: 1`, `TE: trailers` |
 | Grok | Use a token | `POST https://grok.com/prod_mc_billing.ConsumerUiSvc/RedeemReset` with `token_id` (field 10) | The same |
-| Claude | List grants | `GET https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1` | `Authorization: Bearer <Claude OAuth token>`, `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-cli/2.1.281 (external, cli)` |
+| Claude | List grants | `GET https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1` | `Authorization: Bearer <Claude OAuth token>`, `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-cli/<version> (external, cli)` |
 | Z.AI | List cards | `GET https://zcode.z.ai/api/v1/coding-plan/reset/status` | `Authorization: Bearer <ZCode JWT>`, `X-Bigmodel-Authorization: <Z.AI business token>`, `Bigmodel-Target-Type: PERSONAL` |
 | Z.AI | Use a card | `POST …/coding-plan/reset/use` with `{"idempotency_key": <attempt key>, "reset_type": "FIVE_HOUR" \| "WEEK"}` | The same, plus `Content-Type: application/json` |
 | Z.AI | Mark history read | `POST …/coding-plan/reset/history/read` with no body | `Authorization` and `X-Bigmodel-Authorization` only: no target scope |
@@ -88,8 +88,14 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
   queued, so the count reads "1 (+3)". A paused grant is paused.
 - An account outside the program shows no resets. The reasons `tier`, `seat` and `tenure` show a
   short explanation instead.
-- The server fills the block only for the Claude Code client, so the call carries its User-Agent.
-  If Claude starts answering `surface` or `cli_version`, the User-Agent needs a newer version.
+- The server fills the block only for recent Claude Code clients, so the call carries their
+  User-Agent. `ClaudeCodeIdentity.VERSION` in `:core:quota` holds the version for every Claude
+  request. `scripts/update-claude-code-version.sh` sets it to the latest published Claude Code,
+  and each release runs it (see [RELEASING.md](RELEASING.md)).
+- When the account is outside the program, the `HeadroomResets` log line names the server's
+  reason, for example `ineligible cli_version`. The reasons `surface` and `cli_version` mean the
+  version is too old: run the script. A reason that is not a short code is logged as `other`, so
+  the log never carries the server's text.
 
 ### Z.AI
 

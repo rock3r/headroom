@@ -24,7 +24,7 @@ import kotlinx.serialization.json.jsonObject
  *
  * `GET /api/oauth/usage?cedar_ember=1&skip_spend=1` fills the `cedar_ember` block of the usage
  * answer. The server only fills it for the Claude Code client, so the request carries its identity:
- * the `oauth-2025-04-20` beta and a `claude-cli/… (external, cli)` User-Agent. Each grant becomes a
+ * the `oauth-2025-04-20` beta and the User-Agent of [ClaudeCodeIdentity]. Each grant becomes a
  * pool; the grant the server spends next (`next_grant_id`) is usable, the others wait behind it.
  */
 internal class ClaudeResets(
@@ -48,7 +48,7 @@ internal class ClaudeResets(
                             mapOf(
                                 "Authorization" to bearer(credentials.accessToken),
                                 "anthropic-beta" to BETA_HEADER,
-                                "User-Agent" to USER_AGENT,
+                                "User-Agent" to ClaudeCodeIdentity.EXTERNAL_CLI_USER_AGENT,
                                 "Accept" to "application/json",
                                 "Content-Type" to "application/json",
                             ),
@@ -63,7 +63,8 @@ internal class ClaudeResets(
         }
         val program = parseOrNull {
             val block = quotaJson.parseToJsonElement(response.body).jsonObject[PROGRAM_KEY]
-            Program(if (block == null || block is JsonNull) null else parse(block.jsonObject))
+            if (block == null || block is JsonNull) Program(null, ineligibleReason = null)
+            else Program(parse(block.jsonObject), ineligibleReason(block.jsonObject))
         }
         if (program == null) {
             call.done("HTTP 200, unreadable")
@@ -76,11 +77,11 @@ internal class ClaudeResets(
         val availability = program.availability
         call.done(
             "HTTP 200, " +
-                if (availability == null) "no program"
+                (if (availability == null) "no program"
                 else
                     "${availability.pools.size} grants, ${availability.availableNow} now, " +
-                        "${availability.queued} queued" +
-                        availability.ineligibleReason?.let { ", ineligible" }.orEmpty()
+                        "${availability.queued} queued") +
+                program.ineligibleReason?.let { ", ineligible $it" }.orEmpty()
         )
         return ResetRead.Known(availability)
     }
@@ -151,6 +152,17 @@ internal class ClaudeResets(
         return if (clears.isEmpty()) ResetScope.Unknown else ResetScope(windowIds = clears.toSet())
     }
 
+    /**
+     * Why the server left the account out of the program, for the log: `cli_version` or `surface`
+     * means [ClaudeCodeIdentity] needs a newer version. Only a short code is logged as it is; any
+     * other text becomes `other`, so the log never carries what the server put there.
+     */
+    private fun ineligibleReason(block: JsonObject): String? {
+        if ((block["eligible"] as? JsonPrimitive)?.booleanOrNull != false) return null
+        val reason = (block["ineligible_reason"] as? JsonPrimitive)?.contentOrNull ?: return "none"
+        return if (LOGGABLE_REASON.matches(reason)) reason else "other"
+    }
+
     /** Why the account cannot have resets, when it is a lasting reason the user should know. */
     private fun ineligibleText(reason: String?): String? =
         when (reason) {
@@ -165,14 +177,17 @@ internal class ClaudeResets(
     private fun JsonObject.boolean(key: String): Boolean? =
         (this[key] as? JsonPrimitive)?.booleanOrNull
 
-    /** The parsed block; [availability] is null when the account is outside the program. */
-    private class Program(val availability: ResetAvailability?)
+    /**
+     * The parsed block; [availability] is null when the account is outside the program, and
+     * [ineligibleReason] is the server's reason for that, as it can be logged.
+     */
+    private class Program(val availability: ResetAvailability?, val ineligibleReason: String?)
 
     private companion object {
         const val DEFAULT_BASE_URL = "https://api.anthropic.com"
         const val STATUS_PATH = "/api/oauth/usage?cedar_ember=1&skip_spend=1"
         const val PROGRAM_KEY = "cedar_ember"
         const val BETA_HEADER = "oauth-2025-04-20"
-        const val USER_AGENT = "claude-cli/2.1.281 (external, cli)"
+        val LOGGABLE_REASON = Regex("[a-z0-9_]{1,40}")
     }
 }

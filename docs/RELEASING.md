@@ -11,15 +11,25 @@ release for that tag.
    The workflow stops if the tag and `versionName` do not match.
 2. Write the release notes in `docs/release-notes/<version>.md`. Without that file, GitHub writes
    the notes from the commits.
-3. Run `./gradlew check`, commit, and push `main`.
-4. Tag the commit and push the tag:
+3. Update the Claude Code version that Headroom sends to Claude:
+
+   ```bash
+   scripts/update-claude-code-version.sh
+   ```
+
+   The script reads the latest published Claude Code (`npm view @anthropic-ai/claude-code
+   version`), writes it to `ClaudeCodeIdentity.VERSION` in `:core:quota`, and prints the change.
+   Claude lists usage-limit resets only for recent Claude Code clients. With an old version, the
+   Claude resets disappear from the app. See [RESETS.md](RESETS.md#claude).
+4. Run `./gradlew check`, commit, and push `main`.
+5. Tag the commit and push the tag:
 
    ```bash
    git tag -a v1.0.0 -m "Headroom 1.0.0"
    git push origin v1.0.0
    ```
 
-5. Wait for the workflow to finish, then check the release page.
+6. Wait for the workflow to finish, then check the release page.
 
 ## The release key
 
