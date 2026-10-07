@@ -47,7 +47,9 @@ internal class ClaudeResetRedeemer(
             when (val read = grantsLeft(credentials, attemptKey)) {
                 is GrantsRead.Failed -> return read.outcome
                 is GrantsRead.Known -> {
-                    val left = read.left[poolId] ?: return RedeemOutcome.Ineligible
+                    if (poolId !in read.left) return RedeemOutcome.Ineligible
+                    val left =
+                        read.left[poolId] ?: return RedeemOutcome.Failed(QuotaErrorKind.Parse)
                     leftBefore.remember(attemptKey, left.toString())
                 }
             }
@@ -126,7 +128,10 @@ internal class ClaudeResetRedeemer(
         else RedeemOutcome.Unconfirmed
     }
 
-    /** Each grant's `resets_left`, spent grants included, or why they could not be read. */
+    /**
+     * Each grant's `resets_left`, spent grants included, or why they could not be read. A grant
+     * whose count is missing or not a number maps to null.
+     */
     private suspend fun grantsLeft(
         credentials: ProviderCredentials,
         attemptKey: String,
@@ -157,9 +162,7 @@ internal class ClaudeResetRedeemer(
             grants
                 .mapNotNull { element ->
                     val grant = element.jsonObject
-                    grant.nonBlankStringOrNull("id")?.let {
-                        it to (grant.intOrNull("resets_left") ?: 0)
-                    }
+                    grant.nonBlankStringOrNull("id")?.let { it to grant.intOrNull("resets_left") }
                 }
                 .toMap()
         }
@@ -243,7 +246,7 @@ internal class ClaudeResetRedeemer(
     private class RedeemAnswer(val result: String, val left: Int?, val reason: String?)
 
     private sealed interface GrantsRead {
-        class Known(val left: Map<String, Int>) : GrantsRead
+        class Known(val left: Map<String, Int?>) : GrantsRead
 
         class Failed(val outcome: RedeemOutcome) : GrantsRead
     }

@@ -203,6 +203,18 @@ class ClaudeResetRedeemTest {
     }
 
     @Test
+    fun `a grant listed without a count is unreadable, and nothing is sent`() = runTest {
+        status =
+            jsonResponse(
+                fixture("claude/usage_cedar_ember.json")
+                    .replaceFirst("\"resets_left\": 1", "\"resets_left\": \"one\"")
+            )
+
+        assertEquals(RedeemOutcome.Failed(QuotaErrorKind.Parse), redeem())
+        assertTrue(redeemRequests().isEmpty())
+    }
+
+    @Test
     fun `a status that asks for a sign-in asks the user to sign in again`() = runTest {
         status = MockResponse(code = 401)
 

@@ -23,6 +23,7 @@ import dev.sebastiano.headroom.quota.ResetAsker
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
 import dev.sebastiano.headroom.quota.ResetRedeemer
+import java.io.IOException
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -183,6 +184,34 @@ class SyncedResetProviderTest {
         assertEquals("grant", poolId)
         assertEquals("key-1", key)
     }
+
+    @Test
+    fun `only a Claude redeem reads the settings, and settings that cannot be read mean off`() =
+        runTest {
+            signIn(codex)
+            signIn(claude)
+            val unreadable =
+                SyncedResetProvider(
+                    accounts = { states },
+                    settings = { throw IOException("settings store unreadable") },
+                    fetcher =
+                        AccountQuotaFetcher(
+                            CredentialProvider(store, emptyMap()),
+                            QuotaFetchers(emptyList()),
+                        ),
+                    clients = ResetClients(emptyList(), listOf(codexRedeemer, claudeRedeemer)),
+                )
+
+            assertEquals(
+                RedeemOutcome.Success(resetsLeft = 1),
+                unreadable.redeem(codex, "codex", ResetAttemptKey("key-1")),
+            )
+            assertEquals(
+                RedeemOutcome.Unsupported,
+                unreadable.redeem(claude, "grant", ResetAttemptKey("key-2")),
+            )
+            assertTrue(claudeRedeemer.calls.isEmpty())
+        }
 
     @Test
     fun `a check reads what an unconfirmed attempt did, with the same key`() = runTest {

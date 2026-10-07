@@ -11,6 +11,7 @@ import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.canRedeemResets
+import dev.sebastiano.headroom.model.redeemsResetsExperimentally
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
@@ -104,8 +105,21 @@ public class SyncedResetProvider(
         return outcome
     }
 
-    private suspend fun redeems(account: Account): Boolean =
-        account.provider.canRedeemResets(settings())
+    /**
+     * Only an experimental redeem depends on the settings, so the other providers never read them.
+     * Settings that cannot be read count as off.
+     */
+    private suspend fun redeems(account: Account): Boolean {
+        val provider = account.provider
+        if (!provider.redeemsResetsExperimentally) return provider.canRedeemResets(AppSettings())
+        val current =
+            try {
+                settings()
+            } catch (_: IOException) {
+                return false
+            }
+        return provider.canRedeemResets(current)
+    }
 
     private suspend fun credentialsOf(account: Account): Credentials =
         try {
