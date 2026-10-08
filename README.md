@@ -137,9 +137,12 @@ when a new one is out.
 
 [<img src="docs/media/badge_obtainium.png" alt="Get it on Obtainium" width="161">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.sebastiano.headroom%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Frock3r%2Fheadroom%22%2C%22author%22%3A%22rock3r%22%2C%22name%22%3A%22Headroom%22%7D)
 
-If you already have Obtainium, you can also open
-[this link](obtainium://add/https://github.com/rock3r/headroom). The badge goes through
-apps.obtainium.imranr.dev, which shows a "get Obtainium" page when the app is missing.
+The badge goes through apps.obtainium.imranr.dev, which shows a "get Obtainium" page when the app
+is missing. If you already have Obtainium, you can instead add an app in it with this URL:
+
+```
+https://github.com/rock3r/headroom
+```
 
 To check an APK yourself, its signing certificate has this SHA-256:
 
