@@ -119,7 +119,12 @@ fun HeadroomApp(
         if (next == Page.Accounts) accountsFromSettings = true
         page = next
     }
-    val settingsActions = settingsActions(settingsViewModel, addWidget, graph.resetIsland, openPage)
+    // Made once: this composable recomposes whenever the pages settle, for example as Settings'
+    // reveal ends. New callbacks then would compose every row of Settings again.
+    val settingsActions =
+        remember(settingsViewModel, addWidget, graph.resetIsland) {
+            settingsActions(settingsViewModel, addWidget, graph.resetIsland, openPage)
+        }
     val accountsActions =
         accountsActions(accountsViewModel) {
                 page = if (accountsFromSettings) Page.Settings else Page.Home
@@ -200,19 +205,25 @@ private fun SettingsPage(
 ) {
     var tileStatus by rememberSaveable { mutableStateOf<TileAddResult?>(null) }
     val tileSubtitle = graph.tileSettings?.subtitle?.collectAsStateWithLifecycle()?.value
-    SettingsScreen(
-        state = settings,
-        accounts = SettingsAccounts(home.accountsInYourOrder.map { it.provider }, home.isDemo),
-        actions =
+    // The same callbacks and debug row on every recomposition, so Settings' rows can skip.
+    val pageActions =
+        remember(actions, graph) {
             actions.copy(
                 onAddTile = { graph.tileAdder.request { tileStatus = it } },
                 onTileSubtitleChange = { graph.tileSettings?.setSubtitle(it) },
-            ),
+            )
+        }
+    val debugEntry =
+        remember(actions, graph) { graph.prototypes?.settingsEntry { actions.onOpenPrototypes() } }
+    SettingsScreen(
+        state = settings,
+        accounts = SettingsAccounts(home.accountsInYourOrder.map { it.provider }, home.isDemo),
+        actions = pageActions,
         reveal = reveal,
         resetIsland = graph.resetIsland.collectUi(),
         tileStatus = tileStatus,
         tileSubtitle = tileSubtitle ?: TileSubtitleMode.NextReset,
-        debugEntry = graph.prototypes?.settingsEntry { actions.onOpenPrototypes() },
+        debugEntry = debugEntry,
     )
 }
 
