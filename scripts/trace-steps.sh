@@ -55,8 +55,8 @@ else
 fi
 "${adb[@]}" push "$config" /data/local/tmp/headroom-steps.pbtxt >/dev/null
 "${adb[@]}" shell "rm -f $device_trace"
-pid=$("${adb[@]}" shell "cat /data/local/tmp/headroom-steps.pbtxt | perfetto --txt -c - -o $device_trace --background" | tr -d '\r' | tail -1)
-sleep 2
+# --background-wait returns once every data source has started, so the first step is recorded.
+pid=$("${adb[@]}" shell "cat /data/local/tmp/headroom-steps.pbtxt | perfetto --txt -c - -o $device_trace --background-wait" | tr -d '\r' | tail -1)
 
 read -r width height < <("${adb[@]}" shell wm size | sed -nE 's/.*: ([0-9]+)x([0-9]+).*/\1 \2/p' | tail -1)
 x=$((width / 2)); low=$((height * 4 / 5)); high=$((height / 4))
