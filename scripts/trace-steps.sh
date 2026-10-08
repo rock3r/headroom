@@ -32,6 +32,16 @@ rm -rf "$out/app" "$out/marks.txt"
 
 app_trace="${APP_TRACE:-1}"
 broadcast() { "${adb[@]}" shell am broadcast -a "androidx.tracing.profiler.action.$1" -n "$receiver" | tail -1; }
+# If a step fails, stop both traces: the system trace has no set length, and app recording would
+# stay on across restarts. A run that ends normally stops them below.
+pid=""
+finished=0
+cleanup() {
+  [ "$finished" = 1 ] && return
+  if [ -n "$pid" ]; then "${adb[@]}" shell "kill -TERM $pid" >/dev/null 2>&1 || true; fi
+  if [ "$app_trace" = 1 ]; then broadcast STOP >/dev/null 2>&1 || true; fi
+}
+trap cleanup EXIT
 if [ "$app_trace" = 1 ]; then broadcast START >/dev/null; else broadcast STOP >/dev/null; fi
 
 # The scroll configuration without its fixed length: the trace runs until the steps end. Without
@@ -71,6 +81,7 @@ if [ "$app_trace" = 1 ]; then
   broadcast STOP >/dev/null
 fi
 "${adb[@]}" shell "kill -TERM $pid; while kill -0 $pid 2>/dev/null; do sleep 0.2; done"
+finished=1
 
 "${adb[@]}" pull "$device_trace" "$out/system.pftrace" >/dev/null
 if [ "$app_trace" = 1 ]; then
