@@ -130,6 +130,23 @@ open it on your phone. Headroom needs Android 16 or later. Releases are signed w
 every time, so later releases install over earlier ones. [docs/RELEASING.md](docs/RELEASING.md)
 explains how a release is made.
 
+### With Obtainium
+
+[Obtainium](https://obtainium.imranr.dev/) installs Headroom from the GitHub releases and tells you
+when a new one is out.
+
+[<img src="docs/media/badge_obtainium.png" alt="Get it on Obtainium" width="161">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.sebastiano.headroom%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Frock3r%2Fheadroom%22%2C%22author%22%3A%22rock3r%22%2C%22name%22%3A%22Headroom%22%7D)
+
+If you already have Obtainium, you can also open
+[this link](obtainium://add/https://github.com/rock3r/headroom). The badge goes through
+apps.obtainium.imranr.dev, which shows a "get Obtainium" page when the app is missing.
+
+To check an APK yourself, its signing certificate has this SHA-256:
+
+```
+81:5F:AA:26:1D:76:B2:B3:37:E4:AB:D0:F3:BA:31:84:AD:05:FB:8E:BD:65:01:42:43:47:22:69:BC:DA:5F:C2
+```
+
 ## Building
 
 You need JDK 21 and the Android SDK with platform 37.

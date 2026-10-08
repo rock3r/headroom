@@ -31,6 +31,16 @@ release for that tag.
 
 6. Wait for the workflow to finish, then check the release page.
 
+## Obtainium
+
+Users can install and update Headroom with [Obtainium](https://obtainium.imranr.dev/), which
+reads the GitHub releases. Keep these things as they are, or it stops finding updates:
+
+- One `.apk` asset per release. Obtainium asks the user to pick when there are several, and a new
+  asset such as a per-ABI build needs an APK filter in the README link.
+- A tag that is the version, optionally with a leading `v` (`v1.2.0`). Obtainium compares it with
+  the installed `versionName`, so the two must stay the same number.
+
 ## The release key
 
 Every release must be signed with the same key. Android refuses to install an update signed with
