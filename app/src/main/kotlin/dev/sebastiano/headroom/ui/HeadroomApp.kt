@@ -134,7 +134,7 @@ fun HeadroomApp(
         val pageTransition = rememberPageTransition(shown, back) { page = it }
         Pages(
             transition = rememberTransition(pageTransition.state, label = "page"),
-            scrubbing = pageTransition.scrubbing,
+            scrubbing = { pageTransition.scrubbing },
         ) { current, reveal ->
             when (current) {
                 Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
@@ -338,13 +338,13 @@ private fun rememberWidgetAdder(
 @Composable
 private fun Pages(
     transition: Transition<Page>,
-    scrubbing: Boolean,
+    scrubbing: () -> Boolean,
     content: @Composable (Page, PageReveal) -> Unit,
 ) {
     val animate = animationsEnabled()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val revealing = animate && transition.isBetween(Page.Home, Page.Settings)
+    val isScrubbing by rememberUpdatedState(scrubbing)
     SharedTransitionLayout {
         val reveal = remember(this) { SettingsReveal(this) }
         transition.AnimatedContent(
@@ -366,10 +366,16 @@ private fun Pages(
             }
         ) { current ->
             val scope = this
-            val opening = transition.targetState == Page.Settings
             val pageReveal =
-                remember(reveal, scope, revealing, animate, scrubbing, opening) {
-                    PageReveal(reveal, scope, revealing, animate, scrubbing, opening)
+                remember(reveal, scope, animate, transition) {
+                    PageReveal(
+                        reveal = reveal,
+                        visibility = scope,
+                        animate = animate,
+                        isRevealing = { animate && transition.isBetween(Page.Home, Page.Settings) },
+                        isScrubbing = { isScrubbing() },
+                        isOpening = { transition.targetState == Page.Settings },
+                    )
                 }
             val clip = rememberRevealClip(pageReveal, enabled = current == Page.Settings)
             Box(modifier = Modifier.revealClip(clip)) { content(current, pageReveal) }

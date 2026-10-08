@@ -220,7 +220,7 @@ private fun PaletteSwatch(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val morph = remember { Morph(MaterialShapes.Circle, MaterialShapes.Cookie9Sided) }
+    val morph = SwatchMorph
     val path = remember { Path() }
     // Picking a palette is rare, so the chosen swatch may bounce into its new shape.
     val spec = if (animationsEnabled()) HeadroomMotion.containerSpec<Float>() else snap()
@@ -309,6 +309,14 @@ private fun rememberSelectionPop(selected: Boolean): Animatable<Float, Animation
 }
 
 private const val POP_SCALE = 1.25f
+
+/**
+ * The circle to scalloped shape of every swatch. Matching the two shapes' outlines is costly: one
+ * morph per swatch added about 16 ms to Settings' first frame in a debug build, so the swatches
+ * share this one (see docs/TRACING.md). A [Morph] does not change once built.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val SwatchMorph: Morph by lazy { Morph(MaterialShapes.Circle, MaterialShapes.Cookie9Sided) }
 
 /** [morph] at [progress], stretched from its unit square to the size it outlines. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
