@@ -74,13 +74,19 @@ done
 sleep 1
 
 # FLUSH_TRACES_GET_PATH writes the in-process trace out, copies it where the shell can read it,
-# and answers with that folder. Stopping perfetto with SIGTERM ends the trace and writes it.
+# and answers with that folder. Stopping perfetto with SIGTERM ends the trace. The tracing service
+# writes the file, and can still be writing it after perfetto exits, so wait until the file has
+# kept the same size, above zero, for a second.
 if [ "$app_trace" = 1 ]; then
   path=$(broadcast FLUSH_TRACES_GET_PATH | sed -nE 's/.*data="([^"]+)".*/\1/p')
   if [ -z "$path" ]; then echo "The app did not flush its trace. Is a debug build running?" >&2; exit 1; fi
   broadcast STOP >/dev/null
 fi
 "${adb[@]}" shell "kill -TERM $pid; while kill -0 $pid 2>/dev/null; do sleep 0.2; done"
+"${adb[@]}" shell "last=-1; size=\$(stat -c %s $device_trace); tries=0
+  while { [ \"\$size\" != \"\$last\" ] || [ \"\$size\" = 0 ]; } && [ \$tries -lt 60 ]; do
+    sleep 1; last=\$size; size=\$(stat -c %s $device_trace); tries=\$((tries + 1))
+  done"
 finished=1
 
 "${adb[@]}" pull "$device_trace" "$out/system.pftrace" >/dev/null
