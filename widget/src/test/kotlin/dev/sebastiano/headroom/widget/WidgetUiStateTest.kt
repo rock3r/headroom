@@ -553,4 +553,31 @@ class WidgetUiStateTest {
         assertTrue(none.all { it.resetsAvailable == 0 })
         assertEquals(0, expired.first { it.accountId == "demo-claude" }.resetsAvailable)
     }
+
+    @Test
+    fun `a single ring counts its account's resets once, on the main gauge`() {
+        val config = WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-codex"))
+
+        val ring =
+            assertIs<WidgetUiState.SingleRing>(
+                map(config, demo.withResets(), WidgetSize(160f, 160f))
+            )
+
+        assertEquals(2, ring.gauge.resetsAvailable)
+        assertEquals(0, ring.session?.resetsAvailable)
+    }
+
+    @Test
+    fun `shape widgets carry no resets, since they draw no counter`() {
+        val accounts = demo.withResets()
+
+        val single =
+            assertIs<WidgetUiState.SingleShape>(
+                map(WidgetConfig(WidgetStyle.Shape, listOf("demo-codex")), accounts)
+            )
+        val grid = assertIs<WidgetUiState.ShapeGrid>(map(WidgetConfig(WidgetStyle.Shape), accounts))
+
+        assertEquals(0, single.gauge.resetsAvailable)
+        assertTrue(grid.gauges.all { it.resetsAvailable == 0 })
+    }
 }

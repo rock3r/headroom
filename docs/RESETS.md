@@ -34,12 +34,14 @@ adds the result to the snapshot (`QuotaSnapshot.resets`).
 ## Widgets
 
 The Bars and Rings widgets, on the home screen and the lock screen, show a small counter on an
-account that has resets it can use now: just the number, in a disc in the provider's colour. Rings
-carry it just outside the ring, at its bottom-right, so it does not look like the end of the arc.
-Bars carry it on the bottom-right of the avatar. The count is
-`ResetAvailability.availableNow`, the same number the app shows. The counter is hidden when the
-count is zero and when the account's sign-in expired. Screen readers hear "2 resets available now."
-The widget pictures are in `docs/screenshots/widgets/widget-resets-*.png`.
+account that has resets it can use now. It is just the number, or "9+" above nine, in a disc in the
+colour of the account's ring or bar. Rings carry it just outside the ring, at its bottom-right, so it
+does not look like the end of the arc. Bars carry it on the bottom-right of the avatar. The Shape
+widgets show no counter.
+
+The count is `ResetAvailability.availableNow`, the same number the app shows. The counter is hidden
+when the count is zero and when the account's sign-in expired. Screen readers hear "2 resets
+available now." The widget pictures are in `docs/screenshots/widgets/widget-resets-*.png`.
 
 ## Endpoints
 

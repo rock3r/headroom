@@ -92,7 +92,7 @@ internal fun SingleRingWidget(
         }
 
     val counter =
-        render.counterStyle(gauge, render.pxValue(HERO_COUNTER), render.textPx(HERO_COUNTER_TEXT))
+        render.counterStyle(gauge, render.pxValue(HERO_COUNTER), render.pxValue(HERO_COUNTER_TEXT))
 
     WidgetCard(render, modifier) {
         RemoteBox(
@@ -242,9 +242,13 @@ private fun SmallRing(
 ) {
     val colors = render.colorsFor(gauge)
     val counter =
-        render.counterStyle(gauge, render.pxValue(SMALL_COUNTER), render.textPx(SMALL_COUNTER_TEXT))
+        render.counterStyle(
+            gauge,
+            render.pxValue(SMALL_COUNTER),
+            render.pxValue(SMALL_COUNTER_TEXT),
+        )
     val signIn =
-        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.textPx(SIGN_IN_BADGE_TEXT))
+        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.pxValue(SIGN_IN_BADGE_TEXT))
     // Inside the cell's tap area, so the gap between rows still opens the account.
     RemoteColumn(
         modifier = modifier.padding(vertical = render.px(SMALL_CELL_GAP / 2f)),
@@ -295,7 +299,7 @@ private fun SmallRing(
 @Composable
 internal fun SignInBadge(render: RenderContext, modifier: RemoteModifier = RemoteModifier) {
     val radius = render.pxValue(SIGN_IN_BADGE)
-    val style = render.signInBadgeStyle(radius, render.textPx(SIGN_IN_BADGE_TEXT))
+    val style = render.signInBadgeStyle(radius, render.pxValue(SIGN_IN_BADGE_TEXT))
     RemoteBox(modifier.width((radius * 2f).rf).height((radius * 2f).rf)) {
         RemoteCanvas(RemoteModifier.fillMaxSize()) { drawSignInBadge(style) }
     }

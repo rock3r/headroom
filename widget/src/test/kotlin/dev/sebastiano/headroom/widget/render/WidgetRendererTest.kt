@@ -26,6 +26,7 @@ import dev.sebastiano.headroom.widget.WidgetUiState
 import dev.sebastiano.headroom.widget.WidgetWindow
 import dev.sebastiano.headroom.widget.testing.PLAYER_MAX_VARIABLES
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
+import dev.sebastiano.headroom.widget.testing.TwoCodexResets
 import dev.sebastiano.headroom.widget.testing.documentOperations
 import dev.sebastiano.headroom.widget.testing.hasNamedHostActions
 import dev.sebastiano.headroom.widget.testing.hostActionIds
@@ -333,6 +334,26 @@ class WidgetRendererTest {
             assertContains(doc.text(), "2 resets available now.", message = label)
             WidgetRenderer.remoteViews(doc).playAt(size)
         }
+    }
+
+    @Test
+    fun `a counter shows at most 9+`() = runTest {
+        val many = TwoCodexResets.copy(pools = TwoCodexResets.pools.map { it.copy(available = 12) })
+        val size = WidgetSize(160f, 160f)
+        val state =
+            WidgetUiState.from(
+                accounts.withResets(resets = many),
+                WidgetConfig(WidgetStyle.Rings),
+                now,
+                size,
+                HOME,
+            )
+
+        val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+
+        assertTrue(doc.drawsText("9+"))
+        assertFalse(doc.drawsText("12"))
+        doc.assertText("12 resets available now.")
     }
 
     @Test

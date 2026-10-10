@@ -156,9 +156,9 @@ private fun LockScreenGauge(
 ) {
     val colors = render.colorsFor(gauge)
     val counter =
-        render.counterStyle(gauge, render.pxValue(LOCK_COUNTER), render.textPx(LOCK_COUNTER_TEXT))
+        render.counterStyle(gauge, render.pxValue(LOCK_COUNTER), render.pxValue(LOCK_COUNTER_TEXT))
     val signIn =
-        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.textPx(SIGN_IN_BADGE_TEXT))
+        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.pxValue(SIGN_IN_BADGE_TEXT))
     RemoteColumn(modifier = modifier, horizontalAlignment = RemoteAlignment.CenterHorizontally) {
         RemoteBox(
             modifier = RemoteModifier.width(render.px(LOCK_RING)).height(render.px(LOCK_RING)),

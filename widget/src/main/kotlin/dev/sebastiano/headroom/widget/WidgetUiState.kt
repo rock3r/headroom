@@ -185,8 +185,13 @@ public sealed interface WidgetUiState {
                 config.style == WidgetStyle.Rings && gauges.size == 1 ->
                     singleRing(selected, names, gauges.single(), config, now, size)
                 config.style == WidgetStyle.Rings -> RingGrid(gauges.take(MAX_GRID_ITEMS), mode)
-                gauges.size == 1 -> SingleShape(gauges.single(), mode)
-                else -> ShapeGrid(gauges.take(MAX_GRID_ITEMS), mode)
+                // Shapes draw no reset counter, so they do not announce resets either.
+                gauges.size == 1 -> SingleShape(gauges.single().copy(resetsAvailable = 0), mode)
+                else ->
+                    ShapeGrid(
+                        gauges.take(MAX_GRID_ITEMS).map { it.copy(resetsAvailable = 0) },
+                        mode,
+                    )
             }
         }
 
@@ -233,8 +238,10 @@ public sealed interface WidgetUiState {
             val session =
                 if (config.window == WidgetWindow.Weekly) {
                     state.sessionWindow?.let {
+                        // The resets belong to the account: the main gauge carries them, so
+                        // the ring announces them once.
                         gauge(state, names.getValue(main.accountId), it, now)
-                            .copy(display = main.display)
+                            .copy(display = main.display, resetsAvailable = 0)
                     }
                 } else {
                     null

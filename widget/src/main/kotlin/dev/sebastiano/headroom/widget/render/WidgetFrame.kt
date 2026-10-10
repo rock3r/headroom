@@ -112,7 +112,7 @@ internal fun ProviderAvatar(
             // Drawn after the logo, so the counter sits on top of it.
             RemoteCanvas(RemoteModifier.fillMaxSize()) {
                 val inset = (counter.radiusPx + counter.haloPx).rf
-                drawCounter(resets.toString(), width - inset, height - inset, counter)
+                drawCounter(counterLabel(resets), width - inset, height - inset, counter)
             }
         }
     }

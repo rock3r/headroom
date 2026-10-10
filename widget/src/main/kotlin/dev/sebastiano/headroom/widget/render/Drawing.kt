@@ -74,14 +74,21 @@ internal fun RemoteDrawScope.drawCounter(
     val centre = RemoteOffset(x, y)
     drawCircle(fillPaint(style.halo.rc), (style.radiusPx + style.haloPx).rf, centre)
     drawCircle(fillPaint(style.fill.rc), style.radiusPx.rf, centre)
+    // A two-character label ("9+") is drawn smaller, so it stays inside the disc.
+    val textPx = if (text.length > 1) style.textPx * WIDE_LABEL_SCALE else style.textPx
     with(RestrictedRemoteApis) {
-        drawCentredText(text.rs, x, y, textPaint(style.text, style.textPx, bold = true))
+        drawCentredText(text.rs, x, y, textPaint(style.text, textPx, bold = true))
     }
 }
 
+/** The reset counter's label: the count, or "9+" above nine, so it always fits its disc. */
+internal fun counterLabel(count: Int): String =
+    if (count > MAX_COUNTER) "$MAX_COUNTER+" else count.toString()
+
 /**
  * Colours and sizes of a [drawCounter] badge. The sizes are pixels, fixed at capture, because
- * canvas text needs its size then.
+ * canvas text needs its size then. The text does not follow the font scale: the disc does not grow
+ * with it.
  */
 internal data class CounterStyle(
     val fill: Color,
@@ -109,7 +116,7 @@ internal fun RemoteDrawScope.drawRingCounter(
     val outerEdge = remoteMin(width, height) * (geometry.radius + geometry.stroke / 2f).rf
     val distance = outerEdge + (style.radiusPx + style.haloPx).rf
     val offset = distance * DIAGONAL.rf
-    drawCounter(count.toString(), width / 2f.rf + offset, height / 2f.rf + offset, style)
+    drawCounter(counterLabel(count), width / 2f.rf + offset, height / 2f.rf + offset, style)
 }
 
 /**
@@ -263,6 +270,8 @@ private fun fillPaint(color: RemoteColor) = RemotePaint {
 
 private const val FULL_TURN = 360f
 private const val SIGN_IN_MARK = "!"
+private const val MAX_COUNTER = 9
+private const val WIDE_LABEL_SCALE = 0.75f
 /** cos 45°: how far along each axis the bottom-right diagonal crosses a circle, per radius. */
 private const val DIAGONAL = 0.7071f
 private const val TOP = -90f
