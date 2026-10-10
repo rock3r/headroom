@@ -104,23 +104,31 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    /**
+     * Acts on [intent]. The newest request wins: a long press clears an account request, and back.
+     */
     private fun handleRequest(intent: Intent?) {
         if (intent?.action == TileService.ACTION_QS_TILE_PREFERENCES) {
+            openAccount.value = null
             openTileSettings.value = requests++
             return
         }
+        val request = accountRequest(intent) ?: return
+        openTileSettings.value = null
+        openAccount.value = request
+    }
+
+    private fun accountRequest(intent: Intent?): OpenAccountRequest? {
         intent?.getStringExtra(SignInIntents.EXTRA_ACCOUNT_ID)?.let { accountId ->
-            openAccount.value = OpenAccountRequest(accountId, requests++, signInAgain = true)
-            return
+            return OpenAccountRequest(accountId, requests++, signInAgain = true)
         }
         intent?.getStringExtra(ResetReminderIntents.EXTRA_ACCOUNT_ID)?.let { accountId ->
-            openAccount.value = OpenAccountRequest(accountId, requests++, showResets = true)
-            return
+            return OpenAccountRequest(accountId, requests++, showResets = true)
         }
-        val accountId = intent?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID) ?: return
+        val accountId = intent?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID) ?: return null
         // A widget tap on an account whose sign-in expired opens its sign-in.
         val signInAgain = intent.getBooleanExtra(WidgetIntents.EXTRA_SIGN_IN_AGAIN, false)
-        openAccount.value = OpenAccountRequest(accountId, requests++, signInAgain)
+        return OpenAccountRequest(accountId, requests++, signInAgain)
     }
 
     /**

@@ -237,8 +237,13 @@ private fun SettingsPage(
 
 /** Whether Settings still has to scroll to the Quick Settings tile's rows. */
 @Stable
-private class TileScroll {
-    var pending by mutableStateOf(false)
+private class TileScroll(pending: Boolean = false) {
+    var pending by mutableStateOf(pending)
+
+    companion object {
+        /** Keeps a scroll that has not finished across a configuration change. */
+        val Saver: Saver<TileScroll, Boolean> = Saver({ it.pending }, ::TileScroll)
+    }
 }
 
 /**
@@ -254,7 +259,7 @@ private fun rememberTileScroll(
     pending: PendingRequest,
     onOpenPage: (Page) -> Unit,
 ): TileScroll {
-    val scroll = remember { TileScroll() }
+    val scroll = rememberSaveable(saver = TileScroll.Saver) { TileScroll() }
     var handled by remember { mutableStateOf<Long?>(null) }
     SideEffect {
         if (request == null || request == handled) return@SideEffect

@@ -15,10 +15,12 @@ import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.TestHeadroomApplication
 import dev.sebastiano.headroom.tile.HeadroomTileService
+import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.ADD_TILE_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
+import dev.sebastiano.headroom.widget.WidgetIntents
 import kotlin.test.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -95,6 +97,50 @@ class TileLongPressTest {
         activity.newIntent(longPress())
         rule.waitForIdle()
 
+        rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `a rotation while Settings scrolls to the tile's rows still lands on them`() {
+        val activity = launch(Intent(context, MainActivity::class.java))
+        rule.mainClock.autoAdvance = false
+        activity.newIntent(longPress())
+        rule.mainClock.advanceTimeByFrame()
+
+        activity.recreate()
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `a widget tap that arrives after a long press wins over it`() {
+        val widgetTap =
+            Intent(context, MainActivity::class.java)
+                .putExtra(WidgetIntents.EXTRA_ACCOUNT_ID, "demo-codex")
+        // Both arrive before the first frame, while the app is still starting.
+        val activity = Robolectric.buildActivity(MainActivity::class.java, longPress()).create()
+        activity.newIntent(widgetTap)
+        activity.start().resume().visible()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_TAG).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a long press that arrives after a widget tap wins over it`() {
+        val widgetTap =
+            Intent(context, MainActivity::class.java)
+                .putExtra(WidgetIntents.EXTRA_ACCOUNT_ID, "demo-codex")
+        val activity = Robolectric.buildActivity(MainActivity::class.java, widgetTap).create()
+        activity.newIntent(longPress())
+        activity.start().resume().visible()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
         rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
     }
 }
