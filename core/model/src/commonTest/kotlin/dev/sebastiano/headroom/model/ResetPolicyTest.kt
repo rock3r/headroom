@@ -24,7 +24,7 @@ class ResetPolicyTest {
     }
 
     @Test
-    fun `session, daily and monthly windows do not alert by default`() {
+    fun `session daily and monthly windows do not alert by default`() {
         assertFalse(ResetPolicy.alertsByDefault(window(WindowKind.Session)))
         assertFalse(ResetPolicy.alertsByDefault(window(WindowKind.Daily)))
         assertFalse(ResetPolicy.alertsByDefault(window(WindowKind.Monthly)))

@@ -1,11 +1,11 @@
 package dev.sebastiano.headroom.model
 
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
-import org.junit.jupiter.api.Test
 
 class ResetEventDetectorTest {
     private val now = Instant.parse("2026-10-10T12:00:00Z")
@@ -61,7 +61,7 @@ class ResetEventDetectorTest {
         )
 
     @Test
-    fun `a reset that is gone before its expiry was used elsewhere, with an estimate`() {
+    fun `a reset that is gone before its expiry was used elsewhere with an estimate`() {
         val changes = detect(availability(pool(soon, later)), availability(pool(later)))
 
         val event = changes.events.single()
@@ -144,7 +144,7 @@ class ResetEventDetectorTest {
     }
 
     @Test
-    fun `a redeem settles a reset that expired since, because Headroom used it first`() {
+    fun `a redeem settles a reset that expired since because Headroom used it first`() {
         val changes =
             detect(
                 availability(pool(past, later)),
@@ -157,7 +157,7 @@ class ResetEventDetectorTest {
     }
 
     @Test
-    fun `a redeem only settles resets of its own pool, and waits when none is gone`() {
+    fun `a redeem only settles resets of its own pool and waits when none is gone`() {
         val changes =
             detect(
                 availability(pool(soon)),
@@ -173,7 +173,7 @@ class ResetEventDetectorTest {
     }
 
     @Test
-    fun `uses beyond the redeems were made elsewhere, and only the first gets an estimate`() {
+    fun `uses beyond the redeems were made elsewhere and only the first gets an estimate`() {
         val changes =
             detect(
                 availability(pool(soon, soon, soon, later)),
@@ -246,7 +246,7 @@ class ResetEventDetectorTest {
     }
 
     @Test
-    fun `a redeem takes the soonest reset still valid then, and a later one gone was used elsewhere`() {
+    fun `a redeem takes the soonest reset still valid then and a later one gone was used elsewhere`() {
         val changes =
             detect(
                 availability(pool(past, soon, later)),
@@ -262,7 +262,7 @@ class ResetEventDetectorTest {
     }
 
     @Test
-    fun `a redeem never takes a reset that had expired before it, and waits instead`() {
+    fun `a redeem never takes a reset that had expired before it and waits instead`() {
         val longAgo = redeemedAt.minus(1.hours)
 
         val changes =

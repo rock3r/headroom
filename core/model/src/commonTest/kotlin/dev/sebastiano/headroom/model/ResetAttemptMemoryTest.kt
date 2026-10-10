@@ -1,11 +1,11 @@
 package dev.sebastiano.headroom.model
 
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-import org.junit.jupiter.api.Test
 
 class ResetAttemptMemoryTest {
     private var now = Instant.parse("2026-09-30T10:00:00Z")
@@ -28,7 +28,7 @@ class ResetAttemptMemoryTest {
     private fun memory() = ResetAttemptMemory(clock = { now }, store = store)
 
     @Test
-    fun `a key is recalled within ten minutes, and not after`() {
+    fun `a key is recalled within ten minutes and not after`() {
         val memory = memory()
         memory.remember(account, "codex", key)
 
@@ -49,7 +49,7 @@ class ResetAttemptMemoryTest {
     }
 
     @Test
-    fun `the store holds only the account, the pool, the key and the time`() {
+    fun `the store holds only the account the pool the key and the time`() {
         memory().remember(account, "codex", key)
 
         assertEquals(
@@ -80,7 +80,7 @@ class ResetAttemptMemoryTest {
     }
 
     @Test
-    fun `Codex, Grok and Z_AI resets can be redeemed`() {
+    fun `Codex Grok and Z_AI resets can be redeemed`() {
         val redeemable = setOf(Provider.Codex, Provider.Grok, Provider.ZAi)
         Provider.entries.forEach {
             assertEquals(it in redeemable, it.canRedeemResets(AppSettings()), "$it")

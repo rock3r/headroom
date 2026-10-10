@@ -13,11 +13,20 @@
 | Layer | Where | Runs on | Command |
 |---|---|---|---|
 | Unit tests | `src/test` in JVM modules | JVM, JUnit 5 | `./gradlew :core:quota:test` |
+| Multiplatform tests | `src/commonTest` in multiplatform modules | JVM, JUnit 5 | `./gradlew :core:model:jvmTest` |
+| Multiplatform tests | `src/commonTest` in multiplatform modules | iOS simulator (macOS only) | `./gradlew :core:model:iosSimulatorArm64Test` |
 | Android unit tests | `src/test` in Android modules | JVM with Robolectric, JUnit 4 | `./gradlew :core:data:testDebugUnitTest` |
 | Compose UI tests | `src/test` in `:app` and `:core:designsystem` | Robolectric | `./gradlew :app:testDebugUnitTest` |
 | Screenshots | `src/test`, Roborazzi | Robolectric | `./gradlew :app:recordRoborazziDebug` |
 | End-to-end tests | `src/androidTest` in `:app` | Emulator, fake data | `./gradlew :app:pixel9api37DebugAndroidTest` |
 | Release smoke test | `scripts/release-smoke-test.sh` | Emulator, demo data, minified APK | See [RELEASING.md](RELEASING.md#the-smoke-test) |
+
+### Multiplatform tests
+
+`commonTest` code runs on every target, so it uses `kotlin.test` only: no JUnit imports and no
+`java.*` APIs. Kotlin/Native does not allow commas in function names, so backticked test names
+leave them out. `./gradlew check` runs the iOS simulator tests on macOS and skips them elsewhere;
+CI runs them in a macOS job.
 
 ### Fixtures, not live services
 

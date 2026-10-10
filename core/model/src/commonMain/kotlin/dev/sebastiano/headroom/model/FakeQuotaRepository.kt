@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.model
 
+import kotlin.math.pow
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
@@ -8,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 
 /**
@@ -21,7 +23,7 @@ public class FakeQuotaRepository(
     private val state = MutableStateFlow(initial)
 
     /** Resets the provider made on its side, by account id, that the next refresh reads. */
-    private val serverResets = mutableMapOf<String, ResetScope>()
+    private val serverResets = MutableStateFlow(emptyMap<String, ResetScope>())
 
     override val accounts: StateFlow<List<AccountState>> = state.asStateFlow()
 
@@ -31,7 +33,7 @@ public class FakeQuotaRepository(
             accounts.map { account ->
                 val id = account.account.id
                 if (accountId != null && id != accountId) return@map account
-                val reset = synchronized(serverResets) { serverResets.remove(id) }
+                val reset = serverResets.getAndUpdate { it - id }[id]
                 if (reset != null) account.reset(reset, now) else account.bumped(now)
             }
         }
@@ -43,7 +45,7 @@ public class FakeQuotaRepository(
      * provider.
      */
     public fun resetOnServer(accountId: String, scope: ResetScope) {
-        synchronized(serverResets) { serverResets[accountId] = scope }
+        serverResets.update { it + (accountId to scope) }
     }
 
     private fun AccountState.reset(scope: ResetScope, now: Instant): AccountState {
@@ -112,7 +114,7 @@ public object DemoHistory {
             UsagePoint(
                 at = start + ((elapsed.inWholeMilliseconds * fraction).toLong()).milliseconds,
                 usedPercent =
-                    (window.usedPercent * Math.pow(fraction, CURVE) + wobble).coerceIn(
+                    (window.usedPercent * fraction.pow(CURVE) + wobble).coerceIn(
                         0.0,
                         MAX_PERCENT,
                     ),

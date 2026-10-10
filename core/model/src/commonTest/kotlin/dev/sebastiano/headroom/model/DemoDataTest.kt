@@ -49,7 +49,7 @@ class DemoDataTest {
     }
 
     @Test
-    fun `Claude and Grok need attention in demo data, Codex does not`() {
+    fun `Claude and Grok need attention in demo data Codex does not`() {
         val byProvider = DemoData.accounts(now).associateBy { it.account.provider }
         assertTrue(
             byProvider.getValue(Provider.Claude).primaryWindow!!.let {

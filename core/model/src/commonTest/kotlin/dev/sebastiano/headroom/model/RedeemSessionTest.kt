@@ -25,7 +25,7 @@ class RedeemSessionTest {
     }
 
     @Test
-    fun `two pools with resets start with the choice, and back returns to it`() {
+    fun `two pools with resets start with the choice and back returns to it`() {
         val session = session(ResetAvailability(listOf(fiveHour, week)))
         assertEquals(RedeemStep.ChoosePool(listOf(fiveHour, week)), session.step.value)
 
@@ -74,25 +74,24 @@ class RedeemSessionTest {
     }
 
     @Test
-    fun `the step shows resetting, and the session is busy, until the provider answers`() =
-        runTest {
-            val answer = CompletableDeferred<RedeemOutcome>()
-            val provider = ScriptedProvider(gate = answer)
-            val session = session(ResetAvailability(listOf(fiveHour)), provider)
+    fun `the step shows resetting and the session is busy until the provider answers`() = runTest {
+        val answer = CompletableDeferred<RedeemOutcome>()
+        val provider = ScriptedProvider(gate = answer)
+        val session = session(ResetAvailability(listOf(fiveHour)), provider)
 
-            val redeem = async { session.confirm() }
-            runCurrent()
-            assertEquals(RedeemStep.Resetting(fiveHour), session.step.value)
-            assertTrue(session.busy)
+        val redeem = async { session.confirm() }
+        runCurrent()
+        assertEquals(RedeemStep.Resetting(fiveHour), session.step.value)
+        assertTrue(session.busy)
 
-            answer.complete(RedeemOutcome.NothingToReset)
-            redeem.await()
-            assertFalse(session.busy)
-            assertEquals(
-                RedeemStep.Finished(fiveHour, RedeemOutcome.NothingToReset),
-                session.step.value,
-            )
-        }
+        answer.complete(RedeemOutcome.NothingToReset)
+        redeem.await()
+        assertFalse(session.busy)
+        assertEquals(
+            RedeemStep.Finished(fiveHour, RedeemOutcome.NothingToReset),
+            session.step.value,
+        )
+    }
 
     @Test
     fun `asking for a card shows the answer`() = runTest {
@@ -107,7 +106,7 @@ class RedeemSessionTest {
     }
 
     @Test
-    fun `a granted card can be used at once, from the new availability`() = runTest {
+    fun `a granted card can be used at once from the new availability`() = runTest {
         val provider =
             ScriptedProvider(ask = AskOutcome.Granted("week")).apply {
                 next = ResetAvailability(listOf(week), canAskForMore = true)
@@ -126,7 +125,7 @@ class RedeemSessionTest {
     }
 
     @Test
-    fun `an unconfirmed attempt is checked again with its key, never sent again`() = runTest {
+    fun `an unconfirmed attempt is checked again with its key never sent again`() = runTest {
         val provider = ScriptedProvider(RedeemOutcome.Unconfirmed, check = RedeemOutcome.Success(0))
         val session = session(ResetAvailability(listOf(fiveHour)), provider, keys("a"))
 
@@ -140,7 +139,7 @@ class RedeemSessionTest {
     }
 
     @Test
-    fun `a new sheet after a failure sends the remembered key, until it settles`() = runTest {
+    fun `a new sheet after a failure sends the remembered key until it settles`() = runTest {
         val memory = ResetAttemptMemory(clock = { NOW })
         val provider =
             ScriptedProvider(
