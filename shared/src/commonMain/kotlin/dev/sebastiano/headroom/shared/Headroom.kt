@@ -1,15 +1,16 @@
 package dev.sebastiano.headroom.shared
 
-import dev.sebastiano.headroom.auth.AuthMethods
 import dev.sebastiano.headroom.auth.TokenStore
 import dev.sebastiano.headroom.data.AccountsRepository
-import dev.sebastiano.headroom.data.account.AccountQuotaFetcher
 import dev.sebastiano.headroom.data.account.SignInManager
-import dev.sebastiano.headroom.model.FakeQuotaRepository
+import dev.sebastiano.headroom.model.AlertPreferences
+import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.Provider
-import dev.sebastiano.headroom.quota.QuotaFetchers
-import dev.sebastiano.headroom.quota.ResetClients
-import dev.sebastiano.headroom.signin.AuthSignInSteps
+import dev.sebastiano.headroom.model.ResetAttemptMemory
+import dev.sebastiano.headroom.model.ResetEventLog
+import dev.sebastiano.headroom.model.ResetProvider
+import dev.sebastiano.headroom.model.SettingsRepository
+import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.signin.SignInSteps
@@ -17,7 +18,9 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -27,30 +30,48 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+
+/** What Headroom is built from. The iOS opener passes the real ones; tests pass fakes. */
+internal class HeadroomParts(
+    val repository: AccountsRepository,
+    val tokenStore: TokenStore,
+    val signInSteps: SignInSteps,
+    val settings: SettingsRepository,
+    val alerts: AlertPreferences,
+    val resetEvents: ResetEventLog = ResetEventLog.None,
+    val resetProvider: ResetProvider = NoResets,
+    val resetMemory: ResetAttemptMemory = ResetAttemptMemory(),
+    val startZCode: suspend () -> DeviceSession = { error("No ZCode sign-in here") },
+    val clock: () -> Instant = Clock.System::now,
+    val zone: () -> TimeZone = TimeZone::currentSystemDefault,
+    /** Where the stats maths runs: off the main thread. */
+    val compute: CoroutineDispatcher = Dispatchers.Default,
+    val onClose: () -> Unit = {},
+)
 
 /**
- * Headroom for the iOS app: the accounts, sync and sign-in, wired as on Android. Everything the app
- * observes arrives on [scope], which the iOS opener runs on the main thread, so the callbacks can
- * update SwiftUI state directly.
+ * Headroom for the iOS app: the accounts, sync, sign-in, settings, resets, stats and notifications,
+ * wired as on Android. Everything the app observes arrives on [scope], which the iOS opener runs on
+ * the main thread, so the callbacks can update SwiftUI state directly.
  *
- * While no account is signed in, the overview shows the demo accounts, as the Android app does.
+ * While no account is signed in, the overview, the Stats and the Resets tabs show the demo
+ * accounts, as the Android app does.
  */
 public class Headroom
-internal constructor(
-    private val repository: AccountsRepository,
-    private val signInManager: SignInManager,
-    signInSteps: SignInSteps,
-    private val scope: CoroutineScope,
-    private val clock: () -> Instant = Clock.System::now,
-    private val onClose: () -> Unit = {},
-) {
-    private val demo = FakeQuotaRepository(clock)
+internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
+    private val clock = parts.clock
+    private val sources = Sources(parts.repository, parts.resetEvents, clock, parts.zone)
+    private val signInManager = SignInManager(parts.tokenStore, parts.repository)
+    private val alertPreferences = parts.alerts
+    private val settingsRepository = parts.settings
+    private val onClose = parts.onClose
 
     /** Adding an account, or signing one in again. */
     public val signIn: HeadroomSignIn =
         HeadroomSignIn(
             RealSignInController(
-                steps = signInSteps,
+                steps = parts.signInSteps,
                 scope = scope,
                 completeAgain = { accountId, tokens ->
                     signInManager.reauthenticate(accountId, tokens)
@@ -61,29 +82,46 @@ internal constructor(
         )
 
     /** Every provider, in the order the Android app lists them, with how each signs in. */
-    public val providers: List<ProviderUi> = providersFor(signInSteps)
+    public val providers: List<ProviderUi> = providersFor(parts.signInSteps)
+
+    public val settings: HeadroomSettings = HeadroomSettings(parts.settings, scope)
+
+    public val accounts: HeadroomAccounts =
+        HeadroomAccounts(sources, signInManager, parts.alerts, scope, clock)
+
+    public val stats: HeadroomStats =
+        HeadroomStats(sources, scope, clock, parts.zone, parts.compute)
+
+    public val resets: HeadroomResets =
+        HeadroomResets(
+            sources = sources,
+            overview = overview(),
+            provider = parts.resetProvider,
+            memory = parts.resetMemory,
+            events = parts.resetEvents,
+            scope = scope,
+            startZCode = parts.startZCode,
+            saveZCode = { accountId, tokens ->
+                signInManager.signInToZCode(accountId, tokens)
+                sources.refresh(accountId)
+            },
+        )
+
+    public val notifications: HeadroomNotifications =
+        HeadroomNotifications(sources, parts.settings, parts.alerts, clock, parts.zone)
 
     /** Calls [onChange] with the overview now and whenever it changes, until [Watch.cancel]. */
-    public fun watchOverview(onChange: (OverviewUi) -> Unit): Watch = watch(overview(), onChange)
+    public fun watchOverview(onChange: (OverviewUi) -> Unit): Watch =
+        scope.watch(overview(), onChange)
 
     /** Syncs [accountId], or every account when it is null. The overview shows the result. */
     public fun refresh(accountId: String?) {
-        scope.launch { refreshNow(accountId) }
+        scope.launch { sources.refresh(accountId) }
     }
 
     /** Syncs every account and returns when it is done, for a background refresh. */
     public suspend fun refreshAll() {
-        refreshNow(accountId = null)
-    }
-
-    /** Signs the account out: its tokens and its history go. */
-    public fun removeAccount(accountId: String) {
-        scope.launch { signInManager.signOut(accountId) }
-    }
-
-    /** Names the account. A blank or null [nickname] removes the name. */
-    public fun renameAccount(accountId: String, nickname: String?) {
-        scope.launch { repository.renameAccount(accountId, nickname) }
+        sources.refresh(accountId = null)
     }
 
     /** Stops everything this instance started. */
@@ -93,19 +131,19 @@ internal constructor(
         onClose()
     }
 
-    private suspend fun refreshNow(accountId: String?) {
-        if (repository.current().isEmpty()) demo.refresh(accountId)
-        else repository.refresh(accountId)
-    }
-
     /**
-     * The real accounts, or the demo ones while there are none. It is worked out again every
-     * [TICK], so pace keeps moving between syncs.
+     * The real accounts, or the demo ones while there are none, with the settings and the alert
+     * switches. It is worked out again every [TICK], so pace keeps moving between syncs.
      */
     private fun overview(): Flow<OverviewUi> =
-        combine(repository.accounts, demo.accounts, ticks()) { real, demoAccounts, now ->
-                if (real.isEmpty()) UiMapping.overview(demoAccounts, isDemo = true, now)
-                else UiMapping.overview(real, isDemo = false, now)
+        combine(
+                sources.accounts,
+                sources.isDemo,
+                settingsRepository.settings,
+                AlertStates.of(sources.accounts, alertPreferences),
+                ticks(),
+            ) { accounts, demo, settings, alerts, now ->
+                UiMapping.overview(accounts, demo, now, settings, alerts)
             }
             .distinctUntilChanged()
 
@@ -116,34 +154,8 @@ internal constructor(
         }
     }
 
-    private fun <T> watch(flow: Flow<T>, onChange: (T) -> Unit): Watch = scope.watch(flow, onChange)
-
-    public companion object {
+    internal companion object {
         private val TICK: Duration = 1.minutes
-
-        /** Wires Headroom over [repository] and the tokens in [tokenStore]. */
-        internal fun create(
-            tokenStore: TokenStore,
-            repository: (fetch: AccountQuotaFetcher) -> AccountsRepository,
-            scope: CoroutineScope,
-            onClose: () -> Unit,
-        ): Headroom {
-            val authMethods = AuthMethods()
-            val fetcher =
-                AccountQuotaFetcher(
-                    authMethods.credentialProvider(tokenStore),
-                    QuotaFetchers.create(),
-                    ResetClients.create(),
-                )
-            val accounts = repository(fetcher)
-            return Headroom(
-                repository = accounts,
-                signInManager = SignInManager(tokenStore, accounts),
-                signInSteps = AuthSignInSteps(authMethods),
-                scope = scope,
-                onClose = onClose,
-            )
-        }
     }
 }
 
@@ -192,5 +204,5 @@ public class Watch internal constructor(private val job: Job) {
     }
 }
 
-private fun <T> CoroutineScope.watch(flow: Flow<T>, onChange: (T) -> Unit): Watch =
+internal fun <T> CoroutineScope.watch(flow: Flow<T>, onChange: (T) -> Unit): Watch =
     Watch(launch { flow.collect { onChange(it) } })

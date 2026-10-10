@@ -10,8 +10,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.tile.TileAddResult
-import dev.sebastiano.headroom.tile.TileSubtitleMode
 
 /** Adds Headroom's tile to Quick Settings, and says how the last request went. */
 @Composable

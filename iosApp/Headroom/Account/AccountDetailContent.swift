@@ -8,6 +8,13 @@ struct AccountDetailContent: View {
     let isDemo: Bool
     @Environment(AppModel.self) private var model
     @State private var signingInAgain = false
+    @State private var redeeming: Redeeming?
+
+    /// What the redeem sheet opens for.
+    struct Redeeming: Identifiable {
+        let askForMore: Bool
+        var id: Bool { askForMore }
+    }
 
     var body: some View {
         List {
@@ -33,12 +40,26 @@ struct AccountDetailContent: View {
                         .padding(.vertical, 4)
                 }
             }
+            PaceChartSection(account: account)
+            if let resets = account.resets {
+                ResetsCard(
+                    account: account,
+                    resets: resets,
+                    canAct: !isDemo && !account.signInExpired,
+                    onUse: { redeeming = Redeeming(askForMore: false) },
+                    onAsk: { redeeming = Redeeming(askForMore: true) }
+                )
+            }
             if !isDemo {
+                ResetAlertsSection(account: account)
                 AccountActions(account: account)
             }
         }
         .navigationTitle(account.title)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $redeeming) { redeeming in
+            RedeemSheet(account: account, askForMore: redeeming.askForMore)
+        }
         .sheet(isPresented: $signingInAgain) {
             SignInView(mode: .again(accountId: account.id, providerId: account.providerId))
         }

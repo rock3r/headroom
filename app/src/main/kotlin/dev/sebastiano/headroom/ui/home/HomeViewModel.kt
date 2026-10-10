@@ -13,6 +13,7 @@ import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.chartSummary
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant

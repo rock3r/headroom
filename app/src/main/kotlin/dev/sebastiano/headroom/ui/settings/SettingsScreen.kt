@@ -60,8 +60,8 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.model.ThemeMode
 import dev.sebastiano.headroom.model.ThemePalette
+import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.tile.TileAddResult
-import dev.sebastiano.headroom.tile.TileSubtitleMode
 import dev.sebastiano.headroom.tracing.tracedItem
 import dev.sebastiano.headroom.ui.CloseSettingsButton
 import dev.sebastiano.headroom.ui.PageReveal

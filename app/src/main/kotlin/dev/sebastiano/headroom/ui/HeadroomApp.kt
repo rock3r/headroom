@@ -46,10 +46,10 @@ import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.island.ResetIslandAccess
+import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.tile.TileAddResult
-import dev.sebastiano.headroom.tile.TileSubtitleMode
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
 import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep

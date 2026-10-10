@@ -11,11 +11,11 @@ struct SignInStepView: View {
     var body: some View {
         switch model.signInStep {
         case let browser as SignInUiBrowser:
-            BrowserStep(codeRejected: browser.codeRejected, onReopen: onReopen, onSubmit: model.submitCode)
+            BrowserStep(codeRejected: browser.codeRejected, onReopen: onReopen, onSubmit: { model.headroom.signIn.submitCode(code: $0) })
         case let device as SignInUiDeviceCode:
             DeviceCodeStep(userCode: device.userCode, verificationUrl: device.verificationUrl)
         case let apiKey as SignInUiApiKey:
-            ApiKeyStep(providerName: apiKey.providerName, keyRejected: apiKey.keyRejected, onSubmit: model.submitApiKey)
+            ApiKeyStep(providerName: apiKey.providerName, keyRejected: apiKey.keyRejected, onSubmit: { model.headroom.signIn.submitApiKey(key: $0) })
         case let starting as SignInUiStarting:
             WaitingStep(title: "Getting the sign-in ready", detail: Text(starting.providerName))
         case let finishing as SignInUiFinishing:
@@ -23,7 +23,7 @@ struct SignInStepView: View {
         case let success as SignInUiSuccess:
             SuccessStep(accountLabel: success.accountLabel, onDone: onDone)
         case let failed as SignInUiFailed:
-            FailedStep(error: failed.error, onRetry: model.retrySignIn)
+            FailedStep(error: failed.error, onRetry: model.headroom.signIn.retry)
         default:
             if case .add = mode {
                 ProviderPicker(providers: model.providers, onPick: pick)
@@ -34,6 +34,6 @@ struct SignInStepView: View {
     }
 
     private func pick(_ provider: ProviderUi) {
-        model.startSignIn(providerId: provider.id)
+        model.headroom.signIn.start(providerId: provider.id, accountId: nil)
     }
 }
