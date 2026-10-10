@@ -198,8 +198,10 @@ public object ResetEventDetector {
      * expiry date is null, and comes last.
      */
     private fun goneResets(before: ResetPool, after: ResetPool?): List<Instant?> {
-        val remaining = after?.expiries.orEmpty().toMutableList()
-        val goneDated = before.expiries.sorted().filterNot { remaining.remove(it) }
+        // Matched to the millisecond: the stored list keeps no finer time, and Codex sends
+        // microseconds. An exact match would count every stored reset as gone on each sync.
+        val remaining = after?.expiries.orEmpty().map { it.toEpochMilli() }.toMutableList()
+        val goneDated = before.expiries.sorted().filterNot { remaining.remove(it.toEpochMilli()) }
         val undatedBefore = (before.available - before.expiries.size).coerceAtLeast(0)
         val undatedAfter = after?.let { (it.available - it.expiries.size).coerceAtLeast(0) } ?: 0
         val goneUndated = (undatedBefore - undatedAfter).coerceAtLeast(0)
