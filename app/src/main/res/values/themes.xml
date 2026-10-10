@@ -5,4 +5,12 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+
+    <!--
+        The glasses' window. Their display is additive: black is see-through, so the window starts
+        black and nothing flashes before Compose draws.
+    -->
+    <style name="Theme.Headroom.Glasses" parent="Theme.Headroom">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
 </resources>

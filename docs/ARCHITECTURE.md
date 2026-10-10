@@ -145,3 +145,25 @@ camera cutout, shows the provider logo and one line, and shrinks back. It lives 
   pill is on screen. So `AndroidResetNotifier` posts the notification first, then awaits
   `ResetIsland.awaitIdle()`, which returns when the overlay window is gone. The worker's coroutine,
   and so the process, stays alive for that time (about five seconds).
+
+## Display glasses (experimental)
+
+While display glasses are connected, the overview shows a glasses button next to Settings.
+`GlassesLauncher` watches the connection (`ProjectedContext.isProjectedDeviceConnected`) and starts
+`GlassesActivity` on the glasses' display (`ProjectedContext.createProjectedActivityOptions`). The
+manifest gives the activity `requiredDisplayCategory="xr_projected"`, so it never opens on the
+phone's screen.
+
+The activity reads the same `HomeViewModel` as the overview, so the glasses show the same accounts
+in the same order, with the same used or left setting. `glassesPages` turns the state into pages:
+the next reset first, then one page per account. The UI is Jetpack Compose Glimmer, not Material:
+a `GlimmerHorizontalPager` of one card at a time, a `Card` for the next reset and a
+`LeadingImageCard` with the provider's logo for each account. The background is black, which the
+glasses' additive display draws as see-through. System back closes the activity.
+
+`GlassesPreviews.kt` has Compose previews on Android Studio's "Display Glasses" device
+(`id:ai_glasses_device`, 450 x 450 px at mdpi). The Roborazzi screenshots in `docs/screenshots` use
+the same size.
+
+Glimmer and the projected library are alpha releases, and the projected launch and connection
+calls are marked experimental.

@@ -92,6 +92,8 @@ fun HeadroomApp(
     val liveDetail by homeViewModel.detail.collectAsStateWithLifecycle()
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
+    val glassesConnected by
+        graph.glassesLauncher.connected.collectAsStateWithLifecycle(initialValue = false)
     val resets = collectResets(graph)
     val formatter = rememberResetFormatter(graph.zone)
     val snackbar = remember { SnackbarHostState() }
@@ -170,6 +172,7 @@ fun HeadroomApp(
                         playEntrance = !entrancePlayed,
                         onEntranceStart = { entrancePlayed = true },
                         onSignInAgain = signInAgain,
+                        onOpenOnGlasses = graph.glassesLauncher::open.takeIf { glassesConnected },
                         openAccountRequest = openNow,
                         onConsumeOpenAccount = {
                             page = Page.Home

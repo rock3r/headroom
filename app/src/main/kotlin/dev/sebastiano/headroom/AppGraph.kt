@@ -21,6 +21,8 @@ import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.data.reset.AndroidResetLog
+import dev.sebastiano.headroom.glasses.GlassesLauncher
+import dev.sebastiano.headroom.glasses.ProjectedGlassesLauncher
 import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
@@ -77,6 +79,7 @@ import kotlinx.coroutines.flow.map
  * - [resetProvider]: reads and redeems usage limit resets. Prototype: fake data in debug builds,
  *   none in release builds, until the per-provider clients exist.
  * - [tileAdder]: asks the system to add the Quick Settings tile.
+ * - [glassesLauncher]: whether display glasses are connected, and opens Headroom on them.
  */
 class AppGraph(
     val quotaRepository: QuotaRepository,
@@ -121,6 +124,8 @@ class AppGraph(
     val demoAccounts: FakeQuotaRepository? = null,
     /** The ZCode sign-in that Z.AI resets need; null without the data layer. */
     val zCodeSignIn: ZCodeSignIn? = null,
+    /** Whether display glasses are connected, and opens Headroom on them. */
+    val glassesLauncher: GlassesLauncher = GlassesLauncher.Unavailable,
 ) {
     /** The resets of every account, read through the reset provider. */
     val resets: ResetCenter =
@@ -282,6 +287,7 @@ class AppGraph(
                 resetAttempts = data?.resetAttempts ?: ResetAttemptStore.None,
                 resetScope = scope,
                 tileAdder = StatusBarTileAdder(context.applicationContext),
+                glassesLauncher = ProjectedGlassesLauncher(context.applicationContext),
                 tileSettings = tileSettings,
                 prototypes = prototypeTools,
                 demoAccounts = demoAccounts,

@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,11 +41,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.OverviewSort
@@ -93,6 +99,8 @@ fun OverviewScreen(
     resets: AccountResets = AccountResets(),
     seen: SeenValues? = null,
     onSignInAgain: (accountId: String) -> Unit = {},
+    /** Opens Headroom on connected display glasses. Null hides the button: no glasses. */
+    onOpenOnGlasses: (() -> Unit)? = null,
 ) {
     // Cards composed from now on (on scroll, or on coming back) appear without an entrance.
     SideEffect { if (playEntrance) onEntranceStart() }
@@ -134,7 +142,7 @@ fun OverviewScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                fullWidth("header") { OverviewHeader(state, onOpenSettings, settingsReveal) }
+                header(state, onOpenSettings, settingsReveal, onOpenOnGlasses)
                 if (state.isDemo) {
                     fullWidth("demo") { DemoBanner(onAddAccount = onOpenAccounts) }
                 }
@@ -233,11 +241,22 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.fullWidth(
     item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
 }
 
+/** The title, with the glasses and Settings buttons at its end, across every column. */
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.header(
+    state: HomeUiState,
+    onOpenSettings: () -> Unit,
+    settingsReveal: PageReveal?,
+    onOpenOnGlasses: (() -> Unit)?,
+) {
+    fullWidth("header") { OverviewHeader(state, onOpenSettings, settingsReveal, onOpenOnGlasses) }
+}
+
 @Composable
 private fun OverviewHeader(
     state: HomeUiState,
     onOpenSettings: () -> Unit,
     settingsReveal: PageReveal?,
+    onOpenOnGlasses: (() -> Unit)?,
 ) {
     val accounts =
         pluralStringResource(R.plurals.overview_accounts, state.accounts.size, state.accounts.size)
@@ -250,6 +269,15 @@ private fun OverviewHeader(
                 syncedText(state.lastSyncedAt, state.now),
             ),
     ) {
+        if (onOpenOnGlasses != null) {
+            val label = stringResource(R.string.action_open_on_glasses)
+            IconButton(
+                onClick = onOpenOnGlasses,
+                modifier = Modifier.semantics { contentDescription = label },
+            ) {
+                Icon(painter = painterResource(HeadroomIcons.Eyeglasses), contentDescription = null)
+            }
+        }
         SettingsButton(onClick = onOpenSettings, reveal = settingsReveal)
     }
 }
