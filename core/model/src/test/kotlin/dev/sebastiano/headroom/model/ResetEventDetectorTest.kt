@@ -103,6 +103,17 @@ class ResetEventDetectorTest {
     }
 
     @Test
+    fun `a stored reset matches a fresh read of it with a finer expiry time`() {
+        // Codex sends microseconds; the stored list keeps milliseconds.
+        val fresh = Instant.parse("2026-10-22T20:28:20.843110Z")
+        val stored = Instant.ofEpochMilli(fresh.toEpochMilli())
+
+        val changes = detect(availability(pool(stored, later)), availability(pool(fresh, later)))
+
+        assertEquals(emptyList(), changes.events)
+    }
+
+    @Test
     fun `a use and a new grant between two reads are both seen`() {
         val changes = detect(availability(pool(soon)), availability(pool(later)))
 
