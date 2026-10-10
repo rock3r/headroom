@@ -419,10 +419,15 @@ private fun PageScaffold(
     val currentOnScrollFinish by rememberUpdatedState(onScrollFinish)
     LaunchedEffect(listState, scrollTo) {
         if (scrollTo == null) return@LaunchedEffect
-        // Like the user's scroll below, this one waits for the reveal to end.
-        snapshotFlow { reveal?.revealing == true }.first { !it }
-        listState.scrollToKey(scrollTo, animate)
-        currentOnScrollFinish()
+        // However the scroll stops (it lands, the user drags the list or leaves Settings), it is
+        // over: a later long press on the tile starts a new one.
+        try {
+            // Like the user's scroll below, this one waits for the reveal to end.
+            snapshotFlow { reveal?.revealing == true }.first { !it }
+            listState.scrollToKey(scrollTo, animate)
+        } finally {
+            currentOnScrollFinish()
+        }
     }
     StatusBarBlurBox(scrollState = listState, modifier = modifier.fillMaxSize()) {
         LazyColumn(

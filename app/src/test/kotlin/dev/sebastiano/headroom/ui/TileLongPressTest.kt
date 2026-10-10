@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.TestHeadroomApplication
@@ -101,21 +103,6 @@ class TileLongPressTest {
     }
 
     @Test
-    fun `a rotation while Settings scrolls to the tile's rows still lands on them`() {
-        val activity = launch(Intent(context, MainActivity::class.java))
-        rule.mainClock.autoAdvance = false
-        activity.newIntent(longPress())
-        rule.mainClock.advanceTimeByFrame()
-
-        activity.recreate()
-        rule.mainClock.autoAdvance = true
-        rule.waitForIdle()
-
-        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
-        rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
-    }
-
-    @Test
     fun `a widget tap that arrives after a long press wins over it`() {
         val widgetTap =
             Intent(context, MainActivity::class.java)
@@ -162,6 +149,25 @@ class TileLongPressTest {
         rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
         rule.onNodeWithTag(ADD_TILE_TAG).assertIsNotDisplayed()
     }
+
+    @Test
+    fun `a drag that stops the scroll lets the next long press scroll again`() {
+        val activity = launch(Intent(context, MainActivity::class.java))
+        rule.mainClock.autoAdvance = false
+        activity.newIntent(longPress())
+        // Past the reveal, in the middle of the scroll.
+        rule.mainClock.advanceTimeBy(PAST_REVEAL_MILLIS)
+        rule.onNodeWithTag(SETTINGS_LIST_TAG).performTouchInput { swipeDown() }
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        rule.onNodeWithTag(ADD_TILE_TAG).assertIsNotDisplayed()
+
+        activity.newIntent(longPress())
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
+    }
 }
 
 private const val REVEAL_PART_MILLIS = 100L
+private const val PAST_REVEAL_MILLIS = 700L

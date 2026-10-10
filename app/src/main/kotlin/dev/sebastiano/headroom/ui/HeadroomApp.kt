@@ -1,7 +1,6 @@
 package dev.sebastiano.headroom.ui
 
 import android.content.ClipData
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
@@ -22,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -212,12 +210,6 @@ private fun SettingsPage(
     tileScroll: TileScroll,
 ) {
     var tileStatus by rememberSaveable { mutableStateOf<TileAddResult?>(null) }
-    // Leaving Settings before the scroll to the tile's rows ends cancels it. A configuration
-    // change keeps it: Settings comes back and finishes the scroll.
-    val activity = LocalActivity.current
-    DisposableEffect(tileScroll, activity) {
-        onDispose { if (activity?.isChangingConfigurations != true) tileScroll.pending = false }
-    }
     val tileSubtitle = graph.tileSettings?.subtitle?.collectAsStateWithLifecycle()?.value
     // The same callbacks and debug row on every recomposition, so Settings' rows can skip.
     val pageActions =
@@ -245,13 +237,8 @@ private fun SettingsPage(
 
 /** Whether Settings still has to scroll to the Quick Settings tile's rows. */
 @Stable
-private class TileScroll(pending: Boolean = false) {
-    var pending by mutableStateOf(pending)
-
-    companion object {
-        /** Keeps a scroll that has not finished across a configuration change. */
-        val Saver: Saver<TileScroll, Boolean> = Saver({ it.pending }, ::TileScroll)
-    }
+private class TileScroll {
+    var pending by mutableStateOf(false)
 }
 
 /**
@@ -267,7 +254,7 @@ private fun rememberTileScroll(
     pending: PendingRequest,
     onOpenPage: (Page) -> Unit,
 ): TileScroll {
-    val scroll = rememberSaveable(saver = TileScroll.Saver) { TileScroll() }
+    val scroll = remember { TileScroll() }
     var handled by remember { mutableStateOf<Long?>(null) }
     SideEffect {
         if (request == null || request == handled) return@SideEffect
