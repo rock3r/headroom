@@ -38,6 +38,7 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.island.IslandMode
 import dev.sebastiano.headroom.island.appInfoIntent
+import dev.sebastiano.headroom.island.hasIslandService
 import dev.sebastiano.headroom.island.installIsRestricted
 import dev.sebastiano.headroom.island.islandServiceComponent
 import dev.sebastiano.headroom.island.openAccessibilitySettings
@@ -61,11 +62,13 @@ internal fun ResetIslandSetup(
 ) {
     val context = LocalContext.current
     val restricted = remember(context) { context.installIsRestricted() }
+    val accessibilityAvailable = remember(context) { context.hasIslandService() }
     val demoMessage = stringResource(R.string.reset_island_demo_message)
     ResetIslandSetupSheet(
         mode = island.mode,
         starting = island.enabledInSettings && !island.ready,
         restricted = restricted,
+        accessibilityAvailable = accessibilityAvailable,
         onOpenAppInfo = { context.startActivity(appInfoIntent(context.packageName)) },
         onOpenAccessibility = {
             openAccessibilitySettings(islandServiceComponent(context), context::startActivity)
@@ -85,6 +88,7 @@ internal fun ResetIslandSetupSheet(
     mode: IslandMode,
     starting: Boolean,
     restricted: Boolean,
+    accessibilityAvailable: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
@@ -101,6 +105,7 @@ internal fun ResetIslandSetupSheet(
             mode = mode,
             starting = starting,
             restricted = restricted,
+            accessibilityAvailable = accessibilityAvailable,
             onOpenAppInfo = onOpenAppInfo,
             onOpenAccessibility = onOpenAccessibility,
             onOpenOverlaySettings = onOpenOverlaySettings,
@@ -116,13 +121,16 @@ internal fun ResetIslandSetupSheet(
  * Display over other apps, for a device whose admin blocks the service. Once either works it shows
  * success and offers to try the island. [starting] means Android lists the service as on but has
  * not connected it yet. [restricted] means Android blocks the service until the user allows
- * restricted settings, which adds a second step.
+ * restricted settings, which adds a second step. Without [accessibilityAvailable], as in the Play
+ * build that leaves the service out, Display over other apps is the only way, and the sheet offers
+ * just that.
  */
 @Composable
 internal fun ResetIslandSetupContent(
     mode: IslandMode,
     starting: Boolean,
     restricted: Boolean,
+    accessibilityAvailable: Boolean,
     onOpenAppInfo: () -> Unit,
     onOpenAccessibility: () -> Unit,
     onOpenOverlaySettings: () -> Unit,
@@ -139,6 +147,8 @@ internal fun ResetIslandSetupContent(
     ) {
         if (mode != IslandMode.None) {
             SetupDone(overlay = mode == IslandMode.Overlay, onTry = onTry, onDone = onDone)
+        } else if (!accessibilityAvailable) {
+            OverlayOnlySteps(onOpenOverlaySettings)
         } else {
             SetupSteps(
                 starting = starting,
@@ -196,6 +206,31 @@ private fun SetupSteps(
     }
 }
 
+/** The set-up when there is no accessibility service: Display over other apps is the only way. */
+@Composable
+private fun OverlayOnlySteps(onOpenOverlaySettings: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = stringResource(R.string.island_setup_title),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.semantics { heading() },
+        )
+        Text(
+            text = stringResource(R.string.island_setup_intro),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        InfoBlock(
+            R.string.island_setup_overlay_only_why_title,
+            R.string.island_setup_overlay_only_why_body,
+        )
+        InfoBlock(R.string.island_setup_not_title, R.string.island_setup_overlay_only_not_body)
+        OverlayLimits()
+        Button(onClick = onOpenOverlaySettings) {
+            Text(stringResource(R.string.island_setup_overlay_button))
+        }
+    }
+}
+
 /**
  * The second way to set up the island, for a device whose admin blocks accessibility services. It
  * is separated from the steps above by a divider, and says plainly what it cannot do.
@@ -216,14 +251,20 @@ private fun OverlayRoute(onOpenOverlaySettings: () -> Unit) {
             text = stringResource(R.string.island_setup_overlay_body),
             style = MaterialTheme.typography.bodyMedium,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Bullet(R.string.island_setup_overlay_limit_place)
-            Bullet(R.string.island_setup_overlay_limit_lock)
-            Bullet(R.string.island_setup_overlay_limit_tap)
-        }
+        OverlayLimits()
         OutlinedButton(onClick = onOpenOverlaySettings) {
             Text(stringResource(R.string.island_setup_overlay_button))
         }
+    }
+}
+
+/** What the Display over other apps window cannot do, as a short list. */
+@Composable
+private fun OverlayLimits() {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Bullet(R.string.island_setup_overlay_limit_place)
+        Bullet(R.string.island_setup_overlay_limit_lock)
+        Bullet(R.string.island_setup_overlay_limit_tap)
     }
 }
 

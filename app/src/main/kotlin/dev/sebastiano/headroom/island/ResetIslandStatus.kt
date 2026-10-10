@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.island
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.provider.Settings
 
 /** What the settings row says about the island. */
@@ -58,6 +59,21 @@ internal fun isIslandServiceEnabled(context: Context): Boolean {
 /** The service's own name, for the intent that opens its page in accessibility settings. */
 internal fun islandServiceComponent(context: Context): ComponentName =
     ComponentName(context, ResetIslandService::class.java)
+
+/**
+ * Whether this build declares the island's accessibility service. The Play build leaves it out of
+ * the manifest, because Play accepts the Accessibility API only for accessibility tools.
+ */
+internal fun Context.hasIslandService(): Boolean =
+    try {
+        packageManager.getServiceInfo(
+            islandServiceComponent(this),
+            PackageManager.ComponentInfoFlags.of(0),
+        )
+        true
+    } catch (_: PackageManager.NameNotFoundException) {
+        false
+    }
 
 private const val SERVICE_SEPARATOR = ':'
 private const val PACKAGE_SEPARATOR = '/'

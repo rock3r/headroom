@@ -48,6 +48,7 @@ class ResetIslandSetupScreenshotTest {
                             mode = mode,
                             starting = starting,
                             restricted = false,
+                            accessibilityAvailable = true,
                             onOpenAppInfo = {},
                             onOpenAccessibility = {},
                             onOpenOverlaySettings = {},

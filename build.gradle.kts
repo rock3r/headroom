@@ -10,4 +10,5 @@ plugins {
     alias(libs.plugins.ktfmt) apply false
     alias(libs.plugins.roborazzi) apply false
     alias(libs.plugins.aboutlibraries.android) apply false
+    alias(libs.plugins.play.publisher) apply false
 }
