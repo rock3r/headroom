@@ -122,4 +122,61 @@ public object DemoData {
 
     private fun session(id: String, used: Double, resetsAt: Instant) =
         QuotaWindow(id, "Session", WindowKind.Session, used, resetsAt, SESSION)
+
+    /**
+     * Past resets of the demo accounts' main windows, matching the design mockups: how much was
+     * used when each reset, oldest first. Claude's Opus window has none, so the demo also shows a
+     * window without history.
+     */
+    public fun resetPeaks(accountId: String, windowId: String): List<Double> =
+        RESET_PEAKS[accountId to windowId].orEmpty()
+
+    private val RESET_PEAKS =
+        mapOf(
+            ("demo-claude" to "seven_day") to listOf(82.0, 95.0, 100.0, 88.0, 100.0),
+            ("demo-codex" to "secondary") to listOf(40.0, 52.0, 38.0, 61.0, 45.0),
+            ("demo-grok" to "weekly") to listOf(97.0, 100.0, 91.0, 99.0, 100.0),
+            ("demo-copilot" to "premium_interactions") to listOf(70.0, 64.0, 81.0, 58.0),
+        )
+
+    /**
+     * A plausible reset history for the demo accounts: a few months of Codex, Grok and Claude
+     * resets, used in Headroom or elsewhere, and some that expired.
+     */
+    public fun resetEvents(now: Instant): List<ResetEvent> {
+        fun used(
+            provider: Provider,
+            daysAgo: Long,
+            weekly: Double,
+            source: ResetUseSource = ResetUseSource.Headroom,
+        ) =
+            ResetEvent(
+                accountId = "demo-${provider.id}",
+                provider = provider,
+                poolId = "demo",
+                poolLabel = "Resets",
+                kind = ResetEventKind.Used,
+                at = now.minus(daysAgo.days),
+                source = source,
+                givenBack = mapOf(WindowKind.Weekly to weekly),
+                givenBackEstimated = source == ResetUseSource.Elsewhere,
+            )
+
+        fun expired(provider: Provider, daysAgo: Long) =
+            used(provider, daysAgo, weekly = 0.0)
+                .copy(kind = ResetEventKind.Expired, source = null, givenBack = emptyMap())
+
+        return listOf(
+            used(Provider.Codex, daysAgo = 3, weekly = 92.0),
+            used(Provider.Codex, daysAgo = 12, weekly = 85.0),
+            used(Provider.Codex, daysAgo = 20, weekly = 64.0, source = ResetUseSource.Elsewhere),
+            used(Provider.Grok, daysAgo = 9, weekly = 97.0),
+            expired(Provider.Claude, daysAgo = 15),
+            used(Provider.Codex, daysAgo = 45, weekly = 78.0),
+            used(Provider.Grok, daysAgo = 60, weekly = 100.0),
+            expired(Provider.Grok, daysAgo = 75),
+            used(Provider.Claude, daysAgo = 130, weekly = 100.0, source = ResetUseSource.Elsewhere),
+            expired(Provider.Codex, daysAgo = 200),
+        )
+    }
 }

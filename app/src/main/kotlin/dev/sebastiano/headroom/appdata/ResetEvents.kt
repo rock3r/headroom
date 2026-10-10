@@ -1,14 +1,10 @@
 package dev.sebastiano.headroom.appdata
 
 import dev.sebastiano.headroom.model.Account
-import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetEvent
-import dev.sebastiano.headroom.model.ResetEventKind
 import dev.sebastiano.headroom.model.ResetEventLog
-import dev.sebastiano.headroom.model.ResetUseSource
-import dev.sebastiano.headroom.model.WindowKind
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -44,40 +40,5 @@ class DemoResetEvents(private val clock: () -> Instant) : ResetEventLog {
     override suspend fun redeemed(account: Account, poolId: String, attemptKey: ResetAttemptKey) =
         Unit
 
-    private fun demo(now: Instant): List<ResetEvent> {
-        fun used(
-            provider: Provider,
-            daysAgo: Long,
-            weekly: Double,
-            source: ResetUseSource = ResetUseSource.Headroom,
-        ) =
-            ResetEvent(
-                accountId = "demo-${provider.id}",
-                provider = provider,
-                poolId = "demo",
-                poolLabel = "Resets",
-                kind = ResetEventKind.Used,
-                at = now.minus(daysAgo.days),
-                source = source,
-                givenBack = mapOf(WindowKind.Weekly to weekly),
-                givenBackEstimated = source == ResetUseSource.Elsewhere,
-            )
-
-        fun expired(provider: Provider, daysAgo: Long) =
-            used(provider, daysAgo, weekly = 0.0)
-                .copy(kind = ResetEventKind.Expired, source = null, givenBack = emptyMap())
-
-        return listOf(
-            used(Provider.Codex, daysAgo = 3, weekly = 92.0),
-            used(Provider.Codex, daysAgo = 12, weekly = 85.0),
-            used(Provider.Codex, daysAgo = 20, weekly = 64.0, source = ResetUseSource.Elsewhere),
-            used(Provider.Grok, daysAgo = 9, weekly = 97.0),
-            expired(Provider.Claude, daysAgo = 15),
-            used(Provider.Codex, daysAgo = 45, weekly = 78.0),
-            used(Provider.Grok, daysAgo = 60, weekly = 100.0),
-            expired(Provider.Grok, daysAgo = 75),
-            used(Provider.Claude, daysAgo = 130, weekly = 100.0, source = ResetUseSource.Elsewhere),
-            expired(Provider.Codex, daysAgo = 200),
-        )
-    }
+    private fun demo(now: Instant): List<ResetEvent> = DemoData.resetEvents(now)
 }
