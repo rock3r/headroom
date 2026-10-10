@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.appdata
 
+import dev.sebastiano.headroom.model.DemoData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
@@ -19,14 +20,6 @@ fun interface ResetHistory {
  * window has none, so the demo also shows a window without history.
  */
 object DemoResetHistory : ResetHistory {
-    private val history =
-        mapOf(
-            ("demo-claude" to "seven_day") to listOf(82.0, 95.0, 100.0, 88.0, 100.0),
-            ("demo-codex" to "secondary") to listOf(40.0, 52.0, 38.0, 61.0, 45.0),
-            ("demo-grok" to "weekly") to listOf(97.0, 100.0, 91.0, 99.0, 100.0),
-            ("demo-copilot" to "premium_interactions") to listOf(70.0, 64.0, 81.0, 58.0),
-        )
-
     override fun usedAtReset(accountId: String, windowId: String): Flow<List<Double>> =
-        flowOf(history[accountId to windowId].orEmpty())
+        flowOf(DemoData.resetPeaks(accountId, windowId))
 }
