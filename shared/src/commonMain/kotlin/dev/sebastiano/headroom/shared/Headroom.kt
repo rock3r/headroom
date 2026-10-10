@@ -61,8 +61,7 @@ internal constructor(
         )
 
     /** Every provider, in the order the Android app lists them, with how each signs in. */
-    public val providers: List<ProviderUi> =
-        Provider.entries.map { UiMapping.provider(it, signInSteps.kindOf(it)) }
+    public val providers: List<ProviderUi> = providersFor(signInSteps)
 
     /** Calls [onChange] with the overview now and whenever it changes, until [Watch.cancel]. */
     public fun watchOverview(onChange: (OverviewUi) -> Unit): Watch = watch(overview(), onChange)
