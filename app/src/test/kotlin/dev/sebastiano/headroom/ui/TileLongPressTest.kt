@@ -4,14 +4,20 @@ import android.content.ComponentName
 import android.content.Intent
 import android.service.quicksettings.TileService
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.TestHeadroomApplication
 import dev.sebastiano.headroom.tile.HeadroomTileService
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.ADD_TILE_TAG
+import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
 import kotlin.test.assertEquals
 import org.junit.Rule
@@ -73,6 +79,22 @@ class TileLongPressTest {
         rule.waitForIdle()
 
         rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp")
+    fun `a long press while Settings is scrolled past the tile's rows scrolls back up to them`() {
+        val activity = launch(Intent(context, MainActivity::class.java))
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasText("Version", substring = true))
+        rule.onNodeWithTag(ADD_TILE_TAG).assertIsNotDisplayed()
+
+        activity.newIntent(longPress())
+        rule.waitForIdle()
+
         rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
     }
 }
