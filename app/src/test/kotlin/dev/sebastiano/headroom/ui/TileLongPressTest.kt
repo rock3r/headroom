@@ -143,4 +143,25 @@ class TileLongPressTest {
         rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
         rule.onNodeWithTag(ADD_TILE_TAG).assertIsDisplayed()
     }
+
+    @Test
+    fun `leaving Settings before it scrolls cancels the scroll for the next visit`() {
+        val activity = launch(Intent(context, MainActivity::class.java))
+        rule.mainClock.autoAdvance = false
+        activity.newIntent(longPress())
+        // Part of the way into the reveal: the scroll waits for its end.
+        rule.mainClock.advanceTimeBy(REVEAL_PART_MILLIS)
+        activity.get().onBackPressedDispatcher.onBackPressed()
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        rule.onNodeWithTag(SETTINGS_TAG).assertDoesNotExist()
+
+        rule.onNodeWithContentDescription("Settings").performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(SETTINGS_TAG).assertIsDisplayed()
+        rule.onNodeWithTag(ADD_TILE_TAG).assertIsNotDisplayed()
+    }
 }
+
+private const val REVEAL_PART_MILLIS = 100L
