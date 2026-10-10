@@ -9,6 +9,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
+import java.time.Duration
 
 /** Fires when a reset reminder may be due, and hands the check to [ResetReminderWorker]. */
 internal class ResetReminderReceiver : BroadcastReceiver() {
@@ -17,19 +19,27 @@ internal class ResetReminderReceiver : BroadcastReceiver() {
     }
 }
 
-/** Refreshes the accounts whose resets expire soon, and posts the day's reminder. */
+/**
+ * Refreshes the accounts whose resets expire soon, and posts the day's reminder. It re-enqueues
+ * itself with a delay while the refresh cannot reach the provider.
+ */
 internal class ResetReminderWorker(
     context: Context,
     params: WorkerParameters,
     private val reminders: ResetReminders,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        reminders.remind()
+        val attempt = inputData.getInt(KEY_ATTEMPT, 1)
+        when (val outcome = reminders.remind(attempt)) {
+            is ReminderOutcome.Retry -> retry(applicationContext, attempt + 1, outcome.after)
+            ReminderOutcome.Done -> Unit
+        }
         return Result.success()
     }
 
     companion object {
         private const val NAME = "reset-reminder"
+        private const val KEY_ATTEMPT = "attempt"
 
         fun enqueue(context: Context) {
             WorkManager.getInstance(context)
@@ -40,6 +50,20 @@ internal class ResetReminderWorker(
                     ExistingWorkPolicy.KEEP,
                     OneTimeWorkRequestBuilder<ResetReminderWorker>()
                         .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                        .build(),
+                )
+        }
+
+        private fun retry(context: Context, attempt: Int, delay: Duration) {
+            WorkManager.getInstance(context)
+                .enqueueUniqueWork(
+                    NAME,
+                    // Runs after this check ends. An alarm that fires meanwhile finds it pending
+                    // and keeps it, so the retry count is not lost.
+                    ExistingWorkPolicy.APPEND_OR_REPLACE,
+                    OneTimeWorkRequestBuilder<ResetReminderWorker>()
+                        .setInputData(workDataOf(KEY_ATTEMPT to attempt))
+                        .setInitialDelay(delay)
                         .build(),
                 )
         }

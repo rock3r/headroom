@@ -5,12 +5,14 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.ExpiringReset
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.UsagePoint
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -56,12 +58,19 @@ class ResetRemindersTest {
 
     private class FakeRepository(var stored: List<AccountState>) : QuotaRepository {
         var afterRefresh: List<AccountState>? = null
+        /** Like an offline phone: the refresh keeps the stored snapshot and records this error. */
+        var refreshError: QuotaErrorKind? = null
         val refreshed = mutableListOf<String?>()
         override val accounts: StateFlow<List<AccountState>> = MutableStateFlow(stored)
 
         override suspend fun refresh(accountId: String?) {
             refreshed += accountId
             afterRefresh?.let { stored = it }
+            refreshError?.let { error ->
+                stored = stored.map {
+                    if (it.account.id == accountId) it.copy(lastError = error) else it
+                }
+            }
         }
 
         override suspend fun current(): List<AccountState> = stored
@@ -173,5 +182,62 @@ class ResetRemindersTest {
         reminders(repository).remind()
 
         assertEquals(setOf("codex/credits/${nextWeek.toEpochMilli()}"), ledger.record.reminded.keys)
+    }
+
+    @Test
+    fun `a check that cannot reach the provider waits and retries`() = runTest {
+        val repository = FakeRepository(listOf(codex(tomorrow)))
+        repository.refreshError = QuotaErrorKind.Network
+
+        val outcome = reminders(repository).remind()
+
+        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(5)), outcome)
+        assertEquals(emptyList(), posted)
+        assertEquals(ReminderRecord(), ledger.record)
+    }
+
+    @Test
+    fun `retries back off`() = runTest {
+        val repository = FakeRepository(listOf(codex(tomorrow)))
+        repository.refreshError = QuotaErrorKind.Network
+
+        val outcome = reminders(repository).remind(attempt = 3)
+
+        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(30)), outcome)
+    }
+
+    @Test
+    fun `when the retries run out, the reminder comes from the stored resets`() = runTest {
+        val repository = FakeRepository(listOf(codex(tomorrow)))
+        repository.refreshError = QuotaErrorKind.Network
+
+        val outcome = reminders(repository).remind(attempt = 5)
+
+        assertEquals(ReminderOutcome.Done, outcome)
+        assertEquals(listOf(tomorrow), posted.single().map { it.expiresAt })
+        assertEquals(LocalDate.of(2026, 10, 10), ledger.record.lastDay)
+    }
+
+    @Test
+    fun `a reset close to expiring is reminded about without waiting`() = runTest {
+        now = tomorrow.minus(Duration.ofHours(12)).minus(Duration.ofMinutes(2))
+        val repository = FakeRepository(listOf(codex(tomorrow)))
+        repository.refreshError = QuotaErrorKind.Network
+
+        val outcome = reminders(repository).remind()
+
+        assertEquals(ReminderOutcome.Done, outcome)
+        assertEquals(1, posted.size)
+    }
+
+    @Test
+    fun `other refresh errors do not delay the reminder`() = runTest {
+        val repository = FakeRepository(listOf(codex(tomorrow)))
+        repository.refreshError = QuotaErrorKind.RateLimited
+
+        val outcome = reminders(repository).remind()
+
+        assertEquals(ReminderOutcome.Done, outcome)
+        assertEquals(1, posted.size)
     }
 }
