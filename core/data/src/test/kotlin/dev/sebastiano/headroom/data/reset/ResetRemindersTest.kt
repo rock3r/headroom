@@ -12,21 +12,23 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 
 class ResetRemindersTest {
-    private val zone = ZoneId.of("UTC")
+    private val zone = TimeZone.of("UTC")
     private var now = Instant.parse("2026-10-10T08:00:00Z")
     private val tomorrow = Instant.parse("2026-10-11T06:18:00Z")
     private val nextWeek = Instant.parse("2026-10-17T06:18:00Z")
@@ -146,8 +148,11 @@ class ResetRemindersTest {
 
         assertEquals(listOf<String?>("codex"), repository.refreshed)
         assertEquals(listOf(tomorrow), posted.single().map { it.expiresAt })
-        assertEquals(LocalDate.of(2026, 10, 10), ledger.record.lastDay)
-        assertEquals(setOf("codex/credits/${tomorrow.toEpochMilli()}"), ledger.record.reminded.keys)
+        assertEquals(LocalDate(2026, 10, 10), ledger.record.lastDay)
+        assertEquals(
+            setOf("codex/credits/${tomorrow.toEpochMilliseconds()}"),
+            ledger.record.reminded.keys,
+        )
     }
 
     @Test
@@ -175,7 +180,7 @@ class ResetRemindersTest {
     fun `a second check on the same day posts nothing`() = runTest {
         val repository = FakeRepository(listOf(codex(tomorrow)))
         reminders(repository).remind()
-        repository.stored = listOf(codex(tomorrow, tomorrow.plusSeconds(3_600)))
+        repository.stored = listOf(codex(tomorrow, tomorrow + 3_600.seconds))
 
         reminders(repository).remind()
 
@@ -193,12 +198,15 @@ class ResetRemindersTest {
     fun `resets that have expired are forgotten`() = runTest {
         val repository = FakeRepository(listOf(codex(tomorrow)))
         reminders(repository).remind()
-        now = nextWeek.minusSeconds(3_600)
+        now = nextWeek - 3_600.seconds
         repository.stored = listOf(codex(nextWeek))
 
         reminders(repository).remind()
 
-        assertEquals(setOf("codex/credits/${nextWeek.toEpochMilli()}"), ledger.record.reminded.keys)
+        assertEquals(
+            setOf("codex/credits/${nextWeek.toEpochMilliseconds()}"),
+            ledger.record.reminded.keys,
+        )
     }
 
     @Test
@@ -208,7 +216,7 @@ class ResetRemindersTest {
 
         val outcome = reminders(repository).remind()
 
-        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(5)), outcome)
+        assertEquals(ReminderOutcome.Retry(5.minutes), outcome)
         assertEquals(emptyList(), posted)
         assertEquals(ReminderRecord(), ledger.record)
     }
@@ -220,7 +228,7 @@ class ResetRemindersTest {
 
         val outcome = reminders(repository).remind(attempt = 3)
 
-        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(30)), outcome)
+        assertEquals(ReminderOutcome.Retry(30.minutes), outcome)
     }
 
     @Test
@@ -232,12 +240,12 @@ class ResetRemindersTest {
 
         assertEquals(ReminderOutcome.Done, outcome)
         assertEquals(listOf(tomorrow), posted.single().map { it.expiresAt })
-        assertEquals(LocalDate.of(2026, 10, 10), ledger.record.lastDay)
+        assertEquals(LocalDate(2026, 10, 10), ledger.record.lastDay)
     }
 
     @Test
     fun `a reset close to expiring is reminded about without waiting`() = runTest {
-        now = tomorrow.minus(Duration.ofHours(12)).minus(Duration.ofMinutes(2))
+        now = tomorrow.minus(12.hours).minus(2.minutes)
         val repository = FakeRepository(listOf(codex(tomorrow)))
         repository.refreshError = QuotaErrorKind.Network
 
@@ -265,7 +273,7 @@ class ResetRemindersTest {
 
         val outcome = reminders(repository).remind()
 
-        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(5)), outcome)
+        assertEquals(ReminderOutcome.Retry(5.minutes), outcome)
         assertEquals(emptyList(), posted)
         assertEquals(ReminderRecord(), ledger.record)
     }
@@ -279,7 +287,7 @@ class ResetRemindersTest {
 
         assertEquals(ReminderOutcome.Done, outcome)
         assertEquals(listOf(tomorrow), posted.single().map { it.expiresAt })
-        assertEquals(LocalDate.of(2026, 10, 10), ledger.record.lastDay)
+        assertEquals(LocalDate(2026, 10, 10), ledger.record.lastDay)
     }
 
     @Test
@@ -302,7 +310,7 @@ class ResetRemindersTest {
 
     @Test
     fun `the retry cutoff uses only the resets of accounts that may be stale`() = runTest {
-        val soon = now.plus(Duration.ofHours(12)).plus(Duration.ofMinutes(2))
+        val soon = now.plus(12.hours).plus(2.minutes)
         val stale = codex(tomorrow)
         val repository = FakeRepository(listOf(codex(soon, id = "healthy"), stale))
         repository.afterRefresh =
@@ -313,7 +321,7 @@ class ResetRemindersTest {
 
         val outcome = reminders(repository).remind()
 
-        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(5)), outcome)
+        assertEquals(ReminderOutcome.Retry(5.minutes), outcome)
         assertEquals(emptyList(), posted)
     }
 }

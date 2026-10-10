@@ -5,9 +5,10 @@ import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Clock
-import java.time.Duration
 import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -20,7 +21,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class ClaudeQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) : QuotaFetcher {
     override val provider: Provider = Provider.Claude
 
@@ -55,7 +56,7 @@ public class ClaudeQuotaFetcher(
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = planLabel,
                 windows = usage.windows,
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
             )
         )
     }
@@ -223,7 +224,7 @@ public class ClaudeQuotaFetcher(
         const val PROFILE_PATH = "/api/oauth/profile"
         const val BETA_HEADER = "claude-code-20250219,oauth-2025-04-20"
         const val X_APP = "cli"
-        val PROFILE_TIMEOUT: Duration = Duration.ofSeconds(5)
+        val PROFILE_TIMEOUT: Duration = 5.seconds
 
         const val PLAN_TYPE_KEY = "plan_type"
         const val WEEKLY_SCOPED_KIND = "weekly_scoped"

@@ -1,17 +1,18 @@
 package dev.sebastiano.headroom.ui.stats
 
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class BurnTest {
     private val start = Instant.parse("2026-09-21T09:00:00Z")
 
-    private fun at(minutes: Long, used: Double) = UsagePoint(start.plusSeconds(minutes * 60), used)
+    private fun at(minutes: Long, used: Double) = UsagePoint(start + (minutes * 60).seconds, used)
 
     @Test
     fun `growth between two points is what was burned`() {

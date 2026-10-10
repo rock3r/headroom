@@ -2,7 +2,7 @@ package dev.sebastiano.headroom.data.reset
 
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
-import java.time.Duration
+import kotlin.time.Duration
 
 internal sealed interface ResetCheckOutcome {
     data object Notified : ResetCheckOutcome

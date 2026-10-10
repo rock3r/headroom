@@ -1,7 +1,8 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 public enum class PaceStatus {
     Under,
@@ -25,10 +26,10 @@ public object Pace {
         if (window.isInformational) return null
         val resetsAt = window.resetsAt ?: return null
         val length = window.length ?: return null
-        if (length.isZero || length.isNegative) return null
+        if (length <= Duration.ZERO) return null
         val start = resetsAt.minus(length)
-        val elapsed = Duration.between(start, now).toMillis().toDouble()
-        return (elapsed / length.toMillis() * MAX_PERCENT).coerceIn(0.0, MAX_PERCENT)
+        val elapsed = (now - start).inWholeMilliseconds.toDouble()
+        return (elapsed / length.inWholeMilliseconds * MAX_PERCENT).coerceIn(0.0, MAX_PERCENT)
     }
 
     /** Signed difference from even pace, in percentage points. Positive means over pace. */
@@ -58,10 +59,10 @@ public object Pace {
         val resetsAt = window.resetsAt ?: return null
         val length = window.length ?: return null
         val start = resetsAt.minus(length)
-        val elapsedMillis = Duration.between(start, now).toMillis()
+        val elapsedMillis = (now - start).inWholeMilliseconds
         if (elapsedMillis <= 0 || window.usedPercent <= 0.0) return null
         val millisToFull = elapsedMillis / window.usedPercent * MAX_PERCENT
-        val hit = start.plusMillis(millisToFull.toLong())
-        return hit.takeIf { it.isBefore(resetsAt) }
+        val hit = start + (millisToFull.toLong()).milliseconds
+        return hit.takeIf { it < resetsAt }
     }
 }

@@ -31,10 +31,11 @@ import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
 import dev.sebastiano.headroom.ui.home.toSummary
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
-import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -67,7 +68,7 @@ class SignInExpiredTest {
     fun `an expired account never needs attention, and its pace is from its last good sync`() {
         val stale = accounts.first()
         val summary = stale.toSummary(FIXED_NOW, emptyMap(), emptyMap())
-        val syncedAt = FIXED_NOW.minus(Duration.ofHours(2))
+        val syncedAt = FIXED_NOW.minus(2.hours)
 
         assertTrue(summary.signInExpired)
         assertEquals(syncedAt, summary.dataFrom)
@@ -133,7 +134,7 @@ class SignInExpiredTest {
             HeadroomTheme(dynamicColor = false) {
                 SignInExpiredRow(
                     accountId = "a",
-                    dataFrom = FIXED_NOW.minus(Duration.ofMinutes(118)),
+                    dataFrom = FIXED_NOW.minus(118.minutes),
                     now = FIXED_NOW,
                     onSignIn = {},
                 )

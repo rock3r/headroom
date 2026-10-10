@@ -8,9 +8,10 @@ import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
+import kotlin.time.toKotlinInstant
 
 /** Alert switches keyed by account id and window id. */
 internal typealias AlertSwitches = Map<Pair<String, String>, Boolean>
@@ -148,11 +149,14 @@ internal fun chartSummary(
     val length = window.length ?: return null
     val start = resetsAt.minus(length)
     // A projection is an estimate; whole minutes keep "in 1d 17h, 1d 1h before" consistent.
-    val hit = Pace.projectedLimitAt(window, now)?.truncatedTo(ChronoUnit.MINUTES)
-    val elapsed = Duration.between(start, now).toMillis()
+    val hit =
+        Pace.projectedLimitAt(window, now)?.let {
+            it.toJavaInstant().truncatedTo(ChronoUnit.MINUTES).toKotlinInstant()
+        }
+    val elapsed = (now - start).inWholeMilliseconds
     val projectedEnd =
         if (hit == null && elapsed > 0) {
-            window.usedPercent / elapsed * length.toMillis()
+            window.usedPercent / elapsed * length.inWholeMilliseconds
         } else {
             null
         }
@@ -163,7 +167,7 @@ internal fun chartSummary(
         expectedPercent = Pace.expectedPercent(window, now) ?: 0.0,
         kind = window.kind,
         // History keeps earlier windows too. Their samples would pile up on the left edge.
-        points = points.filter { !it.at.isBefore(start) && !it.at.isAfter(now) },
+        points = points.filter { it.at in start..now },
         projectedLimitAt = hit,
         projectedEndPercent = projectedEnd,
     )

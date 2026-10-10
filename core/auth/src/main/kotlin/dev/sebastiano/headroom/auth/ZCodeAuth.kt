@@ -4,10 +4,12 @@ import dev.sebastiano.headroom.model.Provider
 import java.net.URI
 import java.net.URISyntaxException
 import java.security.SecureRandom
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
 import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -65,8 +67,7 @@ internal class ZCodeAuth(
         // than polling a flow that cannot work.
         val expiresIn =
             data.long("expires_at")?.let { at ->
-                Duration.between(clock.instant(), Instant.ofEpochSecond(at))
-                    .coerceAtLeast(Duration.ZERO)
+                (Instant.fromEpochSeconds(at) - clock.now()).coerceAtLeast(Duration.ZERO)
             }
         return DeviceCodeGrant(
             userCode = "",
@@ -74,9 +75,7 @@ internal class ZCodeAuth(
             verificationUri = authorizeUrl,
             verificationUriComplete = null,
             interval =
-                Duration.ofSeconds(
-                    (data.long("poll_interval_sec") ?: DEFAULT_INTERVAL).coerceAtLeast(1)
-                ),
+                ((data.long("poll_interval_sec") ?: DEFAULT_INTERVAL).coerceAtLeast(1)).seconds,
             expiresIn = expiresIn,
             pollToken = data.string("poll_token") ?: clientToken,
         )
@@ -155,7 +154,7 @@ internal class ZCodeAuth(
             data?.string("access_token")
                 ?: data?.string("accessToken")
                 ?: throw AuthException.InvalidResponse("$context response has no access_token")
-        val now = clock.instant()
+        val now = clock.now()
         val lifetime = data?.long("expires_in")?.takeIf { it > 0 } ?: DEFAULT_LIFETIME_SECONDS
         return TokenSet(
             provider = provider,
@@ -196,7 +195,7 @@ internal class ZCodeAuth(
         private const val SERVER_ERROR = 500
         private const val POLL_TOKEN_BYTES = 32
         private val RETRYABLE_STATUSES = setOf(408, 429)
-        private val EXPIRY_MARGIN: Duration = Duration.ofMinutes(5)
+        private val EXPIRY_MARGIN: Duration = 5.minutes
 
         private fun randomPollToken(): String {
             val bytes = ByteArray(POLL_TOKEN_BYTES).also(SecureRandom()::nextBytes)

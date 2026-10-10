@@ -1,10 +1,11 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 class ResetPolicyTest {
     private fun window(kind: WindowKind) =
@@ -38,10 +39,10 @@ class ResetPolicyTest {
 
     @Test
     fun `window kind follows the window length`() {
-        assertEquals(WindowKind.Session, WindowKind.fromLength(Duration.ofHours(5)))
-        assertEquals(WindowKind.Daily, WindowKind.fromLength(Duration.ofDays(1)))
-        assertEquals(WindowKind.Weekly, WindowKind.fromLength(Duration.ofDays(7)))
-        assertEquals(WindowKind.Monthly, WindowKind.fromLength(Duration.ofDays(30)))
+        assertEquals(WindowKind.Session, WindowKind.fromLength(5.hours))
+        assertEquals(WindowKind.Daily, WindowKind.fromLength(1.days))
+        assertEquals(WindowKind.Weekly, WindowKind.fromLength(7.days))
+        assertEquals(WindowKind.Monthly, WindowKind.fromLength(30.days))
         assertEquals(WindowKind.Other, WindowKind.fromLength(null))
     }
 }

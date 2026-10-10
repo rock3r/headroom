@@ -1,10 +1,11 @@
 package dev.sebastiano.headroom.quota
 
 import java.io.IOException
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
@@ -27,7 +28,9 @@ public class OkHttpQuotaHttpClient(
 
     override suspend fun execute(request: QuotaHttpRequest): QuotaHttpResponse {
         val call = okHttpClient.newCall(request.toOkHttpRequest())
-        request.timeout?.let { call.timeout().timeout(it.toMillis(), TimeUnit.MILLISECONDS) }
+        request.timeout?.let {
+            call.timeout().timeout(it.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+        }
         return call.await()
     }
 
@@ -80,6 +83,6 @@ public class OkHttpQuotaHttpClient(
     }
 
     private companion object {
-        val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(30)
+        val DEFAULT_TIMEOUT: Duration = 30.seconds
     }
 }

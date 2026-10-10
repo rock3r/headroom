@@ -11,9 +11,9 @@ import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

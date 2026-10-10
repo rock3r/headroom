@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.quota
 
 import java.io.IOException
-import java.time.Duration
+import kotlin.time.Duration
 
 /** One HTTP request made by a fetcher. */
 public data class QuotaHttpRequest(

@@ -1,7 +1,9 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 /** One usage limit of a subscription, such as "weekly, all models" or "5-hour session". */
 public data class QuotaWindow(
@@ -66,10 +68,10 @@ public enum class WindowKind {
     Credit;
 
     public companion object {
-        private val SESSION_MAX = Duration.ofHours(12)
-        private val DAILY_MAX = Duration.ofDays(2)
-        private val WEEKLY_MAX = Duration.ofDays(10)
-        private val MONTHLY_MAX = Duration.ofDays(35)
+        private val SESSION_MAX = 12.hours
+        private val DAILY_MAX = 2.days
+        private val WEEKLY_MAX = 10.days
+        private val MONTHLY_MAX = 35.days
 
         public fun fromLength(length: Duration?): WindowKind =
             when {

@@ -4,8 +4,10 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 /**
  * A reset the app saw happen while it was open, for the reset confetti. [fromNextReset] is true
@@ -29,7 +31,7 @@ data class ResetBurst(
  * it was fetched at or after [sessionStart]. On a cold start the stored data comes first, fetched
  * before the app opened, so a reset that the first refresh finds happened while the app was closed.
  */
-class ResetTracker(private val sessionStart: Instant = Instant.MIN) {
+class ResetTracker(private val sessionStart: Instant = Instant.DISTANT_PAST) {
     private val lastSeen = mutableMapOf<String, Seen>()
     private val justReset = mutableSetOf<String>()
     private var previous: List<AccountState> = emptyList()
@@ -75,17 +77,14 @@ class ResetTracker(private val sessionStart: Instant = Instant.MIN) {
     private fun wasNextReset(accountId: String, window: QuotaWindow, seenAt: Instant?): Boolean {
         val resetsAt = window.resetsAt ?: return false
         val resetAt = if (seenAt != null && seenAt < resetsAt) seenAt else resetsAt
-        return NextReset.find(previous, resetAt.minusMillis(1))?.account?.id == accountId
+        return NextReset.find(previous, resetAt - 1.milliseconds)?.account?.id == accountId
     }
 
     private fun hasReset(before: QuotaWindow, after: QuotaWindow): Boolean {
         val dropped = before.usedPercent - after.usedPercent >= MIN_DROP_POINTS
         val oldReset = before.resetsAt
         val newReset = after.resetsAt
-        val moved =
-            oldReset != null &&
-                newReset != null &&
-                Duration.between(oldReset, newReset) >= MIN_RESET_SHIFT
+        val moved = oldReset != null && newReset != null && (newReset - oldReset) >= MIN_RESET_SHIFT
         return dropped || moved
     }
 
@@ -94,6 +93,6 @@ class ResetTracker(private val sessionStart: Instant = Instant.MIN) {
 
     private companion object {
         const val MIN_DROP_POINTS = 5.0
-        val MIN_RESET_SHIFT: Duration = Duration.ofDays(5)
+        val MIN_RESET_SHIFT: Duration = 5.days
     }
 }

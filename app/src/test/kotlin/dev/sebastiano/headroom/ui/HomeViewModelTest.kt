@@ -14,14 +14,16 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.HomeViewModel
 import dev.sebastiano.headroom.ui.home.ResetBurst
-import java.time.Duration
-import java.time.Instant
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -204,7 +206,7 @@ class HomeViewModelTest {
             observe()
             val next = assertNotNull(viewModel.state.value.nextReset)
             assertEquals(Provider.Grok, next.provider)
-            assertEquals(now.plus(Duration.ofMinutes(928)), next.resetsAt)
+            assertEquals(now.plus(928.minutes), next.resetsAt)
             assertTrue(next.alertEnabled)
         }
 
@@ -242,8 +244,8 @@ class HomeViewModelTest {
             val chart = assertNotNull(first.chart)
             assertTrue(chart.points.isNotEmpty())
             assertEquals(
-                now.plus(Duration.ofMinutes(2488)).epochSecond / 60,
-                chart.projectedLimitAt!!.epochSecond / 60,
+                now.plus(2488.minutes).epochSeconds / 60,
+                chart.projectedLimitAt!!.epochSeconds / 60,
             )
 
             viewModel.select("demo-codex")
@@ -331,7 +333,7 @@ class HomeViewModelTest {
                                     snapshot.windows.map {
                                         it.copy(
                                             usedPercent = 1.0,
-                                            resetsAt = it.resetsAt?.plus(Duration.ofDays(7)),
+                                            resetsAt = it.resetsAt?.plus(7.days),
                                         )
                                     }
                             )
@@ -367,7 +369,7 @@ class HomeViewModelTest {
     @Test
     fun `a reset found on a cold start, from data stored before the app opened, has no confetti`() =
         runTest(main.dispatcher) {
-            val stored = FakeQuotaRepository({ now }, DemoData.accounts(now.minusSeconds(3_600)))
+            val stored = FakeQuotaRepository({ now }, DemoData.accounts(now - 3_600.seconds))
             val coldStart =
                 HomeViewModel(
                     repository = stored,

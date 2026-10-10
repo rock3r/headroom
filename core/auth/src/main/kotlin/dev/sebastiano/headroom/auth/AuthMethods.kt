@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
+import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -58,7 +58,7 @@ public sealed interface AuthMethod {
  */
 public class AuthMethods(
     http: AuthHttpClient = OkHttpAuthHttpClient(),
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val claude = ClaudeOAuth(http, clock)

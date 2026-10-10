@@ -1,6 +1,8 @@
 package dev.sebastiano.headroom.auth
 
 import java.util.concurrent.Executors
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -46,3 +48,9 @@ internal fun fakeJwt(claimsJson: String): String {
     val header = encoder.encodeToString("""{"alg":"none"}""".toByteArray())
     return "$header.${encoder.encodeToString(claimsJson.toByteArray())}.sig"
 }
+
+/** A clock that always reads [at]. */
+internal fun fixedClock(at: Instant): Clock =
+    object : Clock {
+        override fun now(): Instant = at
+    }

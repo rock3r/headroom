@@ -4,8 +4,8 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
-import java.time.Clock
-import java.time.Duration
+import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
@@ -16,7 +16,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class OpenCodeGoQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) : QuotaFetcher {
     override val provider: Provider = Provider.OpenCodeGo
 
@@ -45,7 +45,7 @@ public class OpenCodeGoQuotaFetcher(
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = PLAN_LABEL,
                 windows = windows,
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
             )
         )
     }

@@ -7,8 +7,9 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.URLDecoder
-import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -31,7 +32,7 @@ public data class LoopbackConfig(
     val timeout: Duration = DEFAULT_TIMEOUT,
 ) {
     private companion object {
-        val DEFAULT_TIMEOUT: Duration = Duration.ofMinutes(10)
+        val DEFAULT_TIMEOUT: Duration = 10.minutes
     }
 }
 
@@ -70,7 +71,7 @@ private constructor(
         withContext(ioDispatcher) {
             val outcome = CompletableDeferred<LoopbackCallback>()
             val reading = ConcurrentHashMap.newKeySet<Socket>()
-            val deadline = System.nanoTime() + config.timeout.toNanos()
+            val deadline = System.nanoTime() + config.timeout.inWholeNanoseconds
             val acceptor = launch { acceptUntil(deadline, outcome, reading) }
             try {
                 outcome.await()

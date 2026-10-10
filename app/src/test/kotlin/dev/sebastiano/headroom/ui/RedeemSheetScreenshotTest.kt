@@ -25,8 +25,9 @@ import dev.sebastiano.headroom.ui.delights.DelightsHost
 import dev.sebastiano.headroom.ui.home.toSummary
 import dev.sebastiano.headroom.ui.resets.RedeemActions
 import dev.sebastiano.headroom.ui.resets.RedeemSheetContent
-import java.time.Duration
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -393,7 +394,7 @@ internal fun sheetShots(): List<SheetShot> {
         SheetShot(
             "zai-ask-not-yet",
             zai,
-            RedeemStep.Answered(AskOutcome.NotYet(now.plus(Duration.ofHours(6)))),
+            RedeemStep.Answered(AskOutcome.NotYet(now.plus(6.hours))),
         ),
         SheetShot("zai-ask-throttled", zai, RedeemStep.Answered(AskOutcome.Throttled)),
         SheetShot("zai-sign-in", zai, RedeemStep.SignInRequired),
@@ -466,7 +467,7 @@ internal fun sheetShots(): List<SheetShot> {
             claude,
             RedeemStep.Finished(
                 grant,
-                RedeemOutcome.RateLimited(now.plus(Duration.ofMinutes(2))),
+                RedeemOutcome.RateLimited(now.plus(2.minutes)),
             ),
         ),
         SheetShot(

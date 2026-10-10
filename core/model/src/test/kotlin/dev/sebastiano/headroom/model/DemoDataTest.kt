@@ -1,9 +1,10 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
@@ -36,7 +37,7 @@ class DemoDataTest {
         assertEquals(DemoData.accounts(now).map { it.account }, accounts.map { it.account })
         val claude = accounts.first()
         assertTrue(claude.isSignInExpired)
-        assertEquals(now.minus(java.time.Duration.ofHours(2)), claude.snapshot?.fetchedAt)
+        assertEquals(now.minus(2.hours), claude.snapshot?.fetchedAt)
         assertEquals(DemoData.accounts(now).drop(1), accounts.drop(1))
     }
 
@@ -44,10 +45,7 @@ class DemoDataTest {
     fun `the soonest weekly reset in demo data is Grok`() {
         val next = NextReset.find(DemoData.accounts(now), now)
         assertEquals(Provider.Grok, next?.account?.provider)
-        assertEquals(
-            "15h 28m",
-            Countdown.format(java.time.Duration.between(now, next!!.window.resetsAt)),
-        )
+        assertEquals("15h 28m", Countdown.format(next!!.window.resetsAt!! - now))
     }
 
     @Test

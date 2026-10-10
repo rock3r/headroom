@@ -15,8 +15,9 @@ import dev.sebastiano.headroom.ui.delights.Delights
 import dev.sebastiano.headroom.ui.delights.DelightsHost
 import dev.sebastiano.headroom.ui.delights.LocalDelights
 import dev.sebastiano.headroom.ui.delights.SHIMMER_OVERLAY_TAG
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,7 +59,7 @@ class HomeDelightsTest {
         rule.mainClock.advanceTimeBy(SETTLE_MILLIS)
         rule.onNodeWithTag(SHIMMER_OVERLAY_TAG).assertDoesNotExist()
 
-        clock = FIXED_NOW.plus(Duration.ofMinutes(5))
+        clock = FIXED_NOW.plus(5.minutes)
         gated.finish()
         rule.mainClock.advanceTimeByFrame()
         rule.mainClock.advanceTimeByFrame()
@@ -160,7 +161,7 @@ internal fun List<AccountState>.withGrokReset(): List<AccountState> = map { stat
             snapshot.copy(
                 windows =
                     snapshot.windows.map {
-                        it.copy(usedPercent = 1.0, resetsAt = it.resetsAt?.plus(Duration.ofDays(7)))
+                        it.copy(usedPercent = 1.0, resetsAt = it.resetsAt?.plus(7.days))
                     }
             )
     )

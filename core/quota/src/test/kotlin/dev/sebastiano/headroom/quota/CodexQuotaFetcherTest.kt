@@ -4,11 +4,12 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -97,12 +98,12 @@ class CodexQuotaFetcherTest {
         )
         val session = snapshot.windows[0]
         assertEquals(12.0, session.usedPercent)
-        assertEquals(Duration.ofHours(5), session.length)
-        assertEquals(Instant.ofEpochSecond(1_775_229_900), session.resetsAt)
+        assertEquals(5.hours, session.length)
+        assertEquals(Instant.fromEpochSeconds(1_775_229_900), session.resetsAt)
         val weekly = snapshot.windows[1]
         assertEquals(34.5, weekly.usedPercent)
-        assertEquals(Duration.ofDays(7), weekly.length)
-        assertEquals(Instant.ofEpochSecond(1_775_578_080), weekly.resetsAt)
+        assertEquals(7.days, weekly.length)
+        assertEquals(Instant.fromEpochSeconds(1_775_578_080), weekly.resetsAt)
     }
 
     @Test
@@ -136,7 +137,7 @@ class CodexQuotaFetcherTest {
             snapshot.windows.map { it.group },
         )
         assertEquals(WindowKind.Monthly, snapshot.windows[0].kind)
-        assertEquals(Duration.ofDays(30), snapshot.windows[0].length)
+        assertEquals(30.days, snapshot.windows[0].length)
         assertNull(snapshot.windows[1].resetsAt)
     }
 

@@ -1,9 +1,10 @@
 package dev.sebastiano.headroom.auth
 
 import java.io.IOException
-import java.time.Duration
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
@@ -68,6 +69,6 @@ public class OkHttpAuthHttpClient internal constructor(private val client: OkHtt
     private fun AuthHttpRequest.host(): String = url.substringAfter("://").substringBefore('/')
 
     private companion object {
-        val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(30)
+        val DEFAULT_TIMEOUT: Duration = 30.seconds
     }
 }

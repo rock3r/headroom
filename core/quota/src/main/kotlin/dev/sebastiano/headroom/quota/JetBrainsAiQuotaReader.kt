@@ -4,11 +4,18 @@ import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.io.IOException
 import java.net.URLEncoder
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalTime
-import java.time.ZoneOffset
 import java.util.Locale
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.minus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -391,14 +398,16 @@ internal class JetBrainsAiQuotaReader(
         val schedule =
             refill(refillStep)?.objectOrNull("current") ?: return missing(refillStep, "current")
         val resetsAt =
-            (schedule.longOrNull("next") ?: current.longOrNull("until"))?.let(Instant::ofEpochMilli)
+            (schedule.longOrNull("next") ?: current.longOrNull("until"))?.let(
+                Instant::fromEpochMilliseconds
+            )
         val period =
             schedule
                 .objectOrNull("tariff")
                 ?.objectOrNull("period")
                 ?.longOrNull("millis")
                 ?.takeIf { it > 0 }
-                ?.let(Duration::ofMillis) ?: resetsAt?.let(::calendarMonthEndingAt)
+                ?.milliseconds ?: resetsAt?.let(::calendarMonthEndingAt)
         val kind = jetBrainsWindowKind(period)
         return quotaWindow(
                 id = source?.windowId ?: LITE_WINDOW_ID,
@@ -616,17 +625,18 @@ private fun redactedPrimitive(element: JsonPrimitive, keepNumbers: Boolean): Str
     }
 }
 
-private val WEEKLY_PERIODS = Duration.ofDays(6)..Duration.ofDays(8)
-private val MONTHLY_PERIODS = Duration.ofDays(28)..Duration.ofDays(31)
+private val WEEKLY_PERIODS = 6.days..8.days
+private val MONTHLY_PERIODS = 28.days..31.days
 
 /**
  * The length of the calendar month (in UTC) that ends at [resetsAt], or null when [resetsAt] is not
  * the last millisecond of a month. Workspace seats have no refill period but reset this way.
  */
 internal fun calendarMonthEndingAt(resetsAt: Instant): Duration? {
-    val end = resetsAt.plusMillis(1).atZone(ZoneOffset.UTC)
-    if (end.dayOfMonth != 1 || end.toLocalTime() != LocalTime.MIDNIGHT) return null
-    return Duration.between(end.minusMonths(1), end)
+    val end = (resetsAt + 1.milliseconds).toLocalDateTime(TimeZone.UTC)
+    if (end.day != 1 || end.time != LocalTime(0, 0)) return null
+    val start = end.date.minus(1, DateTimeUnit.MONTH)
+    return end.toInstant(TimeZone.UTC) - start.atStartOfDayIn(TimeZone.UTC)
 }
 
 /**

@@ -1,9 +1,11 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.delay
 
 /** What the provider returned when a device-code sign-in started. */
@@ -75,7 +77,7 @@ public class DeviceCodeFlow
 internal constructor(
     private val spec: DeviceCodeSpec,
     private val clock: Clock,
-    private val sleep: suspend (Duration) -> Unit = { delay(it.toMillis()) },
+    private val sleep: suspend (Duration) -> Unit = { delay(it.inWholeMilliseconds) },
 ) {
     public val provider: Provider
         get() = spec.provider
@@ -88,7 +90,7 @@ internal constructor(
             userCode = grant.userCode,
             verificationUri = grant.verificationUri,
             verificationUriComplete = grant.verificationUriComplete,
-            expiresAt = clock.instant().plus(grant.expiresIn ?: DEFAULT_LIFETIME),
+            expiresAt = clock.now().plus(grant.expiresIn ?: DEFAULT_LIFETIME),
             grant = grant,
         )
     }
@@ -103,11 +105,11 @@ internal constructor(
     public suspend fun awaitTokens(prompt: DeviceCodePrompt): TokenSet {
         var interval = prompt.grant.interval
         while (true) {
-            val now = clock.instant()
-            if (!now.isBefore(prompt.expiresAt)) {
+            val now = clock.now()
+            if (now >= prompt.expiresAt) {
                 throw AuthException.TimedOut("The sign-in code expired. Start again.")
             }
-            sleep(minOf(interval, Duration.between(now, prompt.expiresAt)))
+            sleep(minOf(interval, (prompt.expiresAt - now)))
             val answer =
                 try {
                     spec.poll(prompt.grant)
@@ -126,7 +128,7 @@ internal constructor(
     }
 
     private companion object {
-        val DEFAULT_LIFETIME: Duration = Duration.ofMinutes(15)
-        val SLOW_DOWN_STEP: Duration = Duration.ofSeconds(5)
+        val DEFAULT_LIFETIME: Duration = 15.minutes
+        val SLOW_DOWN_STEP: Duration = 5.seconds
     }
 }

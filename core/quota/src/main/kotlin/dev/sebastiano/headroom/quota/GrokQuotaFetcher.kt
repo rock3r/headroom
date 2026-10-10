@@ -4,10 +4,11 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
 import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -28,7 +29,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class GrokQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) : QuotaFetcher {
     override val provider: Provider = Provider.Grok
 
@@ -62,7 +63,7 @@ public class GrokQuotaFetcher(
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = planLabel,
                 windows = listOf(usage.window),
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
             )
         )
     }
@@ -134,8 +135,8 @@ public class GrokQuotaFetcher(
     }
 
     private fun lengthBetween(start: Instant?, end: Instant?): Duration? {
-        if (start == null || end == null || !end.isAfter(start)) return null
-        return Duration.between(start, end)
+        if (start == null || end == null || end <= start) return null
+        return (end - start)
     }
 
     private fun JsonObject.instantOrNull(key: String): Instant? =
@@ -172,7 +173,7 @@ public class GrokQuotaFetcher(
         const val USER_PATH = "/v1/user"
         const val TOKEN_AUTH_HEADER = "X-XAI-Token-Auth"
         const val TOKEN_AUTH_VALUE = "xai-grok-cli"
-        val USER_TIMEOUT: Duration = Duration.ofSeconds(5)
+        val USER_TIMEOUT: Duration = 5.seconds
         const val CREDIT_USAGE_PERCENT_KEY = "creditUsagePercent"
         const val WEEKLY_ID = "weekly"
         const val MONTHLY_ID = "monthly"

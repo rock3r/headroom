@@ -51,7 +51,7 @@ import dev.sebastiano.headroom.designsystem.rememberLiquidRippleState
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.home.NextResetSummary
-import java.time.Instant
+import kotlin.time.Instant
 
 const val NEXT_RESET_ALERT_TAG: String = "next-reset-alert"
 const val NEXT_RESET_CARD_TAG: String = "next-reset-card"

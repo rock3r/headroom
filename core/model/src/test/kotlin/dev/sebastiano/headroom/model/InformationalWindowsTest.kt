@@ -1,12 +1,13 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 /** Credits and quotas the app does not recognise are shown, but never drive anything. */
 class InformationalWindowsTest {
@@ -19,8 +20,8 @@ class InformationalWindowsTest {
             label = "Weekly · all models",
             kind = WindowKind.Weekly,
             usedPercent = 40.0,
-            resetsAt = now.plus(Duration.ofDays(3)),
-            length = Duration.ofDays(7),
+            resetsAt = now.plus(3.days),
+            length = 7.days,
         )
 
     private val credit =
@@ -34,7 +35,7 @@ class InformationalWindowsTest {
             usedAmount = 237.5,
             limitAmount = 250.0,
             amountUnit = "USD",
-            expiresAt = now.plus(Duration.ofDays(1)),
+            expiresAt = now.plus(1.days),
         )
 
     /** An unknown window that looks weekly and resets sooner than the known weekly window. */
@@ -44,8 +45,8 @@ class InformationalWindowsTest {
             label = "Nimbus quill",
             kind = WindowKind.Weekly,
             usedPercent = 99.0,
-            resetsAt = now.plus(Duration.ofHours(2)),
-            length = Duration.ofDays(7),
+            resetsAt = now.plus(2.hours),
+            length = 7.days,
             isRecognised = false,
         )
 
@@ -103,7 +104,7 @@ class InformationalWindowsTest {
 
     @Test
     fun `an unknown window is never the session window`() {
-        val unknownSession = unknown.copy(kind = WindowKind.Session, length = Duration.ofHours(5))
+        val unknownSession = unknown.copy(kind = WindowKind.Session, length = 5.hours)
 
         assertNull(state(credit, unknownSession).sessionWindow)
     }

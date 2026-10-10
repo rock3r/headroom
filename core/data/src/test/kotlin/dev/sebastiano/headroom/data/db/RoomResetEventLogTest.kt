@@ -14,14 +14,17 @@ import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.ResetUseSource
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -35,8 +38,8 @@ import org.robolectric.RobolectricTestRunner
 class RoomResetEventLogTest {
     private var now = Instant.parse("2026-10-10T12:00:00Z")
     private val account = Account("codex-1", Provider.Codex, "sam@example.com")
-    private val soon = now.plus(Duration.ofDays(2))
-    private val later = now.plus(Duration.ofDays(9))
+    private val soon = now.plus(2.days)
+    private val later = now.plus(9.days)
     private lateinit var db: HeadroomDatabase
     private lateinit var snapshot: QuotaSnapshot
 
@@ -60,8 +63,8 @@ class RoomResetEventLogTest {
             label = "Weekly",
             kind = WindowKind.Weekly,
             usedPercent = used,
-            resetsAt = now.plus(Duration.ofDays(3)),
-            length = Duration.ofDays(7),
+            resetsAt = now.plus(3.days),
+            length = 7.days,
         )
 
     private fun resets(vararg expiries: Instant) =
@@ -103,14 +106,14 @@ class RoomResetEventLogTest {
 
     private fun log() = RoomResetEventLog(db.quotaDao(), clock = { now })
 
-    private suspend fun events() = log().events(Instant.EPOCH).first()
+    private suspend fun events() = log().events(Instant.fromEpochSeconds(0)).first()
 
     @Test
     fun `a sync that finds a reset gone before its expiry records a use elsewhere`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)
 
-            now = now.plus(Duration.ofHours(1))
+            now = now.plus(1.hours)
             snapshot = snapshot(resets(later), weeklyUsed = 5.0)
             repo.refresh()
 
@@ -129,7 +132,7 @@ class RoomResetEventLogTest {
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)
 
-            now = soon.plus(Duration.ofMinutes(5))
+            now = soon.plus(5.minutes)
             snapshot = snapshot(resets(later), weeklyUsed = 95.0)
             repo.refresh()
 
@@ -140,11 +143,11 @@ class RoomResetEventLogTest {
     fun `a redeem in Headroom is recorded once, with the usage it gave back`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)
-            now = now.plus(Duration.ofMinutes(10))
+            now = now.plus(10.minutes)
 
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
-            now = now.plus(Duration.ofSeconds(2))
+            now = now.plus(2.seconds)
             snapshot = snapshot(resets(later), weeklyUsed = 0.0)
             repo.refresh()
 
@@ -162,13 +165,13 @@ class RoomResetEventLogTest {
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)
             // The provider used the reset, and a sync stored that before Headroom recorded it.
-            now = now.plus(Duration.ofSeconds(5))
+            now = now.plus(5.seconds)
             snapshot = snapshot(resets(later), weeklyUsed = 0.0)
             repo.refresh()
 
-            now = now.plus(Duration.ofSeconds(1))
+            now = now.plus(1.seconds)
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
-            now = now.plus(Duration.ofSeconds(2))
+            now = now.plus(2.seconds)
             repo.refresh()
 
             val event = events().single()
@@ -184,7 +187,7 @@ class RoomResetEventLogTest {
             snapshot = snapshot(resets(later), weeklyUsed = 0.0)
             repo.refresh()
 
-            now = now.plus(Duration.ofHours(1))
+            now = now.plus(1.hours)
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
 
             assertEquals(
@@ -199,7 +202,7 @@ class RoomResetEventLogTest {
             val repo = setUpAccount(backgroundScope)
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
 
-            now = now.plus(Duration.ofDays(3))
+            now = now.plus(3.days)
             snapshot = snapshot(resets(later), weeklyUsed = 0.0)
             repo.refresh()
 
@@ -210,7 +213,7 @@ class RoomResetEventLogTest {
     fun `a redeem measured on usage older than half an hour is an estimate`() =
         runTest(UnconfinedTestDispatcher()) {
             setUpAccount(backgroundScope)
-            now = now.plus(Duration.ofHours(1))
+            now = now.plus(1.hours)
 
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
 
@@ -232,7 +235,7 @@ class RoomResetEventLogTest {
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
 
             assertEquals(1, log().events(now).first().size)
-            assertEquals(0, log().events(now.plusSeconds(1)).first().size)
+            assertEquals(0, log().events(now + 1.seconds).first().size)
         }
 
     @Test
@@ -241,7 +244,7 @@ class RoomResetEventLogTest {
             val repo = setUpAccount(backgroundScope)
             log().redeemed(account, "credits", ResetAttemptKey("key-1"))
 
-            now = now.plus(Duration.ofDays(366))
+            now = now.plus(366.days)
             repo.refresh()
 
             assertEquals(emptyList(), events())

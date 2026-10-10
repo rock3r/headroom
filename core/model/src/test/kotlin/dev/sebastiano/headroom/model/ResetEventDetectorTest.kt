@@ -1,17 +1,18 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import org.junit.jupiter.api.Test
 
 class ResetEventDetectorTest {
     private val now = Instant.parse("2026-10-10T12:00:00Z")
-    private val soon = now.plus(Duration.ofDays(2))
-    private val later = now.plus(Duration.ofDays(9))
-    private val past = now.minus(Duration.ofHours(1))
-    private val redeemedAt = now.minus(Duration.ofHours(2))
+    private val soon = now.plus(2.days)
+    private val later = now.plus(9.days)
+    private val past = now.minus(1.hours)
+    private val redeemedAt = now.minus(2.hours)
 
     private val weekly =
         QuotaWindow(
@@ -19,8 +20,8 @@ class ResetEventDetectorTest {
             label = "Weekly",
             kind = WindowKind.Weekly,
             usedPercent = 92.0,
-            resetsAt = now.plus(Duration.ofDays(3)),
-            length = Duration.ofDays(7),
+            resetsAt = now.plus(3.days),
+            length = 7.days,
         )
     private val session =
         QuotaWindow(
@@ -28,8 +29,8 @@ class ResetEventDetectorTest {
             label = "5-hour",
             kind = WindowKind.Session,
             usedPercent = 40.0,
-            resetsAt = now.plus(Duration.ofHours(2)),
-            length = Duration.ofHours(5),
+            resetsAt = now.plus(2.hours),
+            length = 5.hours,
         )
 
     private fun pool(vararg expiries: Instant, available: Int = expiries.size) =
@@ -106,7 +107,7 @@ class ResetEventDetectorTest {
     fun `a stored reset matches a fresh read of it with a finer expiry time`() {
         // Codex sends microseconds; the stored list keeps milliseconds.
         val fresh = Instant.parse("2026-10-22T20:28:20.843110Z")
-        val stored = Instant.ofEpochMilli(fresh.toEpochMilli())
+        val stored = Instant.fromEpochMilliseconds(fresh.toEpochMilliseconds())
 
         val changes = detect(availability(pool(stored, later)), availability(pool(fresh, later)))
 
@@ -262,7 +263,7 @@ class ResetEventDetectorTest {
 
     @Test
     fun `a redeem never takes a reset that had expired before it, and waits instead`() {
-        val longAgo = redeemedAt.minus(Duration.ofHours(1))
+        val longAgo = redeemedAt.minus(1.hours)
 
         val changes =
             detect(

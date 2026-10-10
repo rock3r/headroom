@@ -52,9 +52,12 @@ import dev.sebastiano.headroom.widget.HeadroomWidgetProvider
 import dev.sebastiano.headroom.widgets.AppWidgetManagerPinner
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -100,7 +103,7 @@ class AppGraph(
     /** Stores the order the user put the accounts in. Does nothing without the data layer. */
     val reorderAccounts: suspend (orderedIds: List<String>) -> Unit = {},
     /** How often countdowns re-read the clock. Null turns it off, for tests with a fixed clock. */
-    val tickInterval: Duration? = Duration.ofMinutes(1),
+    val tickInterval: Duration? = 1.minutes,
     /** Used or left, how often to sync in the background, and how the overview sorts accounts. */
     val settings: SettingsRepository = InMemorySettingsRepository(),
     /** The version name the settings screen shows. */
@@ -210,11 +213,11 @@ class AppGraph(
 
         fun create(
             context: Context,
-            clock: () -> Instant = Instant::now,
+            clock: () -> Instant = Clock.System::now,
             zone: ZoneId = ZoneId.systemDefault(),
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            demoLatency: Duration = Duration.ofMillis(DEMO_LATENCY_MILLIS),
-            tickInterval: Duration? = Duration.ofMinutes(1),
+            demoLatency: Duration = DEMO_LATENCY_MILLIS.milliseconds,
+            tickInterval: Duration? = 1.minutes,
             data: DataGraph? = null,
             resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
             tileSettings: TileSettings? = null,

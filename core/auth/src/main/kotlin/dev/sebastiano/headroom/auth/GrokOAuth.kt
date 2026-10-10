@@ -1,9 +1,10 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
 import java.util.UUID
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Grok (xAI) sign-in: PKCE with a redirect to a fixed loopback port, `127.0.0.1:56121`. xAI's page
@@ -78,7 +79,7 @@ internal class GrokOAuth(
         val json = http.postForm(tokenEndpoint, form).successJson(context)
         val expiresIn = json.long("expires_in") ?: DEFAULT_EXPIRES_IN_SECONDS
         if (expiresIn <= 0) throw AuthException.InvalidResponse("$context has an invalid expiry")
-        val expiresAt = expiryWithSkew(clock.instant(), expiresIn, EXPIRY_MARGIN)
+        val expiresAt = expiryWithSkew(clock.now(), expiresIn, EXPIRY_MARGIN)
         return json.toTokenSet(provider, context, expiresAt, requireRefresh)
     }
 
@@ -90,6 +91,6 @@ internal class GrokOAuth(
         const val CALLBACK_PATH = "/callback"
         const val SCOPE = "openid profile email offline_access grok-cli:access api:access"
         const val DEFAULT_EXPIRES_IN_SECONDS = 3600L
-        val EXPIRY_MARGIN: Duration = Duration.ofMinutes(2)
+        val EXPIRY_MARGIN: Duration = 2.minutes
     }
 }

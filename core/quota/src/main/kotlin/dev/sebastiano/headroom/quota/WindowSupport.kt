@@ -2,9 +2,11 @@ package dev.sebastiano.headroom.quota
 
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import java.util.Locale
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -14,10 +16,10 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
 // Window lengths the providers use. A "month" is 30 days, as in the providers' own maths.
-internal val FIVE_HOURS: Duration = Duration.ofHours(5)
-internal val ONE_DAY: Duration = Duration.ofDays(1)
-internal val ONE_WEEK: Duration = Duration.ofDays(7)
-internal val THIRTY_DAYS: Duration = Duration.ofDays(30)
+internal val FIVE_HOURS: Duration = 5.hours
+internal val ONE_DAY: Duration = 1.days
+internal val ONE_WEEK: Duration = 7.days
+internal val THIRTY_DAYS: Duration = 30.days
 
 internal const val MIN_PERCENT = 0.0
 internal const val MAX_PERCENT = 100.0

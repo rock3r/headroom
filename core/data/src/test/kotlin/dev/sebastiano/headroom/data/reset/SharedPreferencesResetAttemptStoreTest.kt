@@ -8,11 +8,12 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetAttempt
 import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetAttemptMemory
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
@@ -26,7 +27,7 @@ class SharedPreferencesResetAttemptStoreTest {
         val attempts =
             listOf(
                 ResetAttempt("acc-1", "codex", "key-1", at),
-                ResetAttempt("acc-2", "grok", "key-2", at.plusSeconds(5)),
+                ResetAttempt("acc-2", "grok", "key-2", at + 5.seconds),
             )
 
         SharedPreferencesResetAttemptStore(context).save(attempts)
@@ -64,7 +65,7 @@ class SharedPreferencesResetAttemptStoreTest {
         ResetAttemptMemory(clock = { now }, store = SharedPreferencesResetAttemptStore(context))
             .remember(account, "codex", ResetAttemptKey("key-1"))
 
-        now = now.plus(Duration.ofMinutes(3))
+        now = now.plus(3.minutes)
         val restarted =
             ResetAttemptMemory(clock = { now }, store = SharedPreferencesResetAttemptStore(context))
 

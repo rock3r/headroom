@@ -3,9 +3,10 @@ package dev.sebastiano.headroom.data.reset
 import android.app.AlarmManager
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -21,7 +22,7 @@ class AlarmResetSchedulerTest {
     private fun scheduler() = AlarmResetScheduler(context) { handedOver += it }
 
     private fun alarm(account: String, window: String, at: String) =
-        ResetAlarm(account, window, Instant.parse(at), Instant.parse(at).minusSeconds(60), 50.0)
+        ResetAlarm(account, window, Instant.parse(at), Instant.parse(at) - 60.seconds, 50.0)
 
     @Test
     fun `schedules one alarm per planned reset`() {
@@ -36,7 +37,7 @@ class AlarmResetSchedulerTest {
         val scheduled = shadowOf(alarmManager).scheduledAlarms
         assertEquals(2, scheduled.size)
         assertEquals(
-            Instant.parse("2026-09-28T06:01:00Z").toEpochMilli(),
+            Instant.parse("2026-09-28T06:01:00Z").toEpochMilliseconds(),
             scheduled.minOf { it.triggerAtTime },
         )
     }
@@ -119,7 +120,7 @@ class AlarmResetSchedulerTest {
                 60.0,
             )
         scheduler.replaceAll(now, listOf(pending))
-        scheduler.replaceAll(now.plusSeconds(600), listOf(pending.copy(usedBefore = 70.0)))
+        scheduler.replaceAll(now + 600.seconds, listOf(pending.copy(usedBefore = 70.0)))
         assertEquals(70.0, scheduler.pendingAlarms().single().usedBefore)
     }
 }

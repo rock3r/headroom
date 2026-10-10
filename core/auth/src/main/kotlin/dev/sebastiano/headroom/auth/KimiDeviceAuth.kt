@@ -1,8 +1,10 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
 
 /** Kimi Code sign-in with the device-code flow of `auth.kimi.com`. */
@@ -28,9 +30,8 @@ internal class KimiDeviceAuth(
             deviceCode = json.requireString("device_code", context),
             verificationUri = json.string("verification_uri") ?: complete,
             verificationUriComplete = complete,
-            interval =
-                Duration.ofSeconds((json.long("interval") ?: DEFAULT_INTERVAL).coerceAtLeast(1)),
-            expiresIn = json.long("expires_in")?.let(Duration::ofSeconds),
+            interval = ((json.long("interval") ?: DEFAULT_INTERVAL).coerceAtLeast(1)).seconds,
+            expiresIn = json.long("expires_in")?.seconds,
         )
     }
 
@@ -79,7 +80,7 @@ internal class KimiDeviceAuth(
         context: String,
         requireRefresh: Boolean,
     ): TokenSet {
-        val now = clock.instant()
+        val now = clock.now()
         val expiresAt =
             maxOf(
                 expiryWithSkew(now, json.long("expires_in") ?: 0L, EXPIRY_MARGIN),
@@ -93,7 +94,7 @@ internal class KimiDeviceAuth(
         const val OAUTH_HOST = "https://auth.kimi.com"
         const val DEVICE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code"
         const val DEFAULT_INTERVAL = 5L
-        val EXPIRY_MARGIN: Duration = Duration.ofMinutes(5)
-        val MIN_LIFETIME: Duration = Duration.ofSeconds(30)
+        val EXPIRY_MARGIN: Duration = 5.minutes
+        val MIN_LIFETIME: Duration = 30.seconds
     }
 }

@@ -42,7 +42,7 @@ import dev.sebastiano.headroom.ui.resets.RedeemSheet
 import dev.sebastiano.headroom.ui.settings.PageTopBar
 import dev.sebastiano.headroom.ui.settings.RowAction
 import dev.sebastiano.headroom.ui.settings.SettingsRow
-import java.time.Instant
+import kotlin.time.Instant
 import kotlinx.coroutines.delay
 
 /** Debug builds have the prototype tools. */

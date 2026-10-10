@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /** Which windows may send a "your limit has reset" notification. */
 public object ResetPolicy {
@@ -17,5 +18,5 @@ public object ResetPolicy {
         canAlert(window) && window.kind == WindowKind.Weekly
 
     /** How long after a window's reset time the app checks that the reset happened. */
-    public val CHECK_DELAY: Duration = Duration.ofSeconds(10)
+    public val CHECK_DELAY: Duration = 10.seconds
 }

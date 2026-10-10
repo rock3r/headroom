@@ -8,10 +8,10 @@ import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import dev.sebastiano.headroom.model.SyncFrequency
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -39,7 +39,7 @@ class SyncWorkerScheduleTest {
 
         val work = activeSyncWork().single()
         assertEquals(
-            Duration.ofHours(3).toMillis(),
+            3.hours.inWholeMilliseconds,
             work.periodicityInfo?.repeatIntervalMillis,
         )
     }
@@ -53,7 +53,7 @@ class SyncWorkerScheduleTest {
 
         val after = activeSyncWork().single()
         assertEquals(before.id, after.id)
-        assertEquals(Duration.ofHours(1).toMillis(), after.periodicityInfo?.repeatIntervalMillis)
+        assertEquals(1.hours.inWholeMilliseconds, after.periodicityInfo?.repeatIntervalMillis)
     }
 
     @Test

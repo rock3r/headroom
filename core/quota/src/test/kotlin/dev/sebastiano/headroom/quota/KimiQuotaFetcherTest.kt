@@ -5,12 +5,15 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -63,12 +66,12 @@ class KimiQuotaFetcherTest {
         val weekly = snapshot.windows[0]
         assertEquals(12.0, weekly.usedPercent)
         assertEquals(WindowKind.Weekly, weekly.kind)
-        assertEquals(Duration.ofDays(7), weekly.length)
+        assertEquals(7.days, weekly.length)
         assertEquals(Instant.parse("2026-04-08T20:08:27.033436Z"), weekly.resetsAt)
         val rateLimit = snapshot.windows[1]
         assertEquals(3.0, rateLimit.usedPercent)
         assertEquals(WindowKind.Session, rateLimit.kind)
-        assertEquals(Duration.ofMinutes(300), rateLimit.length)
+        assertEquals(300.minutes, rateLimit.length)
         assertEquals(Instant.parse("2026-04-03T15:08:27.033436Z"), rateLimit.resetsAt)
     }
 
@@ -93,7 +96,7 @@ class KimiQuotaFetcherTest {
             snapshotFor("""{"usage":{"utilization":0.25,"reset_in":3600}}""").windows.single()
 
         assertEquals(25.0, window.usedPercent)
-        assertEquals(FIXED_NOW.plusSeconds(3600), window.resetsAt)
+        assertEquals(FIXED_NOW + 3600.seconds, window.resetsAt)
     }
 
     @Test
@@ -117,7 +120,7 @@ class KimiQuotaFetcherTest {
             snapshot.windows.map { it.label },
         )
         assertEquals(
-            listOf(null, Duration.ofHours(2), Duration.ofDays(1), null),
+            listOf(null, 2.hours, 1.days, null),
             snapshot.windows.map { it.length },
         )
         assertEquals(listOf(50.0, 10.0, 0.0, 10.0), snapshot.windows.map { it.usedPercent })

@@ -12,8 +12,10 @@ import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetGivenBack
 import dev.sebastiano.headroom.model.ResetUseSource
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -25,13 +27,13 @@ import kotlinx.coroutines.flow.map
 internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: () -> Instant) :
     ResetEventLog {
     override fun events(since: Instant): Flow<List<ResetEvent>> =
-        dao.observeResetEvents(since.toEpochMilli()).map { rows ->
+        dao.observeResetEvents(since.toEpochMilliseconds()).map { rows ->
             rows.mapNotNull { it.toDomain() }
         }
 
     override suspend fun redeemed(account: Account, poolId: String, attemptKey: ResetAttemptKey) {
         val now = clock()
-        dao.recordRedeem(account.id, now.minus(CLAIM_WINDOW).toEpochMilli()) { stored ->
+        dao.recordRedeem(account.id, now.minus(CLAIM_WINDOW).toEpochMilliseconds()) { stored ->
             val pool =
                 stored.account.resetsJson?.let(ResetsCodec::decode)?.pools?.firstOrNull {
                     it.id == poolId
@@ -39,9 +41,8 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
             val givenBack = pool?.let {
                 ResetGivenBack.measure(it.scope, stored.windows.map { w -> w.toDomain() }, now)
             }
-            val fetchedAt = stored.account.fetchedAtEpochMs?.let(Instant::ofEpochMilli)
-            val fresh =
-                fetchedAt != null && Duration.between(fetchedAt, now) <= ResetGivenBack.FRESH_FOR
+            val fetchedAt = stored.account.fetchedAtEpochMs?.let(Instant::fromEpochMilliseconds)
+            val fresh = fetchedAt != null && (now - fetchedAt) <= ResetGivenBack.FRESH_FOR
             ResetEvent(
                     accountId = account.id,
                     provider = account.provider,
@@ -59,13 +60,13 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
     }
 
     companion object {
-        val RETENTION: Duration = Duration.ofDays(365)
+        val RETENTION: Duration = 365.days
 
         /**
          * A use elsewhere that a sync recorded this recently may be a redeem in Headroom whose
          * record came after the sync: the redeem takes it over. A redeem call takes seconds.
          */
-        val CLAIM_WINDOW: Duration = Duration.ofMinutes(5)
+        val CLAIM_WINDOW: Duration = 5.minutes
 
         /** What a sync at [now] that read [current] adds to the history of [provider]'s account. */
         fun finder(
@@ -74,7 +75,7 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
             now: Instant,
         ): ResetEventFinder =
             object : ResetEventFinder {
-                override val pruneBeforeEpochMs: Long = now.minus(RETENTION).toEpochMilli()
+                override val pruneBeforeEpochMs: Long = now.minus(RETENTION).toEpochMilliseconds()
 
                 override fun find(
                     previous: AccountWithWindows,
@@ -92,7 +93,7 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
                                     PendingRedeem(
                                         it.id,
                                         it.poolId,
-                                        Instant.ofEpochMilli(it.atEpochMs),
+                                        Instant.fromEpochMilliseconds(it.atEpochMs),
                                     )
                                 },
                             now = now,
@@ -114,8 +115,8 @@ private fun ResetEvent.toEntity(attemptKey: String?, settled: Boolean) =
         poolId = poolId,
         poolLabel = poolLabel,
         kind = kind.name,
-        atEpochMs = at.toEpochMilli(),
-        expiresAtEpochMs = expiresAt?.toEpochMilli(),
+        atEpochMs = at.toEpochMilliseconds(),
+        expiresAtEpochMs = expiresAt?.toEpochMilliseconds(),
         source = source?.name,
         givenBackSession = givenBack[WindowKind.Session],
         givenBackDaily = givenBack[WindowKind.Daily],
@@ -136,8 +137,8 @@ private fun ResetEventEntity.toDomain(): ResetEvent? {
         poolId = poolId,
         poolLabel = poolLabel,
         kind = kind,
-        at = Instant.ofEpochMilli(atEpochMs),
-        expiresAt = expiresAtEpochMs?.let(Instant::ofEpochMilli),
+        at = Instant.fromEpochMilliseconds(atEpochMs),
+        expiresAt = expiresAtEpochMs?.let(Instant::fromEpochMilliseconds),
         source = ResetUseSource.entries.firstOrNull { it.name == source },
         givenBack =
             buildMap {

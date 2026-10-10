@@ -9,7 +9,7 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Instant
+import kotlin.time.Instant
 
 /** Everything the overview, resets and detail screens show. */
 @Immutable

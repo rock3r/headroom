@@ -6,8 +6,9 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -123,7 +124,7 @@ internal class RoomQuotaRepository(
                     account =
                         entity.copy(
                             planLabel = snapshot.planLabel ?: entity.planLabel,
-                            fetchedAtEpochMs = snapshot.fetchedAt.toEpochMilli(),
+                            fetchedAtEpochMs = snapshot.fetchedAt.toEpochMilliseconds(),
                             lastError = null,
                             balanceAmount = snapshot.balance?.amount,
                             balanceUnit = snapshot.balance?.unit,
@@ -142,11 +143,11 @@ internal class RoomQuotaRepository(
                             UsagePointEntity(
                                 entity.id,
                                 window.id,
-                                now.toEpochMilli(),
+                                now.toEpochMilliseconds(),
                                 window.usedPercent,
                             )
                         },
-                    pruneBeforeEpochMs = now.minus(HISTORY_RETENTION).toEpochMilli(),
+                    pruneBeforeEpochMs = now.minus(HISTORY_RETENTION).toEpochMilliseconds(),
                     // Resets that could not be read are compared with nothing: they record no
                     // event.
                     resetEvents =
@@ -177,10 +178,10 @@ internal class RoomQuotaRepository(
 
     override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
         dao.observeHistory(accountId, windowId).map { points ->
-            points.map { UsagePoint(Instant.ofEpochMilli(it.atEpochMs), it.usedPercent) }
+            points.map { UsagePoint(Instant.fromEpochMilliseconds(it.atEpochMs), it.usedPercent) }
         }
 
     private companion object {
-        val HISTORY_RETENTION: Duration = Duration.ofDays(60)
+        val HISTORY_RETENTION: Duration = 60.days
     }
 }

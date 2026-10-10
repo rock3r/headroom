@@ -11,10 +11,14 @@ import dev.sebastiano.headroom.model.ExpiringReset
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetReminderPolicy
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /** Which resets were reminded about, with when each expires, and the day of the last reminder. */
 internal data class ReminderRecord(
@@ -39,7 +43,7 @@ internal class SharedPreferencesResetReminderLedger(context: Context) : ResetRem
                     .filterKeys { it.startsWith(RESET_PREFIX) }
                     .mapNotNull { (key, value) ->
                         (value as? Long)?.let {
-                            key.removePrefix(RESET_PREFIX) to Instant.ofEpochMilli(it)
+                            key.removePrefix(RESET_PREFIX) to Instant.fromEpochMilliseconds(it)
                         }
                     }
                     .toMap(),
@@ -47,16 +51,16 @@ internal class SharedPreferencesResetReminderLedger(context: Context) : ResetRem
                 store
                     .getLong(LAST_DAY, Long.MIN_VALUE)
                     .takeIf { it != Long.MIN_VALUE }
-                    ?.let { LocalDate.ofEpochDay(it) },
+                    ?.let { LocalDate.fromEpochDays(it) },
         )
 
     override fun save(record: ReminderRecord) {
         store.edit {
             clear()
             record.reminded.forEach { (key, expiresAt) ->
-                putLong(RESET_PREFIX + key, expiresAt.toEpochMilli())
+                putLong(RESET_PREFIX + key, expiresAt.toEpochMilliseconds())
             }
-            record.lastDay?.let { putLong(LAST_DAY, it.toEpochDay()) }
+            record.lastDay?.let { putLong(LAST_DAY, it.toEpochDays()) }
         }
     }
 
@@ -86,10 +90,10 @@ internal sealed interface ReminderOutcome {
 internal object ResetReminderRetryPolicy {
     private val DELAYS: List<Duration> =
         listOf(
-            Duration.ofMinutes(5),
-            Duration.ofMinutes(15),
-            Duration.ofMinutes(30),
-            Duration.ofMinutes(60),
+            5.minutes,
+            15.minutes,
+            30.minutes,
+            60.minutes,
         )
 
     /**
@@ -97,16 +101,14 @@ internal object ResetReminderRetryPolicy {
      * expires. After that it goes out from the stored resets, as a stale reminder is better than
      * none.
      */
-    val MIN_NOTICE: Duration = Duration.ofHours(12)
+    val MIN_NOTICE: Duration = 12.hours
 
     /**
      * The delay after the given failed attempt (1-based), or null to post now. It is null once the
      * retries run out, or when waiting would bring [now] closer than [MIN_NOTICE] to [expiresAt].
      */
     fun delayAfterAttempt(attempt: Int, now: Instant, expiresAt: Instant): Duration? =
-        DELAYS.getOrNull(attempt - 1)?.takeUnless {
-            now.plus(it).isAfter(expiresAt.minus(MIN_NOTICE))
-        }
+        DELAYS.getOrNull(attempt - 1)?.takeUnless { now + it > expiresAt - MIN_NOTICE }
 }
 
 /** Posts the reminder that [resets] expire soon. [accounts] are all the user's accounts. */
@@ -125,8 +127,8 @@ internal class ResetReminders(
     private val ledger: ResetReminderLedger,
     private val notifier: ResetReminderNotifier,
     private val schedule: (Instant?) -> Unit,
-    private val clock: () -> Instant = Instant::now,
-    private val zone: () -> ZoneId = ZoneId::systemDefault,
+    private val clock: () -> Instant = Clock.System::now,
+    private val zone: () -> TimeZone = TimeZone::currentSystemDefault,
 ) {
     suspend fun reschedule() {
         val now = clock()
@@ -193,9 +195,9 @@ internal class ResetReminders(
                 // Expired resets can never be due again, so they are forgotten.
                 reminded =
                     (record.reminded + due.associate { it.key to it.expiresAt }).filterValues {
-                        it.isAfter(now)
+                        it > now
                     },
-                lastDay = now.atZone(zone()).toLocalDate(),
+                lastDay = now.toLocalDateTime(zone()).date,
             )
         )
     }
@@ -231,7 +233,11 @@ internal class ResetReminderAlarm(private val context: Context) {
         if (at == null) {
             alarmManager.cancel(intent)
         } else {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), intent)
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                at.toEpochMilliseconds(),
+                intent,
+            )
         }
     }
 

@@ -16,6 +16,7 @@ import dev.sebastiano.headroom.model.SignInAlertPolicy
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.time.toJavaInstant
 
 /** Shows and removes the warning that an account's sign-in expired. */
 public interface SignInNotifier {
@@ -118,7 +119,7 @@ internal class AndroidSignInNotifier(
                 context.getString(
                     R.string.sign_in_expired_body_with_time,
                     DateTimeFormatter.ofPattern(timePattern(), locale)
-                        .format(syncedAt.atZone(zone)),
+                        .format(syncedAt.toJavaInstant().atZone(zone)),
                 )
             } ?: context.getString(R.string.sign_in_expired_body)
         val intent = pendingIntent(account.account.id)

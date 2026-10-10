@@ -1,10 +1,10 @@
 package dev.sebastiano.headroom.ui
 
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 
 class ResetFormatterTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")

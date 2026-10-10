@@ -1,7 +1,8 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
@@ -78,7 +79,7 @@ public object ResetGivenBack {
      * A redeem in Headroom measures the usage of the last sync. Usage older than this may have
      * grown since, so the measure is marked as estimated.
      */
-    public val FRESH_FOR: Duration = Duration.ofMinutes(30)
+    public val FRESH_FOR: Duration = 30.minutes
 
     private val MEASURED_KINDS =
         setOf(WindowKind.Session, WindowKind.Daily, WindowKind.Weekly, WindowKind.Monthly)
@@ -200,8 +201,9 @@ public object ResetEventDetector {
     private fun goneResets(before: ResetPool, after: ResetPool?): List<Instant?> {
         // Matched to the millisecond: the stored list keeps no finer time, and Codex sends
         // microseconds. An exact match would count every stored reset as gone on each sync.
-        val remaining = after?.expiries.orEmpty().map { it.toEpochMilli() }.toMutableList()
-        val goneDated = before.expiries.sorted().filterNot { remaining.remove(it.toEpochMilli()) }
+        val remaining = after?.expiries.orEmpty().map { it.toEpochMilliseconds() }.toMutableList()
+        val goneDated =
+            before.expiries.sorted().filterNot { remaining.remove(it.toEpochMilliseconds()) }
         val undatedBefore = (before.available - before.expiries.size).coerceAtLeast(0)
         val undatedAfter = after?.let { (it.available - it.expiries.size).coerceAtLeast(0) } ?: 0
         val goneUndated = (undatedBefore - undatedAfter).coerceAtLeast(0)

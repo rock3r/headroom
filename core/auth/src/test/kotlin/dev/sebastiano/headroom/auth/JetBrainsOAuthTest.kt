@@ -1,16 +1,15 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -28,7 +27,7 @@ class JetBrainsOAuthTest {
         jetBrains =
             JetBrainsOAuth(
                 http = OkHttpAuthHttpClient(),
-                clock = Clock.fixed(now, ZoneOffset.UTC),
+                clock = fixedClock(now),
                 tokenEndpoint = server.url("/oauth2/token").toString(),
             )
     }
@@ -107,7 +106,7 @@ class JetBrainsOAuthTest {
         assertEquals(Provider.JetBrains, tokens.provider)
         assertEquals("ja", tokens.accessToken)
         assertEquals("jr", tokens.refreshToken)
-        assertEquals(now.plus(Duration.ofMinutes(55)), tokens.expiresAt)
+        assertEquals(now.plus(55.minutes), tokens.expiresAt)
         assertEquals("sam@example.com", tokens.label)
         assertEquals(idToken, tokens.extras[CredentialExtras.JETBRAINS_ID_TOKEN])
         assertEquals(
@@ -137,7 +136,7 @@ class JetBrainsOAuthTest {
             form,
         )
         assertEquals("new", tokens.accessToken)
-        assertEquals(now.plusSeconds(300), tokens.expiresAt)
+        assertEquals(now + 300.seconds, tokens.expiresAt)
     }
 
     @Test

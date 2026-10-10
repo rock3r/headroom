@@ -1,6 +1,8 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,7 +15,7 @@ import kotlinx.coroutines.flow.update
  * refresh adds a little usage, so a refresh visibly changes the numbers.
  */
 public class FakeQuotaRepository(
-    private val clock: () -> Instant = Instant::now,
+    private val clock: () -> Instant = Clock.System::now,
     initial: List<AccountState> = DemoData.accounts(clock()),
 ) : QuotaRepository {
     private val state = MutableStateFlow(initial)
@@ -100,15 +102,15 @@ public object DemoHistory {
         val resetsAt = window.resetsAt ?: return emptyList()
         val length = window.length ?: return emptyList()
         val start = resetsAt.minus(length)
-        if (!now.isAfter(start)) return emptyList()
-        val elapsed = java.time.Duration.between(start, now)
+        if (now <= start) return emptyList()
+        val elapsed = now - start
         return (0..POINTS).map { index ->
             val fraction = index.toDouble() / POINTS
             val wobble =
                 if (index in 1 until POINTS) kotlin.math.sin(index * WOBBLE_FREQUENCY) * WOBBLE
                 else 0.0
             UsagePoint(
-                at = start.plusMillis((elapsed.toMillis() * fraction).toLong()),
+                at = start + ((elapsed.inWholeMilliseconds * fraction).toLong()).milliseconds,
                 usedPercent =
                     (window.usedPercent * Math.pow(fraction, CURVE) + wobble).coerceIn(
                         0.0,

@@ -2,10 +2,6 @@ package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
 import java.net.ServerSocket
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -13,6 +9,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -31,7 +31,7 @@ class GrokOAuthTest {
         grok =
             GrokOAuth(
                 http = OkHttpAuthHttpClient(),
-                clock = Clock.fixed(now, ZoneOffset.UTC),
+                clock = fixedClock(now),
                 tokenEndpoint = server.url("/oauth2/token").toString(),
                 callbackPort = port,
             )
@@ -47,7 +47,7 @@ class GrokOAuthTest {
 
     @Test
     fun `the default listener is the fixed xAI callback port`() {
-        val config = GrokOAuth(OkHttpAuthHttpClient(), Clock.systemUTC()).loopback
+        val config = GrokOAuth(OkHttpAuthHttpClient(), Clock.System).loopback
         assertEquals(56121..56121, config.ports)
         assertEquals("/callback", config.path)
         assertEquals(setOf("https://accounts.x.ai", "https://auth.x.ai"), config.allowedOrigins)
@@ -117,7 +117,7 @@ class GrokOAuthTest {
         assertEquals(Provider.Grok, tokens.provider)
         assertEquals("xa", tokens.accessToken)
         assertEquals("xr", tokens.refreshToken)
-        assertEquals(now.plus(Duration.ofMinutes(58)), tokens.expiresAt)
+        assertEquals(now.plus(58.minutes), tokens.expiresAt)
         assertEquals("xai-user", tokens.providerAccountId)
         assertEquals("sam@example.com", tokens.label)
         assertEquals(200, browser.await().status)
@@ -150,13 +150,13 @@ class GrokOAuthTest {
         assertEquals("b1a00492-073a-47ea-816f-4c329264a828", form["client_id"])
         assertNull(tokens.refreshToken)
         assertEquals("old-refresh", old.refreshedWith(tokens).refreshToken)
-        assertEquals(now.plusSeconds(30), tokens.expiresAt)
+        assertEquals(now + 30.seconds, tokens.expiresAt)
     }
 
     @Test
     fun `a missing expiry defaults to one hour`() = runTest {
         server.enqueue(MockResponse(code = 200, body = """{"access_token":"new"}"""))
         val old = TokenSet(Provider.Grok, CredentialKind.OAuth, "old", "r", now).toCredential("g")
-        assertEquals(now.plus(Duration.ofMinutes(58)), grok.refresh(old).expiresAt)
+        assertEquals(now.plus(58.minutes), grok.refresh(old).expiresAt)
     }
 }

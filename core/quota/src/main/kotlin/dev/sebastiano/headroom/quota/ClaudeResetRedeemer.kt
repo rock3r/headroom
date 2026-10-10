@@ -5,9 +5,9 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
 import java.io.IOException
 import java.security.MessageDigest
-import java.time.Clock
-import java.time.Instant
 import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -242,7 +242,7 @@ internal class ClaudeResetRedeemer(
                 "%02x".format(Locale.ROOT, it)
             }
 
-    private fun now(): Instant = clock.instant()
+    private fun now(): Instant = clock.now()
 
     /**
      * A code from Claude's answer as the log may show it: a short code, or `other` for any other

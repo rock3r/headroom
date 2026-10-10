@@ -4,10 +4,11 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -68,7 +69,7 @@ class OpenCodeGoQuotaFetcherTest {
             snapshot.windows.map { it.kind },
         )
         assertEquals(
-            listOf(Duration.ofHours(5), Duration.ofDays(7), Duration.ofDays(30)),
+            listOf(5.hours, 7.days, 30.days),
             snapshot.windows.map { it.length },
         )
         assertEquals(listOf(25.0, 100.0, 50.5), snapshot.windows.map { it.usedPercent })
