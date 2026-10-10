@@ -10,7 +10,7 @@ package dev.sebastiano.headroom.quota
  */
 internal object ClaudeCodeIdentity {
     /** The Claude Code version. Change it with `scripts/update-claude-code-version.sh`. */
-    const val VERSION = "2.1.292"
+    const val VERSION = "2.1.296"
 
     /** The User-Agent of the usage and profile requests. */
     const val USER_AGENT = "claude-cli/$VERSION"
