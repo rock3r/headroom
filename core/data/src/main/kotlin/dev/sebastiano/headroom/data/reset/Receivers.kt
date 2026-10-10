@@ -88,15 +88,13 @@ internal class MuteAlertReceiver : BroadcastReceiver() {
     }
 }
 
-/** Alarms do not survive a reboot or an app update; plan them again. */
+/**
+ * Alarms do not survive a reboot or an app update; plan them again. A time zone change plans them
+ * again too, because a reset reminder moved to the next morning is due at a local time.
+ */
 internal class RescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (
-            intent.action != Intent.ACTION_BOOT_COMPLETED &&
-                intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
-        ) {
-            return
-        }
+        if (intent.action !in ACTIONS) return
         val graph = (context.applicationContext as? DataGraphOwner)?.dataGraph ?: return
         val pending = goAsync()
         graph.launchInBackground {
@@ -107,5 +105,14 @@ internal class RescheduleReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }
+    }
+
+    private companion object {
+        val ACTIONS =
+            setOf(
+                Intent.ACTION_BOOT_COMPLETED,
+                Intent.ACTION_MY_PACKAGE_REPLACED,
+                Intent.ACTION_TIMEZONE_CHANGED,
+            )
     }
 }

@@ -249,7 +249,7 @@ in Settings ("Remind me before a reset expires"). It is on by default.
   moves to 09:00 the next day (`DEFERRED_TIME`), and is skipped if it expires before then.
 
 `ResetReminders` in `:core:data` runs it. After every sync and every settings change it sets one
-inexact alarm for the next check (`ResetReminderAlarm`); a reboot or an app update sets it again.
+inexact alarm for the next check (`ResetReminderAlarm`); a reboot, an app update or a time zone change sets it again.
 The alarm starts `ResetReminderWorker`, which refreshes the accounts with due resets first, so a
 reset used on another device is left out. `SharedPreferencesResetReminderLedger` stores which
 resets were reminded about and the day of the last reminder. It stores keys made of the account
