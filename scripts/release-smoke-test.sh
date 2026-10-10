@@ -127,12 +127,15 @@ before=$(text_after "Max 20x")
 [ -n "$before" ] || fail "the overview does not show Claude's usage"
 tap "Refresh"
 deadline=$((SECONDS + timeout_seconds))
-while [ "$(text_after "Max 20x")" = "$before" ]; do
+after=$(text_after "Max 20x")
+# A blank read means the dump missed the node, not that the number changed.
+while [ -z "$after" ] || [ "$after" = "$before" ]; do
   [ "$SECONDS" -lt "$deadline" ] || fail "a sync did not change Claude's usage from $before"
   sleep 1
+  after=$(text_after "Max 20x")
 done
 check_alive
-step "a sync moved Claude from $before to $(text_after "Max 20x")" 2-synced
+step "a sync moved Claude from $before to $after" 2-synced
 
 # An account's detail, and back.
 tap "Claude"
