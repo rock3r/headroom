@@ -4,14 +4,14 @@ import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.model.Provider
-import java.io.IOException
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlinx.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ZCodeSignInTest {
@@ -26,7 +26,7 @@ class ZCodeSignInTest {
     }
 
     @Test
-    fun `opens the sign-in page, then returns to the app and saves the tokens`() =
+    fun `opens the sign-in page then returns to the app and saves the tokens`() =
         runTest(UnconfinedTestDispatcher()) {
             val session = FakeSession()
             val events = mutableListOf<String>()
@@ -77,7 +77,7 @@ class ZCodeSignInTest {
         }
 
     @Test
-    fun `a new start replaces the one before, and cancel forgets it`() =
+    fun `a new start replaces the one before and cancel forgets it`() =
         runTest(UnconfinedTestDispatcher()) {
             val first = FakeSession("https://chat.z.ai/1")
             val second = FakeSession("https://chat.z.ai/2")
@@ -131,7 +131,7 @@ class ZCodeSignInTest {
         }
 
     @Test
-    fun `logs each step and why it failed, without tokens`() =
+    fun `logs each step and why it failed without tokens`() =
         runTest(UnconfinedTestDispatcher()) {
             val lines = mutableListOf<String>()
             val session = FakeSession()
@@ -146,8 +146,8 @@ class ZCodeSignInTest {
             signIn.start("z1")
             session.result.completeExceptionally(AuthException.SignInFailed("refused (HTTP 403)"))
 
-            assertTrue(lines.toString(), lines.any { "waiting" in it })
-            assertTrue(lines.toString(), lines.any { "SignInFailed" in it && "HTTP 403" in it })
+            assertTrue(lines.any { "waiting" in it }, lines.toString())
+            assertTrue(lines.any { "SignInFailed" in it && "HTTP 403" in it }, lines.toString())
             assertTrue(lines.none { "business" in it || "bundle" in it })
         }
 }

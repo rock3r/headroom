@@ -2,37 +2,41 @@ package dev.sebastiano.headroom.signin
 
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.TokenSet
-import java.io.IOException
-import kotlinx.coroutines.CancellationException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.io.IOException
 
 /** Where the ZCode sign-in of a Z.AI account is. */
-sealed interface ZCodeSignInState {
+public sealed interface ZCodeSignInState {
     /** The Z.AI account this sign-in is for; null when none runs. */
-    val accountId: String?
+    public val accountId: String?
 
-    data object Idle : ZCodeSignInState {
+    public data object Idle : ZCodeSignInState {
         override val accountId: String? = null
     }
 
-    data class Starting(override val accountId: String) : ZCodeSignInState
+    public data class Starting(override val accountId: String) : ZCodeSignInState
 
     /**
      * The ZCode page at [url] is open in the browser, and the app waits for the user. [opened]
      * counts the times the user asked for the page, so each ask is a new state that opens it again.
      */
-    data class Waiting(override val accountId: String, val url: String, val opened: Int = 1) :
-        ZCodeSignInState
+    public data class Waiting(
+        override val accountId: String,
+        val url: String,
+        val opened: Int = 1,
+    ) : ZCodeSignInState
 
     /** The user signed in. The tokens are stored and the account's resets read again. */
-    data class Done(override val accountId: String) : ZCodeSignInState
+    public data class Done(override val accountId: String) : ZCodeSignInState
 
-    data class Failed(override val accountId: String, val error: SignInError) : ZCodeSignInState
+    public data class Failed(override val accountId: String, val error: SignInError) :
+        ZCodeSignInState
 }
 
 /**
@@ -42,7 +46,7 @@ sealed interface ZCodeSignInState {
  * brings the app in front of the browser tab. [save] stores the tokens next to the account's API
  * key and refreshes the account, so its resets show. [log] gets one line per step, with no token.
  */
-class ZCodeSignIn(
+public class ZCodeSignIn(
     private val start: suspend () -> DeviceSession,
     private val save: suspend (accountId: String, tokens: TokenSet) -> Unit,
     private val scope: CoroutineScope,
@@ -50,7 +54,7 @@ class ZCodeSignIn(
     private val log: (String) -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow<ZCodeSignInState>(ZCodeSignInState.Idle)
-    val state: StateFlow<ZCodeSignInState> = mutableState.asStateFlow()
+    public val state: StateFlow<ZCodeSignInState> = mutableState.asStateFlow()
 
     private var job: Job? = null
 
@@ -59,7 +63,7 @@ class ZCodeSignIn(
      * page again: a new flow would leave the user on a page whose sign-in the app no longer
      * watches. A sign-in for another account stops.
      */
-    fun start(accountId: String) {
+    public fun start(accountId: String) {
         val current = mutableState.value
         if (current is ZCodeSignInState.Waiting && current.accountId == accountId) {
             log("ZCode sign-in: opening the page again")
@@ -85,18 +89,18 @@ class ZCodeSignIn(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: AuthException) {
-                    log("ZCode sign-in failed: ${failure.javaClass.simpleName}: ${failure.message}")
+                    log("ZCode sign-in failed: ${failure::class.simpleName}: ${failure.message}")
                     ZCodeSignInState.Failed(accountId, failure.toSignInError())
                 } catch (failure: IOException) {
                     // The sign-in worked but storing it did not.
-                    log("ZCode sign-in could not be saved: ${failure.javaClass.simpleName}")
+                    log("ZCode sign-in could not be saved: ${failure::class.simpleName}")
                     ZCodeSignInState.Failed(accountId, SignInError.Unknown)
                 }
         }
     }
 
     /** Stops the sign-in and forgets it. */
-    fun cancel() {
+    public fun cancel() {
         job?.cancel()
         job = null
         mutableState.value = ZCodeSignInState.Idle

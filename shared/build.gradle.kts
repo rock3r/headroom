@@ -18,6 +18,9 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.atomicfu)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.androidx.datastore.preferences.core)
+            implementation(libs.okio)
         }
     }
 }
