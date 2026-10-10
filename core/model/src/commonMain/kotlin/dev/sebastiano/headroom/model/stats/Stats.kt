@@ -1,4 +1,4 @@
-package dev.sebastiano.headroom.ui.stats
+package dev.sebastiano.headroom.model.stats
 
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.model.Account
@@ -6,19 +6,24 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.DayOfWeek
-import java.time.LocalDate
 import kotlin.time.Instant
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.isoDayNumber
 
 /**
  * One account's main limit (see [dev.sebastiano.headroom.model.AccountState.primaryWindow]) and its
  * recorded usage, oldest point first. Every stat is made of these.
  */
-data class StatsSource(val account: Account, val window: QuotaWindow, val points: List<UsagePoint>)
+public data class StatsSource(
+    val account: Account,
+    val window: QuotaWindow,
+    val points: List<UsagePoint>,
+)
 
 /** Everything the Stats tab shows. A null or empty stat does not have enough history yet. */
 @Immutable
-data class Stats(
+public data class Stats(
     val coverage: Coverage? = null,
     val resets: ResetScore? = null,
     val shares: List<ProviderShare> = emptyList(),
@@ -33,11 +38,11 @@ data class Stats(
 )
 
 /** How much history the stats are based on: whole days since the oldest point. */
-@Immutable data class Coverage(val days: Int)
+@Immutable public data class Coverage(val days: Int)
 
 /** The account and the limit a stat is about. */
 @Immutable
-data class StatAccount(
+public data class StatAccount(
     val id: String,
     val provider: Provider,
     /** The name the user gave the account, or the provider's name. */
@@ -47,14 +52,14 @@ data class StatAccount(
 
 /** One reset seen in the history: the highest usage before it, and when that was reached. */
 @Immutable
-data class PastReset(val account: StatAccount, val peak: Double, val peakAt: Instant) {
+public data class PastReset(val account: StatAccount, val peak: Double, val peakAt: Instant) {
     val hitLimit: Boolean
         get() = peak >= LIMIT
 }
 
 /** How many resets came without hitting the limit. */
 @Immutable
-data class ResetScore(
+public data class ResetScore(
     val total: Int,
     val clean: Int,
     /** Resets in a row, up to the latest, that did not hit the limit. */
@@ -68,17 +73,17 @@ data class ResetScore(
 
 /** One provider's share of all the quota burned, in percentage points of each main limit. */
 @Immutable
-data class ProviderShare(val provider: Provider, val points: Double, val fraction: Double)
+public data class ProviderShare(val provider: Provider, val points: Double, val fraction: Double)
 
 /**
  * Percentage points burned in each hour of the week, in the user's zone, from Monday 00:00 to
  * Sunday 23:00: [DAYS] × [HOURS] cells.
  */
 @Immutable
-data class BurnHeatmap(val cells: List<Double>) {
-    fun at(day: DayOfWeek, hour: Int): Double = cells[(day.value - 1) * HOURS + hour]
+public data class BurnHeatmap(val cells: List<Double>) {
+    public fun at(day: DayOfWeek, hour: Int): Double = cells[(day.isoDayNumber - 1) * HOURS + hour]
 
-    fun dayTotal(day: DayOfWeek): Double = (0 until HOURS).sumOf { at(day, it) }
+    public fun dayTotal(day: DayOfWeek): Double = (0 until HOURS).sumOf { at(day, it) }
 
     val total: Double
         get() = cells.sum()
@@ -90,22 +95,22 @@ data class BurnHeatmap(val cells: List<Double>) {
     val busiest: Pair<DayOfWeek, Int>
         get() {
             val index = cells.indices.maxBy { cells[it] }
-            return DayOfWeek.of(index / HOURS + 1) to index % HOURS
+            return DayOfWeek(index / HOURS + 1) to index % HOURS
         }
 
     /** The day with the most use. The earliest wins a tie. */
     val busiestDay: DayOfWeek
         get() = DayOfWeek.entries.maxBy { dayTotal(it) }
 
-    companion object {
-        const val DAYS: Int = 7
-        const val HOURS: Int = 24
+    public companion object {
+        public const val DAYS: Int = 7
+        public const val HOURS: Int = 24
     }
 }
 
 /** How much was left, on average, when the limits reset. */
 @Immutable
-data class LeftOver(
+public data class LeftOver(
     /** Percent of the limit left unused, averaged over every reset. */
     val averageLeft: Double,
     val resets: Int,
@@ -114,14 +119,19 @@ data class LeftOver(
 )
 
 @Immutable
-data class AccountLeftOver(val account: StatAccount, val averageLeft: Double, val resets: Int)
+public data class AccountLeftOver(
+    val account: StatAccount,
+    val averageLeft: Double,
+    val resets: Int,
+)
 
 /** The most of one limit used in a single local day. */
-@Immutable data class BiggestDay(val account: StatAccount, val points: Double, val date: LocalDate)
+@Immutable
+public data class BiggestDay(val account: StatAccount, val points: Double, val date: LocalDate)
 
 /** The usage of one account's main limit over a recent span, for a small line chart. */
 @Immutable
-data class Sparkline(
+public data class Sparkline(
     val account: StatAccount,
     /** The points inside the span, oldest first. Fewer than two cannot draw a line. */
     val points: List<UsagePoint>,
@@ -132,4 +142,4 @@ data class Sparkline(
 )
 
 /** Usage at or above this hit the limit. */
-internal const val LIMIT = 100.0
+public const val LIMIT: Double = 100.0

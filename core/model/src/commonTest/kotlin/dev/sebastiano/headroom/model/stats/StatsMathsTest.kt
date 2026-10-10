@@ -1,13 +1,10 @@
-package dev.sebastiano.headroom.ui.stats
+package dev.sebastiano.headroom.model.stats
 
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -15,6 +12,10 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
 
 class StatsMathsTest {
     /** A Monday, 00:00 UTC. */
@@ -68,7 +69,7 @@ class StatsMathsTest {
     @Test
     fun `with no history every stat is empty`() {
         val empty = source("c", Provider.Claude)
-        val stats = stats(listOf(empty), now, ZoneOffset.UTC)
+        val stats = stats(listOf(empty), now, TimeZone.UTC)
         assertNull(stats.coverage)
         assertNull(stats.resets)
         assertEquals(emptyList<ProviderShare>(), stats.shares)
@@ -81,7 +82,7 @@ class StatsMathsTest {
 
     @Test
     fun `with no accounts every stat is empty`() {
-        assertEquals(Stats(), stats(emptyList(), now, ZoneOffset.UTC))
+        assertEquals(Stats(), stats(emptyList(), now, TimeZone.UTC))
     }
 
     @Test
@@ -94,7 +95,7 @@ class StatsMathsTest {
     }
 
     @Test
-    fun `past resets come from every account, oldest first`() {
+    fun `past resets come from every account oldest first`() {
         val resets = pastResets(listOf(claude, codex))
         assertEquals(listOf(50.0, 80.0, 100.0), resets.map { it.peak })
         assertEquals(listOf("x", "c", "c"), resets.map { it.account.id })
@@ -148,7 +149,7 @@ class StatsMathsTest {
     }
 
     @Test
-    fun `left over averages what was left at each reset, per account too`() {
+    fun `left over averages what was left at each reset per account too`() {
         val left = leftOver(pastResets(listOf(claude, codex)))
         // Left at the resets: Codex 50, Claude 20 and 0.
         assertEquals(70.0 / 3, left?.averageLeft)
@@ -163,14 +164,14 @@ class StatsMathsTest {
     }
 
     @Test
-    fun `usage above the limit leaves nothing, not less than nothing`() {
+    fun `usage above the limit leaves nothing not less than nothing`() {
         val over = PastReset(account("a", Provider.Grok), 104.0, monday)
         assertEquals(0.0, leftOver(listOf(over))?.averageLeft)
         assertNull(leftOver(emptyList()))
     }
 
     @Test
-    fun `shares split all the burned quota by provider, biggest first`() {
+    fun `shares split all the burned quota by provider biggest first`() {
         val secondClaude = source("c2", Provider.Claude, 0L to 10.0, 5L to 30.0, nickname = "Work")
         val shares = shares(listOf(claude, codex, secondClaude))
         // Claude: 80 + 2 + 58 + 40 + 1 + 29 = 210, plus 20 on the second account. Codex: 50 + 10.
@@ -190,14 +191,14 @@ class StatsMathsTest {
     @Test
     fun `the heatmap needs a week of history`() {
         val short = source("c", Provider.Claude, 0L to 0.0, 2L to 30.0, 100L to 60.0)
-        assertNull(heatmap(listOf(short), ZoneOffset.UTC))
+        assertNull(heatmap(listOf(short), TimeZone.UTC))
     }
 
     @Test
     fun `the heatmap puts the use in the hour of the week it happened`() {
         // Monday 09:00 to 10:00 burns 10, and the next Tuesday 14:00 to 16:00 burns 30.
         val week = source("c", Provider.Claude, 9L to 0.0, 10L to 10.0, 206L to 10.0, 208L to 40.0)
-        val map = requireNotNull(heatmap(listOf(week), ZoneOffset.UTC))
+        val map = requireNotNull(heatmap(listOf(week), TimeZone.UTC))
         assertEquals(10.0, map.at(DayOfWeek.MONDAY, 9))
         assertEquals(15.0, map.at(DayOfWeek.TUESDAY, 14))
         assertEquals(15.0, map.at(DayOfWeek.TUESDAY, 15))
@@ -211,7 +212,7 @@ class StatsMathsTest {
     @Test
     fun `a week of history with no use has no heatmap`() {
         val idle = source("c", Provider.Claude, 0L to 20.0, 200L to 20.0)
-        assertNull(heatmap(listOf(idle), ZoneOffset.UTC))
+        assertNull(heatmap(listOf(idle), TimeZone.UTC))
     }
 
     @Test
@@ -228,7 +229,7 @@ class StatsMathsTest {
                 35L to 35.0,
                 40L to 45.0,
             )
-        val day = requireNotNull(biggestDay(listOf(busy, codex), ZoneOffset.UTC))
+        val day = requireNotNull(biggestDay(listOf(busy, codex), TimeZone.UTC))
         assertEquals("c", day.account.id)
         assertEquals(LocalDate.parse("2026-09-01"), day.date)
         assertEquals(25.0, day.points, 1e-9)
@@ -236,7 +237,7 @@ class StatsMathsTest {
 
     @Test
     fun `no use means no biggest day`() {
-        assertNull(biggestDay(listOf(source("c", Provider.Claude, 0L to 5.0)), ZoneOffset.UTC))
+        assertNull(biggestDay(listOf(source("c", Provider.Claude, 0L to 5.0)), TimeZone.UTC))
     }
 
     @Test
@@ -271,7 +272,7 @@ class StatsMathsTest {
     private fun mapWith(vararg cells: Pair<Pair<DayOfWeek, Int>, Double>): BurnHeatmap {
         val values = MutableList(BurnHeatmap.DAYS * BurnHeatmap.HOURS) { 0.0 }
         cells.forEach { (at, value) ->
-            values[(at.first.value - 1) * BurnHeatmap.HOURS + at.second] = value
+            values[(at.first.isoDayNumber - 1) * BurnHeatmap.HOURS + at.second] = value
         }
         return BurnHeatmap(values)
     }

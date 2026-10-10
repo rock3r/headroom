@@ -45,6 +45,12 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.model.stats.coverage
+import dev.sebastiano.headroom.model.stats.heatmap
+import dev.sebastiano.headroom.model.stats.leftOver
+import dev.sebastiano.headroom.model.stats.resetUsage
+import dev.sebastiano.headroom.model.stats.shares
+import dev.sebastiano.headroom.model.stats.sparklines
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox

@@ -38,10 +38,25 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaBar
 import dev.sebastiano.headroom.designsystem.providerColors
+import dev.sebastiano.headroom.model.stats.BurnHeatmap
+import dev.sebastiano.headroom.model.stats.Coverage
+import dev.sebastiano.headroom.model.stats.LIMIT
+import dev.sebastiano.headroom.model.stats.LeftOver
+import dev.sebastiano.headroom.model.stats.Persona
+import dev.sebastiano.headroom.model.stats.ProviderShare
+import dev.sebastiano.headroom.model.stats.ResetScore
+import dev.sebastiano.headroom.model.stats.Sparkline
+import dev.sebastiano.headroom.model.stats.StatAccount
+import dev.sebastiano.headroom.model.stats.Stats
+import dev.sebastiano.headroom.model.stats.biggestDay
+import dev.sebastiano.headroom.model.stats.closestCall
+import dev.sebastiano.headroom.model.stats.persona
 import dev.sebastiano.headroom.ui.ResetFormatter
-import java.time.DayOfWeek
 import java.time.format.TextStyle
 import kotlin.math.roundToInt
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.toJavaDayOfWeek
+import kotlinx.datetime.toJavaLocalDate
 
 /** The headline: how many resets came without hitting the limit, and the current streak. */
 @Composable
@@ -194,7 +209,7 @@ internal fun HeatmapCard(
         }
         val locale = LocalLocale.current.platformLocale
         val (busiestDay, busiestHour) = heatmap.busiest
-        val dayName = busiestDay.getDisplayName(TextStyle.FULL, locale)
+        val dayName = busiestDay.toJavaDayOfWeek().getDisplayName(TextStyle.FULL, locale)
         val hour = formatter.hour(busiestHour)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -209,7 +224,7 @@ internal fun HeatmapCard(
                 val share = heatmap.dayTotal(day) / heatmap.total
                 stringResource(
                     R.string.stats_share_item,
-                    day.getDisplayName(TextStyle.FULL, locale),
+                    day.toJavaDayOfWeek().getDisplayName(TextStyle.FULL, locale),
                     share.asPercent(),
                 )
             }
@@ -217,7 +232,10 @@ internal fun HeatmapCard(
             stringResource(R.string.stats_heatmap_description, dayName, hour, byDay.joinToString())
         BurnHeatmapChart(
             heatmap = heatmap,
-            dayLabels = DayOfWeek.entries.map { it.getDisplayName(TextStyle.NARROW, locale) },
+            dayLabels =
+                DayOfWeek.entries.map {
+                    it.toJavaDayOfWeek().getDisplayName(TextStyle.NARROW, locale)
+                },
             modifier = Modifier.semantics { contentDescription = description },
         )
         ChartNote(stringResource(R.string.stats_heatmap_note))
@@ -292,7 +310,7 @@ internal fun HighlightsRow(stats: Stats, formatter: ResetFormatter, modifier: Mo
                         R.string.stats_biggest_body,
                         day.account.name,
                         day.points.roundToInt(),
-                        formatter.day(day.date),
+                        formatter.day(day.date.toJavaLocalDate()),
                     ),
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )

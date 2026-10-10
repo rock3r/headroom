@@ -27,6 +27,12 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.stats.GivenBack
+import dev.sebastiano.headroom.model.stats.LIMIT
+import dev.sebastiano.headroom.model.stats.ProviderResetUsage
+import dev.sebastiano.headroom.model.stats.ResetPeriod
+import dev.sebastiano.headroom.model.stats.ResetUsage
+import dev.sebastiano.headroom.model.stats.ResetUsageStats
 
 /**
  * "Usage limit resets": how many resets were used, in Headroom or elsewhere, how many expired

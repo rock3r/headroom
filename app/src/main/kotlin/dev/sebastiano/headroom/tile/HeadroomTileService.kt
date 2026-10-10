@@ -10,6 +10,7 @@ import dev.sebastiano.headroom.HeadroomApplication
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.TileSubtitle
 import kotlin.time.Clock
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
