@@ -84,8 +84,11 @@ it.
 - The app and the widgets draw its numbers faded and pulled towards grey (`Modifier.stale` and
   `StaleStyle` in `:core:designsystem`). They are never wavy, and pace is worked out at the time
   of the last good sync. "Last updated 2 hours ago" rounds to the nearest unit (`Age`).
-- The card, the detail and every widget layout show a "Sign in" action that is never faded. A
-  widget tap on such an account opens its sign-in.
+- The card and the detail show a "Sign in" action that is never faded. Every widget layout marks
+  the account too, never faded: Bars and the single ring and shape show a "Sign in" label, and the
+  ring grid, the lock screen and the Shape grid show a red "!" badge where the number would be,
+  because only the account name goes under a ring. The content description still says that the
+  sign-in expired, with the last numbers. A widget tap on such an account opens its sign-in.
 - It never leads the next reset, gets no reset alarms, and its resets are not listed as upcoming.
 - `SignInAlertingRepository` in `:core:data` runs `SignInAlertPolicy` after every refresh. The
   first time an account expires, it posts a warning on the "Sign-in problems" channel. Tapping it
