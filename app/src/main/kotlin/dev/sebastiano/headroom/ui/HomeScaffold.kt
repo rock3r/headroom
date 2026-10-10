@@ -140,10 +140,9 @@ internal fun HomeScaffold(
             resets,
             resetHandlers,
             onSignInAgain,
+            opener,
         )
-    val suiteType =
-        if (width == LayoutWidth.Compact) NavigationSuiteType.None
-        else NavigationSuiteType.WideNavigationRailCollapsed
+    val suiteType = width.navigationSuiteType
 
     NavigationSuiteScaffold(
         navigationItems = { HomeNavigationItems(tab, suiteType, selectTab) },
@@ -426,7 +425,15 @@ private class DetailActions(
     val resets: AccountResets,
     val resetHandlers: ResetHandlers,
     val onSignInAgain: (accountId: String) -> Unit,
-)
+    private val opener: AccountOpener,
+) {
+    /** The account whose detail must bring its Resets card into view, or null. */
+    val revealResetsOf: String?
+        get() = opener.resetsFor
+
+    /** Called once the detail brought the Resets card into view. */
+    val onRevealResets: () -> Unit = { opener.resetsFor = null }
+}
 
 /**
  * A tab's list and the account detail, in a [NavigableListDetailPaneScaffold] driven by
@@ -487,15 +494,7 @@ private fun ListDetailPanes(
                 ) {
                     val current = detail ?: return@AnimatedPane
                     if (twoPanes) {
-                        DetailPane(
-                            current,
-                            details.formatter,
-                            details.onAlertChange,
-                            details.onChartWindowChange,
-                            details.resets,
-                            details.resetHandlers,
-                            details.onSignInAgain,
-                        )
+                        DetailPane(current, details)
                     } else {
                         val shared = rememberSharedElements(transitionScope, this, animate)
                         DetailScreen(
@@ -509,6 +508,8 @@ private fun ListDetailPanes(
                             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
                             resets = details.resets,
                             resetHandlers = details.resetHandlers,
+                            revealResets = details.revealResetsOf == current.account.id,
+                            onRevealResets = details.onRevealResets,
                         )
                     }
                 }
@@ -547,30 +548,36 @@ private fun HomeNavigationItems(
 @Composable
 private fun OpenAccountEffect(
     request: OpenAccountRequest?,
-    onOpen: suspend (String) -> Unit,
+    onOpen: suspend (OpenAccountRequest) -> Unit,
     onConsume: () -> Unit,
 ) {
     val open by rememberUpdatedState(onOpen)
     val consume by rememberUpdatedState(onConsume)
     LaunchedEffect(request) {
         val pending = request ?: return@LaunchedEffect
-        open(pending.accountId)
+        open(pending)
         consume()
     }
 }
 
 /**
- * The account whose detail opens next, from a widget tap, a sign-in warning, or the wide Resets
- * tab: [open] switches to the Overview tab, and [OpenDetailEffect] then shows the detail.
+ * The account whose detail opens next, from a widget tap, a sign-in warning, a reset reminder, or
+ * the wide Resets tab: [open] switches to the Overview tab, and [OpenDetailEffect] then shows the
+ * detail. With showResets, [resetsFor] holds the account until its detail has brought the Resets
+ * card into view.
  */
 @Stable
 internal class AccountOpener(private val onShowOverview: () -> Unit) {
     var pending: String? by mutableStateOf(null)
         private set
 
-    fun open(accountId: String) {
+    /** Cleared by the detail once the Resets card is in view. */
+    var resetsFor: String? by mutableStateOf(null)
+
+    fun open(accountId: String, showResets: Boolean = false) {
         onShowOverview()
         pending = accountId
+        resetsFor = accountId.takeIf { showResets }
     }
 
     fun consume() {
@@ -587,7 +594,7 @@ private fun rememberAccountOpener(
 ): AccountOpener {
     val showOverview by rememberUpdatedState(onShowOverview)
     val opener = remember { AccountOpener { showOverview() } }
-    OpenAccountEffect(request, { opener.open(it) }, onConsumeRequest)
+    OpenAccountEffect(request, { opener.open(it.accountId, it.showResets) }, onConsumeRequest)
     return opener
 }
 
@@ -617,12 +624,7 @@ private fun OpenDetailEffect(
 @Composable
 private fun DetailPane(
     detail: DetailUiState,
-    formatter: ResetFormatter,
-    onAlertChange: (String, String, Boolean) -> Unit,
-    onChartWindowChange: (String) -> Unit,
-    resets: AccountResets,
-    resetHandlers: ResetHandlers,
-    onSignInAgain: (accountId: String) -> Unit,
+    details: DetailActions,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
@@ -646,12 +648,14 @@ private fun DetailPane(
     ) { shown ->
         DetailScreen(
             state = shown,
-            formatter = formatter,
-            onAlertChange = onAlertChange,
-            onChartWindowChange = onChartWindowChange,
-            resets = resets,
-            resetHandlers = resetHandlers,
-            onSignInAgain = onSignInAgain,
+            formatter = details.formatter,
+            onAlertChange = details.onAlertChange,
+            onChartWindowChange = details.onChartWindowChange,
+            resets = details.resets,
+            resetHandlers = details.resetHandlers,
+            onSignInAgain = details.onSignInAgain,
+            revealResets = details.revealResetsOf == shown.account.id,
+            onRevealResets = details.onRevealResets,
         )
     }
 }

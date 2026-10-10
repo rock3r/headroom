@@ -289,6 +289,8 @@
     <string name="settings_reset_island">Reset island (experimental)</string>
     <string name="settings_reset_island_body">A small black pill grows out of your camera cutout when a limit resets while Headroom is in the background.</string>
     <string name="settings_resets">Resets</string>
+    <string name="settings_reset_expiry_reminders">Remind me before a reset expires</string>
+    <string name="settings_reset_expiry_reminders_body">A notification about a day before a reset you can use expires. At most one a day, for every reset that expires soon.</string>
     <string name="settings_redeem_claude_resets">Redeem Claude resets (experimental)</string>
     <string name="settings_redeem_claude_resets_body">Use Claude\'s saved resets from Headroom. Claude has not published this API, so it may fail or stop working.</string>
     <string name="settings_reset_island_off">Off</string>

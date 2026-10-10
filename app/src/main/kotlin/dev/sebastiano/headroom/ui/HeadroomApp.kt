@@ -432,6 +432,7 @@ private fun settingsActions(
         onResetConfettiChange = viewModel::setResetConfetti,
         onResetIslandChange = viewModel::setResetIsland,
         onRedeemClaudeResetsChange = viewModel::setRedeemClaudeResets,
+        onResetExpiryRemindersChange = viewModel::setResetExpiryReminders,
         onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
         onRefreshResetIsland = resetIsland::refresh,
         onOpenPrototypes = { onNavigate(Page.Prototypes) },
