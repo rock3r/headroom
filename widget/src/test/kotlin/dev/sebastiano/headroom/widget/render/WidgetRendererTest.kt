@@ -342,7 +342,7 @@ class WidgetRendererTest {
     }
 
     @Test
-    fun `an expired account says Sign in in every layout, and its tap signs it in again`() =
+    fun `an expired account asks to sign in in every layout, and its tap signs it in again`() =
         runTest {
             val expired = DemoData.accountsWithExpiredSignIn(now)
             val claudeOnly = listOf("demo-claude")
@@ -368,11 +368,31 @@ class WidgetRendererTest {
                 val state = WidgetUiState.from(expired, config, now, size, host)
                 val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
                 val label = "$config $size $host"
-                assertContains(doc.text(), "Sign in", message = label)
+                // Rings show a "!" badge instead of a "Sign in" label.
+                assertTrue(doc.text().contains("Sign in") || doc.drawsText("!"), label)
                 assertContains(doc.text(), "Sign-in expired", message = label)
                 assertTrue(Tap.SignIn("demo-claude") in doc.taps(), label)
                 assertFalse(Tap.Open("demo-claude") in doc.taps(), label)
             }
+        }
+
+    @Test
+    fun `an expired account's small ring shows a centred badge, and only its name below`() =
+        runTest {
+            val expired = DemoData.accountsWithExpiredSignIn(now)
+            listOf(
+                    WidgetConfig(WidgetStyle.Rings) to (WidgetSize(160f, 160f) to HOME),
+                    WidgetConfig(WidgetStyle.Rings) to (WidgetSize(300f, 120f) to LOCK),
+                )
+                .forEach { (config, sizeAndHost) ->
+                    val (size, host) = sizeAndHost
+                    val state = WidgetUiState.from(expired, config, now, size, host)
+                    val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+                    assertTrue(doc.drawsText("!"), "No sign-in badge in $config $host")
+                    assertFalse(doc.drawsText("Sign in"), "A Sign in line in $config $host")
+                    assertTrue(doc.drawsText("Claude"), "No name under the ring in $config $host")
+                    WidgetRenderer.remoteViews(doc).playAt(size)
+                }
         }
 
     @Test

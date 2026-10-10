@@ -62,11 +62,11 @@ internal fun RemoteDrawScope.drawGaugeRing(
 }
 
 /**
- * The reset counter: [count] in a small disc, ringed by the card colour so it stands apart from
- * what it sits on. It is centred on ([x], [y]).
+ * A small badge: [text] in a disc, ringed by the card colour so it stands apart from what it sits
+ * on. It is centred on ([x], [y]). The reset counter and the "!" of a stale ring use it.
  */
 internal fun RemoteDrawScope.drawCounter(
-    count: Int,
+    text: String,
     x: RemoteFloat,
     y: RemoteFloat,
     style: CounterStyle,
@@ -75,12 +75,12 @@ internal fun RemoteDrawScope.drawCounter(
     drawCircle(fillPaint(style.halo.rc), (style.radiusPx + style.haloPx).rf, centre)
     drawCircle(fillPaint(style.fill.rc), style.radiusPx.rf, centre)
     with(RestrictedRemoteApis) {
-        drawCentredText(count.toString().rs, x, y, textPaint(style.text, style.textPx, bold = true))
+        drawCentredText(text.rs, x, y, textPaint(style.text, style.textPx, bold = true))
     }
 }
 
 /**
- * Colours and sizes of a [drawCounter] counter. The sizes are pixels, fixed at capture, because
+ * Colours and sizes of a [drawCounter] badge. The sizes are pixels, fixed at capture, because
  * canvas text needs its size then.
  */
 internal data class CounterStyle(
@@ -91,6 +91,11 @@ internal data class CounterStyle(
     val textPx: Float,
     val haloPx: Float,
 )
+
+/** Draws the "!" badge of a ring whose sign-in expired, in the centre of the ring. */
+internal fun RemoteDrawScope.drawSignInBadge(style: CounterStyle) {
+    drawCounter(SIGN_IN_MARK, width / 2f.rf, height / 2f.rf, style)
+}
 
 /**
  * Draws the reset counter off the bottom-right of a ring of [geometry], just past its outer edge,
@@ -104,7 +109,7 @@ internal fun RemoteDrawScope.drawRingCounter(
     val outerEdge = remoteMin(width, height) * (geometry.radius + geometry.stroke / 2f).rf
     val distance = outerEdge + (style.radiusPx + style.haloPx).rf
     val offset = distance * DIAGONAL.rf
-    drawCounter(count, width / 2f.rf + offset, height / 2f.rf + offset, style)
+    drawCounter(count.toString(), width / 2f.rf + offset, height / 2f.rf + offset, style)
 }
 
 /**
@@ -257,6 +262,7 @@ private fun fillPaint(color: RemoteColor) = RemotePaint {
 }
 
 private const val FULL_TURN = 360f
+private const val SIGN_IN_MARK = "!"
 /** cos 45°: how far along each axis the bottom-right diagonal crosses a circle, per radius. */
 private const val DIAGONAL = 0.7071f
 private const val TOP = -90f

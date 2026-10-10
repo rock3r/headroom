@@ -243,8 +243,11 @@ private fun SmallRing(
     val colors = render.colorsFor(gauge)
     val counter =
         render.counterStyle(gauge, render.pxValue(SMALL_COUNTER), render.textPx(SMALL_COUNTER_TEXT))
+    val signIn =
+        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.textPx(SIGN_IN_BADGE_TEXT))
+    // Inside the cell's tap area, so the gap between rows still opens the account.
     RemoteColumn(
-        modifier = modifier,
+        modifier = modifier.padding(vertical = render.px(SMALL_CELL_GAP / 2f)),
         verticalArrangement = RemoteArrangement.Center,
         horizontalAlignment = RemoteAlignment.CenterHorizontally,
     ) {
@@ -262,13 +265,18 @@ private fun SmallRing(
                 if (gauge.resetsAvailable > 0) {
                     drawRingCounter(gauge.resetsAvailable, SmallRing, counter)
                 }
+                if (gauge.stale) drawSignInBadge(signIn)
             }
-            WidgetText(
-                text = gauge.shownPercent.toString(),
-                color = colors.onSurface,
-                fontSize = render.sp(SMALL_NUMBER),
-                fontWeight = FontWeight.ExtraBold,
-            )
+            // A stale ring shows a "!" badge where its number would be: only the name goes under
+            // a ring. Its faded arc still shows the last usage.
+            if (!gauge.stale) {
+                WidgetText(
+                    text = gauge.shownPercent.toString(),
+                    color = colors.onSurface,
+                    fontSize = render.sp(SMALL_NUMBER),
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
         }
         WidgetText(
             gauge.name,
@@ -276,7 +284,6 @@ private fun SmallRing(
             render.sp(SMALL_NAME),
             fontWeight = FontWeight.SemiBold,
         )
-        if (gauge.stale) SignInLabel(render, render.sp(SMALL_NAME))
     }
 }
 
@@ -301,4 +308,8 @@ private const val LABEL_LINE = 1.4f
 private const val HERO_COUNTER = 10f
 private const val HERO_COUNTER_TEXT = 12f
 private const val SMALL_COUNTER = 7f
+internal const val SIGN_IN_BADGE = 9f
+internal const val SIGN_IN_BADGE_TEXT = 13f
+/** Space between the rows of the ring grid. */
+private const val SMALL_CELL_GAP = 8f
 private const val SMALL_COUNTER_TEXT = 9f

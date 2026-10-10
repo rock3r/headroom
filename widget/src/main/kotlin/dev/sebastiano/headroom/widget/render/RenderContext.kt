@@ -47,6 +47,20 @@ internal class RenderContext(
             haloPx = radiusPx * COUNTER_HALO_SHARE,
         )
 
+    /**
+     * The "!" badge in the centre of a ring whose sign-in expired, [radiusPx] wide, with [textPx]
+     * text.
+     */
+    fun signInBadgeStyle(radiusPx: Float, textPx: Float): CounterStyle =
+        CounterStyle(
+            fill = colors.signIn,
+            text = colors.background,
+            halo = colors.background,
+            radiusPx = radiusPx,
+            textPx = textPx,
+            haloPx = 0f,
+        )
+
     /** Text size for a design size, scaled with the widget. */
     fun sp(design: Float): RemoteTextUnit = (design * unit).sp.asRemoteTextUnit()
 

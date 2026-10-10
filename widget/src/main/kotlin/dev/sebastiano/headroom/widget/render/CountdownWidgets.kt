@@ -157,6 +157,8 @@ private fun LockScreenGauge(
     val colors = render.colorsFor(gauge)
     val counter =
         render.counterStyle(gauge, render.pxValue(LOCK_COUNTER), render.textPx(LOCK_COUNTER_TEXT))
+    val signIn =
+        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.textPx(SIGN_IN_BADGE_TEXT))
     RemoteColumn(modifier = modifier, horizontalAlignment = RemoteAlignment.CenterHorizontally) {
         RemoteBox(
             modifier = RemoteModifier.width(render.px(LOCK_RING)).height(render.px(LOCK_RING)),
@@ -172,8 +174,12 @@ private fun LockScreenGauge(
                 if (gauge.resetsAvailable > 0) {
                     drawRingCounter(gauge.resetsAvailable, LockRing, counter)
                 }
+                if (gauge.stale) drawSignInBadge(signIn)
             }
-            ProviderLogoIcon(gauge.provider, render.pxValue(LOCK_LOGO), colors.onSurface)
+            // A stale ring shows a "!" badge in place of its logo: only the name goes under a ring.
+            if (!gauge.stale) {
+                ProviderLogoIcon(gauge.provider, render.pxValue(LOCK_LOGO), colors.onSurface)
+            }
         }
         WidgetText(
             text = render.strings.percent(gauge.shownPercent),
@@ -181,17 +187,12 @@ private fun LockScreenGauge(
             fontSize = render.sp(LOCK_NUMBER),
             fontWeight = FontWeight.ExtraBold,
         )
-        // The logo in the ring names a stale account, so its name line asks to sign in.
-        if (gauge.stale) {
-            SignInLabel(render, render.sp(LOCK_NAME))
-        } else {
-            WidgetText(
-                gauge.name,
-                colors.onSurfaceVariant,
-                render.sp(LOCK_NAME),
-                fontWeight = FontWeight.Medium,
-            )
-        }
+        WidgetText(
+            gauge.name,
+            colors.onSurfaceVariant,
+            render.sp(LOCK_NAME),
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
