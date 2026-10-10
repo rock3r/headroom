@@ -89,6 +89,9 @@ Android 16 widget player.
   the account again and notifies you only if the reset really happened. The notification pops up
   as a heads-up. Session and daily limits never alert; monthly ones can be turned on, and each
   alert has a bell you can switch in the Resets tab.
+- **Reset reminders.** About a day before a reset you can use expires, a notification says so, for
+  example "Your ChatGPT Codex reset expires tomorrow at 06:18". You get at most one a day. Tapping
+  it opens the account with its resets in view. Settings can turn it off.
 - **Widgets for the home screen and the lock screen.** There are four styles (Rings, Bars, Shape
   and Countdown), and each widget remembers its own accounts, window and colours. Settings can
   add any style to the home screen.

@@ -232,6 +232,32 @@ refreshed so its resets show.
   account. The refill animation plays from the new usage.
 - An account whose sign-in expired shows its resets faded, with no action.
 
+## Reminders before a reset expires
+
+About a day before a reset expires unused, Headroom posts a notification on the "Reset reminders"
+channel, for example "Your ChatGPT Codex reset expires tomorrow at 06:18". The user can turn it off
+in Settings ("Remind me before a reset expires"). It is on by default.
+
+`ResetReminderPolicy` in `:core:model` makes every decision:
+
+- It reminds about the resets the user can act on: the account's sign-in works,
+  `Provider.canRedeemResets(settings)` is true, and the pool is `Ready` or `WaitingForLimit`. Each
+  expiry in `ResetPool.expiries` is one reset. Pools with no expiry dates never remind.
+- A reset is due `LEAD` (one day) before it expires, and is reminded about once.
+- The user gets at most one reminder per day. When it goes out, it lists every reset whose reminder
+  falls on that day, soonest first. A reset whose reminder falls on a day that already had one
+  moves to 09:00 the next day (`DEFERRED_TIME`), and is skipped if it expires before then.
+
+`ResetReminders` in `:core:data` runs it. After every sync and every settings change it sets one
+inexact alarm for the next check (`ResetReminderAlarm`); a reboot or an app update sets it again.
+The alarm starts `ResetReminderWorker`, which refreshes the accounts with due resets first, so a
+reset used on another device is left out. `SharedPreferencesResetReminderLedger` stores which
+resets were reminded about and the day of the last reminder. It stores keys made of the account
+id, the pool id and the expiry time, and no token.
+
+Tapping the notification opens the detail of the soonest reset's account and scrolls its Resets
+card into view (`ResetReminderIntents`, `OpenAccountRequest.showResets`).
+
 ## Logs
 
 The reset clients write one line per request to logcat, under the tag `HeadroomResets`:

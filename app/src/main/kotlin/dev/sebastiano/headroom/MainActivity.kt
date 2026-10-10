@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import dev.sebastiano.headroom.data.ResetReminderIntents
 import dev.sebastiano.headroom.data.SignInIntents
 import dev.sebastiano.headroom.ui.AppearanceTheme
 import dev.sebastiano.headroom.ui.HeadroomApp
@@ -28,7 +29,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    /** The account a widget tap or a sign-in warning asked for, until the UI has opened it. */
+    /**
+     * The account a widget tap, a sign-in warning or a reset reminder asked for, until the UI has
+     * opened it.
+     */
     private val openAccount = MutableStateFlow<OpenAccountRequest?>(null)
     private var requests = 0L
 
@@ -69,9 +73,10 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * The activity is single-task: widget taps, sign-in warnings and the sign-in return link arrive
-     * here. The return link carries nothing to act on; bringing the task forward is all it needs,
-     * so whatever the accounts screen shows (a finished sign-in, for example) stays on screen.
+     * The activity is single-task: widget taps, sign-in warnings, reset reminders and the sign-in
+     * return link arrive here. The return link carries nothing to act on; bringing the task forward
+     * is all it needs, so whatever the accounts screen shows (a finished sign-in, for example)
+     * stays on screen.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -96,6 +101,10 @@ class MainActivity : ComponentActivity() {
     private fun handleRequest(intent: Intent?) {
         intent?.getStringExtra(SignInIntents.EXTRA_ACCOUNT_ID)?.let { accountId ->
             openAccount.value = OpenAccountRequest(accountId, requests++, signInAgain = true)
+            return
+        }
+        intent?.getStringExtra(ResetReminderIntents.EXTRA_ACCOUNT_ID)?.let { accountId ->
+            openAccount.value = OpenAccountRequest(accountId, requests++, showResets = true)
             return
         }
         val accountId = intent?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID) ?: return

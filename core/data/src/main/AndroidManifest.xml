@@ -15,6 +15,9 @@
             android:name=".reset.MuteAlertReceiver"
             android:exported="false" />
         <receiver
+            android:name=".reset.ResetReminderReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".reset.RescheduleReceiver"
             android:exported="false">
             <intent-filter>

@@ -102,6 +102,7 @@ internal class RescheduleReceiver : BroadcastReceiver() {
         graph.launchInBackground {
             try {
                 graph.rescheduleResetAlarms()
+                graph.rescheduleResetReminders()
             } finally {
                 pending.finish()
             }
