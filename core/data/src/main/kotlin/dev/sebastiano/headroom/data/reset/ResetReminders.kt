@@ -8,8 +8,10 @@ import androidx.core.content.edit
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.ExpiringReset
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetReminderPolicy
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -65,6 +67,44 @@ internal class SharedPreferencesResetReminderLedger(context: Context) : ResetRem
     }
 }
 
+/** What [ResetReminders.remind] did. */
+internal sealed interface ReminderOutcome {
+    /** The reminder went out, or none was due. The next check is planned. */
+    data object Done : ReminderOutcome
+
+    /** The provider could not be reached, so the check must run again [after] this delay. */
+    data class Retry(val after: Duration) : ReminderOutcome
+}
+
+/**
+ * How long to wait before checking again when the refresh before a reminder could not reach the
+ * provider, as when the phone is offline.
+ */
+internal object ResetReminderRetryPolicy {
+    private val DELAYS: List<Duration> =
+        listOf(
+            Duration.ofMinutes(5),
+            Duration.ofMinutes(15),
+            Duration.ofMinutes(30),
+            Duration.ofMinutes(60),
+        )
+
+    /**
+     * The reminder never waits past this long before the soonest due reset expires. After that it
+     * goes out from the stored resets, as a stale reminder is better than none.
+     */
+    val MIN_NOTICE: Duration = Duration.ofHours(12)
+
+    /**
+     * The delay after the given failed attempt (1-based), or null to post now. It is null once the
+     * retries run out, or when waiting would bring [now] closer than [MIN_NOTICE] to [expiresAt].
+     */
+    fun delayAfterAttempt(attempt: Int, now: Instant, expiresAt: Instant): Duration? =
+        DELAYS.getOrNull(attempt - 1)?.takeUnless {
+            now.plus(it).isAfter(expiresAt.minus(MIN_NOTICE))
+        }
+}
+
 /** Posts the reminder that [resets] expire soon. [accounts] are all the user's accounts. */
 internal fun interface ResetReminderNotifier {
     fun notifyExpiring(resets: List<ExpiringReset>, accounts: List<AccountState>)
@@ -101,17 +141,36 @@ internal class ResetReminders(
 
     /**
      * Posts one reminder for the resets that are due, then plans the next check. The accounts are
-     * refreshed first, so a reset the user used elsewhere since the last sync is left out.
+     * refreshed first, so a reset the user used elsewhere since the last sync is left out. When a
+     * refresh cannot reach the provider, nothing is posted and the check asks to run again later,
+     * as [ResetReminderRetryPolicy] decides. [attempt] counts these checks, starting at 1.
      */
-    suspend fun remind() {
+    suspend fun remind(attempt: Int = 1): ReminderOutcome {
         val before = due(repository.current())
-        before.map { it.account.id }.distinct().forEach { repository.refresh(it) }
+        val refreshed = before.map { it.account.id }.distinct()
+        refreshed.forEach { repository.refresh(it) }
         if (before.isNotEmpty()) {
             val accounts = repository.current()
+            val offline = accounts.any {
+                it.account.id in refreshed && it.lastError == QuotaErrorKind.Network
+            }
+            val retry =
+                if (offline) {
+                    ResetReminderRetryPolicy.delayAfterAttempt(
+                        attempt,
+                        clock(),
+                        before.minOf { it.expiresAt },
+                    )
+                } else {
+                    null
+                }
+            // The retry plans the next check itself, so the alarm is not set here.
+            if (retry != null) return ReminderOutcome.Retry(retry)
             val due = due(accounts)
             if (due.isNotEmpty()) post(due, accounts)
         }
         reschedule()
+        return ReminderOutcome.Done
     }
 
     private fun post(due: List<ExpiringReset>, accounts: List<AccountState>) {

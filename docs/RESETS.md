@@ -251,7 +251,17 @@ in Settings ("Remind me before a reset expires"). It is on by default.
 `ResetReminders` in `:core:data` runs it. After every sync and every settings change it sets one
 inexact alarm for the next check (`ResetReminderAlarm`); a reboot, an app update or a time zone change sets it again.
 The alarm starts `ResetReminderWorker`, which refreshes the accounts with due resets first, so a
-reset used on another device is left out. `SharedPreferencesResetReminderLedger` stores which
+reset used on another device is left out.
+
+The worker has no network constraint, because an offline phone must still get the reminder. When
+the refresh of an account with a due reset fails with `QuotaErrorKind.Network`, the stored resets
+may be stale. The worker then posts nothing and runs again later (`ResetReminderRetryPolicy`). It
+waits 5, 15, 30 and 60 minutes. When the retries run out, it posts from the stored resets. It also
+posts from the stored resets when the next wait would end less than 12 hours (`MIN_NOTICE`) before
+the soonest due reset expires. A retry does not count as a reminder, so the rule of one reminder
+per day still holds.
+
+`SharedPreferencesResetReminderLedger` stores which
 resets were reminded about and the day of the last reminder. It stores keys made of the account
 id, the pool id and the expiry time, and no token.
 
