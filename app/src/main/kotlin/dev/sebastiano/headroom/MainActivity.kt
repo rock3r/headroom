@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.service.quicksettings.TileService
 import android.view.View
 import android.view.ViewTreeObserver
 import androidx.activity.ComponentActivity
@@ -34,6 +35,8 @@ class MainActivity : ComponentActivity() {
      * opened it.
      */
     private val openAccount = MutableStateFlow<OpenAccountRequest?>(null)
+    /** A long press on the Quick Settings tile, until the UI has opened the tile's settings. */
+    private val openTileSettings = MutableStateFlow<Long?>(null)
     private var requests = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,6 +50,7 @@ class MainActivity : ComponentActivity() {
         keepSplashUntil { settings.value != null }
         setContent {
             val request by openAccount.collectAsStateWithLifecycle()
+            val tileSettingsRequest by openTileSettings.collectAsStateWithLifecycle()
             val appearance by settings.collectAsStateWithLifecycle()
             // Nothing is drawn until the stored appearance is read, so the first frame already
             // has the chosen theme and colours.
@@ -63,6 +67,8 @@ class MainActivity : ComponentActivity() {
                                 graph = graph,
                                 openAccountRequest = request,
                                 onConsumeOpenAccount = { openAccount.value = null },
+                                openTileSettingsRequest = tileSettingsRequest,
+                                onConsumeOpenTileSettings = { openTileSettings.value = null },
                             )
                         }
                     }
@@ -73,10 +79,10 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * The activity is single-task: widget taps, sign-in warnings, reset reminders and the sign-in
-     * return link arrive here. The return link carries nothing to act on; bringing the task forward
-     * is all it needs, so whatever the accounts screen shows (a finished sign-in, for example)
-     * stays on screen.
+     * The activity is single-task: widget taps, sign-in warnings, reset reminders, long presses on
+     * the Quick Settings tile and the sign-in return link arrive here. The return link carries
+     * nothing to act on; bringing the task forward is all it needs, so whatever the accounts screen
+     * shows (a finished sign-in, for example) stays on screen.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -99,6 +105,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleRequest(intent: Intent?) {
+        if (intent?.action == TileService.ACTION_QS_TILE_PREFERENCES) {
+            openTileSettings.value = requests++
+            return
+        }
         intent?.getStringExtra(SignInIntents.EXTRA_ACCOUNT_ID)?.let { accountId ->
             openAccount.value = OpenAccountRequest(accountId, requests++, signInAgain = true)
             return

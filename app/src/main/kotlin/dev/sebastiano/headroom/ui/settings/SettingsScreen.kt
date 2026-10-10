@@ -27,11 +27,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -65,8 +68,10 @@ import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.SettingsTitle
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
+import dev.sebastiano.headroom.ui.components.scrollToKey
 import dev.sebastiano.headroom.ui.revealContentEntrance
 import dev.sebastiano.headroom.widgets.WidgetStyle
+import kotlinx.coroutines.flow.first
 
 const val SETTINGS_TAG: String = "settings"
 
@@ -156,6 +161,10 @@ fun SettingsScreen(
     tileSubtitle: TileSubtitleMode = TileSubtitleMode.NextReset,
     /** Debug builds' row that opens the prototypes page; null in release builds. */
     debugEntry: (@Composable (Modifier) -> Unit)? = null,
+    /** True to scroll to the Quick Settings tile's rows, after a long press on the tile. */
+    scrollToTile: Boolean = false,
+    /** Called once the list has scrolled to the tile's rows. */
+    onScrollToTileFinish: () -> Unit = {},
 ) {
     // The set-up opens when the island is switched on with no way to draw it. A return from
     // one of the settings pages reads the state again.
@@ -173,6 +182,9 @@ fun SettingsScreen(
         PageScaffold(
             onClose = actions.onClose,
             reveal = reveal,
+            scrollTo = TILE_SECTION_KEY.takeIf { scrollToTile },
+            animate = animate,
+            onScrollFinish = onScrollToTileFinish,
         ) {
             val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().then(entrance)
             settingsRows(
@@ -345,7 +357,7 @@ private fun LazyListScope.settingsRows(
             modifier = block.padding(horizontal = 6.dp),
         )
     }
-    tracedItem("Settings: SectionLabel quick settings") {
+    tracedItem("Settings: SectionLabel quick settings", key = TILE_SECTION_KEY) {
         SectionLabel(stringResource(R.string.settings_quick_settings), block)
     }
     val subtitles = TileSubtitleMode.entries
@@ -385,6 +397,9 @@ private fun LazyListScope.settingsRows(
 /** The space between blocks of the settings list, on top of the gap between all its items. */
 private val BLOCK_GAP = 10.dp
 
+/** The list key of the Quick Settings section's label, where a long press on the tile lands. */
+private const val TILE_SECTION_KEY = "tile-section"
+
 /**
  * The settings header above a scrolling list, drawn edge to edge with the blur behind the status
  * bar. The list is centred and at most [MAX_CONTENT_WIDTH] wide on large screens.
@@ -394,10 +409,21 @@ private fun PageScaffold(
     onClose: () -> Unit,
     reveal: PageReveal?,
     modifier: Modifier = Modifier,
+    scrollTo: Any? = null,
+    animate: Boolean = true,
+    onScrollFinish: () -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     val listState = rememberLazyListState()
+    val currentOnScrollFinish by rememberUpdatedState(onScrollFinish)
+    LaunchedEffect(listState, scrollTo) {
+        if (scrollTo == null) return@LaunchedEffect
+        // Like the user's scroll below, this one waits for the reveal to end.
+        snapshotFlow { reveal?.revealing == true }.first { !it }
+        listState.scrollToKey(scrollTo, animate)
+        currentOnScrollFinish()
+    }
     StatusBarBlurBox(scrollState = listState, modifier = modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
