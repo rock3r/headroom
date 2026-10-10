@@ -10,8 +10,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import dev.sebastiano.headroom.AppGraph
+import dev.sebastiano.headroom.appdata.DemoAwareResetEvents
 import dev.sebastiano.headroom.appdata.DemoAwareUsageHistory
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
+import dev.sebastiano.headroom.appdata.DemoResetEvents
 import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
@@ -25,6 +27,7 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.prototype.PrototypeTools
@@ -106,6 +109,12 @@ fun testGraph(
         resetScope = scope,
         prototypes = prototypes,
         demoAccounts = demo,
+        resetEvents =
+            DemoAwareResetEvents(
+                isDemo = repository.isDemo,
+                real = ResetEventLog.None,
+                demo = DemoResetEvents(clock),
+            ),
     )
 }
 

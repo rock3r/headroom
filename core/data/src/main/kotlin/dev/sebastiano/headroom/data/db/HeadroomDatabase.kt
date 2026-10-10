@@ -7,8 +7,14 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
 
 @Database(
-    entities = [AccountEntity::class, WindowEntity::class, UsagePointEntity::class],
-    version = 6,
+    entities =
+        [
+            AccountEntity::class,
+            WindowEntity::class,
+            UsagePointEntity::class,
+            ResetEventEntity::class,
+        ],
+    version = 7,
     exportSchema = false,
 )
 internal abstract class HeadroomDatabase : RoomDatabase() {
@@ -75,6 +81,39 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
             object : Migration(5, 6) {
                 override fun migrate(connection: SQLiteConnection) {
                     connection.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
+                }
+            }
+
+        /** Version 7 adds the history of usage-limit resets that were used or expired. */
+        val MIGRATION_6_7: Migration =
+            object : Migration(6, 7) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `reset_events` (" +
+                            "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`accountId` TEXT NOT NULL, `provider` TEXT NOT NULL, " +
+                            "`poolId` TEXT NOT NULL, `poolLabel` TEXT NOT NULL, " +
+                            "`kind` TEXT NOT NULL, `atEpochMs` INTEGER NOT NULL, " +
+                            "`expiresAtEpochMs` INTEGER, `source` TEXT, " +
+                            "`givenBackSession` REAL, `givenBackDaily` REAL, " +
+                            "`givenBackWeekly` REAL, `givenBackMonthly` REAL, " +
+                            "`givenBackEstimated` INTEGER NOT NULL, `attemptKey` TEXT, " +
+                            "`settled` INTEGER NOT NULL, " +
+                            "FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) " +
+                            "ON UPDATE NO ACTION ON DELETE CASCADE )"
+                    )
+                    connection.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_reset_events_accountId` " +
+                            "ON `reset_events` (`accountId`)"
+                    )
+                    connection.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_reset_events_atEpochMs` " +
+                            "ON `reset_events` (`atEpochMs`)"
+                    )
+                    connection.execSQL(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_reset_events_attemptKey` " +
+                            "ON `reset_events` (`attemptKey`)"
+                    )
                 }
             }
     }

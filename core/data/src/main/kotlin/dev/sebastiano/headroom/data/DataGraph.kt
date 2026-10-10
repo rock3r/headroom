@@ -21,6 +21,7 @@ import dev.sebastiano.headroom.data.account.SyncedResetProvider
 import dev.sebastiano.headroom.data.account.TinkCredentialCipher
 import dev.sebastiano.headroom.data.db.HeadroomDatabase
 import dev.sebastiano.headroom.data.db.RoomQuotaRepository
+import dev.sebastiano.headroom.data.db.RoomResetEventLog
 import dev.sebastiano.headroom.data.prefs.DataStoreAlertPreferences
 import dev.sebastiano.headroom.data.prefs.DataStoreSettingsRepository
 import dev.sebastiano.headroom.data.reset.AlarmResetScheduler
@@ -40,6 +41,7 @@ import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetAttemptStore
+import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.quota.QuotaFetchers
@@ -116,6 +118,7 @@ public class DataGraph(
                 HeadroomDatabase.MIGRATION_3_4,
                 HeadroomDatabase.MIGRATION_4_5,
                 HeadroomDatabase.MIGRATION_5_6,
+                HeadroomDatabase.MIGRATION_6_7,
             )
             .build()
 
@@ -182,6 +185,12 @@ public class DataGraph(
             clients = resetClients,
             log = resetLog,
         )
+
+    /**
+     * The resets used and expired, kept in Room for a year: each sync records the ones it finds
+     * gone, and a redeem that works in Headroom is recorded here.
+     */
+    public val resetEvents: ResetEventLog = RoomResetEventLog(database.quotaDao(), clock)
 
     /** Keeps the keys of unsettled redeem attempts across restarts. */
     public val resetAttempts: ResetAttemptStore = SharedPreferencesResetAttemptStore(appContext)

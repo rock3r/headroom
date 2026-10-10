@@ -107,8 +107,9 @@ stores them with the snapshot. Codex, Grok and Z.AI resets can be used. Claude's
 when the user turns on the experimental setting; otherwise they are shown only. Z.AI resets need a
 second sign-in, to ZCode,
 which `:core:auth` runs and stores next to the account's API key. The reset clients live in
-`:core:quota`, the sync and storage in `:core:data`, and the screens in `:app`. See
-[RESETS.md](RESETS.md), which also says how to read their logs.
+`:core:quota`, the sync and storage in `:core:data`, and the screens in `:app`. Each sync also
+records the resets that were used or expired, for the Stats tab. See [RESETS.md](RESETS.md),
+which also describes that history and says how to read the logs.
 
 ## Demo mode
 
