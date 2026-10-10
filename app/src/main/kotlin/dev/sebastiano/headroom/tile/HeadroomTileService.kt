@@ -54,8 +54,10 @@ class HeadroomTileService : TileService() {
                 PendingIntent.FLAG_IMMUTABLE,
             )
         // The Intent overload throws on Android 14 and later; the PendingIntent one is required.
-        if (isLocked) unlockAndRun { startActivityAndCollapse(open) }
-        else startActivityAndCollapse(open)
+        // Do not wrap this in unlockAndRun when the device is locked: an active tile is unbound
+        // while the user unlocks, and the pending action is lost with it. SystemUI holds on to the
+        // PendingIntent instead, asks for the unlock and starts it afterwards.
+        startActivityAndCollapse(open)
     }
 
     override fun onDestroy() {
