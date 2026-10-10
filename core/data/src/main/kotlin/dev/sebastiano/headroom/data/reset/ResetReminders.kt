@@ -72,13 +72,16 @@ internal sealed interface ReminderOutcome {
     /** The reminder went out, or none was due. The next check is planned. */
     data object Done : ReminderOutcome
 
-    /** The provider could not be reached, so the check must run again [after] this delay. */
+    /**
+     * The provider could not be reached, or its resets could not be read, so the check must run
+     * again [after] this delay.
+     */
     data class Retry(val after: Duration) : ReminderOutcome
 }
 
 /**
  * How long to wait before checking again when the refresh before a reminder could not reach the
- * provider, as when the phone is offline.
+ * provider, as when the phone is offline, or could not read the resets.
  */
 internal object ResetReminderRetryPolicy {
     private val DELAYS: List<Duration> =
@@ -142,8 +145,9 @@ internal class ResetReminders(
     /**
      * Posts one reminder for the resets that are due, then plans the next check. The accounts are
      * refreshed first, so a reset the user used elsewhere since the last sync is left out. When a
-     * refresh cannot reach the provider, nothing is posted and the check asks to run again later,
-     * as [ResetReminderRetryPolicy] decides. [attempt] counts these checks, starting at 1.
+     * refresh cannot reach the provider, or cannot read the resets, nothing is posted and the check
+     * asks to run again later, as [ResetReminderRetryPolicy] decides. [attempt] counts these
+     * checks, starting at 1.
      */
     suspend fun remind(attempt: Int = 1): ReminderOutcome {
         val before = due(repository.current())
@@ -151,11 +155,9 @@ internal class ResetReminders(
         refreshed.forEach { repository.refresh(it) }
         if (before.isNotEmpty()) {
             val accounts = repository.current()
-            val offline = accounts.any {
-                it.account.id in refreshed && it.lastError == QuotaErrorKind.Network
-            }
+            val stale = accounts.any { it.account.id in refreshed && it.hasStaleResets() }
             val retry =
-                if (offline) {
+                if (stale) {
                     ResetReminderRetryPolicy.delayAfterAttempt(
                         attempt,
                         clock(),
@@ -172,6 +174,14 @@ internal class ResetReminders(
         reschedule()
         return ReminderOutcome.Done
     }
+
+    /**
+     * True when the refresh could not reach the provider, or reached it but could not read the
+     * resets. Either way the account still holds the resets read in an earlier sync.
+     */
+    private fun AccountState.hasStaleResets(): Boolean =
+        lastError == QuotaErrorKind.Network ||
+            (lastError == null && snapshot?.resetsReadFailed == true)
 
     private fun post(due: List<ExpiringReset>, accounts: List<AccountState>) {
         notifier.notifyExpiring(due, accounts)

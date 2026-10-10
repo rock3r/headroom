@@ -196,6 +196,37 @@ class HeadroomDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `accounts saved before failed reset reads were stored count as read`() = runTest {
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { v7 ->
+            VERSION_1_SCHEMA.forEach(v7::execSQL)
+            v7.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+            v7.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+            v7.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+            v7.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+            v7.execSQL("ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+            v7.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
+            v7.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
+            v7.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
+            VERSION_7_RESET_EVENTS.forEach(v7::execSQL)
+            v7.execSQL(
+                "INSERT INTO accounts (id, provider, label, resetsJson) " +
+                    "VALUES ('a1', 'zai', 'a1', NULL)"
+            )
+            v7.version = 7
+        }
+
+        val db = openCurrent()
+        try {
+            val account = db.quotaDao().observeAccounts().first().single().account
+            assertEquals("a1", account.id)
+            assertEquals(false, account.resetsReadFailed)
+        } finally {
+            db.close()
+        }
+    }
+
     private fun openCurrent(): HeadroomDatabase =
         Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
             .addMigrations(
@@ -205,6 +236,7 @@ class HeadroomDatabaseMigrationTest {
                 HeadroomDatabase.MIGRATION_4_5,
                 HeadroomDatabase.MIGRATION_5_6,
                 HeadroomDatabase.MIGRATION_6_7,
+                HeadroomDatabase.MIGRATION_7_8,
             )
             .allowMainThreadQueries()
             .build()
@@ -238,6 +270,29 @@ class HeadroomDatabaseMigrationTest {
                     "(id INTEGER PRIMARY KEY,identity_hash TEXT)",
                 "INSERT OR REPLACE INTO room_master_table (id,identity_hash) " +
                     "VALUES(42, 'c9d7de0e82970a28b73024ef140953c2')",
+            )
+
+        /** The reset history table that version 7 added, copied from [HeadroomDatabase]. */
+        val VERSION_7_RESET_EVENTS =
+            listOf(
+                "CREATE TABLE IF NOT EXISTS `reset_events` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`accountId` TEXT NOT NULL, `provider` TEXT NOT NULL, " +
+                    "`poolId` TEXT NOT NULL, `poolLabel` TEXT NOT NULL, " +
+                    "`kind` TEXT NOT NULL, `atEpochMs` INTEGER NOT NULL, " +
+                    "`expiresAtEpochMs` INTEGER, `source` TEXT, " +
+                    "`givenBackSession` REAL, `givenBackDaily` REAL, " +
+                    "`givenBackWeekly` REAL, `givenBackMonthly` REAL, " +
+                    "`givenBackEstimated` INTEGER NOT NULL, `attemptKey` TEXT, " +
+                    "`settled` INTEGER NOT NULL, " +
+                    "FOREIGN KEY(`accountId`) REFERENCES `accounts`(`id`) " +
+                    "ON UPDATE NO ACTION ON DELETE CASCADE )",
+                "CREATE INDEX IF NOT EXISTS `index_reset_events_accountId` " +
+                    "ON `reset_events` (`accountId`)",
+                "CREATE INDEX IF NOT EXISTS `index_reset_events_atEpochMs` " +
+                    "ON `reset_events` (`atEpochMs`)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_reset_events_attemptKey` " +
+                    "ON `reset_events` (`attemptKey`)",
             )
     }
 }

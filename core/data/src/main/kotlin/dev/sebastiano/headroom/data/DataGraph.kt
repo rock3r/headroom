@@ -123,6 +123,7 @@ public class DataGraph(
                 HeadroomDatabase.MIGRATION_4_5,
                 HeadroomDatabase.MIGRATION_5_6,
                 HeadroomDatabase.MIGRATION_6_7,
+                HeadroomDatabase.MIGRATION_7_8,
             )
             .build()
 

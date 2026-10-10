@@ -60,6 +60,11 @@ class ResetRemindersTest {
         var afterRefresh: List<AccountState>? = null
         /** Like an offline phone: the refresh keeps the stored snapshot and records this error. */
         var refreshError: QuotaErrorKind? = null
+        /**
+         * Like a provider whose reset endpoint does not answer: the refresh reads the usage, keeps
+         * the stored resets and marks them as not read.
+         */
+        var resetsReadFails: Boolean = false
         val refreshed = mutableListOf<String?>()
         override val accounts: StateFlow<List<AccountState>> = MutableStateFlow(stored)
 
@@ -69,6 +74,18 @@ class ResetRemindersTest {
             refreshError?.let { error ->
                 stored = stored.map {
                     if (it.account.id == accountId) it.copy(lastError = error) else it
+                }
+            }
+            if (resetsReadFails) {
+                stored = stored.map {
+                    if (it.account.id == accountId) {
+                        it.copy(
+                            lastError = null,
+                            snapshot = it.snapshot?.copy(resetsReadFailed = true),
+                        )
+                    } else {
+                        it
+                    }
                 }
             }
         }
@@ -240,4 +257,46 @@ class ResetRemindersTest {
         assertEquals(ReminderOutcome.Done, outcome)
         assertEquals(1, posted.size)
     }
+
+    @Test
+    fun `a check that cannot read the resets waits and retries`() = runTest {
+        val repository = FakeRepository(listOf(codex(tomorrow)))
+        repository.resetsReadFails = true
+
+        val outcome = reminders(repository).remind()
+
+        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(5)), outcome)
+        assertEquals(emptyList(), posted)
+        assertEquals(ReminderRecord(), ledger.record)
+    }
+
+    @Test
+    fun `when the reset read keeps failing, the reminder comes from the stored resets`() = runTest {
+        val repository = FakeRepository(listOf(codex(tomorrow)))
+        repository.resetsReadFails = true
+
+        val outcome = reminders(repository).remind(attempt = 5)
+
+        assertEquals(ReminderOutcome.Done, outcome)
+        assertEquals(listOf(tomorrow), posted.single().map { it.expiresAt })
+        assertEquals(LocalDate.of(2026, 10, 10), ledger.record.lastDay)
+    }
+
+    @Test
+    fun `a failed reset read on an account that was not refreshed does not delay the reminder`() =
+        runTest {
+            val other = codex(nextWeek, id = "other")
+            val repository =
+                FakeRepository(
+                    listOf(
+                        codex(tomorrow),
+                        other.copy(snapshot = other.snapshot!!.copy(resetsReadFailed = true)),
+                    )
+                )
+
+            val outcome = reminders(repository).remind()
+
+            assertEquals(ReminderOutcome.Done, outcome)
+            assertEquals(1, posted.size)
+        }
 }
