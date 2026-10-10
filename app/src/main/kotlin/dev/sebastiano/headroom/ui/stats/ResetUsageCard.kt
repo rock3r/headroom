@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.ui.stats
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
@@ -36,7 +37,8 @@ import dev.sebastiano.headroom.model.WindowKind
 internal fun ResetUsageCard(stats: ResetUsageStats, modifier: Modifier = Modifier) {
     var period by rememberSaveable { mutableStateOf(ResetPeriod.FourWeeks) }
     StatCard(title = stringResource(R.string.stats_reset_usage_title), modifier = modifier) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Wraps on narrow screens and with large text, so every period stays readable.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ResetPeriod.entries.forEach { option ->
                 FilterChip(
                     selected = option == period,

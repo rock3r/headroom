@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -10,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
@@ -26,11 +29,13 @@ import dev.sebastiano.headroom.ui.stats.StatsScreen
 import dev.sebastiano.headroom.ui.stats.StatsUiState
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlin.test.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w411dp-h891dp")
@@ -129,6 +134,37 @@ class StatsTest {
         scrollToDescription("in the last 12 months: 7 used, 2 expired unused")
         scrollToDescription("Gave back about 1.5 times the weekly limit")
         scrollTo("Codex")
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h640dp", fontScale = 2f)
+    // Text is only measured for real with native graphics.
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `the period buttons wrap on a narrow screen with large text`() {
+        val usage = ResetUsageStats(ResetPeriod.entries.associateWith { period(1, 0) })
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                StatsScreen(
+                    StatsUiState(loading = false, stats = Stats(resetUsage = usage)),
+                    formatter,
+                )
+            }
+        }
+        scrollTo("12 months")
+        val layouts = mutableListOf<TextLayoutResult>()
+        rule.onNodeWithText("12 months").performSemanticsAction(
+            SemanticsActions.GetTextLayoutResult
+        ) {
+            it(layouts)
+        }
+        val label = layouts.single()
+        val needed = label.multiParagraph.intrinsics.maxIntrinsicWidth
+        assertTrue(
+            label.lineCount == 1 && needed <= label.size.width,
+            "The 12 months label needs ${needed}px but has ${label.size.width}px",
+        )
+        rule.onNodeWithText("12 months").performClick()
+        scrollToDescription("in the last 12 months")
     }
 
     @Test
