@@ -31,18 +31,17 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
 
     override suspend fun redeemed(account: Account, poolId: String, attemptKey: ResetAttemptKey) {
         val now = clock()
-        val stored = dao.accountWithWindows(account.id) ?: return
-        val pool =
-            stored.account.resetsJson?.let(ResetsCodec::decode)?.pools?.firstOrNull {
-                it.id == poolId
+        dao.recordRedeem(account.id, now.minus(CLAIM_WINDOW).toEpochMilli()) { stored ->
+            val pool =
+                stored.account.resetsJson?.let(ResetsCodec::decode)?.pools?.firstOrNull {
+                    it.id == poolId
+                }
+            val givenBack = pool?.let {
+                ResetGivenBack.measure(it.scope, stored.windows.map { w -> w.toDomain() }, now)
             }
-        val givenBack = pool?.let {
-            ResetGivenBack.measure(it.scope, stored.windows.map { w -> w.toDomain() }, now)
-        }
-        val fetchedAt = stored.account.fetchedAtEpochMs?.let(Instant::ofEpochMilli)
-        val fresh =
-            fetchedAt != null && Duration.between(fetchedAt, now) <= ResetGivenBack.FRESH_FOR
-        dao.insertResetEvent(
+            val fetchedAt = stored.account.fetchedAtEpochMs?.let(Instant::ofEpochMilli)
+            val fresh =
+                fetchedAt != null && Duration.between(fetchedAt, now) <= ResetGivenBack.FRESH_FOR
             ResetEvent(
                     accountId = account.id,
                     provider = account.provider,
@@ -56,11 +55,17 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
                     givenBackEstimated = !givenBack.isNullOrEmpty() && !fresh,
                 )
                 .toEntity(attemptKey = attemptKey.value, settled = false)
-        )
+        }
     }
 
     companion object {
         val RETENTION: Duration = Duration.ofDays(365)
+
+        /**
+         * A use elsewhere that a sync recorded this recently may be a redeem in Headroom whose
+         * record came after the sync: the redeem takes it over. A redeem call takes seconds.
+         */
+        val CLAIM_WINDOW: Duration = Duration.ofMinutes(5)
 
         /** A redeem that no sync matched within this time is no longer matched. */
         val PENDING_FOR: Duration = Duration.ofDays(1)

@@ -158,6 +158,42 @@ class RoomResetEventLogTest {
         }
 
     @Test
+    fun `a redeem recorded after a sync already found its reset gone takes over that use`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            // The provider used the reset, and a sync stored that before Headroom recorded it.
+            now = now.plus(Duration.ofSeconds(5))
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            now = now.plus(Duration.ofSeconds(1))
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"))
+            now = now.plus(Duration.ofSeconds(2))
+            repo.refresh()
+
+            val event = events().single()
+            assertEquals(ResetUseSource.Headroom, event.source)
+            // The sync measured the usage before the reset; the redeem only sees it after.
+            assertEquals(mapOf(WindowKind.Weekly to 90.0), event.givenBack)
+        }
+
+    @Test
+    fun `an older use elsewhere is not taken over by a redeem`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            now = now.plus(Duration.ofHours(1))
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"))
+
+            assertEquals(
+                listOf(ResetUseSource.Elsewhere, ResetUseSource.Headroom),
+                events().map { it.source },
+            )
+        }
+
+    @Test
     fun `a redeem measured on usage older than half an hour is an estimate`() =
         runTest(UnconfinedTestDispatcher()) {
             setUpAccount(backgroundScope)
