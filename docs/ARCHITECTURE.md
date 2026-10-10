@@ -44,6 +44,9 @@ revisions as the Android token store. Swift observes `OverviewUi` and `SignInUi`
 on the main thread. These carry plain values and stable ids (`"network"`, `"over"`), and the app's
 String Catalog holds the text.
 
+The SwiftUI app lives in `iosApp/`; its [README](../iosApp/README.md) covers building, testing and
+how it fits together. Its Xcode project is generated from `iosApp/project.yml` with XcodeGen.
+
 The OAuth loopback listener (`LoopbackServer`) keeps its HTTP handling in common code, over a small
 socket interface: `ServerSocket` on the JVM and POSIX sockets on iOS, always bound to the loopback
 address. On iOS the sign-in page must open in `ASWebAuthenticationSession`, never in Safari: Safari

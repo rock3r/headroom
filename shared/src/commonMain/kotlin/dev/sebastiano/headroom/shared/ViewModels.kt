@@ -8,6 +8,7 @@ import dev.sebastiano.headroom.model.PaceStatus
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.logo
 import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.signin.SignInKind
 import dev.sebastiano.headroom.signin.SignInState
@@ -40,7 +41,7 @@ public data class AccountUi(
     /** [Provider.id], such as `claude`, for the provider's logo. */
     val providerId: String,
     val providerName: String,
-    /** The nickname when there is one, otherwise what the provider calls the account. */
+    /** The nickname when there is one, otherwise the provider's name. */
     val title: String,
     /** What the provider calls the account, such as an email address. */
     val label: String,
@@ -89,6 +90,12 @@ public data class ProviderUi(
     val name: String,
     /** `browser`, `deviceCode` or `apiKey`. */
     val signIn: String,
+    /** The provider's monochrome logo as SVG path data, filled with the nonzero rule. */
+    val logoPath: String,
+    /** Side of the square [logoPath] is drawn in. */
+    val logoViewport: Float,
+    /** Empty space to add on every side of the viewport, so every logo looks the same size. */
+    val logoInset: Float,
 )
 
 /** One step of a sign-in, as [SignInState] but with Swift-friendly fields. */
@@ -207,6 +214,9 @@ internal object UiMapping {
                     SignInKind.DeviceCode -> "deviceCode"
                     SignInKind.ApiKey -> "apiKey"
                 },
+            logoPath = provider.logo.pathData,
+            logoViewport = provider.logo.viewportSize,
+            logoInset = provider.logo.inset,
         )
 
     fun signIn(state: SignInState): SignInUi =

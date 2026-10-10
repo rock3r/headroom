@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.shared
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.logo
 import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.signin.SignInKind
 import dev.sebastiano.headroom.signin.SignInState
@@ -85,11 +86,14 @@ class UiMappingTest {
     }
 
     @Test
-    fun `providers say how they sign in`() {
-        assertEquals(
-            ProviderUi("zai", "Z.AI", "apiKey"),
-            UiMapping.provider(Provider.ZAi, SignInKind.ApiKey),
-        )
+    fun `providers say how they sign in and carry their logo`() {
+        val zai = UiMapping.provider(Provider.ZAi, SignInKind.ApiKey)
+
+        assertEquals("zai", zai.id)
+        assertEquals("Z.AI", zai.name)
+        assertEquals("apiKey", zai.signIn)
+        assertEquals(Provider.ZAi.logo.pathData, zai.logoPath)
+        assertEquals(40f, zai.logoViewport)
         assertEquals(
             "deviceCode",
             UiMapping.provider(Provider.Copilot, SignInKind.DeviceCode).signIn,

@@ -15,6 +15,7 @@
 | Unit tests | `src/test` in JVM modules | JVM, JUnit 5 | `./gradlew :core:quota:test` |
 | Multiplatform tests | `src/commonTest` in multiplatform modules | JVM, JUnit 5 | `./gradlew :core:model:jvmTest` |
 | Multiplatform tests | `src/commonTest` in multiplatform modules | iOS simulator (macOS only) | `./gradlew :core:model:iosSimulatorArm64Test` |
+| iOS app tests | `iosApp/HeadroomTests`, `iosApp/HeadroomUITests` | iOS simulator (macOS only) | `iosApp/scripts/test.sh` |
 | Android unit tests | `src/test` in Android modules | JVM with Robolectric, JUnit 4 | `./gradlew :core:data:testDebugUnitTest` |
 | Compose UI tests | `src/test` in `:app` and `:core:designsystem` | Robolectric | `./gradlew :app:testDebugUnitTest` |
 | Screenshots | `src/test`, Roborazzi | Robolectric | `./gradlew :app:recordRoborazziDebug` |
