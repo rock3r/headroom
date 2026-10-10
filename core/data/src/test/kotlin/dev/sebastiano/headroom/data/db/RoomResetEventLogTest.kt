@@ -194,6 +194,19 @@ class RoomResetEventLogTest {
         }
 
     @Test
+    fun `a redeem is still matched by a sync days later`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"))
+
+            now = now.plus(Duration.ofDays(3))
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            assertEquals(listOf(ResetUseSource.Headroom), events().map { it.source })
+        }
+
+    @Test
     fun `a redeem measured on usage older than half an hour is an estimate`() =
         runTest(UnconfinedTestDispatcher()) {
             setUpAccount(backgroundScope)

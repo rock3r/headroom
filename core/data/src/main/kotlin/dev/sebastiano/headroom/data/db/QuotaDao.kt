@@ -66,8 +66,7 @@ internal interface QuotaDao : ResetEventQueries {
         resetEvents: ResetEventFinder = ResetEventFinder.None,
     ) {
         val previous = accountWithWindows(account.id) ?: return
-        val found =
-            resetEvents.find(previous, pendingRedeems(account.id, resetEvents.pendingSinceEpochMs))
+        val found = resetEvents.find(previous, pendingRedeems(account.id))
         upsertAccount(account)
         deleteWindows(account.id)
         upsertWindows(windows)
@@ -81,16 +80,12 @@ internal interface QuotaDao : ResetEventQueries {
 
 /** What a sync stores in the reset history: see [QuotaDao.storeSnapshot]. */
 internal interface ResetEventFinder {
-    /** Redeems older than this are no longer matched to a reset that is gone. */
-    val pendingSinceEpochMs: Long
-
     /** Events older than this are deleted. */
     val pruneBeforeEpochMs: Long
 
     fun find(previous: AccountWithWindows, pending: List<ResetEventEntity>): FoundResetEvents
 
     object None : ResetEventFinder {
-        override val pendingSinceEpochMs: Long = Long.MAX_VALUE
         override val pruneBeforeEpochMs: Long = Long.MIN_VALUE
 
         override fun find(previous: AccountWithWindows, pending: List<ResetEventEntity>) =
@@ -114,11 +109,15 @@ internal interface ResetEventQueries {
 
     @Insert suspend fun insertResetEvents(events: List<ResetEventEntity>)
 
+    /**
+     * The redeems that no sync has matched yet. They stay pending until one does, however long that
+     * takes, so a reset is never counted twice; the yearly pruning removes them in the end.
+     */
     @Query(
         "SELECT * FROM reset_events WHERE accountId = :accountId AND settled = 0 " +
-            "AND atEpochMs >= :sinceEpochMs ORDER BY atEpochMs, id"
+            "ORDER BY atEpochMs, id"
     )
-    suspend fun pendingRedeems(accountId: String, sinceEpochMs: Long): List<ResetEventEntity>
+    suspend fun pendingRedeems(accountId: String): List<ResetEventEntity>
 
     @Query("UPDATE reset_events SET settled = 1 WHERE id IN (:ids)")
     suspend fun settleRedeems(ids: List<Long>)

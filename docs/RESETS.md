@@ -292,8 +292,9 @@ pool by pool. Every provider lists one expiry date per reset, so a reset is matc
   counts once. It keeps that row's expiry and its estimate of the usage before the reset. The
   takeover matches by pool, not by reset, because the stored resets no longer show which reset the
   redeem used. When a use elsewhere and a redeem in Headroom of the same pool fall within those 5
-  minutes, both still count, but their "in Headroom" and "elsewhere" labels can swap. A redeem that no sync settles within a day is no longer
-  matched.
+  minutes, both still count, but their "in Headroom" and "elsewhere" labels can swap.
+- A redeem stays pending until a sync settles it, however long that takes. A first sync after days
+  offline still counts its reset once.
 - Any other use counts as a use "elsewhere", for example in Claude Code or on chatgpt.com.
 - Nothing is recorded when the resets could not be read, when Z.AI needs its ZCode sign-in, when
   the account is outside the provider's program, or on the first read of an account.

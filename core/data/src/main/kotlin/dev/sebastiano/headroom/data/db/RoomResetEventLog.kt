@@ -67,9 +67,6 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
          */
         val CLAIM_WINDOW: Duration = Duration.ofMinutes(5)
 
-        /** A redeem that no sync matched within this time is no longer matched. */
-        val PENDING_FOR: Duration = Duration.ofDays(1)
-
         /** What a sync at [now] that read [current] adds to the history of [provider]'s account. */
         fun finder(
             provider: Provider,
@@ -77,7 +74,6 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
             now: Instant,
         ): ResetEventFinder =
             object : ResetEventFinder {
-                override val pendingSinceEpochMs: Long = now.minus(PENDING_FOR).toEpochMilli()
                 override val pruneBeforeEpochMs: Long = now.minus(RETENTION).toEpochMilli()
 
                 override fun find(
