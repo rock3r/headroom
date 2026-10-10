@@ -102,9 +102,9 @@ internal fun CountdownWidget(
 }
 
 /**
- * The lock screen layout: a row of small rings with the provider logo inside, the percentage and
- * name below, and the next reset underneath. It is readable without unlocking and uses light marks
- * on a dark, translucent card whatever the style.
+ * The lock screen layout: a row of small rings with the number inside and the name below, and the
+ * next reset underneath. It is readable without unlocking and uses light marks on a dark,
+ * translucent card whatever the style.
  */
 @RemoteComposable
 @Composable
@@ -155,6 +155,10 @@ private fun LockScreenGauge(
     modifier: RemoteModifier = RemoteModifier,
 ) {
     val colors = render.colorsFor(gauge)
+    val counter =
+        render.counterStyle(gauge, render.pxValue(LOCK_COUNTER), render.pxValue(LOCK_COUNTER_TEXT))
+    val signIn =
+        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.pxValue(SIGN_IN_BADGE_TEXT))
     RemoteColumn(modifier = modifier, horizontalAlignment = RemoteAlignment.CenterHorizontally) {
         RemoteBox(
             modifier = RemoteModifier.width(render.px(LOCK_RING)).height(render.px(LOCK_RING)),
@@ -167,26 +171,29 @@ private fun LockScreenGauge(
                     active = colors.accent(gauge.provider).rc,
                     track = colors.track.rc,
                 )
+                if (gauge.resetsAvailable > 0) {
+                    drawRingCounter(gauge.resetsAvailable, LockRing, counter)
+                }
+                if (gauge.stale) drawSignInBadge(signIn)
             }
-            ProviderLogoIcon(gauge.provider, render.pxValue(LOCK_LOGO), colors.onSurface)
+            // The number goes inside the ring, or a "!" badge when the sign-in expired: only the
+            // name goes under a ring.
+            if (!gauge.stale) {
+                WidgetText(
+                    text = gauge.shownPercent.toString(),
+                    color = colors.onSurface,
+                    fontSize = render.sp(LOCK_NUMBER),
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
         }
         WidgetText(
-            text = render.strings.percent(gauge.shownPercent),
-            color = colors.onSurface,
-            fontSize = render.sp(LOCK_NUMBER),
-            fontWeight = FontWeight.ExtraBold,
+            gauge.name,
+            colors.onSurfaceVariant,
+            render.sp(LOCK_NAME),
+            modifier = RemoteModifier.padding(top = render.px(NAME_GAP)),
+            fontWeight = FontWeight.Medium,
         )
-        // The logo in the ring names a stale account, so its name line asks to sign in.
-        if (gauge.stale) {
-            SignInLabel(render, render.sp(LOCK_NAME))
-        } else {
-            WidgetText(
-                gauge.name,
-                colors.onSurfaceVariant,
-                render.sp(LOCK_NAME),
-                fontWeight = FontWeight.Medium,
-            )
-        }
     }
 }
 
@@ -199,8 +206,9 @@ private const val LINE = 1.2f
 private const val DETAIL = 11f
 private const val LOCK_CORNER = 24f
 private const val LOCK_PADDING = 10f
-private const val LOCK_RING = 44f
-private const val LOCK_LOGO = 22f
+private const val LOCK_RING = 52f
 private const val LOCK_NUMBER = 15f
 private const val LOCK_NAME = 10f
 private const val LOCK_FOOTER = 11.5f
+private const val LOCK_COUNTER = 6.5f
+private const val LOCK_COUNTER_TEXT = 8.5f

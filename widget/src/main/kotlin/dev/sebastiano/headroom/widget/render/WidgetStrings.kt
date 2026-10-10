@@ -71,8 +71,18 @@ internal class WidgetStrings(
             gauge.reset?.let {
                 usage + " " + context.getString(R.string.widget_cd_resets, reset(it))
             } ?: usage
-        return if (gauge.stale) withReset + " " + context.getString(R.string.widget_cd_stale)
-        else withReset
+        val withStale =
+            if (gauge.stale) withReset + " " + context.getString(R.string.widget_cd_stale)
+            else withReset
+        val resets = gauge.resetsAvailable
+        if (resets <= 0) return withStale
+        return withStale +
+            " " +
+            context.resources.getQuantityString(
+                R.plurals.widget_cd_resets_available,
+                resets,
+                resets,
+            )
     }
 
     fun countdownTitle(window: GaugeWindow?): String =

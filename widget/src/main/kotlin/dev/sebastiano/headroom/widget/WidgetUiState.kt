@@ -72,6 +72,8 @@ public data class Gauge(
     val display: QuotaDisplay = QuotaDisplay.Used,
     /** The account's sign-in expired: these are old numbers, drawn faded and never wavy. */
     val stale: Boolean = false,
+    /** How many resets the account can use now. Zero shows no badge. */
+    val resetsAvailable: Int = 0,
 ) {
     /** The number the widget shows, and how much of its ring or bar is filled: 0 to 100. */
     val shownPercent: Int
@@ -183,8 +185,13 @@ public sealed interface WidgetUiState {
                 config.style == WidgetStyle.Rings && gauges.size == 1 ->
                     singleRing(selected, names, gauges.single(), config, now, size)
                 config.style == WidgetStyle.Rings -> RingGrid(gauges.take(MAX_GRID_ITEMS), mode)
-                gauges.size == 1 -> SingleShape(gauges.single(), mode)
-                else -> ShapeGrid(gauges.take(MAX_GRID_ITEMS), mode)
+                // Shapes draw no reset counter, so they do not announce resets either.
+                gauges.size == 1 -> SingleShape(gauges.single().copy(resetsAvailable = 0), mode)
+                else ->
+                    ShapeGrid(
+                        gauges.take(MAX_GRID_ITEMS).map { it.copy(resetsAvailable = 0) },
+                        mode,
+                    )
             }
         }
 
@@ -231,8 +238,10 @@ public sealed interface WidgetUiState {
             val session =
                 if (config.window == WidgetWindow.Weekly) {
                     state.sessionWindow?.let {
+                        // The resets belong to the account: the main gauge carries them, so
+                        // the ring announces them once.
                         gauge(state, names.getValue(main.accountId), it, now)
-                            .copy(display = main.display)
+                            .copy(display = main.display, resetsAvailable = 0)
                     }
                 } else {
                     null
@@ -269,6 +278,8 @@ public sealed interface WidgetUiState {
                 reset =
                     resetLabel(window, isSession, now).takeUnless { stale && window.hasReset(now) },
                 stale = stale,
+                // A stale account cannot use its resets until it signs in again.
+                resetsAvailable = if (stale) 0 else state.snapshot?.resets?.availableNow ?: 0,
             )
         }
 

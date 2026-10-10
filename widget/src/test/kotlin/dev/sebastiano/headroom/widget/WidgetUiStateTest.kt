@@ -7,7 +7,11 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.ResetAvailability
+import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.widget.testing.pool
+import dev.sebastiano.headroom.widget.testing.withResets
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.assertEquals
@@ -481,5 +485,99 @@ class WidgetUiStateTest {
         assertEquals(QuotaDisplay.Used, gauge.display)
         assertEquals(71, gauge.shownPercent)
         assertEquals(60, gauge.shownPacePercent)
+    }
+
+    @Test
+    fun `gauges carry the resets an account can use now, in every layout`() {
+        val accounts = demo.withResets()
+        val layouts =
+            listOf(
+                map(WidgetConfig(WidgetStyle.Bars), accounts),
+                map(WidgetConfig(WidgetStyle.Rings), accounts),
+                map(WidgetConfig(WidgetStyle.Rings), accounts, host = WidgetHostCategory.Keyguard),
+            )
+
+        layouts.forEach { state ->
+            val gauges =
+                when (state) {
+                    is WidgetUiState.Bars -> state.gauges
+                    is WidgetUiState.RingGrid -> state.gauges
+                    is WidgetUiState.LockScreen -> state.gauges
+                    else -> error("Unexpected $state")
+                }
+            assertEquals(listOf(0, 2, 0), gauges.take(3).map { it.resetsAvailable }, "$state")
+        }
+        val ring =
+            map(
+                WidgetConfig(WidgetStyle.Rings, listOf("demo-codex")),
+                accounts,
+                WidgetSize(160f, 160f),
+            )
+        assertEquals(2, assertIs<WidgetUiState.SingleRing>(ring).gauge.resetsAvailable)
+    }
+
+    @Test
+    fun `resets count as the app counts them available now`() {
+        val resets =
+            ResetAvailability(
+                listOf(
+                    pool(1, ResetPoolStatus.Ready),
+                    pool(2, ResetPoolStatus.WaitingForLimit),
+                    pool(4, ResetPoolStatus.Queued),
+                    pool(8, ResetPoolStatus.Paused),
+                    pool(16, ResetPoolStatus.NotUsableYet),
+                )
+            )
+        val config = WidgetConfig(WidgetStyle.Bars, accountIds = listOf("demo-codex"))
+
+        val gauge =
+            assertIs<WidgetUiState.Bars>(map(config, demo.withResets(resets = resets)))
+                .gauges
+                .single()
+
+        assertEquals(resets.availableNow, gauge.resetsAvailable)
+        assertEquals(3, gauge.resetsAvailable)
+    }
+
+    @Test
+    fun `an account with no resets, or whose sign-in expired, shows none`() {
+        val config = WidgetConfig(WidgetStyle.Bars)
+
+        val none = assertIs<WidgetUiState.Bars>(map(config)).gauges
+        val expired =
+            assertIs<WidgetUiState.Bars>(
+                    map(config, DemoData.accountsWithExpiredSignIn(now).withResets("demo-claude"))
+                )
+                .gauges
+
+        assertTrue(none.all { it.resetsAvailable == 0 })
+        assertEquals(0, expired.first { it.accountId == "demo-claude" }.resetsAvailable)
+    }
+
+    @Test
+    fun `a single ring counts its account's resets once, on the main gauge`() {
+        val config = WidgetConfig(WidgetStyle.Rings, accountIds = listOf("demo-codex"))
+
+        val ring =
+            assertIs<WidgetUiState.SingleRing>(
+                map(config, demo.withResets(), WidgetSize(160f, 160f))
+            )
+
+        assertEquals(2, ring.gauge.resetsAvailable)
+        assertEquals(0, ring.session?.resetsAvailable)
+    }
+
+    @Test
+    fun `shape widgets carry no resets, since they draw no counter`() {
+        val accounts = demo.withResets()
+
+        val single =
+            assertIs<WidgetUiState.SingleShape>(
+                map(WidgetConfig(WidgetStyle.Shape, listOf("demo-codex")), accounts)
+            )
+        val grid = assertIs<WidgetUiState.ShapeGrid>(map(WidgetConfig(WidgetStyle.Shape), accounts))
+
+        assertEquals(0, single.gauge.resetsAvailable)
+        assertTrue(grid.gauges.all { it.resetsAvailable == 0 })
     }
 }

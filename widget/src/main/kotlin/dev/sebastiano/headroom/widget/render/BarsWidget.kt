@@ -133,7 +133,19 @@ private fun BarRow(
         // the width it gives to weighted children, so the row would overflow.
         verticalAlignment = RemoteAlignment.CenterVertically,
     ) {
-        ProviderAvatar(gauge.provider, render, AVATAR_DP * scale)
+        val avatarPx = render.fixedPxValue(AVATAR_DP * scale)
+        ProviderAvatar(
+            gauge.provider,
+            render,
+            AVATAR_DP * scale,
+            resets = gauge.resetsAvailable,
+            counter =
+                render.counterStyle(
+                    gauge,
+                    avatarPx * AVATAR_COUNTER_SHARE,
+                    avatarPx * AVATAR_COUNTER_TEXT_SHARE,
+                ),
+        )
         RemoteColumn(
             modifier =
                 RemoteModifier.padding(start = render.fixedPx(ROW_SPACING * scale))
@@ -209,6 +221,9 @@ private const val MAX_TEXT_SCALE = 1.45f
 private const val HORIZONTAL_PADDING = 14f
 private const val ROW_SPACING = 8f
 private const val AVATAR_DP = 22f
+/** The reset counter on an avatar: its radius and its text size, as shares of the avatar. */
+private const val AVATAR_COUNTER_SHARE = 0.24f
+private const val AVATAR_COUNTER_TEXT_SHARE = 0.36f
 private const val NAME_WIDTH = 60f
 private const val VALUE_WIDTH = 42f
 private const val BAR_HEIGHT = 12f

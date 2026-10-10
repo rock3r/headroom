@@ -16,6 +16,7 @@ import dev.sebastiano.headroom.widget.WidgetSize
 import dev.sebastiano.headroom.widget.WidgetStyle
 import dev.sebastiano.headroom.widget.WidgetUiState
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
+import dev.sebastiano.headroom.widget.testing.withResets
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
@@ -47,6 +48,9 @@ class WidgetGalleryRecorder {
     /** Android 17 is the first player the Bars widget scrolls in, see `WidgetRenderer`. */
     @Test @Config(sdk = [37]) fun recordScrollingGallery() = record(scrollingShots)
 
+    /** Codex has two resets it can use now. */
+    @Test fun recordResets() = record(resetShots)
+
     /** An expired sign-in: Claude's numbers are stale. */
     @Test fun recordExpiredSignIn() = record(expiredShots)
 
@@ -66,7 +70,7 @@ class WidgetGalleryRecorder {
                     shot.expiredSignIn -> DemoData.accountsWithExpiredSignIn(now)
                     shot.manyAccounts -> DemoData.manyAccounts(now)
                     else -> DemoData.accounts(now)
-                }
+                }.let { if (shot.withResets) it.withResets() else it }
             val state =
                 WidgetUiState.from(accounts, shot.config, now, shot.size, shot.host, shot.display)
             val document = WidgetRenderer.capture(context, state, APP_WIDGET_ID, shot.size, strings)
@@ -124,6 +128,8 @@ class WidgetGalleryRecorder {
         val display: QuotaDisplay = QuotaDisplay.Used,
         /** Shows the demo accounts with Claude's sign-in expired. */
         val expiredSignIn: Boolean = false,
+        /** Gives Codex two resets it can use now. */
+        val withResets: Boolean = false,
     )
 
     private companion object {
@@ -216,6 +222,41 @@ class WidgetGalleryRecorder {
                     WidgetSize(320f, 140f),
                     WidgetHostCategory.Keyguard,
                     expiredSignIn = true,
+                ),
+            )
+
+        val resetShots =
+            listOf(
+                Shot(
+                    "widget-resets-bars",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(320f, 140f),
+                    withResets = true,
+                ),
+                Shot(
+                    "widget-resets-bars-tall",
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(320f, 220f),
+                    withResets = true,
+                ),
+                Shot(
+                    "widget-resets-ring",
+                    WidgetConfig(WidgetStyle.Rings, listOf("demo-codex")),
+                    WidgetSize(160f, 160f),
+                    withResets = true,
+                ),
+                Shot(
+                    "widget-resets-rings-grid",
+                    WidgetConfig(WidgetStyle.Rings),
+                    WidgetSize(160f, 160f),
+                    withResets = true,
+                ),
+                Shot(
+                    "widget-resets-lock-screen",
+                    WidgetConfig(WidgetStyle.Rings),
+                    WidgetSize(320f, 140f),
+                    WidgetHostCategory.Keyguard,
+                    withResets = true,
                 ),
             )
 

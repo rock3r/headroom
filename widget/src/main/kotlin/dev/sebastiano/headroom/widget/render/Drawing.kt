@@ -11,6 +11,7 @@ import androidx.compose.remote.creation.compose.state.RemotePaint
 import androidx.compose.remote.creation.compose.state.min as remoteMin
 import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.remote.creation.compose.state.rf
+import androidx.compose.remote.creation.compose.state.rs
 import androidx.compose.remote.creation.compose.text.RemoteTypeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PaintingStyle
@@ -58,6 +59,64 @@ internal fun RemoteDrawScope.drawGaugeRing(
     } else {
         drawArc(activePaint, TOP.rf, sweep.rf, false, topLeft, box)
     }
+}
+
+/**
+ * A small badge: [text] in a disc, ringed by the card colour so it stands apart from what it sits
+ * on. It is centred on ([x], [y]). The reset counter and the "!" of a stale ring use it.
+ */
+internal fun RemoteDrawScope.drawCounter(
+    text: String,
+    x: RemoteFloat,
+    y: RemoteFloat,
+    style: CounterStyle,
+) {
+    val centre = RemoteOffset(x, y)
+    drawCircle(fillPaint(style.halo.rc), (style.radiusPx + style.haloPx).rf, centre)
+    drawCircle(fillPaint(style.fill.rc), style.radiusPx.rf, centre)
+    // A two-character label ("9+") is drawn smaller, so it stays inside the disc.
+    val textPx = if (text.length > 1) style.textPx * WIDE_LABEL_SCALE else style.textPx
+    with(RestrictedRemoteApis) {
+        drawCentredText(text.rs, x, y, textPaint(style.text, textPx, bold = true))
+    }
+}
+
+/** The reset counter's label: the count, or "9+" above nine, so it always fits its disc. */
+internal fun counterLabel(count: Int): String =
+    if (count > MAX_COUNTER) "$MAX_COUNTER+" else count.toString()
+
+/**
+ * Colours and sizes of a [drawCounter] badge. The sizes are pixels, fixed at capture, because
+ * canvas text needs its size then. The text does not follow the font scale: the disc does not grow
+ * with it.
+ */
+internal data class CounterStyle(
+    val fill: Color,
+    val text: Color,
+    val halo: Color,
+    val radiusPx: Float,
+    val textPx: Float,
+    val haloPx: Float,
+)
+
+/** Draws the "!" badge of a ring whose sign-in expired, in the centre of the ring. */
+internal fun RemoteDrawScope.drawSignInBadge(style: CounterStyle) {
+    drawCounter(SIGN_IN_MARK, width / 2f.rf, height / 2f.rf, style)
+}
+
+/**
+ * Draws the reset counter off the bottom-right of a ring of [geometry], just past its outer edge,
+ * so it never reads as the end of the arc.
+ */
+internal fun RemoteDrawScope.drawRingCounter(
+    count: Int,
+    geometry: RingGeometry,
+    style: CounterStyle,
+) {
+    val outerEdge = remoteMin(width, height) * (geometry.radius + geometry.stroke / 2f).rf
+    val distance = outerEdge + (style.radiusPx + style.haloPx).rf
+    val offset = distance * DIAGONAL.rf
+    drawCounter(counterLabel(count), width / 2f.rf + offset, height / 2f.rf + offset, style)
 }
 
 /**
@@ -210,6 +269,11 @@ private fun fillPaint(color: RemoteColor) = RemotePaint {
 }
 
 private const val FULL_TURN = 360f
+private const val SIGN_IN_MARK = "!"
+private const val MAX_COUNTER = 9
+private const val WIDE_LABEL_SCALE = 0.75f
+/** cos 45°: how far along each axis the bottom-right diagonal crosses a circle, per radius. */
+private const val DIAGONAL = 0.7071f
 private const val TOP = -90f
 private const val MIN_VISIBLE_DEGREES = 1.5f
 private const val MIN_WAVE_STEPS = 24

@@ -141,4 +141,18 @@ class WidgetStringsTest {
         assertEquals("Add an account in Headroom.", strings.empty(EmptyReason.NoAccounts))
         assertEquals("No usage data yet. Tap to open Headroom.", strings.empty(EmptyReason.NoData))
     }
+
+    @Test
+    fun `names the resets an account can use now`() {
+        assertEquals(
+            "Claude: 71% of the weekly limit used, over pace. Resets Thu 15:48. " +
+                "2 resets available now.",
+            strings.gaugeDescription(gauge.copy(resetsAvailable = 2)),
+        )
+        assertEquals(
+            "Claude: 71% of the weekly limit used, over pace. Resets Thu 15:48. " +
+                "1 reset available now.",
+            strings.gaugeDescription(gauge.copy(resetsAvailable = 1)),
+        )
+    }
 }
