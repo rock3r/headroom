@@ -18,7 +18,7 @@ class ResetAlarmPlannerTest {
     private val defaults = { _: String, window: QuotaWindow -> window.kind.name == "Weekly" }
 
     @Test
-    fun `plans one alarm per enabled weekly window, ten seconds after the reset`() {
+    fun `plans one alarm per enabled weekly window ten seconds after the reset`() {
         val alarms = ResetAlarmPlanner.plan(accounts, now, isEnabled = defaults)
         val grok = alarms.single { it.accountId == "demo-grok" }
         assertEquals("weekly", grok.windowId)
@@ -30,7 +30,7 @@ class ResetAlarmPlannerTest {
     }
 
     @Test
-    fun `an account whose sign-in expired gets no alarm, as its data is stale`() {
+    fun `an account whose sign-in expired gets no alarm as its data is stale`() {
         val expired = accounts.map {
             if (it.account.id == "demo-grok") it.copy(lastError = QuotaErrorKind.Auth) else it
         }

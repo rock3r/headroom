@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.tile
 
 import android.content.Context
 import androidx.core.content.edit
+import dev.sebastiano.headroom.model.TileSubtitleMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

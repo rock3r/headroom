@@ -12,6 +12,7 @@ import dev.sebastiano.headroom.model.ResetEvent
 import dev.sebastiano.headroom.model.ResetEventKind
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetUseSource
+import dev.sebastiano.headroom.model.stats.ResetPeriod
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals

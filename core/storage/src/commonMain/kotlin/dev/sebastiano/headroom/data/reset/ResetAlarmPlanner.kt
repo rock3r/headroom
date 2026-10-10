@@ -7,26 +7,26 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 
 /** One scheduled check, a few seconds after a window is due to reset. */
-internal data class ResetAlarm(
-    val accountId: String,
-    val windowId: String,
-    val triggerAt: Instant,
-    val expectedResetAt: Instant,
-    val usedBefore: Double,
+public data class ResetAlarm(
+    public val accountId: String,
+    public val windowId: String,
+    public val triggerAt: Instant,
+    public val expectedResetAt: Instant,
+    public val usedBefore: Double,
 ) {
     /** Stable per account and window, so rescheduling replaces the old alarm. */
-    val requestCode: Int
+    public val requestCode: Int
         get() = "$accountId/$windowId".hashCode()
 }
 
-internal object ResetAlarmPlanner {
+public object ResetAlarmPlanner {
     /**
      * Checking right at the reset time races the provider. A few seconds later usually sees the
      * reset, and [ResetRetryPolicy] checks again soon when it does not.
      */
     private val GRACE: Duration = ResetPolicy.CHECK_DELAY
 
-    fun plan(
+    public fun plan(
         accounts: List<AccountState>,
         now: Instant,
         isEnabled: (accountId: String, window: QuotaWindow) -> Boolean,

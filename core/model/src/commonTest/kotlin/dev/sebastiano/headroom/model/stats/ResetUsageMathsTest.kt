@@ -1,4 +1,4 @@
-package dev.sebastiano.headroom.ui.stats
+package dev.sebastiano.headroom.model.stats
 
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetEvent
@@ -68,7 +68,7 @@ class ResetUsageMathsTest {
     }
 
     @Test
-    fun `uses are split by where they happened, and per provider, busiest first`() {
+    fun `uses are split by where they happened and per provider busiest first`() {
         val events =
             listOf(
                 used(Provider.Grok, daysAgo = 1),
@@ -90,7 +90,7 @@ class ResetUsageMathsTest {
     }
 
     @Test
-    fun `given back adds up each kind of limit, and is estimated when any part is`() {
+    fun `given back adds up each kind of limit and is estimated when any part is`() {
         val events =
             listOf(
                 used(Provider.Codex, 1, givenBack = mapOf(WindowKind.Weekly to 90.0)),

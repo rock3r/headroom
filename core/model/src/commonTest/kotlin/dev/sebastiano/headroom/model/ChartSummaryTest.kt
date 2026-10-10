@@ -1,8 +1,5 @@
-package dev.sebastiano.headroom.ui.home
+package dev.sebastiano.headroom.model
 
-import dev.sebastiano.headroom.model.QuotaWindow
-import dev.sebastiano.headroom.model.UsagePoint
-import dev.sebastiano.headroom.model.WindowKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

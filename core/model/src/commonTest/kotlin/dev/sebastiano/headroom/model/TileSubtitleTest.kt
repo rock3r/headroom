@@ -1,7 +1,5 @@
-package dev.sebastiano.headroom.tile
+package dev.sebastiano.headroom.model
 
-import dev.sebastiano.headroom.model.DemoData
-import dev.sebastiano.headroom.model.QuotaDisplay
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -21,7 +19,7 @@ class TileSubtitleTest {
     }
 
     @Test
-    fun `tightest quota names the most used account, in the chosen display`() {
+    fun `tightest quota names the most used account in the chosen display`() {
         assertEquals(
             TileSubtitle.Tightest("Grok", 88, QuotaDisplay.Used),
             TileSubtitle.of(TileSubtitleMode.TightestQuota, accounts, now, QuotaDisplay.Used),
@@ -33,7 +31,7 @@ class TileSubtitleTest {
     }
 
     @Test
-    fun `no accounts means no subtitle, so the tile falls back to its own line`() {
+    fun `no accounts means no subtitle so the tile falls back to its own line`() {
         assertNull(TileSubtitle.of(TileSubtitleMode.NextReset, emptyList(), now, QuotaDisplay.Used))
         assertNull(
             TileSubtitle.of(TileSubtitleMode.TightestQuota, emptyList(), now, QuotaDisplay.Used)

@@ -5,5 +5,7 @@ kotlin {
         api(libs.kotlinx.coroutines.core)
         api(libs.kotlinx.datetime)
         implementation(libs.kotlinx.atomicfu)
+        // @Immutable, so Compose can skip the stats cards when their numbers do not change.
+        implementation(libs.compose.runtime.annotation)
     }
 }

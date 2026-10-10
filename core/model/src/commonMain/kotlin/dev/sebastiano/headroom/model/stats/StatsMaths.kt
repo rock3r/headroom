@@ -1,21 +1,21 @@
-package dev.sebastiano.headroom.ui.stats
+package dev.sebastiano.headroom.model.stats
 
-import dev.sebastiano.headroom.appdata.ResetPeaks
-import java.time.DayOfWeek
-import java.time.LocalDateTime
-import java.time.ZoneId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
+import kotlinx.datetime.DayOfWeek
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
 
 /** The heatmap needs this much history, so that every day of the week has had a turn. */
 private val MIN_HEATMAP_SPAN: Duration = (BurnHeatmap.DAYS.toLong()).days
 
 /** The sparklines show this recent span. */
-internal val SPARKLINE_SPAN: Duration = (BurnHeatmap.DAYS.toLong()).days
+public val SPARKLINE_SPAN: Duration = (BurnHeatmap.DAYS.toLong()).days
 
 /** Every stat, from each account's main limit and its history. Pure, so it can run anywhere. */
-internal fun stats(sources: List<StatsSource>, now: Instant, zone: ZoneId): Stats {
+public fun stats(sources: List<StatsSource>, now: Instant, zone: TimeZone): Stats {
     val resets = pastResets(sources)
     return Stats(
         coverage = coverage(sources, now),
@@ -29,18 +29,18 @@ internal fun stats(sources: List<StatsSource>, now: Instant, zone: ZoneId): Stat
     )
 }
 
-internal val StatsSource.statAccount: StatAccount
+public val StatsSource.statAccount: StatAccount
     get() = StatAccount(account.id, account.provider, account.name, window.kind)
 
 /** Whole days since the oldest point, or null without any history. */
-internal fun coverage(sources: List<StatsSource>, now: Instant): Coverage? {
+public fun coverage(sources: List<StatsSource>, now: Instant): Coverage? {
     val oldest =
         sources.flatMap { source -> source.points.map { it.at } }.minOrNull() ?: return null
     return Coverage(days = (now - oldest).inWholeDays.toInt().coerceAtLeast(0))
 }
 
 /** Every reset in the history of every account, oldest first. */
-internal fun pastResets(sources: List<StatsSource>): List<PastReset> =
+public fun pastResets(sources: List<StatsSource>): List<PastReset> =
     sources
         .flatMap { source ->
             ResetPeaks.resets(source.points).map {
@@ -50,7 +50,7 @@ internal fun pastResets(sources: List<StatsSource>): List<PastReset> =
         .sortedBy { it.peakAt }
 
 /** How many of [resets] came without hitting the limit, or null when there are none yet. */
-internal fun resetScore(resets: List<PastReset>): ResetScore? {
+public fun resetScore(resets: List<PastReset>): ResetScore? {
     if (resets.isEmpty()) return null
     val timeline = resets.map { it.hitLimit }
     return ResetScore(
@@ -62,13 +62,13 @@ internal fun resetScore(resets: List<PastReset>): ResetScore? {
 }
 
 /** The highest peak that did not hit the limit; the most recent wins a tie. */
-internal fun closestCall(resets: List<PastReset>): PastReset? =
+public fun closestCall(resets: List<PastReset>): PastReset? =
     resets
         .filterNot { it.hitLimit }
         .maxWithOrNull(compareBy<PastReset> { it.peak }.thenBy { it.peakAt })
 
 /** What was left, on average, at each reset, overall and per account. */
-internal fun leftOver(resets: List<PastReset>): LeftOver? {
+public fun leftOver(resets: List<PastReset>): LeftOver? {
     if (resets.isEmpty()) return null
     val accounts =
         resets
@@ -84,7 +84,7 @@ private val PastReset.left: Double
     get() = (LIMIT - peak).coerceIn(0.0, LIMIT)
 
 /** Each provider's share of all the quota burned, the biggest first. */
-internal fun shares(sources: List<StatsSource>): List<ProviderShare> {
+public fun shares(sources: List<StatsSource>): List<ProviderShare> {
     val burned =
         sources
             .groupBy { it.account.provider }
@@ -101,7 +101,7 @@ internal fun shares(sources: List<StatsSource>): List<ProviderShare> {
  * The use in each hour of the week, or null before a week of history or without any use that can be
  * placed in time.
  */
-internal fun heatmap(sources: List<StatsSource>, zone: ZoneId): BurnHeatmap? {
+public fun heatmap(sources: List<StatsSource>, zone: TimeZone): BurnHeatmap? {
     val times = sources.flatMap { source -> source.points.map { it.at } }
     val first = times.minOrNull() ?: return null
     val last = times.maxOrNull() ?: return null
@@ -114,22 +114,22 @@ internal fun heatmap(sources: List<StatsSource>, zone: ZoneId): BurnHeatmap? {
 }
 
 private val LocalDateTime.cell: Int
-    get() = (dayOfWeek.value - 1) * BurnHeatmap.HOURS + hour
+    get() = (dayOfWeek.isoDayNumber - 1) * BurnHeatmap.HOURS + hour
 
 /** The most of one limit used in one local day, or null without any use that can be placed. */
-internal fun biggestDay(sources: List<StatsSource>, zone: ZoneId): BiggestDay? =
+public fun biggestDay(sources: List<StatsSource>, zone: TimeZone): BiggestDay? =
     sources
         .flatMap { source ->
-            hourlyBurn(source.points, zone)
-                .entries
-                .groupBy({ it.key.toLocalDate() }, { it.value })
-                .map { (date, amounts) -> BiggestDay(source.statAccount, amounts.sum(), date) }
+            hourlyBurn(source.points, zone).entries.groupBy({ it.key.date }, { it.value }).map {
+                (date, amounts) ->
+                BiggestDay(source.statAccount, amounts.sum(), date)
+            }
         }
         .filter { it.points > 0.0 }
         .maxWithOrNull(compareBy<BiggestDay> { it.points }.thenBy { it.date })
 
 /** Each account's points in the last [SPARKLINE_SPAN], in the order of [sources]. */
-internal fun sparklines(sources: List<StatsSource>, now: Instant): List<Sparkline> {
+public fun sparklines(sources: List<StatsSource>, now: Instant): List<Sparkline> {
     val start = now.minus(SPARKLINE_SPAN)
     return sources.map { source ->
         Sparkline(
@@ -143,7 +143,7 @@ internal fun sparklines(sources: List<StatsSource>, now: Instant): List<Sparklin
 }
 
 /** The timeline as stretches of clean resets (false) and limit hits (true), with their lengths. */
-internal fun runs(timeline: List<Boolean>): List<Pair<Boolean, Int>> {
+public fun runs(timeline: List<Boolean>): List<Pair<Boolean, Int>> {
     val runs = mutableListOf<Pair<Boolean, Int>>()
     timeline.forEach { hit ->
         val last = runs.lastOrNull()
@@ -157,7 +157,7 @@ internal fun runs(timeline: List<Boolean>): List<Pair<Boolean, Int>> {
 }
 
 /** A playful name for when most of the quota goes. */
-enum class Persona {
+public enum class Persona {
     EarlyBird,
     NineToFive,
     EveningHacker,
@@ -172,7 +172,7 @@ private val WORK_HOURS = 9..17
 private val EVENING_HOURS = 18..21
 
 /** The persona of [map]: the weekend if it takes a big share, else the busiest hour of the day. */
-internal fun persona(map: BurnHeatmap): Persona {
+public fun persona(map: BurnHeatmap): Persona {
     val weekend = map.dayTotal(DayOfWeek.SATURDAY) + map.dayTotal(DayOfWeek.SUNDAY)
     if (map.total > 0.0 && weekend / map.total >= WEEKEND_SHARE) return Persona.WeekendWarrior
     val hour =
