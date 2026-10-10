@@ -58,8 +58,7 @@ import dev.sebastiano.headroom.ui.delights.NEXT_RESET_ANCHOR
 import dev.sebastiano.headroom.ui.delights.delightAnchor
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.resets.AccountResets
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Instant
 
 const val OVERVIEW_LIST_TAG: String = "overview-list"
 const val DEMO_BANNER_TAG: String = "demo-banner"
@@ -258,7 +257,7 @@ private fun OverviewHeader(
 @ReadOnlyComposable
 private fun syncedText(lastSyncedAt: Instant?, now: Instant): String {
     if (lastSyncedAt == null) return stringResource(R.string.overview_never_synced)
-    val minutes = Duration.between(lastSyncedAt, now).toMinutes().coerceAtLeast(0)
+    val minutes = (now - lastSyncedAt).inWholeMinutes.coerceAtLeast(0)
     return when {
         minutes < 1 -> stringResource(R.string.overview_synced_just_now)
         minutes < MINUTES_PER_HOUR ->

@@ -13,10 +13,10 @@ import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.homeUiState
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

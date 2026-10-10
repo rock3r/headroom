@@ -6,11 +6,11 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
 import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner

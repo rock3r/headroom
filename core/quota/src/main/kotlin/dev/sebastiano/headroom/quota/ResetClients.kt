@@ -6,8 +6,9 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.ResetAvailability
 import java.io.IOException
-import java.time.Clock
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /** What reading an account's resets gave. */
 public sealed interface ResetRead {
@@ -89,7 +90,7 @@ public class ResetClients(
          */
         public fun create(
             httpClient: QuotaHttpClient = OkHttpQuotaHttpClient(),
-            clock: Clock = Clock.systemUTC(),
+            clock: Clock = Clock.System,
             log: ResetLog = ResetLog.None,
             /** Where Z.AI keeps the attempt keys that reached `use`, across restarts. */
             zAiReachedUse: AttemptTargetStore = AttemptTargetStore.None,
@@ -221,4 +222,4 @@ internal fun redeemFailureFor(statusCode: Int, retryAfter: Instant?): RedeemOutc
 
 /** The time a `Retry-After` header in seconds points to, or null. */
 internal fun retryAfter(headers: Map<String, String>, now: Instant): Instant? =
-    headers["retry-after"]?.trim()?.toLongOrNull()?.takeIf { it >= 0 }?.let(now::plusSeconds)
+    headers["retry-after"]?.trim()?.toLongOrNull()?.takeIf { it >= 0 }?.let { now + it.seconds }

@@ -5,13 +5,13 @@ import dev.sebastiano.headroom.model.ResetEvent
 import dev.sebastiano.headroom.model.ResetEventKind
 import dev.sebastiano.headroom.model.ResetUseSource
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 class ResetUsageMathsTest {
     private val now = Instant.parse("2026-10-10T12:00:00Z")
@@ -29,7 +29,7 @@ class ResetUsageMathsTest {
             poolId = "pool",
             poolLabel = "Pool",
             kind = ResetEventKind.Used,
-            at = now.minus(Duration.ofDays(daysAgo)),
+            at = now.minus(daysAgo.days),
             source = source,
             givenBack = givenBack,
             givenBackEstimated = estimated,

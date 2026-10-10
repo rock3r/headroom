@@ -6,9 +6,10 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
 import dev.sebastiano.headroom.ui.home.sortedFor
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class OverviewSortTest {
     private val now = Instant.parse("2026-09-27T12:00:00Z")
@@ -105,7 +106,7 @@ class OverviewSortTest {
                         kind = WindowKind.Weekly,
                         usedPercent = it,
                         expectedPercent = null,
-                        resetsAt = resetsInHours?.let { hours -> now.plusSeconds(hours * 3600) },
+                        resetsAt = resetsInHours?.let { hours -> now + (hours * 3600).seconds },
                         canAlert = true,
                         alertEnabled = true,
                     )

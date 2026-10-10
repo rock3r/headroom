@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.quota
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
+import kotlin.time.Clock
 
 /** Looks up the [QuotaFetcher] for a [Provider]. */
 public class QuotaFetchers(fetchers: List<QuotaFetcher>) {
@@ -26,7 +26,7 @@ public class QuotaFetchers(fetchers: List<QuotaFetcher>) {
          */
         public fun create(
             httpClient: QuotaHttpClient = OkHttpQuotaHttpClient(),
-            clock: Clock = Clock.systemUTC(),
+            clock: Clock = Clock.System,
             jetBrainsLog: (String) -> Unit = {},
         ): QuotaFetchers =
             QuotaFetchers(

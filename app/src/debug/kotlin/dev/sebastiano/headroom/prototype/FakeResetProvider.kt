@@ -9,7 +9,8 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetScope
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 
 /** What the fake provider answers to one redeem call. */
@@ -44,7 +45,7 @@ data class FakeResetScript(
  */
 class FakeResetProvider(
     scripts: Map<String, FakeResetScript>,
-    private val latency: Duration = Duration.ofMillis(LATENCY_MILLIS),
+    private val latency: Duration = LATENCY_MILLIS.milliseconds,
     /** Resets the account's usage on the fake provider's side, for the next refresh to read. */
     private val onServerReset: (accountId: String, scope: ResetScope) -> Unit = { _, _ -> },
 ) : ResetProvider {
@@ -64,7 +65,7 @@ class FakeResetProvider(
         poolId: String,
         attemptKey: ResetAttemptKey,
     ): RedeemOutcome {
-        delay(latency.toMillis())
+        delay(latency.inWholeMilliseconds)
         sentKeys += attemptKey.value
         val script = scripts[account.id] ?: return RedeemOutcome.Unsupported
         if (attemptKey.value in usedKeys)
@@ -94,7 +95,7 @@ class FakeResetProvider(
         poolId: String,
         attemptKey: ResetAttemptKey,
     ): RedeemOutcome {
-        delay(latency.toMillis() / 2)
+        delay(latency.inWholeMilliseconds / 2)
         return if (attemptKey.value in usedKeys) {
             RedeemOutcome.Success(left(account), replayed = true)
         } else {
@@ -103,7 +104,7 @@ class FakeResetProvider(
     }
 
     override suspend fun askForMore(account: Account): AskOutcome {
-        delay(latency.toMillis())
+        delay(latency.inWholeMilliseconds)
         val script = scripts[account.id] ?: return AskOutcome.Unsupported
         val call = askCalls.next(account.id)
         val answer = script.asks.getOrNull(call.coerceAtMost(script.asks.lastIndex))

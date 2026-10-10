@@ -1,13 +1,13 @@
 package dev.sebastiano.headroom.appdata
 
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Instant
+import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ResetPeaksTest {
     private fun points(vararg used: Double) = used.mapIndexed { index, value ->
-        UsagePoint(Instant.ofEpochSecond(index * 3600L), value)
+        UsagePoint(Instant.fromEpochSeconds(index * 3600L), value)
     }
 
     @Test

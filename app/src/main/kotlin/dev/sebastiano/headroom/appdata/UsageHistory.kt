@@ -4,10 +4,14 @@ import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import java.time.DayOfWeek
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.sin
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,7 +58,7 @@ class DemoAwareUsageHistory(
 }
 
 /** The real history keeps this long, so the demo does too. */
-private val DEMO_RETENTION: Duration = Duration.ofDays(60)
+private val DEMO_RETENTION: Duration = 60.days
 
 private const val LIMIT = 100.0
 
@@ -77,18 +81,18 @@ internal fun demoUsage(
     val currentStart = resetsAt.minus(length)
     val points = mutableListOf<UsagePoint>()
     peaks.forEachIndexed { index, peak ->
-        val start = currentStart.minus(length.multipliedBy((peaks.size - index).toLong()))
+        val start = currentStart - length * (peaks.size - index)
         val end = start.plus(length)
         val demand = if (peak >= LIMIT) LIMIT * HIT_DEMAND else peak
         points += cycle(start, end, zone) { share -> minOf(LIMIT, demand * share) }
-        points += UsagePoint(end.minusSeconds(SECONDS_PER_MINUTE), peak)
+        points += UsagePoint(end - SECONDS_PER_MINUTE.seconds, peak)
     }
-    if (now.isAfter(currentStart)) {
+    if (now > currentStart) {
         points += cycle(currentStart, now, zone) { share -> window.usedPercent * share }
         points += UsagePoint(now, window.usedPercent)
     }
     val cutoff = now.minus(DEMO_RETENTION)
-    return points.filter { !it.at.isBefore(cutoff) }
+    return points.filter { it.at >= cutoff }
 }
 
 /**
@@ -101,13 +105,13 @@ private fun cycle(
     zone: ZoneId,
     usage: (Double) -> Double,
 ): List<UsagePoint> {
-    val hours = Duration.between(start, end).toHours()
+    val hours = (end - start).inWholeHours
     if (hours <= 0) return emptyList()
-    val weights = (0 until hours).map { activity(start.plus(Duration.ofHours(it)), zone) }
+    val weights = (0 until hours).map { activity(start.plus(it.hours), zone) }
     val total = weights.sum()
     var sofar = 0.0
     return (0 until hours).map { hour ->
-        val point = UsagePoint(start.plus(Duration.ofHours(hour)), usage(sofar / total))
+        val point = UsagePoint(start.plus(hour.hours), usage(sofar / total))
         sofar += weights[hour.toInt()]
         point
     }
@@ -115,7 +119,7 @@ private fun cycle(
 
 /** How busy the hour starting at [at] is: mostly weekday working hours, a little in the evening. */
 private fun activity(at: Instant, zone: ZoneId): Double {
-    val local = at.atZone(zone)
+    val local = at.toJavaInstant().atZone(zone)
     val weekend = local.dayOfWeek == DayOfWeek.SATURDAY || local.dayOfWeek == DayOfWeek.SUNDAY
     val base =
         when (local.hour) {

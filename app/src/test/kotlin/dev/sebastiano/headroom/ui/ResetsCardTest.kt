@@ -15,8 +15,8 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.prototype.ResetScenarios
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.resets.ResetsCard
-import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

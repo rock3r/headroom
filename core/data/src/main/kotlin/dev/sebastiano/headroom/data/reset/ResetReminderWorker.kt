@@ -10,7 +10,8 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 /** Fires when a reset reminder may be due, and hands the check to [ResetReminderWorker]. */
 internal class ResetReminderReceiver : BroadcastReceiver() {
@@ -63,7 +64,7 @@ internal class ResetReminderWorker(
                     ExistingWorkPolicy.APPEND_OR_REPLACE,
                     OneTimeWorkRequestBuilder<ResetReminderWorker>()
                         .setInputData(workDataOf(KEY_ATTEMPT to attempt))
-                        .setInitialDelay(delay)
+                        .setInitialDelay(delay.toJavaDuration())
                         .build(),
                 )
         }

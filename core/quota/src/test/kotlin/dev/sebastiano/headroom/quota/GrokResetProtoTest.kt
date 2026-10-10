@@ -1,9 +1,9 @@
 package dev.sebastiano.headroom.quota
 
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.time.Instant
 import org.junit.jupiter.api.Test
 
 class GrokResetProtoTest {

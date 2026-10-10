@@ -9,8 +9,9 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Instant
+import kotlin.time.toJavaDuration
 
 /** Checks one reset, and re-enqueues itself with a delay while the reset has not shown up yet. */
 internal class ResetCheckWorker(
@@ -51,8 +52,8 @@ internal class ResetCheckWorker(
                         workDataOf(
                             KEY_ACCOUNT to alarm.accountId,
                             KEY_WINDOW to alarm.windowId,
-                            KEY_TRIGGER to alarm.triggerAt.toEpochMilli(),
-                            KEY_EXPECTED to alarm.expectedResetAt.toEpochMilli(),
+                            KEY_TRIGGER to alarm.triggerAt.toEpochMilliseconds(),
+                            KEY_EXPECTED to alarm.expectedResetAt.toEpochMilliseconds(),
                             KEY_USED to alarm.usedBefore,
                             KEY_ATTEMPT to attempt,
                         )
@@ -60,7 +61,7 @@ internal class ResetCheckWorker(
             if (delay == null) {
                 builder.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             } else {
-                builder.setInitialDelay(delay)
+                builder.setInitialDelay(delay.toJavaDuration())
             }
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(
@@ -76,8 +77,8 @@ internal class ResetCheckWorker(
             return ResetAlarm(
                 accountId = account,
                 windowId = window,
-                triggerAt = Instant.ofEpochMilli(getLong(KEY_TRIGGER, 0)),
-                expectedResetAt = Instant.ofEpochMilli(getLong(KEY_EXPECTED, 0)),
+                triggerAt = Instant.fromEpochMilliseconds(getLong(KEY_TRIGGER, 0)),
+                expectedResetAt = Instant.fromEpochMilliseconds(getLong(KEY_EXPECTED, 0)),
                 usedBefore = getDouble(KEY_USED, 0.0),
             )
         }

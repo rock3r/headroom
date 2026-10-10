@@ -6,7 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.edit
-import java.time.Instant
+import kotlin.time.Instant
 
 /**
  * Keeps exactly one alarm per planned reset. Exact alarms are used when the app may schedule them
@@ -30,7 +30,7 @@ internal class AlarmResetScheduler(
         previous.values.forEach { old ->
             val replacement = wantedCodes[old.requestCode]
             if (replacement?.expectedResetAt == old.expectedResetAt) return@forEach
-            if (!old.expectedResetAt.isAfter(now)) handOver(old)
+            if (old.expectedResetAt <= now) handOver(old)
             if (replacement == null) cancel(old.requestCode)
         }
         merged.forEach { schedule(it) }
@@ -48,7 +48,7 @@ internal class AlarmResetScheduler(
     private fun merge(old: ResetAlarm?, wanted: ResetAlarm, now: Instant): ResetAlarm =
         when {
             old == null || old.expectedResetAt != wanted.expectedResetAt -> wanted
-            !old.expectedResetAt.isAfter(now) -> old
+            old.expectedResetAt <= now -> old
             else -> wanted.copy(usedBefore = maxOf(old.usedBefore, wanted.usedBefore))
         }
 
@@ -66,7 +66,7 @@ internal class AlarmResetScheduler(
     @SuppressLint("MissingPermission")
     private fun schedule(alarm: ResetAlarm) {
         val intent = pendingIntent(alarm.requestCode, ResetAlarmReceiver.intent(context, alarm))
-        val at = alarm.triggerAt.toEpochMilli()
+        val at = alarm.triggerAt.toEpochMilliseconds()
         if (alarmManager.canScheduleExactAlarms()) {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent)
         } else {
@@ -97,8 +97,8 @@ internal class AlarmResetScheduler(
             listOf(
                     alarm.accountId,
                     alarm.windowId,
-                    alarm.triggerAt.toEpochMilli().toString(),
-                    alarm.expectedResetAt.toEpochMilli().toString(),
+                    alarm.triggerAt.toEpochMilliseconds().toString(),
+                    alarm.expectedResetAt.toEpochMilliseconds().toString(),
                     alarm.usedBefore.toString(),
                 )
                 .joinToString(SEPARATOR)
@@ -110,8 +110,10 @@ internal class AlarmResetScheduler(
             return ResetAlarm(
                 accountId = fields.next(),
                 windowId = fields.next(),
-                triggerAt = Instant.ofEpochMilli(fields.next().toLongOrNull() ?: return null),
-                expectedResetAt = Instant.ofEpochMilli(fields.next().toLongOrNull() ?: return null),
+                triggerAt =
+                    Instant.fromEpochMilliseconds(fields.next().toLongOrNull() ?: return null),
+                expectedResetAt =
+                    Instant.fromEpochMilliseconds(fields.next().toLongOrNull() ?: return null),
                 usedBefore = fields.next().toDoubleOrNull() ?: return null,
             )
         }

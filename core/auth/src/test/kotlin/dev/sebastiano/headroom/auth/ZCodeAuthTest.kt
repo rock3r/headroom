@@ -1,10 +1,6 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -13,6 +9,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -29,7 +27,7 @@ class ZCodeAuthTest {
         zCode =
             ZCodeAuth(
                 http = OkHttpAuthHttpClient(),
-                clock = Clock.fixed(now, ZoneOffset.UTC),
+                clock = fixedClock(now),
                 zCodeHost = host,
                 apiHost = host,
                 newPollToken = { "client-poll-token" },
@@ -47,14 +45,14 @@ class ZCodeAuthTest {
             deviceCode = "flow-1",
             verificationUri = "https://chat.z.ai/api/oauth/authorize",
             verificationUriComplete = null,
-            interval = Duration.ofSeconds(2),
+            interval = 2.seconds,
             expiresIn = null,
             pollToken = pollToken,
         )
 
     private fun initBody(authorizeUrl: String = "https://chat.z.ai/api/oauth/authorize?x=1") =
         """{"code":0,"msg":"ok","data":{"flow_id":"flow-1","authorize_url":"$authorizeUrl",""" +
-            """"expires_at":${now.epochSecond + 600},"poll_interval_sec":3,""" +
+            """"expires_at":${now.epochSeconds + 600},"poll_interval_sec":3,""" +
             """"poll_token":"server-poll-token"}}"""
 
     @Test
@@ -70,8 +68,8 @@ class ZCodeAuthTest {
         assertEquals("""{"provider":"zai"}""", request.body?.utf8())
         assertEquals("flow-1", grant.deviceCode)
         assertEquals("https://chat.z.ai/api/oauth/authorize?x=1", grant.verificationUri)
-        assertEquals(Duration.ofSeconds(3), grant.interval)
-        assertEquals(Duration.ofSeconds(600), grant.expiresIn)
+        assertEquals(3.seconds, grant.interval)
+        assertEquals(600.seconds, grant.expiresIn)
         // The server may hand out its own poll token, which then replaces the client's.
         assertEquals("server-poll-token", grant.pollToken)
     }
@@ -90,15 +88,15 @@ class ZCodeAuthTest {
         val grant = zCode.requestCode()
 
         assertEquals("client-poll-token", grant.pollToken)
-        assertEquals(Duration.ofSeconds(1), grant.interval)
+        assertEquals(1.seconds, grant.interval)
         assertEquals(null, grant.expiresIn)
     }
 
     @Test
     fun `a flow that has already expired times out at once, without polling`() = runTest {
-        val expired = initBody().replace("${now.epochSecond + 600}", "${now.epochSecond - 30}")
+        val expired = initBody().replace("${now.epochSeconds + 600}", "${now.epochSeconds - 30}")
         server.enqueue(MockResponse(code = 200, body = expired))
-        val flow = DeviceCodeFlow(zCode, Clock.fixed(now, ZoneOffset.UTC)) {}
+        val flow = DeviceCodeFlow(zCode, fixedClock(now)) {}
 
         val prompt = flow.start()
 
@@ -183,7 +181,7 @@ class ZCodeAuthTest {
         assertEquals(CredentialKind.OAuth, tokens.kind)
         assertEquals("business", tokens.accessToken)
         assertEquals("ada@example.com", tokens.label)
-        assertEquals(now.plusSeconds(3600 - 300), tokens.expiresAt)
+        assertEquals(now + (3600 - 300).seconds, tokens.expiresAt)
         val bundle = assertNotNull(ZCodeTokens.decode(checkNotNull(tokens.refreshToken)))
         assertEquals("zcode-jwt", bundle.zCodeJwt)
         assertEquals("zai-oauth", bundle.zAiAccessToken)
@@ -213,7 +211,7 @@ class ZCodeAuthTest {
         assertEquals("fresh", tokens.accessToken)
         assertEquals(bundle, tokens.refreshToken)
         // No expires_in: an hour, less the margin.
-        assertEquals(now.plusSeconds(3600 - 300), tokens.expiresAt)
+        assertEquals(now + (3600 - 300).seconds, tokens.expiresAt)
     }
 
     @Test
@@ -231,7 +229,7 @@ class ZCodeAuthTest {
         val tokens = zCode.refresh(old)
 
         // Refreshed half-way through its 10 seconds, never after them.
-        assertEquals(now.plusSeconds(5), tokens.expiresAt)
+        assertEquals(now + 5.seconds, tokens.expiresAt)
     }
 
     @Test

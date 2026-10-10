@@ -7,10 +7,10 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.time.Duration
+import kotlin.time.Instant
 
 /** The size of a widget on screen, from the launcher's widget options. */
 public data class WidgetSize(val widthDp: Float, val heightDp: Float) {
@@ -283,12 +283,12 @@ public sealed interface WidgetUiState {
             )
         }
 
-        private fun QuotaWindow.hasReset(now: Instant): Boolean = resetsAt?.isAfter(now) == false
+        private fun QuotaWindow.hasReset(now: Instant): Boolean =
+            resetsAt?.let { it <= now } == true
 
         private fun resetLabel(window: QuotaWindow, isSession: Boolean, now: Instant): ResetLabel? {
             val resetsAt = window.resetsAt ?: return null
-            return if (isSession) ResetLabel.In(Duration.between(now, resetsAt))
-            else ResetLabel.At(resetsAt)
+            return if (isSession) ResetLabel.In(resetsAt - now) else ResetLabel.At(resetsAt)
         }
 
         private fun nextReset(
@@ -303,7 +303,7 @@ public sealed interface WidgetUiState {
                 name = names.getValue(next.account.id),
                 window = GaugeWindow.of(next.window.kind),
                 resetsAt = resetsAt,
-                remaining = Duration.between(now, resetsAt),
+                remaining = (resetsAt - now),
             )
         }
 

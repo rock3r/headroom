@@ -89,7 +89,7 @@ fun ResetsScreen(
             .filterNot { it.signInExpired }
             .flatMap { account ->
                 account.windows
-                    .filter { it.canAlert && it.resetsAt?.isAfter(state.now) == true }
+                    .filter { it.canAlert && it.resetsAt?.let { at -> at > state.now } == true }
                     .map { account to it }
             }
             .sortedBy { (_, window) -> window.resetsAt }

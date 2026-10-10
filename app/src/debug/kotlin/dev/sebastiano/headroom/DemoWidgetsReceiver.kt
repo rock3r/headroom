@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.widget.WidgetUpdater
-import java.time.Instant
+import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +35,7 @@ class DemoWidgetsReceiver(
         val pending = goAsync()
         CoroutineScope(dispatcher).launch {
             try {
-                val now = Instant.now()
+                val now = Clock.System.now()
                 WidgetUpdater(app.widgetConfigStore).updateAll(app, DemoData.manyAccounts(now), now)
             } finally {
                 pending.finish()

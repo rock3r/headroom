@@ -7,8 +7,8 @@ import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.ResetTiming
 import java.io.IOException
-import java.time.Clock
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -93,7 +93,7 @@ internal class ClaudeResets(
                 is JsonArray -> element
                 else -> throw IllegalArgumentException("grants is not a list")
             }
-        val now = clock.instant()
+        val now = clock.now()
         return ResetAvailability(grants.mapNotNull { grant(it.jsonObject, next, now) })
     }
 
@@ -101,7 +101,7 @@ internal class ClaudeResets(
         val id = grant.nonBlankStringOrNull("id") ?: return null
         val left = grant.int("resets_left") ?: return null
         val endsAt = grant.nonBlankStringOrNull("ends_at")?.let(::parseInstantOrNull)
-        if (left <= 0 || endsAt?.isAfter(now) == false) return null
+        if (left <= 0 || endsAt != null && endsAt <= now) return null
         val requiresLimit = grant.boolean("use_requires_limit") ?: true
         return ResetPool(
             id = id,
@@ -132,7 +132,7 @@ internal class ClaudeResets(
         return when {
             grant.boolean("paused") == true -> ResetPoolStatus.Paused
             next != null && id != next -> ResetPoolStatus.Queued
-            startsAt?.isAfter(now) == true -> ResetPoolStatus.NotUsableYet
+            startsAt != null && startsAt > now -> ResetPoolStatus.NotUsableYet
             !usableNow && requiresLimit -> ResetPoolStatus.WaitingForLimit
             !usableNow -> ResetPoolStatus.NotUsableYet
             else -> ResetPoolStatus.Ready

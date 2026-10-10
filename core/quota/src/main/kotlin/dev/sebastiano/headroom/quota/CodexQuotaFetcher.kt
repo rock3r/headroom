@@ -5,9 +5,8 @@ import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
@@ -20,7 +19,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class CodexQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) : QuotaFetcher {
     override val provider: Provider = Provider.Codex
 
@@ -52,7 +51,7 @@ public class CodexQuotaFetcher(
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = root.nonBlankStringOrNull("plan_type")?.let(::displayPlanLabel),
                 windows = windows,
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
             )
         )
     }
@@ -89,22 +88,20 @@ public class CodexQuotaFetcher(
                 id = idPrefix?.let { "$it:$windowId" } ?: windowId,
                 label = windowLabel(length, windowId),
                 usedPercent = usedPercent,
-                resetsAt = window.longOrNull("reset_at")?.let(Instant::ofEpochSecond),
-                length = length?.let(Duration::ofSeconds),
+                resetsAt = window.longOrNull("reset_at")?.let(::epochSecondsToInstant),
+                length = length?.seconds,
                 group = group,
-                kind =
-                    length?.let { WindowKind.fromLength(Duration.ofSeconds(it)) }
-                        ?: legacyKind(windowId),
+                kind = length?.let { WindowKind.fromLength(it.seconds) } ?: legacyKind(windowId),
             )
         }
     }
 
     private fun windowLabel(lengthSeconds: Long?, windowId: String): String =
         when (lengthSeconds) {
-            FIVE_HOURS.seconds -> "5 hour"
-            ONE_DAY.seconds -> "Daily"
-            ONE_WEEK.seconds -> "Weekly"
-            THIRTY_DAYS.seconds -> "Monthly"
+            FIVE_HOURS.inWholeSeconds -> "5 hour"
+            ONE_DAY.inWholeSeconds -> "Daily"
+            ONE_WEEK.inWholeSeconds -> "Weekly"
+            THIRTY_DAYS.inWholeSeconds -> "Monthly"
             else -> if (windowId == PRIMARY_ID) "Session" else "Weekly"
         }
 

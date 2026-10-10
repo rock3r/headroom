@@ -1,6 +1,6 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
+import kotlin.time.Instant
 
 /** Everything one account reported in a single fetch. */
 public data class QuotaSnapshot(

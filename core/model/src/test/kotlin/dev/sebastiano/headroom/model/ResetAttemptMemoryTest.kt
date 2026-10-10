@@ -1,10 +1,10 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import org.junit.jupiter.api.Test
 
 class ResetAttemptMemoryTest {
@@ -32,9 +32,9 @@ class ResetAttemptMemoryTest {
         val memory = memory()
         memory.remember(account, "codex", key)
 
-        now = now.plus(Duration.ofMinutes(9))
+        now = now.plus(9.minutes)
         assertEquals(key, memory.recall(account, "codex"))
-        now = now.plus(Duration.ofMinutes(2))
+        now = now.plus(2.minutes)
         assertNull(memory.recall(account, "codex"))
     }
 
@@ -42,7 +42,7 @@ class ResetAttemptMemoryTest {
     fun `a key survives a restart`() {
         memory().remember(account, "codex", key)
 
-        now = now.plus(Duration.ofMinutes(5))
+        now = now.plus(5.minutes)
         val afterRestart = memory()
 
         assertEquals(key, afterRestart.recall(account, "codex"))
@@ -72,7 +72,7 @@ class ResetAttemptMemoryTest {
     @Test
     fun `expired keys are not kept`() {
         memory().remember(account, "codex", key)
-        now = now.plus(Duration.ofMinutes(11))
+        now = now.plus(11.minutes)
 
         memory().remember(account, "other", ResetAttemptKey("key-2"))
 

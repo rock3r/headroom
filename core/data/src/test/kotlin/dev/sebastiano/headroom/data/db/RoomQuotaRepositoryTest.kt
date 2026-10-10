@@ -13,13 +13,13 @@ import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.ResetTiming
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -93,7 +93,7 @@ class RoomQuotaRepositoryTest {
                     label = "Launch week",
                     available = 1,
                     scope = ResetScope.ofWindows("five_hour", "seven_day"),
-                    expiries = listOf(now.plus(Duration.ofDays(3))),
+                    expiries = listOf(now.plus(3.days)),
                     total = 2,
                     status = ResetPoolStatus.Queued,
                     timing = ResetTiming.AnyTime,
@@ -281,7 +281,7 @@ class RoomQuotaRepositoryTest {
     @Test
     fun `history older than the retention period is pruned`() =
         runTest(UnconfinedTestDispatcher()) {
-            var clock = now.minus(Duration.ofDays(90))
+            var clock = now.minus(90.days)
             val repo =
                 RoomQuotaRepository(
                     db.quotaDao(),
@@ -379,8 +379,8 @@ class RoomQuotaRepositoryTest {
                     label = "JetBrains Team",
                     kind = dev.sebastiano.headroom.model.WindowKind.Monthly,
                     usedPercent = 6.0,
-                    resetsAt = now.plus(Duration.ofDays(10)),
-                    length = Duration.ofDays(30),
+                    resetsAt = now.plus(10.days),
+                    length = 30.days,
                     usedAmount = 12.0,
                     limitAmount = 200.0,
                     amountUnit = "credits",
@@ -413,7 +413,7 @@ class RoomQuotaRepositoryTest {
                     usedAmount = 102.0,
                     limitAmount = 250.0,
                     amountUnit = "USD",
-                    expiresAt = now.plus(Duration.ofDays(40)),
+                    expiresAt = now.plus(40.days),
                 )
             val unknown =
                 dev.sebastiano.headroom.model.QuotaWindow(

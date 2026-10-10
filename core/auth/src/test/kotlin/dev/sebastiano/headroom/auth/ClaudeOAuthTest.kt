@@ -1,10 +1,6 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -12,6 +8,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -33,7 +32,7 @@ class ClaudeOAuthTest {
         claude =
             ClaudeOAuth(
                 http = OkHttpAuthHttpClient(),
-                clock = Clock.fixed(now, ZoneOffset.UTC),
+                clock = fixedClock(now),
                 tokenEndpoint = server.url("/v1/oauth/token").toString(),
             )
     }
@@ -143,7 +142,7 @@ class ClaudeOAuthTest {
         assertEquals(Provider.Claude, tokens.provider)
         assertEquals("sk-ant-oat-access", tokens.accessToken)
         assertEquals("sk-ant-ort-refresh", tokens.refreshToken)
-        assertEquals(now.plus(Duration.ofHours(8)).minus(Duration.ofMinutes(5)), tokens.expiresAt)
+        assertEquals(now.plus(8.hours).minus(5.minutes), tokens.expiresAt)
         assertEquals("acc-uuid", tokens.providerAccountId)
         assertEquals("sam@example.com", tokens.label)
         assertEquals("org-uuid", tokens.extras[CredentialExtras.CLAUDE_ORGANIZATION_ID])
@@ -192,7 +191,7 @@ class ClaudeOAuthTest {
         assertEquals("9d1c250a-e61b-44d9-88ed-5944d1962f5e", body.text("client_id"))
         assertEquals("new-access", tokens.accessToken)
         assertEquals("new-refresh", tokens.refreshToken)
-        assertEquals(now.plus(Duration.ofMinutes(55)), tokens.expiresAt)
+        assertEquals(now.plus(55.minutes), tokens.expiresAt)
     }
 
     @Test

@@ -6,14 +6,16 @@ import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.io.IOException
-import java.time.Duration
-import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -87,7 +89,7 @@ class JetBrainsGrazieQuotaTest {
                         kind = WindowKind.Monthly,
                         usedPercent = 25.0,
                         resetsAt = Instant.parse("2026-05-01T00:00:00Z"),
-                        length = Duration.ofHours(720),
+                        length = 720.hours,
                         usedAmount = 0.000125,
                         limitAmount = 0.0005,
                         amountUnit = "credits",
@@ -144,9 +146,9 @@ class JetBrainsGrazieQuotaTest {
     fun `a seven day refill period is a weekly window, and other periods are Other`() = runTest {
         for ((millis, kind) in
             listOf(
-                Duration.ofDays(7).toMillis() to WindowKind.Weekly,
-                Duration.ofDays(1).toMillis() to WindowKind.Other,
-                Duration.ofDays(90).toMillis() to WindowKind.Other,
+                7.days.inWholeMilliseconds to WindowKind.Weekly,
+                1.days.inWholeMilliseconds to WindowKind.Other,
+                90.days.inWholeMilliseconds to WindowKind.Other,
             )) {
             routes(
                 refill =
@@ -158,7 +160,7 @@ class JetBrainsGrazieQuotaTest {
             val window = fetchSnapshot().windows.single()
 
             assertEquals(kind, window.kind, "period $millis")
-            assertEquals(Duration.ofMillis(millis), window.length)
+            assertEquals(millis.milliseconds, window.length)
         }
     }
 
@@ -172,7 +174,7 @@ class JetBrainsGrazieQuotaTest {
             val window = fetchSnapshot().windows.single()
 
             assertEquals(WindowKind.Monthly, window.kind)
-            assertEquals(Duration.ofDays(30), window.length)
+            assertEquals(30.days, window.length)
         }
 
     @Test

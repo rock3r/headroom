@@ -1,16 +1,23 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.atTime
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /** One reset of [account] that expires at [expiresAt] unless the user uses it. */
 public data class ExpiringReset(val account: Account, val poolId: String, val expiresAt: Instant) {
     /** The same reset keeps its key from one sync to the next, so it is reminded about once. */
     val key: String
-        get() = "${account.id}/$poolId/${expiresAt.toEpochMilli()}"
+        get() = "${account.id}/$poolId/${expiresAt.toEpochMilliseconds()}"
 }
 
 /**
@@ -20,13 +27,13 @@ public data class ExpiringReset(val account: Account, val poolId: String, val ex
  */
 public object ResetReminderPolicy {
     /** How long before a reset expires the reminder goes out. */
-    public val LEAD: Duration = Duration.ofDays(1)
+    public val LEAD: Duration = 1.days
 
     /**
      * When a reminder moves to the next day, because the user already had one today, it goes out at
      * this time of that day. A reset that expires before then is not reminded about.
      */
-    public val DEFERRED_TIME: LocalTime = LocalTime.of(9, 0)
+    public val DEFERRED_TIME: LocalTime = LocalTime(9, 0)
 
     /**
      * The resets the user can act on that are still to expire, soonest first. Those are the resets
@@ -49,7 +56,7 @@ public object ResetReminderPolicy {
                     .filter { it.available > 0 && it.status in ACTIONABLE }
                     .flatMap { pool ->
                         pool.expiries
-                            .filter { it.isAfter(now) }
+                            .filter { it > now }
                             .map { ExpiringReset(state.account, pool.id, it) }
                     }
             }
@@ -65,15 +72,13 @@ public object ResetReminderPolicy {
         reminded: Set<String>,
         lastReminderDay: LocalDate?,
         now: Instant,
-        zone: ZoneId,
+        zone: TimeZone,
     ): List<ExpiringReset> {
-        val today = now.atZone(zone).toLocalDate()
-        if (lastReminderDay != null && !lastReminderDay.isBefore(today)) return emptyList()
-        val tomorrow = today.plusDays(1).atStartOfDay(zone).toInstant()
+        val today = now.toLocalDateTime(zone).date
+        if (lastReminderDay != null && lastReminderDay >= today) return emptyList()
+        val tomorrow = today.plus(1, DateTimeUnit.DAY).atStartOfDayIn(zone)
         return resets
-            .filter {
-                it.key !in reminded && it.expiresAt.isAfter(now) && remindAt(it).isBefore(tomorrow)
-            }
+            .filter { it.key !in reminded && it.expiresAt > now && remindAt(it) < tomorrow }
             .sortedBy { it.expiresAt }
     }
 
@@ -86,24 +91,27 @@ public object ResetReminderPolicy {
         reminded: Set<String>,
         lastReminderDay: LocalDate?,
         now: Instant,
-        zone: ZoneId,
+        zone: TimeZone,
     ): Instant? =
         resets
             .filter { it.key !in reminded }
             .mapNotNull { reset ->
                 val at = maxOf(remindAt(reset), now)
-                val day = at.atZone(zone).toLocalDate()
+                val day = at.toLocalDateTime(zone).date
                 val moved =
-                    if (lastReminderDay != null && !day.isAfter(lastReminderDay)) {
-                        lastReminderDay.plusDays(1).atTime(DEFERRED_TIME).atZone(zone).toInstant()
+                    if (lastReminderDay != null && day <= lastReminderDay) {
+                        lastReminderDay
+                            .plus(1, DateTimeUnit.DAY)
+                            .atTime(DEFERRED_TIME)
+                            .toInstant(zone)
                     } else {
                         at
                     }
-                moved.takeIf { it.isBefore(reset.expiresAt) }
+                moved.takeIf { it < reset.expiresAt }
             }
             .minOrNull()
 
-    private fun remindAt(reset: ExpiringReset): Instant = reset.expiresAt.minus(LEAD)
+    private fun remindAt(reset: ExpiringReset): Instant = reset.expiresAt - LEAD
 
     private val ACTIONABLE = setOf(ResetPoolStatus.Ready, ResetPoolStatus.WaitingForLimit)
 }

@@ -8,10 +8,11 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import java.io.IOException
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 /**
  * Z.AI Coding Plan reset cards: the calls ZCode makes from its usage screen ([ZCodeResetApi]). They
@@ -107,13 +108,13 @@ internal class ZAiResets(
                 ZCodeSignIn.Unavailable -> return AskOutcome.Failed(QuotaErrorKind.Network)
                 is ZCodeSignIn.Ready -> zCode
             }
-        val held = holds.until(signIn, clock.instant())
+        val held = holds.until(signIn, clock.now())
         if (held != null || !holds.startAsking(signIn)) return AskOutcome.NotYet(held)
         return try {
             val key = holds.retryKey(signIn) ?: UUID.randomUUID().toString()
             val ask = api.opportunity(signIn, key)
             holds.keepKey(signIn, key.takeIf { ask.passing })
-            val now = clock.instant()
+            val now = clock.now()
             when (val outcome = ask.outcome) {
                 is AskOutcome.Granted -> outcome.also { holds.hold(signIn, until = null, now) }
                 is AskOutcome.NotYet -> {
@@ -159,9 +160,9 @@ internal class ZAiResets(
 
     companion object {
         const val ZCODE_HOST: String = "https://zcode.z.ai"
-        private val THROTTLED_HOLD: Duration = Duration.ofMinutes(10)
-        private val DECLINE_HOLD: Duration = Duration.ofMinutes(10)
-        private val MIN_HOLD: Duration = Duration.ofMinutes(5)
+        private val THROTTLED_HOLD: Duration = 10.minutes
+        private val DECLINE_HOLD: Duration = 10.minutes
+        private val MIN_HOLD: Duration = 5.minutes
         private val SIGN_IN_NEEDED = ResetAvailability(emptyList(), requiresSignIn = true)
     }
 }
@@ -185,12 +186,11 @@ private class AskHolds {
 
     @Synchronized
     fun until(signIn: ZCodeSignIn.Ready, now: Instant): Instant? =
-        holds[signIn.jwt]?.takeIf { it.isAfter(now) }
+        holds[signIn.jwt]?.takeIf { it > now }
 
     @Synchronized
     fun hold(signIn: ZCodeSignIn.Ready, until: Instant?, now: Instant) {
-        if (until != null && until.isAfter(now)) holds[signIn.jwt] = until
-        else holds.remove(signIn.jwt)
+        if (until != null && until > now) holds[signIn.jwt] = until else holds.remove(signIn.jwt)
     }
 
     /** False when an ask of this sign-in is already on its way. */

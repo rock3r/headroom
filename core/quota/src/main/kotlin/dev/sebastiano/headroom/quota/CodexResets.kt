@@ -8,8 +8,8 @@ import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
 import java.io.IOException
-import java.time.Clock
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -119,8 +119,8 @@ internal class CodexResets(
         val now = now()
         val available =
             credits
-                .filter { it.status == AVAILABLE && (it.expiresAt ?: Instant.MAX).isAfter(now) }
-                .sortedBy { it.expiresAt ?: Instant.MAX }
+                .filter { it.status == AVAILABLE && (it.expiresAt ?: Instant.DISTANT_FUTURE) > now }
+                .sortedBy { it.expiresAt ?: Instant.DISTANT_FUTURE }
         call.done("HTTP 200, ${credits.size} credits, ${available.size} available$suffix")
         return available
     }
@@ -165,7 +165,7 @@ internal class CodexResets(
     private fun baseUrl(credentials: ProviderCredentials): String =
         resolveBaseUrl(credentials.baseUrl, DEFAULT_BASE_URL)
 
-    private fun now(): Instant = clock.instant()
+    private fun now(): Instant = clock.now()
 
     private data class CodexCredit(val id: String, val status: String, val expiresAt: Instant?)
 

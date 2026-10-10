@@ -8,11 +8,11 @@ import dev.sebastiano.headroom.widget.GaugeWindow
 import dev.sebastiano.headroom.widget.NextResetUi
 import dev.sebastiano.headroom.widget.ResetLabel
 import dev.sebastiano.headroom.widget.UsageShape
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -56,8 +56,8 @@ class WidgetStringsTest {
             "Thu 15:48",
             strings.reset(ResetLabel.At(Instant.parse("2026-10-01T15:48:00Z"))),
         )
-        assertEquals("3h 05m", strings.reset(ResetLabel.In(Duration.ofMinutes(185))))
-        assertEquals("2d 18h", strings.reset(ResetLabel.In(Duration.ofMinutes(3988))))
+        assertEquals("3h 05m", strings.reset(ResetLabel.In(185.minutes)))
+        assertEquals("2d 18h", strings.reset(ResetLabel.In(3988.minutes)))
     }
 
     @Test
@@ -119,7 +119,7 @@ class WidgetStringsTest {
                 name = "Grok",
                 window = GaugeWindow.Weekly,
                 resetsAt = Instant.parse("2026-09-28T03:28:00Z"),
-                remaining = Duration.ofMinutes(928),
+                remaining = 928.minutes,
             )
 
         assertEquals("NEXT WEEKLY RESET", strings.countdownTitle(next.window))

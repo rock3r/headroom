@@ -6,7 +6,7 @@ import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.ResetTiming
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -41,7 +41,7 @@ internal object ResetsCodec {
                         available = pool.available,
                         kinds = pool.scope.kinds?.map { it.name },
                         windowIds = pool.scope.windowIds.toList(),
-                        expiriesEpochMs = pool.expiries.map { it.toEpochMilli() },
+                        expiriesEpochMs = pool.expiries.map { it.toEpochMilliseconds() },
                         total = pool.total,
                         status = pool.status.name,
                         timing = pool.timing?.name,
@@ -70,7 +70,7 @@ internal object ResetsCodec {
                                         ?.toSet(),
                                 windowIds = pool.windowIds.toSet(),
                             ),
-                        expiries = pool.expiriesEpochMs.map(Instant::ofEpochMilli),
+                        expiries = pool.expiriesEpochMs.map(Instant::fromEpochMilliseconds),
                         total = pool.total,
                         status =
                             ResetPoolStatus.entries.firstOrNull { it.name == pool.status }

@@ -1,8 +1,8 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
 import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * How long ago something happened, in the largest unit that fits, rounded to the nearest one: 1 h
@@ -24,7 +24,7 @@ public sealed interface Age {
 
         /** The age of [then] at [now]. A time after [now] is [JustNow]. */
         public fun between(then: Instant, now: Instant): Age {
-            val seconds = Duration.between(then, now).seconds.coerceAtLeast(0)
+            val seconds = (now - then).inWholeSeconds.coerceAtLeast(0)
             val minutes = (seconds / SECONDS_PER_MINUTE).roundToLong().toInt()
             val hours = (minutes / MINUTES_PER_HOUR.toDouble()).roundToLong().toInt()
             val days = (hours / HOURS_PER_DAY.toDouble()).roundToLong().toInt()

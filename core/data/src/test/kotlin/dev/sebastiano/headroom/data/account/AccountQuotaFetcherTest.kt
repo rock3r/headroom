@@ -26,11 +26,12 @@ import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetRead
 import dev.sebastiano.headroom.quota.ResetReader
 import dev.sebastiano.headroom.quota.ZCodeSignIn
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 
@@ -44,7 +45,13 @@ class AccountQuotaFetcherTest {
         override suspend fun fetch(credentials: ProviderCredentials): QuotaResult {
             seen += credentials
             return QuotaResult.Success(
-                QuotaSnapshot(provider, "provider-side-id", "Pro", emptyList(), Instant.EPOCH)
+                QuotaSnapshot(
+                    provider,
+                    "provider-side-id",
+                    "Pro",
+                    emptyList(),
+                    Instant.fromEpochSeconds(0),
+                )
             )
         }
     }
@@ -167,7 +174,7 @@ class AccountQuotaFetcherTest {
                 "a1",
                 Provider.Claude,
                 refreshToken = "r",
-                expiresAt = now.minusSeconds(1),
+                expiresAt = now - 1.seconds,
             )
             val rejected = TokenRefresher {
                 throw AuthException.Rejected(401, "invalid_grant", "no")
@@ -348,7 +355,7 @@ class AccountQuotaFetcherTest {
     @Test
     fun `an expired ZCode sign-in is refreshed first`() = runTest {
         saveCredential("z1", Provider.ZAi)
-        saveZCode("z1", expiresAt = Instant.EPOCH)
+        saveZCode("z1", expiresAt = Instant.fromEpochSeconds(0))
         val refresher = TokenRefresher { old ->
             TokenSet(Provider.ZAi, CredentialKind.OAuth, "business-2", old.refreshToken, null)
         }
@@ -362,7 +369,7 @@ class AccountQuotaFetcherTest {
     @Test
     fun `a ZCode refresh that fails leaves the sign-in unavailable or missing`() = runTest {
         saveCredential("z1", Provider.ZAi)
-        saveZCode("z1", expiresAt = Instant.EPOCH)
+        saveZCode("z1", expiresAt = Instant.fromEpochSeconds(0))
         listOf(
                 AuthException.Network("offline") to ZCodeSignIn.Unavailable,
                 AuthException.Rejected(401, null, "revoked") to ZCodeSignIn.Missing,
@@ -379,7 +386,7 @@ class AccountQuotaFetcherTest {
     @Test
     fun `a slow ZCode refresh does not hold up the usage`() = runTest {
         saveCredential("z1", Provider.ZAi)
-        saveZCode("z1", expiresAt = Instant.EPOCH)
+        saveZCode("z1", expiresAt = Instant.fromEpochSeconds(0))
         val refresher = TokenRefresher {
             delay(ZCODE_TIMEOUT_MS)
             throw AuthException.TimedOut("token endpoint unreachable")
@@ -392,7 +399,13 @@ class AccountQuotaFetcherTest {
                 override suspend fun fetch(credentials: ProviderCredentials): QuotaResult {
                     usageFetchedAt = testScheduler.currentTime
                     return QuotaResult.Success(
-                        QuotaSnapshot(provider, "z", "Pro", emptyList(), Instant.EPOCH)
+                        QuotaSnapshot(
+                            provider,
+                            "z",
+                            "Pro",
+                            emptyList(),
+                            Instant.fromEpochSeconds(0),
+                        )
                     )
                 }
             }
@@ -401,7 +414,10 @@ class AccountQuotaFetcherTest {
 
         assertEquals(0L, usageFetchedAt)
         // The sync gives up on the ZCode sign-in long before the refresh's own timeout.
-        assertEquals(AccountQuotaFetcher.ZCODE_SIGN_IN_WAIT.toMillis(), testScheduler.currentTime)
+        assertEquals(
+            AccountQuotaFetcher.ZCODE_SIGN_IN_WAIT.inWholeMilliseconds,
+            testScheduler.currentTime,
+        )
         assertIs<QuotaResult.Success>(result)
         assertEquals(ZCodeSignIn.Unavailable, zAiResets.seen.single().zCode)
     }

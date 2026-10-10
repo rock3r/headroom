@@ -5,10 +5,14 @@ import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import java.io.IOException
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
 import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
@@ -20,7 +24,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class KimiQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) : QuotaFetcher {
     override val provider: Provider = Provider.Kimi
 
@@ -54,7 +58,7 @@ public class KimiQuotaFetcher(
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = planLabel(root),
                 windows = windows,
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
             )
         )
     }
@@ -111,7 +115,7 @@ public class KimiQuotaFetcher(
         val absolute = RESET_AT_KEYS.firstNotNullOfOrNull { nonBlankStringOrNull(it) }
         if (absolute != null) return parseInstantOrNull(absolute)
         val relativeSeconds = RESET_IN_KEYS.firstNotNullOfOrNull { doubleOrNull(it) }
-        return relativeSeconds?.let { clock.instant().plusSeconds(it.toLong()) }
+        return relativeSeconds?.let { clock.now() + (it.toLong()).seconds }
     }
 
     private companion object {
@@ -193,10 +197,10 @@ private data class LimitSpan(val amount: Long, val timeUnit: String) {
     val length: Duration
         get() =
             when {
-                "MINUTE" in timeUnit -> Duration.ofMinutes(amount)
-                "HOUR" in timeUnit -> Duration.ofHours(amount)
-                "DAY" in timeUnit -> Duration.ofDays(amount)
-                else -> Duration.ofSeconds(amount)
+                "MINUTE" in timeUnit -> amount.minutes
+                "HOUR" in timeUnit -> amount.hours
+                "DAY" in timeUnit -> amount.days
+                else -> amount.seconds
             }
 
     /** `300 minutes` becomes `5h limit`; `90 minutes` stays `90m limit`. */

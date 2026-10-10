@@ -7,11 +7,11 @@ import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetAttemptKey
-import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
@@ -188,9 +188,9 @@ class HeadroomDatabaseMigrationTest {
 
         val db = openCurrent()
         try {
-            val log = RoomResetEventLog(db.quotaDao(), clock = { Instant.EPOCH })
+            val log = RoomResetEventLog(db.quotaDao(), clock = { Instant.fromEpochSeconds(0) })
             log.redeemed(Account("a1", Provider.Codex, "a1"), "credits", ResetAttemptKey("k"))
-            assertEquals(1, log.events(Instant.EPOCH).first().size)
+            assertEquals(1, log.events(Instant.fromEpochSeconds(0)).first().size)
         } finally {
             db.close()
         }

@@ -15,6 +15,7 @@ import dev.sebastiano.headroom.model.accountBadge
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.time.toJavaInstant
 
 internal fun interface ResetNotifier {
     /**
@@ -102,7 +103,7 @@ internal class AndroidResetNotifier(
             window.resetsAt?.let { next ->
                 context.getString(
                     R.string.reset_body_with_next,
-                    nextResetFormat().format(next.atZone(zone)),
+                    nextResetFormat().format(next.toJavaInstant().atZone(zone)),
                 )
             } ?: context.getString(R.string.reset_body)
         val id = notificationId(account.account.id, window.id)

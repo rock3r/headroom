@@ -27,13 +27,13 @@ import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.detail.alertSwitchTag
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.homeUiState
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,8 +55,8 @@ class CreditAndUnknownQuotaTest {
             label = "Weekly · all models",
             kind = WindowKind.Weekly,
             usedPercent = 30.0,
-            resetsAt = now.plus(Duration.ofDays(4)),
-            length = Duration.ofDays(7),
+            resetsAt = now.plus(4.days),
+            length = 7.days,
         )
 
     private val cloudCredit =

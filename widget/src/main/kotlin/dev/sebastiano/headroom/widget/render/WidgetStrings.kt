@@ -10,10 +10,11 @@ import dev.sebastiano.headroom.widget.GaugeWindow
 import dev.sebastiano.headroom.widget.NextResetUi
 import dev.sebastiano.headroom.widget.R
 import dev.sebastiano.headroom.widget.ResetLabel
-import java.time.Duration
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.time.Duration
+import kotlin.time.toJavaInstant
 
 /**
  * Every piece of text a widget shows, resolved from resources before the document is captured.
@@ -44,7 +45,7 @@ internal class WidgetStrings(
 
     fun reset(label: ResetLabel): String =
         when (label) {
-            is ResetLabel.At -> dayAndTime.format(label.instant)
+            is ResetLabel.At -> dayAndTime.format(label.instant.toJavaInstant())
             is ResetLabel.In -> remaining(label.remaining)
         }
 
@@ -93,7 +94,7 @@ internal class WidgetStrings(
         context.getString(
             R.string.widget_account_and_time,
             next.name,
-            dayAndTime.format(next.resetsAt),
+            dayAndTime.format(next.resetsAt.toJavaInstant()),
         )
 
     fun lockScreenFooter(next: NextResetUi): String =
@@ -101,7 +102,7 @@ internal class WidgetStrings(
             R.string.widget_lock_footer,
             windowWord(next.window),
             next.name,
-            dayAndTime.format(next.resetsAt),
+            dayAndTime.format(next.resetsAt.toJavaInstant()),
         )
 
     fun countdownDescription(next: NextResetUi): String =
@@ -110,7 +111,7 @@ internal class WidgetStrings(
             windowWord(next.window),
             remaining(next.remaining),
             next.name,
-            dayAndTime.format(next.resetsAt),
+            dayAndTime.format(next.resetsAt.toJavaInstant()),
         )
 
     fun empty(reason: EmptyReason): String =

@@ -4,9 +4,8 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.Countdown
 import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.QuotaDisplay
-import java.time.Duration
-import java.time.Instant
 import kotlin.math.roundToInt
+import kotlin.time.Instant
 
 /**
  * What the Quick Settings tile shows under its label. There is always a subtitle; the user picks
@@ -45,7 +44,7 @@ sealed interface TileSubtitle {
                 TileSubtitleMode.NextReset ->
                     NextReset.find(accounts, now)?.let { next ->
                         val at = next.window.resetsAt ?: return null
-                        Reset(next.account.name, Countdown.format(Duration.between(now, at)))
+                        Reset(next.account.name, Countdown.format(at - now))
                     }
                 TileSubtitleMode.TightestQuota ->
                     accounts

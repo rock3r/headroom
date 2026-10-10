@@ -4,10 +4,12 @@ import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class ResetAlarmPlannerTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")
@@ -20,7 +22,7 @@ class ResetAlarmPlannerTest {
         val alarms = ResetAlarmPlanner.plan(accounts, now, isEnabled = defaults)
         val grok = alarms.single { it.accountId == "demo-grok" }
         assertEquals("weekly", grok.windowId)
-        assertEquals(now.plus(Duration.ofMinutes(928)).plusSeconds(10), grok.triggerAt)
+        assertEquals(now.plus(928.minutes) + 10.seconds, grok.triggerAt)
         assertEquals(88.0, grok.usedBefore)
         // Claude has two weekly windows, Codex one, Grok one; Copilot is monthly and off by
         // default.
@@ -61,7 +63,7 @@ class ResetAlarmPlannerTest {
                 id = "iguana_necktie",
                 kind = WindowKind.Credit,
                 resetsAt = null,
-                expiresAt = now.plus(Duration.ofDays(30)),
+                expiresAt = now.plus(30.days),
             )
         val unknown = weekly.copy(id = "nimbus_quill", isRecognised = false)
         val withExtras =
@@ -79,7 +81,7 @@ class ResetAlarmPlannerTest {
 
     @Test
     fun `windows whose reset is in the past get no alarm`() {
-        val later = now.plus(Duration.ofDays(8))
+        val later = now.plus(8.days)
         assertEquals(emptyList(), ResetAlarmPlanner.plan(accounts, later, isEnabled = defaults))
     }
 
@@ -88,7 +90,7 @@ class ResetAlarmPlannerTest {
         val first =
             ResetAlarmPlanner.plan(accounts, now, isEnabled = defaults).map { it.requestCode }
         val second =
-            ResetAlarmPlanner.plan(accounts, now.plusSeconds(5), isEnabled = defaults).map {
+            ResetAlarmPlanner.plan(accounts, now + 5.seconds, isEnabled = defaults).map {
                 it.requestCode
             }
         assertEquals(first, second)
@@ -97,16 +99,15 @@ class ResetAlarmPlannerTest {
 
     @Test
     fun `a window inside its grace seconds keeps its alarm`() {
-        val resetsAt = now.plus(Duration.ofMinutes(928))
-        val alarms = ResetAlarmPlanner.plan(accounts, resetsAt.plusSeconds(5), isEnabled = defaults)
+        val resetsAt = now.plus(928.minutes)
+        val alarms = ResetAlarmPlanner.plan(accounts, resetsAt + 5.seconds, isEnabled = defaults)
         assertEquals(true, alarms.any { it.accountId == "demo-grok" })
     }
 
     @Test
     fun `a window past its grace seconds gets no new alarm`() {
-        val resetsAt = now.plus(Duration.ofMinutes(928))
-        val alarms =
-            ResetAlarmPlanner.plan(accounts, resetsAt.plusSeconds(30), isEnabled = defaults)
+        val resetsAt = now.plus(928.minutes)
+        val alarms = ResetAlarmPlanner.plan(accounts, resetsAt + 30.seconds, isEnabled = defaults)
         assertEquals(false, alarms.any { it.accountId == "demo-grok" })
     }
 }

@@ -2,7 +2,7 @@ package dev.sebastiano.headroom.designsystem
 
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Instant
+import kotlin.time.Instant
 
 /** Everything the pace chart draws, in model terms. */
 @Immutable

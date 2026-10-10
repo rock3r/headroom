@@ -1,15 +1,14 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -17,11 +16,11 @@ import kotlinx.coroutines.yield
 
 class CredentialProviderTest {
     private val now = Instant.parse("2026-09-27T12:00:00Z")
-    private val clock = Clock.fixed(now, ZoneOffset.UTC)
+    private val clock = fixedClock(now)
     private val store = InMemoryTokenStore()
 
     private fun credential(
-        expiresAt: Instant? = now.plus(Duration.ofHours(1)),
+        expiresAt: Instant? = now.plus(1.hours),
         refreshToken: String? = "refresh-1",
     ) =
         StoredCredential(
@@ -46,7 +45,7 @@ class CredentialProviderTest {
             kind = CredentialKind.OAuth,
             accessToken = "access-2",
             refreshToken = "refresh-2",
-            expiresAt = now.plus(Duration.ofHours(8)),
+            expiresAt = now.plus(8.hours),
         )
     }
 
@@ -71,7 +70,7 @@ class CredentialProviderTest {
 
         assertEquals("access-2", result.accessToken)
         assertEquals("refresh-2", result.refreshToken)
-        assertEquals(now.plus(Duration.ofHours(8)), result.expiresAt)
+        assertEquals(now.plus(8.hours), result.expiresAt)
         assertEquals(mapOf("org" to "o1"), result.extras)
         assertEquals(result, store.load("acc"))
         assertEquals(2, result.revision)
@@ -79,9 +78,9 @@ class CredentialProviderTest {
 
     @Test
     fun `a refresh without a new refresh token keeps the old one`() = runTest {
-        saved(credential(expiresAt = now.minusSeconds(1)))
+        saved(credential(expiresAt = now - 1.seconds))
         val refresher = TokenRefresher {
-            TokenSet(Provider.Claude, CredentialKind.OAuth, "access-2", null, now.plusSeconds(60))
+            TokenSet(Provider.Claude, CredentialKind.OAuth, "access-2", null, now + 60.seconds)
         }
 
         val result = provider(refresher).validCredential("acc")
@@ -129,7 +128,7 @@ class CredentialProviderTest {
         val credentials = provider {
             // Another process rotated the single-use refresh token first.
             store.save(
-                first.copy(accessToken = "fresh", expiresAt = now.plusSeconds(600)),
+                first.copy(accessToken = "fresh", expiresAt = now + 600.seconds),
                 first.revision,
             )
             throw AuthException.Rejected(400, "invalid_grant", "Refresh token already used")
@@ -153,7 +152,7 @@ class CredentialProviderTest {
         val first = saved(credential(expiresAt = now))
         val credentials = provider { old ->
             store.save(
-                first.copy(accessToken = "winner", expiresAt = now.plusSeconds(600)),
+                first.copy(accessToken = "winner", expiresAt = now + 600.seconds),
                 first.revision,
             )
             rotating.refresh(old)

@@ -2,7 +2,6 @@ package dev.sebastiano.headroom.auth
 
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.time.Duration
 import java.util.concurrent.Executors
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -12,6 +11,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -169,7 +169,7 @@ class LoopbackServerTest {
 
     @Test
     fun `waiting too long times out and frees the port`() = runTest {
-        val server = start(LoopbackConfig(timeout = Duration.ofMillis(300)))
+        val server = start(LoopbackConfig(timeout = 300.milliseconds))
         val port = server.port
 
         assertFailsWith<AuthException.TimedOut> { server.awaitCallback() }

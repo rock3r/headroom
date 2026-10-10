@@ -1,8 +1,8 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 
 class FakeQuotaRepositoryTest {

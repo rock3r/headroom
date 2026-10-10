@@ -1,8 +1,8 @@
 package dev.sebastiano.headroom
 
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 /** The app with a fixed clock and UTC, so every run shows the same numbers. */
 class E2eApplication : HeadroomApplication() {
@@ -13,7 +13,7 @@ class E2eApplication : HeadroomApplication() {
             context = this,
             clock = { FIXED_NOW },
             zone = ZoneOffset.UTC,
-            demoLatency = Duration.ofMillis(DEMO_LATENCY_MILLIS),
+            demoLatency = DEMO_LATENCY_MILLIS.milliseconds,
             tickInterval = null,
         )
 

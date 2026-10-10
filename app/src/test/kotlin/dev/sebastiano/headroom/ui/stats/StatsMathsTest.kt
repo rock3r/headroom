@@ -6,19 +6,20 @@ import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import java.time.DayOfWeek
-import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class StatsMathsTest {
     /** A Monday, 00:00 UTC. */
     private val monday = Instant.parse("2026-08-31T00:00:00Z")
-    private val now = monday.plus(Duration.ofDays(21))
+    private val now = monday.plus(21.days)
 
     private fun source(
         id: String,
@@ -35,13 +36,11 @@ class StatsMathsTest {
                     label = "Weekly",
                     kind = WindowKind.Weekly,
                     usedPercent = used,
-                    resetsAt = now.plus(Duration.ofDays(1)),
-                    length = Duration.ofDays(7),
+                    resetsAt = now.plus(1.days),
+                    length = 7.days,
                 ),
             points =
-                points.map { (hours, value) ->
-                    UsagePoint(monday.plusSeconds(hours * 3600), value)
-                },
+                points.map { (hours, value) -> UsagePoint(monday + (hours * 3600).seconds, value) },
         )
 
     private fun account(id: String, provider: Provider, name: String = provider.displayName) =
@@ -99,7 +98,7 @@ class StatsMathsTest {
         val resets = pastResets(listOf(claude, codex))
         assertEquals(listOf(50.0, 80.0, 100.0), resets.map { it.peak })
         assertEquals(listOf("x", "c", "c"), resets.map { it.account.id })
-        assertEquals(monday.plusSeconds(150 * 3600L), resets[1].peakAt)
+        assertEquals(monday + (150 * 3600L).seconds, resets[1].peakAt)
     }
 
     @Test
@@ -116,7 +115,7 @@ class StatsMathsTest {
     fun `the streak counts every clean reset after the last hit`() {
         val resets =
             listOf(95.0, 100.0, 40.0, 70.0).mapIndexed { index, peak ->
-                PastReset(account("c", Provider.Claude), peak, monday.plusSeconds(index * 3600L))
+                PastReset(account("c", Provider.Claude), peak, monday + (index * 3600L).seconds)
             }
         assertEquals(2, resetScore(resets)?.streak)
         assertEquals(3, resetScore(resets.filterNot { it.hitLimit })?.streak)
@@ -137,7 +136,7 @@ class StatsMathsTest {
     @Test
     fun `a tie for the closest call goes to the most recent`() {
         val older = PastReset(account("a", Provider.Grok), 97.0, monday)
-        val newer = PastReset(account("b", Provider.Claude), 97.0, monday.plusSeconds(60))
+        val newer = PastReset(account("b", Provider.Claude), 97.0, monday + 60.seconds)
         assertEquals(newer, closestCall(listOf(older, newer)))
     }
 
@@ -244,8 +243,8 @@ class StatsMathsTest {
     fun `sparklines keep the last seven days of each account`() {
         val lines = sparklines(listOf(claude, codex), now)
         assertEquals(listOf("c", "x"), lines.map { it.account.id })
-        val start = now.minus(Duration.ofDays(7))
-        assertTrue(lines.all { line -> line.points.all { !it.at.isBefore(start) } })
+        val start = now.minus(7.days)
+        assertTrue(lines.all { line -> line.points.all { it.at >= start } })
         // The span starts at hour 336: Claude's points at hours 340 and 400 are in, Codex has none.
         assertEquals(listOf(1.0, 30.0), lines.first().points.map { it.usedPercent })
         assertEquals(emptyList<UsagePoint>(), lines.last().points)

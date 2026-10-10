@@ -24,8 +24,8 @@ import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.prototype.PrototypeEnv
 import dev.sebastiano.headroom.prototype.PrototypeTools
-import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
