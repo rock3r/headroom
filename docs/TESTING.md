@@ -17,6 +17,7 @@
 | Compose UI tests | `src/test` in `:app` and `:core:designsystem` | Robolectric | `./gradlew :app:testDebugUnitTest` |
 | Screenshots | `src/test`, Roborazzi | Robolectric | `./gradlew :app:recordRoborazziDebug` |
 | End-to-end tests | `src/androidTest` in `:app` | Emulator, fake data | `./gradlew :app:pixel9api37DebugAndroidTest` |
+| Release smoke test | `scripts/release-smoke-test.sh` | Emulator, demo data, minified APK | See [RELEASING.md](RELEASING.md#the-smoke-test) |
 
 ### Fixtures, not live services
 
