@@ -7,13 +7,14 @@
 | `:core:model` | Kotlin Multiplatform (JVM, iOS) | Quota types, pace maths, reset alert policy, countdown formatting, repository contracts, demo data |
 | `:core:quota` | Kotlin Multiplatform (JVM, iOS) | One fetcher per provider: calls the provider's usage endpoint and parses it into the model |
 | `:core:auth` | Kotlin Multiplatform (JVM, iOS) | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
-| `:core:data` | Android library | Room history, DataStore settings, encrypted token store, sync, reset alarms, notifications |
+| `:core:storage` | Kotlin Multiplatform (Android, JVM, iOS) | Room database (accounts, snapshots, history, reset events), DataStore settings, account fetching and sign-in bookkeeping |
+| `:core:data` | Android library | Encrypted token store, sync worker, reset alarms, notifications, the Android wiring (`DataGraph`) |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
 | `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
 
 Dependencies point down: `:app` → `:widget`, `:core:designsystem`, `:core:data` →
-`:core:quota`, `:core:auth` → `:core:model`. `:widget` also uses `:core:designsystem`, for the
+`:core:storage` → `:core:quota`, `:core:auth` → `:core:model`. `:widget` also uses `:core:designsystem`, for the
 colour palettes it shares with the app. The JVM modules have no Android dependencies, so their
 tests run fast on the JVM.
 
@@ -25,8 +26,14 @@ targets, its code in `src/commonMain` and its tests in `src/commonTest`. The And
 JVM target. Common code uses `kotlin.time`, `kotlinx-datetime` and `kotlinx-atomicfu` locks in place
 of `java.time` and `synchronized`, and Okio for hashing. HTTP goes through Ktor
 (`KtorQuotaHttpClient`), with the OkHttp engine on the JVM and Android and the Darwin engine on
-iOS. `:core:model`, `:core:quota` and `:core:auth` are multiplatform; the shared parts of
-`:core:data` follow.
+iOS. `:core:model`, `:core:quota`, `:core:auth` and `:core:storage` are multiplatform.
+
+`:core:storage` uses `headroom.kmp.android.library`, which adds an Android target: Room and DataStore
+ship separate Android builds, and the Android app keeps Android's own SQLite and the same file names
+(`headroom.db`, `files/datastore/settings.preferences_pb`). iOS opens the same database with the
+SQLite that ships with Room. The JVM target only runs `commonTest` on the host, with that bundled
+SQLite. `HeadroomStorage` is the one public entry point; each platform opens it with its own
+`openHeadroomStorage`.
 
 The OAuth loopback listener (`LoopbackServer`) keeps its HTTP handling in common code, over a small
 socket interface: `ServerSocket` on the JVM and POSIX sockets on iOS, always bound to the loopback

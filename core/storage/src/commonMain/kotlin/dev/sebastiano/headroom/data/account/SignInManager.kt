@@ -6,10 +6,10 @@ import dev.sebastiano.headroom.auth.TokenStore
 import dev.sebastiano.headroom.auth.ZCodeCredential
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
-import java.io.IOException
-import java.util.UUID
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.io.IOException
 
 /**
  * A sign-in to refresh an account finished as another account of the provider. Nothing was saved.
@@ -21,7 +21,7 @@ public class DifferentAccountException(accountId: String) :
 public class SignInManager(
     private val store: TokenStore,
     private val accounts: AccountsRepository,
-    private val newAccountId: () -> String = { UUID.randomUUID().toString() },
+    private val newAccountId: () -> String = { Uuid.random().toString() },
 ) {
     /** Keeps a ZCode sign-in from saving while a sign-out runs. */
     private val zCodeLock = Mutex()

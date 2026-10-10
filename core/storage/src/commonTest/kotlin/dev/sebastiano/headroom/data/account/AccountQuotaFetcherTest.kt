@@ -104,7 +104,7 @@ class AccountQuotaFetcherTest {
     }
 
     @Test
-    fun `JetBrains sends the ID token, and other providers never do`() = runTest {
+    fun `JetBrains sends the ID token and other providers never do`() = runTest {
         val jetBrains = RecordingFetcher(Provider.JetBrains)
         val claude = RecordingFetcher(Provider.Claude)
         saveCredential(
@@ -127,7 +127,7 @@ class AccountQuotaFetcherTest {
     }
 
     @Test
-    fun `JetBrains sends the refresh token, and other providers never do`() = runTest {
+    fun `JetBrains sends the refresh token and other providers never do`() = runTest {
         val jetBrains = RecordingFetcher(Provider.JetBrains)
         val claude = RecordingFetcher(Provider.Claude)
         saveCredential("j1", Provider.JetBrains, refreshToken = "refresh-j1")
@@ -152,7 +152,7 @@ class AccountQuotaFetcherTest {
     }
 
     @Test
-    fun `Copilot uses the GitHub token, not the Copilot token`() = runTest {
+    fun `Copilot uses the GitHub token not the Copilot token`() = runTest {
         val copilot = RecordingFetcher(Provider.Copilot)
         saveCredential("g1", Provider.Copilot, refreshToken = "github-token")
         fetcherFor(copilot).fetch(Account("g1", Provider.Copilot, "sam"))
@@ -209,10 +209,10 @@ class AccountQuotaFetcherTest {
     }
 
     @Test
-    fun `a storage failure while refreshing is a failure result, not a crash`() = runTest {
+    fun `a storage failure while refreshing is a failure result not a crash`() = runTest {
         val broken =
             object : dev.sebastiano.headroom.auth.TokenStore {
-                override suspend fun load(accountId: String) = throw java.io.IOException("disk")
+                override suspend fun load(accountId: String) = throw kotlinx.io.IOException("disk")
 
                 override suspend fun save(credential: StoredCredential, expectedRevision: Long?) =
                     null
@@ -241,7 +241,7 @@ class AccountQuotaFetcherTest {
     private val pool = ResetPool("grok", "Weekly limit reset", 2, ResetScope.of(WindowKind.Weekly))
 
     @Test
-    fun `the resets are read in the same sync, with the same credential`() = runTest {
+    fun `the resets are read in the same sync with the same credential`() = runTest {
         saveCredential("g1", Provider.Grok)
         val reader = FixedReader(Provider.Grok, ResetRead.Known(ResetAvailability(listOf(pool))))
         val fetcher =
@@ -328,7 +328,7 @@ class AccountQuotaFetcherTest {
         )
 
     @Test
-    fun `Z_AI usage uses the API key, and its resets the ZCode sign-in`() = runTest {
+    fun `Z_AI usage uses the API key and its resets the ZCode sign-in`() = runTest {
         val zAi = RecordingFetcher(Provider.ZAi)
         saveCredential("z1", Provider.ZAi)
         saveZCode("z1", expiresAt = null)

@@ -14,12 +14,12 @@ import dev.sebastiano.headroom.quota.QuotaFetchers
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetRead
 import dev.sebastiano.headroom.quota.ZCodeSignIn
-import java.io.IOException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.io.IOException
 
 /**
  * Fetches one account's quota with a credential that is valid now, refreshing it if needed. For

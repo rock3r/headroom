@@ -28,6 +28,9 @@ internal fun Project.configureQuality() {
     tasks.withType<Detekt>().configureEach {
         jvmTarget.set(HeadroomSdk.JVM_TOOLCHAIN.toString())
         exclude(*generatedSources)
+        // In multiplatform modules KSP output is a source root of its own, so the relative
+        // patterns above never see `build/generated` in its path.
+        exclude { it.file.invariantSeparatorsPath.contains("/build/generated/") }
     }
 
     tasks
