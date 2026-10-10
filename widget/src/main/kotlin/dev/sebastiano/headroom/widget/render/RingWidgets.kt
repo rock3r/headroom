@@ -27,7 +27,6 @@ import androidx.compose.remote.creation.compose.state.rs
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.WidgetUiState
 
@@ -92,6 +91,9 @@ internal fun SingleRingWidget(
             RemoteModifier.fillMaxSize()
         }
 
+    val counter =
+        render.counterStyle(gauge, render.pxValue(HERO_COUNTER), render.textPx(HERO_COUNTER_TEXT))
+
     WidgetCard(render, modifier) {
         RemoteBox(
             modifier = ringModifier.semantics { contentDescription = description.rs },
@@ -113,6 +115,9 @@ internal fun SingleRingWidget(
                         track = colors.track.rc,
                     )
                 }
+                if (gauge.resetsAvailable > 0) {
+                    drawRingCounter(gauge.resetsAvailable, HeroOuter, counter)
+                }
             }
             RemoteColumn(horizontalAlignment = RemoteAlignment.CenterHorizontally) {
                 WidgetText(
@@ -125,7 +130,6 @@ internal fun SingleRingWidget(
                         },
                 )
                 RingNumber(number, word, colors.onSurface, wordColor, render)
-                ResetsBadge(gauge, render, render.sp(LABEL))
             }
         }
     }
@@ -237,6 +241,8 @@ private fun SmallRing(
     modifier: RemoteModifier = RemoteModifier,
 ) {
     val colors = render.colorsFor(gauge)
+    val counter =
+        render.counterStyle(gauge, render.pxValue(SMALL_COUNTER), render.textPx(SMALL_COUNTER_TEXT))
     RemoteColumn(
         modifier = modifier,
         verticalArrangement = RemoteArrangement.Center,
@@ -253,6 +259,9 @@ private fun SmallRing(
                     active = colors.accent(gauge.provider).rc,
                     track = colors.track.rc,
                 )
+                if (gauge.resetsAvailable > 0) {
+                    drawRingCounter(gauge.resetsAvailable, SmallRing, counter)
+                }
             }
             WidgetText(
                 text = gauge.shownPercent.toString(),
@@ -268,31 +277,7 @@ private fun SmallRing(
             fontWeight = FontWeight.SemiBold,
         )
         if (gauge.stale) SignInLabel(render, render.sp(SMALL_NAME))
-        ResetsBadge(gauge, render, render.sp(SMALL_NAME))
     }
-}
-
-/**
- * The compact "2 resets" badge on an account with resets it can use now. It draws nothing when the
- * account has none.
- */
-@RemoteComposable
-@Composable
-internal fun ResetsBadge(
-    gauge: Gauge,
-    render: RenderContext,
-    fontSize: RemoteTextUnit,
-    modifier: RemoteModifier = RemoteModifier,
-    textAlign: TextAlign = TextAlign.Center,
-) {
-    if (gauge.resetsAvailable <= 0) return
-    WidgetText(
-        text = render.strings.resets(gauge.resetsAvailable).label,
-        color = render.colorsFor(gauge).accent(gauge.provider),
-        fontSize = fontSize,
-        modifier = modifier,
-        textAlign = textAlign,
-    )
 }
 
 /** The compact "Sign in" label under a stale gauge. It is never faded. */
@@ -313,3 +298,7 @@ private const val SMALL_NAME = 9.5f
 private const val NUMBER_BOX_WIDTH = 110f
 private const val NUMBER_LINE = 1.15f
 private const val LABEL_LINE = 1.4f
+private const val HERO_COUNTER = 10f
+private const val HERO_COUNTER_TEXT = 12f
+private const val SMALL_COUNTER = 7f
+private const val SMALL_COUNTER_TEXT = 9f

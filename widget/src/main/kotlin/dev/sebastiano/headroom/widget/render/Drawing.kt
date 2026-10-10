@@ -11,6 +11,7 @@ import androidx.compose.remote.creation.compose.state.RemotePaint
 import androidx.compose.remote.creation.compose.state.min as remoteMin
 import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.remote.creation.compose.state.rf
+import androidx.compose.remote.creation.compose.state.rs
 import androidx.compose.remote.creation.compose.text.RemoteTypeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PaintingStyle
@@ -58,6 +59,52 @@ internal fun RemoteDrawScope.drawGaugeRing(
     } else {
         drawArc(activePaint, TOP.rf, sweep.rf, false, topLeft, box)
     }
+}
+
+/**
+ * The reset counter: [count] in a small disc, ringed by the card colour so it stands apart from
+ * what it sits on. It is centred on ([x], [y]).
+ */
+internal fun RemoteDrawScope.drawCounter(
+    count: Int,
+    x: RemoteFloat,
+    y: RemoteFloat,
+    style: CounterStyle,
+) {
+    val centre = RemoteOffset(x, y)
+    drawCircle(fillPaint(style.halo.rc), (style.radiusPx + style.haloPx).rf, centre)
+    drawCircle(fillPaint(style.fill.rc), style.radiusPx.rf, centre)
+    with(RestrictedRemoteApis) {
+        drawCentredText(count.toString().rs, x, y, textPaint(style.text, style.textPx, bold = true))
+    }
+}
+
+/**
+ * Colours and sizes of a [drawCounter] counter. The sizes are pixels, fixed at capture, because
+ * canvas text needs its size then.
+ */
+internal data class CounterStyle(
+    val fill: Color,
+    val text: Color,
+    val halo: Color,
+    val radiusPx: Float,
+    val textPx: Float,
+    val haloPx: Float,
+)
+
+/**
+ * Draws the reset counter off the bottom-right of a ring of [geometry], just past its outer edge,
+ * so it never reads as the end of the arc.
+ */
+internal fun RemoteDrawScope.drawRingCounter(
+    count: Int,
+    geometry: RingGeometry,
+    style: CounterStyle,
+) {
+    val outerEdge = remoteMin(width, height) * (geometry.radius + geometry.stroke / 2f).rf
+    val distance = outerEdge + (style.radiusPx + style.haloPx).rf
+    val offset = distance * DIAGONAL.rf
+    drawCounter(count, width / 2f.rf + offset, height / 2f.rf + offset, style)
 }
 
 /**
@@ -210,6 +257,8 @@ private fun fillPaint(color: RemoteColor) = RemotePaint {
 }
 
 private const val FULL_TURN = 360f
+/** cos 45°: how far along each axis the bottom-right diagonal crosses a circle, per radius. */
+private const val DIAGONAL = 0.7071f
 private const val TOP = -90f
 private const val MIN_VISIBLE_DEGREES = 1.5f
 private const val MIN_WAVE_STEPS = 24

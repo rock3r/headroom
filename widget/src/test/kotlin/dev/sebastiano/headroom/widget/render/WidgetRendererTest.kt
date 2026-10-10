@@ -303,7 +303,7 @@ class WidgetRendererTest {
     }
 
     @Test
-    fun `bars and rings show a badge on an account with resets it can use now`() = runTest {
+    fun `bars and rings show a counter on an account with resets it can use now`() = runTest {
         val withResets = accounts.withResets()
         val layouts =
             listOf(
@@ -321,21 +321,24 @@ class WidgetRendererTest {
             val state = WidgetUiState.from(withResets, config, now, size, host)
             val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
             val label = "$config $size $host"
-            assertContains(doc.text(), "2 resets", message = label)
+            assertTrue(doc.drawsText("2"), "No reset counter in $label")
             assertContains(doc.text(), "2 resets available now.", message = label)
             WidgetRenderer.remoteViews(doc).playAt(size)
         }
     }
 
     @Test
-    fun `no badge shows without resets`() = runTest {
+    fun `no counter shows without resets`() = runTest {
         listOf(
                 capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f)),
                 capture(WidgetConfig(WidgetStyle.Rings)),
                 capture(WidgetConfig(WidgetStyle.Rings, listOf("demo-codex"))),
                 capture(WidgetConfig(WidgetStyle.Rings), WidgetSize(300f, 120f), LOCK),
             )
-            .forEach { it.assertNoText("available now") }
+            .forEach {
+                it.assertNoText("available now")
+                assertFalse(it.drawsText("2"))
+            }
     }
 
     @Test
@@ -669,6 +672,11 @@ class WidgetRendererTest {
         val text = text()
         expected.forEach { assertContains(text, it) }
     }
+
+    /** Whether the document holds the text [exact] on its own, as a counter is. */
+    private fun WidgetDocument.drawsText(exact: String): Boolean =
+        Regex("""TextData\[\d+] = "${Regex.escape(exact)}"""")
+            .containsMatchIn(documentOperations(bytes))
 
     private fun WidgetDocument.assertNoText(unexpected: String) {
         assertFalse(text().contains(unexpected), "Did not expect \"$unexpected\" in the document")

@@ -75,24 +75,15 @@ internal class WidgetStrings(
             if (gauge.stale) withReset + " " + context.getString(R.string.widget_cd_stale)
             else withReset
         val resets = gauge.resetsAvailable
-        return if (resets > 0) withStale + " " + resets(resets).description else withStale
+        if (resets <= 0) return withStale
+        return withStale +
+            " " +
+            context.resources.getQuantityString(
+                R.plurals.widget_cd_resets_available,
+                resets,
+                resets,
+            )
     }
-
-    /**
-     * The badge on an account with resets it can use now, "2 resets", and what a screen reader says
-     * for it.
-     */
-    fun resets(count: Int): LabelAndDescription =
-        LabelAndDescription(
-            label =
-                context.resources.getQuantityString(R.plurals.widget_resets_badge, count, count),
-            description =
-                context.resources.getQuantityString(
-                    R.plurals.widget_cd_resets_available,
-                    count,
-                    count,
-                ),
-        )
 
     fun countdownTitle(window: GaugeWindow?): String =
         if (window == null) upper(context.getString(R.string.widget_countdown_none))
@@ -144,8 +135,7 @@ internal class WidgetStrings(
                 ),
         )
 
-    val refreshAction: String
-        get() = context.getString(R.string.widget_cd_refresh)
+    fun refreshAction(): String = context.getString(R.string.widget_cd_refresh)
 
     /**
      * What tapping an account does, for a screen reader: open it, or with [signInAgain] sign it in

@@ -33,6 +33,20 @@ internal class RenderContext(
     /** The colours to draw [gauge] with: faded when its numbers are stale. */
     fun colorsFor(gauge: Gauge): WidgetColors = if (gauge.stale) staleColors else colors
 
+    /**
+     * How [gauge]'s reset counter looks: a disc in its accent colour with the number in the card
+     * colour, [radiusPx] wide and with [textPx] text.
+     */
+    fun counterStyle(gauge: Gauge, radiusPx: Float, textPx: Float): CounterStyle =
+        CounterStyle(
+            fill = colorsFor(gauge).accent(gauge.provider),
+            text = colors.background,
+            halo = colors.background,
+            radiusPx = radiusPx,
+            textPx = textPx,
+            haloPx = radiusPx * COUNTER_HALO_SHARE,
+        )
+
     /** Text size for a design size, scaled with the widget. */
     fun sp(design: Float): RemoteTextUnit = (design * unit).sp.asRemoteTextUnit()
 
@@ -58,5 +72,6 @@ internal class RenderContext(
         const val DESIGN_WIDGET_DP = 148f
         const val MIN_SCALE = 0.6f
         const val MAX_SCALE = 1.6f
+        const val COUNTER_HALO_SHARE = 0.25f
     }
 }

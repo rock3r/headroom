@@ -155,6 +155,8 @@ private fun LockScreenGauge(
     modifier: RemoteModifier = RemoteModifier,
 ) {
     val colors = render.colorsFor(gauge)
+    val counter =
+        render.counterStyle(gauge, render.pxValue(LOCK_COUNTER), render.textPx(LOCK_COUNTER_TEXT))
     RemoteColumn(modifier = modifier, horizontalAlignment = RemoteAlignment.CenterHorizontally) {
         RemoteBox(
             modifier = RemoteModifier.width(render.px(LOCK_RING)).height(render.px(LOCK_RING)),
@@ -167,6 +169,9 @@ private fun LockScreenGauge(
                     active = colors.accent(gauge.provider).rc,
                     track = colors.track.rc,
                 )
+                if (gauge.resetsAvailable > 0) {
+                    drawRingCounter(gauge.resetsAvailable, LockRing, counter)
+                }
             }
             ProviderLogoIcon(gauge.provider, render.pxValue(LOCK_LOGO), colors.onSurface)
         }
@@ -187,7 +192,6 @@ private fun LockScreenGauge(
                 fontWeight = FontWeight.Medium,
             )
         }
-        ResetsBadge(gauge, render, render.sp(LOCK_NAME))
     }
 }
 
@@ -205,3 +209,5 @@ private const val LOCK_LOGO = 22f
 private const val LOCK_NUMBER = 15f
 private const val LOCK_NAME = 10f
 private const val LOCK_FOOTER = 11.5f
+private const val LOCK_COUNTER = 6.5f
+private const val LOCK_COUNTER_TEXT = 8.5f
