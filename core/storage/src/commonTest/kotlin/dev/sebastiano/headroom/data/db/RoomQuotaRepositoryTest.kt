@@ -1,7 +1,5 @@
 package dev.sebastiano.headroom.data.db
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
@@ -26,11 +24,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@RunWith(RobolectricTestRunner::class)
 class RoomQuotaRepositoryTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")
     private val demo = DemoData.accounts(now)
@@ -39,13 +34,7 @@ class RoomQuotaRepositoryTest {
 
     @BeforeTest
     fun setUp() {
-        db =
-            Room.inMemoryDatabaseBuilder(
-                    ApplicationProvider.getApplicationContext(),
-                    HeadroomDatabase::class.java,
-                )
-                .allowMainThreadQueries()
-                .build()
+        db = inMemoryDatabase()
     }
 
     @AfterTest fun tearDown() = db.close()
@@ -122,7 +111,7 @@ class RoomQuotaRepositoryTest {
         }
 
     @Test
-    fun `resets that could not be read keep the last ones, and none clears them`() =
+    fun `resets that could not be read keep the last ones and none clears them`() =
         runTest(UnconfinedTestDispatcher()) {
             var snapshot = claude.snapshot!!.copy(resets = resets)
             val repo = repo({ QuotaResult.Success(snapshot) }, backgroundScope)
@@ -181,7 +170,7 @@ class RoomQuotaRepositoryTest {
         }
 
     @Test
-    fun `an expired sign-in stays expired through later errors, until a sync works`() =
+    fun `an expired sign-in stays expired through later errors until a sync works`() =
         runTest(UnconfinedTestDispatcher()) {
             var result: QuotaResult = QuotaResult.Failure(QuotaErrorKind.Auth, "expired")
             val repo = repo({ result }, backgroundScope)
@@ -241,7 +230,7 @@ class RoomQuotaRepositoryTest {
         }
 
     @Test
-    fun `renaming an account keeps the name, and a blank name clears it`() =
+    fun `renaming an account keeps the name and a blank name clears it`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
             repo.addAccount(claude.account)

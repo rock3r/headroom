@@ -2,9 +2,6 @@ package dev.sebastiano.headroom.data
 
 import android.content.Context
 import android.util.Log
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.preferencesDataStoreFile
-import androidx.room.Room
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerFactory
 import dev.sebastiano.headroom.auth.AuthMethods
@@ -19,11 +16,6 @@ import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.data.account.SignInNotifier
 import dev.sebastiano.headroom.data.account.SyncedResetProvider
 import dev.sebastiano.headroom.data.account.TinkCredentialCipher
-import dev.sebastiano.headroom.data.db.HeadroomDatabase
-import dev.sebastiano.headroom.data.db.RoomQuotaRepository
-import dev.sebastiano.headroom.data.db.RoomResetEventLog
-import dev.sebastiano.headroom.data.prefs.DataStoreAlertPreferences
-import dev.sebastiano.headroom.data.prefs.DataStoreSettingsRepository
 import dev.sebastiano.headroom.data.reset.AlarmResetScheduler
 import dev.sebastiano.headroom.data.reset.AndroidResetLog
 import dev.sebastiano.headroom.data.reset.AndroidResetNotifier
@@ -41,9 +33,7 @@ import dev.sebastiano.headroom.data.reset.SharedPreferencesResetLedger
 import dev.sebastiano.headroom.data.reset.SharedPreferencesResetReminderLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
 import dev.sebastiano.headroom.data.sync.SyncWorker
-import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AlertPreferences
-import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetAttemptStore
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
@@ -61,22 +51,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-
-/** A [QuotaRepository] that also manages which accounts exist. */
-public interface AccountsRepository : QuotaRepository {
-    public suspend fun addAccount(account: Account)
-
-    public suspend fun removeAccount(accountId: String)
-
-    /** Names the account. A blank or null [nickname] removes the name. */
-    public suspend fun renameAccount(accountId: String, nickname: String?)
-
-    /** Stores what the provider calls the account, for example a changed email address. */
-    public suspend fun relabelAccount(accountId: String, label: String)
-
-    /** Puts the accounts in the order of [orderedIds]. Every list of accounts follows it. */
-    public suspend fun reorderAccounts(orderedIds: List<String>)
-}
 
 /** Implemented by the Application, so receivers and workers can reach the [DataGraph]. */
 public interface DataGraphOwner {
@@ -115,67 +89,24 @@ public class DataGraph(
 ) {
     private val appContext = context.applicationContext
 
-    private val database =
-        Room.databaseBuilder(appContext, HeadroomDatabase::class.java, "headroom.db")
-            .addMigrations(
-                HeadroomDatabase.MIGRATION_1_2,
-                HeadroomDatabase.MIGRATION_2_3,
-                HeadroomDatabase.MIGRATION_3_4,
-                HeadroomDatabase.MIGRATION_4_5,
-                HeadroomDatabase.MIGRATION_5_6,
-                HeadroomDatabase.MIGRATION_6_7,
-                HeadroomDatabase.MIGRATION_7_8,
-            )
-            .build()
-
-    private val alertStore =
-        PreferenceDataStoreFactory.create(scope = scope) {
-            appContext.preferencesDataStoreFile("alerts")
-        }
-
-    private val settingsStore =
-        PreferenceDataStoreFactory.create(scope = scope) {
-            appContext.preferencesDataStoreFile("settings")
-        }
+    private val storage = openHeadroomStorage(appContext, scope)
 
     private val accountFetcher =
         AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers, resetClients)
 
-    private val roomRepository =
-        RoomQuotaRepository(
-            database.quotaDao(),
-            database.accountOrderDao(),
-            accountFetcher::fetch,
-            clock,
-            scope,
-        )
+    private val roomRepository = storage.accounts(accountFetcher::fetch, clock, scope)
 
     /** Shows and removes the warning that an account's sign-in expired. */
     public val signInNotifier: SignInNotifier = AndroidSignInNotifier(appContext)
 
     public val repository: AccountsRepository =
         SignInAlertingRepository(
-            object : AccountsRepository, QuotaRepository by roomRepository {
-                override suspend fun addAccount(account: Account) =
-                    roomRepository.addAccount(account)
-
-                override suspend fun removeAccount(accountId: String) =
-                    roomRepository.removeAccount(accountId)
-
-                override suspend fun renameAccount(accountId: String, nickname: String?) =
-                    roomRepository.renameAccount(accountId, nickname)
-
-                override suspend fun relabelAccount(accountId: String, label: String) =
-                    roomRepository.relabelAccount(accountId, label)
-
-                override suspend fun reorderAccounts(orderedIds: List<String>) =
-                    roomRepository.reorderAccounts(orderedIds)
-            },
+            roomRepository,
             SignInAlerts(signInNotifier, SharedPreferencesSignInAlertLedger(appContext)),
         )
 
     /** The user's app settings: used or left, and how often to sync in the background. */
-    public val settings: SettingsRepository = DataStoreSettingsRepository(settingsStore)
+    public val settings: SettingsRepository = storage.settings
 
     /**
      * The resets of the signed-in accounts: read by each sync and stored with the snapshot, and
@@ -196,12 +127,12 @@ public class DataGraph(
      * The resets used and expired, kept in Room for a year: each sync records the ones it finds
      * gone, and a redeem that works in Headroom is recorded here.
      */
-    public val resetEvents: ResetEventLog = RoomResetEventLog(database.quotaDao(), clock)
+    public val resetEvents: ResetEventLog = storage.resetEvents(clock)
 
     /** Keeps the keys of unsettled redeem attempts across restarts. */
     public val resetAttempts: ResetAttemptStore = SharedPreferencesResetAttemptStore(appContext)
 
-    public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
+    public val alertPreferences: AlertPreferences = storage.alertPreferences
 
     /** Turns finished sign-ins into accounts, and signs accounts out. */
     public val signInManager: SignInManager = SignInManager(tokenStore, repository)
@@ -257,7 +188,7 @@ public class DataGraph(
                 .collect { SyncWorker.schedule(appContext, it) }
         }
         scope.launch {
-            combine(repository.accounts, alertStore.data) { _, _ -> Unit }
+            combine(repository.accounts, storage.alertChanges) { _, _ -> Unit }
                 .debounce(RESCHEDULE_DEBOUNCE_MS)
                 .collect { rescheduleResetAlarms() }
         }

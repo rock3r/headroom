@@ -22,6 +22,11 @@ gradlePlugin {
             id = "headroom.kmp.library"
             implementationClass = "dev.sebastiano.headroom.buildlogic.KmpLibraryConventionPlugin"
         }
+        register("kmpAndroidLibrary") {
+            id = "headroom.kmp.android.library"
+            implementationClass =
+                "dev.sebastiano.headroom.buildlogic.KmpAndroidLibraryConventionPlugin"
+        }
         register("androidLibrary") {
             id = "headroom.android.library"
             implementationClass = "dev.sebastiano.headroom.buildlogic.AndroidLibraryConventionPlugin"

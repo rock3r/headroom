@@ -1,7 +1,9 @@
 package dev.sebastiano.headroom.data.db
 
+import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.RoomDatabaseConstructor
 import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
@@ -17,6 +19,7 @@ import androidx.sqlite.execSQL
     version = 8,
     exportSchema = false,
 )
+@ConstructedBy(HeadroomDatabaseConstructor::class)
 internal abstract class HeadroomDatabase : RoomDatabase() {
     abstract fun quotaDao(): QuotaDao
 
@@ -129,5 +132,32 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                     )
                 }
             }
+
+        /** Every migration, oldest first. */
+        val MIGRATIONS: List<Migration> =
+            listOf(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+            )
+
+        /** The database file's name, the same on every platform. */
+        const val NAME = "headroom.db"
     }
+}
+
+/** Adds every migration, so a database of any older version opens. */
+internal fun RoomDatabase.Builder<HeadroomDatabase>.addAllMigrations():
+    RoomDatabase.Builder<HeadroomDatabase> = apply {
+    HeadroomDatabase.MIGRATIONS.forEach { addMigrations(it) }
+}
+
+/** Room generates the actual for each target. */
+@Suppress("KotlinNoActualForExpect")
+internal expect object HeadroomDatabaseConstructor : RoomDatabaseConstructor<HeadroomDatabase> {
+    override fun initialize(): HeadroomDatabase
 }

@@ -1,26 +1,30 @@
 package dev.sebastiano.headroom.data.prefs
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import dev.sebastiano.headroom.data.db.TestDirectory
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.io.File
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.Rule
-import org.junit.rules.TemporaryFolder
 
 class DataStoreAlertPreferencesTest {
-    @get:Rule val folder = TemporaryFolder()
+    private val folder = TestDirectory()
+
+    @AfterTest
+    fun tearDown() {
+        folder.close()
+    }
 
     private fun window(kind: WindowKind, id: String = "w") =
         QuotaWindow(id, id, kind, 10.0, null, null)
 
     private fun kotlinx.coroutines.test.TestScope.prefs() =
         DataStoreAlertPreferences(
-            PreferenceDataStoreFactory.create(scope = backgroundScope) {
-                File(folder.root, "alerts.preferences_pb")
+            PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
+                folder.path / "alerts.preferences_pb"
             }
         )
 
@@ -39,7 +43,7 @@ class DataStoreAlertPreferencesTest {
     }
 
     @Test
-    fun `a stored choice overrides the default, per account and window`() = runTest {
+    fun `a stored choice overrides the default per account and window`() = runTest {
         val prefs = prefs()
         prefs.setEnabled("a", "w", false)
         prefs.setEnabled("b", "m", true)
