@@ -13,14 +13,14 @@ class SettingsTest {
     }
 
     @Test
-    fun `left mode shows what is left, never below zero`() {
+    fun `left mode shows what is left never below zero`() {
         assertEquals(29.0, QuotaDisplay.Left.percent(71.0))
         assertEquals(0.0, QuotaDisplay.Left.percent(104.0))
         assertEquals(100.0, QuotaDisplay.Left.percent(0.0))
     }
 
     @Test
-    fun `sync frequencies run from the WorkManager minimum to six hours, or not at all`() {
+    fun `sync frequencies run from the WorkManager minimum to six hours or not at all`() {
         assertEquals(
             listOf(
                 15.minutes,

@@ -1,7 +1,5 @@
 package dev.sebastiano.headroom.model
 
-import java.util.Locale
-
 /**
  * The letter that tells the account called [name] apart from [others], the other accounts of the
  * same provider, or null when there are no others. It is the first letter of the first word of
@@ -24,10 +22,10 @@ public fun accountBadge(name: String, others: List<String>): String? {
 private fun String.words(): List<String> = trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
 
 /**
- * The first letter, uppercased. A letter outside the basic plane is two chars, so this counts code
- * points.
+ * The first letter, uppercased. A letter outside the basic plane is two chars (a surrogate pair),
+ * so this counts code points.
  */
 private fun String.firstLetter(): String {
-    val end = offsetByCodePoints(0, 1)
-    return substring(0, end).uppercase(Locale.ROOT)
+    val end = if (length > 1 && this[0].isHighSurrogate() && this[1].isLowSurrogate()) 2 else 1
+    return substring(0, end).uppercase()
 }

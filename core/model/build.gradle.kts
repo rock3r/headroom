@@ -1,6 +1,9 @@
-plugins { alias(libs.plugins.headroom.jvm.library) }
+plugins { alias(libs.plugins.headroom.kmp.library) }
 
-dependencies {
-    api(libs.kotlinx.coroutines.core)
-    api(libs.kotlinx.datetime)
+kotlin {
+    sourceSets.commonMain.dependencies {
+        api(libs.kotlinx.coroutines.core)
+        api(libs.kotlinx.datetime)
+        implementation(libs.kotlinx.atomicfu)
+    }
 }

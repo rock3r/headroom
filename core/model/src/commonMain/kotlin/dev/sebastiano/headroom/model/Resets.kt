@@ -1,11 +1,14 @@
 package dev.sebastiano.headroom.model
 
-import java.util.UUID
+import kotlin.jvm.JvmInline
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 /**
  * Which limits a reset restores. A provider names them by window id ([windowIds], as Claude's
@@ -174,7 +177,7 @@ public data class ResetAvailability(
 @JvmInline
 public value class ResetAttemptKey(public val value: String) {
     public companion object {
-        public fun mint(): ResetAttemptKey = ResetAttemptKey(UUID.randomUUID().toString())
+        public fun mint(): ResetAttemptKey = ResetAttemptKey(Uuid.random().toString())
     }
 }
 
@@ -346,26 +349,27 @@ public class ResetAttemptMemory(
     private val lifetime: (Provider) -> Duration = { DEFAULT_LIFETIME },
     private val store: ResetAttemptStore = ResetAttemptStore.None,
 ) {
+    private val lock = SynchronizedObject()
     private val keys: MutableMap<Pair<String, String>, ResetAttempt> by lazy {
         store.load().associateBy { it.accountId to it.poolId }.toMutableMap()
     }
 
     /** The key of an unsettled attempt on this pool that is still fresh, or null. */
-    @Synchronized
-    public fun recall(account: Account, poolId: String): ResetAttemptKey? {
-        val attempt = keys[account.id to poolId] ?: return null
-        return ResetAttemptKey(attempt.key).takeIf { isFresh(attempt, account.provider) }
-    }
+    public fun recall(account: Account, poolId: String): ResetAttemptKey? =
+        synchronized(lock) {
+            val attempt = keys[account.id to poolId] ?: return null
+            ResetAttemptKey(attempt.key).takeIf { isFresh(attempt, account.provider) }
+        }
 
-    @Synchronized
     public fun remember(account: Account, poolId: String, key: ResetAttemptKey) {
-        keys[account.id to poolId] = ResetAttempt(account.id, poolId, key.value, clock())
-        persist()
+        synchronized(lock) {
+            keys[account.id to poolId] = ResetAttempt(account.id, poolId, key.value, clock())
+            persist()
+        }
     }
 
-    @Synchronized
     public fun forget(account: Account, poolId: String) {
-        if (keys.remove(account.id to poolId) != null) persist()
+        synchronized(lock) { if (keys.remove(account.id to poolId) != null) persist() }
     }
 
     /** Saves the attempts that are still fresh, and drops the rest. */
@@ -375,7 +379,7 @@ public class ResetAttemptMemory(
     }
 
     private fun isFresh(attempt: ResetAttempt, provider: Provider?): Boolean {
-        val age = (clock() - attempt.at)
+        val age = clock() - attempt.at
         val limit = provider?.let(lifetime) ?: DEFAULT_LIFETIME
         return age < limit
     }
