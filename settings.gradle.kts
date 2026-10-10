@@ -24,6 +24,7 @@ include(
     ":core:auth",
     ":core:data",
     ":core:storage",
+    ":shared",
     ":core:designsystem",
     ":widget",
 )
