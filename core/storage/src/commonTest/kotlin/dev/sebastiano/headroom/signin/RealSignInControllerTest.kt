@@ -6,15 +6,15 @@ import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.data.account.DifferentAccountException
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
-import java.io.IOException
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlinx.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RealSignInControllerTest {
@@ -133,7 +133,7 @@ class RealSignInControllerTest {
         }
 
     @Test
-    fun `a device code sign-in is finishing once it has tokens, until they are stored`() =
+    fun `a device code sign-in is finishing once it has tokens until they are stored`() =
         runTest(UnconfinedTestDispatcher()) {
             val steps = FakeSteps()
             val gate = CompletableDeferred<Unit>()
@@ -187,7 +187,7 @@ class RealSignInControllerTest {
         }
 
     @Test
-    fun `browser sign-in shows the authorize page, then succeeds`() =
+    fun `browser sign-in shows the authorize page then succeeds`() =
         runTest(UnconfinedTestDispatcher()) {
             val steps = FakeSteps()
             val completed = mutableListOf<TokenSet>()
@@ -219,7 +219,7 @@ class RealSignInControllerTest {
         }
 
     @Test
-    fun `device code sign-in shows the code, then succeeds`() =
+    fun `device code sign-in shows the code then succeeds`() =
         runTest(UnconfinedTestDispatcher()) {
             val steps = FakeSteps()
             val controller = controller(steps)
@@ -236,7 +236,7 @@ class RealSignInControllerTest {
         }
 
     @Test
-    fun `an empty API key is rejected, a good one signs in`() =
+    fun `an empty API key is rejected a good one signs in`() =
         runTest(UnconfinedTestDispatcher()) {
             val controller = controller(FakeSteps())
             controller.start(Provider.ZAi)
@@ -291,7 +291,7 @@ class RealSignInControllerTest {
         }
 
     @Test
-    fun `an API key is saved once, however often it is submitted`() =
+    fun `an API key is saved once however often it is submitted`() =
         runTest(UnconfinedTestDispatcher()) {
             val completed = mutableListOf<TokenSet>()
             val gate = CompletableDeferred<Unit>()
@@ -322,7 +322,7 @@ class RealSignInControllerTest {
         }
 
     @Test
-    fun `signing an account in again stores the tokens for that account, also after a retry`() =
+    fun `signing an account in again stores the tokens for that account also after a retry`() =
         runTest(UnconfinedTestDispatcher()) {
             val steps = FakeSteps()
             val again = mutableListOf<String>()
@@ -369,7 +369,7 @@ class RealSignInControllerTest {
         }
 
     @Test
-    fun `a sign-in shows its first step at once, while the browser session starts`() =
+    fun `a sign-in shows its first step at once while the browser session starts`() =
         runTest(kotlinx.coroutines.test.StandardTestDispatcher()) {
             val steps = FakeSteps()
             val controller = controller(steps)

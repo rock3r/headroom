@@ -9,6 +9,7 @@
 | `:core:auth` | Kotlin Multiplatform (JVM, iOS) | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
 | `:core:storage` | Kotlin Multiplatform (Android, JVM, iOS) | Room database (accounts, snapshots, history, reset events), DataStore settings, account fetching and sign-in bookkeeping |
 | `:core:data` | Android library | Encrypted token store, sync worker, reset alarms, notifications, the Android wiring (`DataGraph`) |
+| `:shared` | Kotlin Multiplatform (JVM, iOS) | The `HeadroomKit` framework for the iOS app: wiring, Keychain-backed token store, Swift-friendly view models |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
 | `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
@@ -33,7 +34,15 @@ ship separate Android builds, and the Android app keeps Android's own SQLite and
 (`headroom.db`, `files/datastore/settings.preferences_pb`). iOS opens the same database with the
 SQLite that ships with Room. The JVM target only runs `commonTest` on the host, with that bundled
 SQLite. `HeadroomStorage` is the one public entry point; each platform opens it with its own
-`openHeadroomStorage`.
+`openHeadroomStorage`. The sign-in state machine (`RealSignInController`, `AuthSignInSteps`) lives
+in `:core:storage` too, so both apps run the same sign-in steps.
+
+`:shared` builds the static `HeadroomKit` framework the iOS app links. `openHeadroom(directory:secrets:)`
+wires storage, sync and sign-in as `DataGraph` and `AppGraph` do on Android. The app implements
+`SecureValueStore` with the Keychain, and `SecureTokenStore` keeps the same compare-and-swap
+revisions as the Android token store. Swift observes `OverviewUi` and `SignInUi` through callbacks
+on the main thread. These carry plain values and stable ids (`"network"`, `"over"`), and the app's
+String Catalog holds the text.
 
 The OAuth loopback listener (`LoopbackServer`) keeps its HTTP handling in common code, over a small
 socket interface: `ServerSocket` on the JVM and POSIX sockets on iOS, always bound to the loopback

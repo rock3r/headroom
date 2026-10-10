@@ -9,8 +9,7 @@ import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.data.account.DifferentAccountException
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
-import java.io.IOException
-import kotlinx.coroutines.CancellationException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,42 +17,43 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.io.IOException
 
 /** How a provider signs in, from the UI's point of view. */
-enum class SignInKind {
+public enum class SignInKind {
     Browser,
     DeviceCode,
     ApiKey,
 }
 
 /** A browser sign-in in progress: the loopback redirect or a pasted code finishes it. */
-interface BrowserSession : AutoCloseable {
-    val authorizeUrl: String
+public interface BrowserSession : AutoCloseable {
+    public val authorizeUrl: String
 
     /** @throws AuthException.SignInFailed when the text is not a usable code. */
-    fun submitPastedCode(code: String)
+    public fun submitPastedCode(code: String)
 
     /** [onCodeReceived] runs once a code arrives, before it is exchanged for the tokens. */
-    suspend fun awaitTokens(onCodeReceived: () -> Unit): TokenSet
+    public suspend fun awaitTokens(onCodeReceived: () -> Unit): TokenSet
 }
 
-interface DeviceSession {
-    val userCode: String
-    val verificationUrl: String
+public interface DeviceSession {
+    public val userCode: String
+    public val verificationUrl: String
 
-    suspend fun awaitTokens(): TokenSet
+    public suspend fun awaitTokens(): TokenSet
 }
 
 /** The auth layer, seen through the steps the sign-in screens need. */
-interface SignInSteps {
-    fun kindOf(provider: Provider): SignInKind
+public interface SignInSteps {
+    public fun kindOf(provider: Provider): SignInKind
 
-    suspend fun startBrowser(provider: Provider): BrowserSession
+    public suspend fun startBrowser(provider: Provider): BrowserSession
 
-    suspend fun startDeviceCode(provider: Provider): DeviceSession
+    public suspend fun startDeviceCode(provider: Provider): DeviceSession
 
     /** @throws AuthException.SignInFailed when the key is not usable. */
-    fun apiKeyTokens(provider: Provider, key: String): TokenSet
+    public fun apiKeyTokens(provider: Provider, key: String): TokenSet
 }
 
 /**
@@ -61,7 +61,7 @@ interface SignInSteps {
  * adds the account. A sign-in started for an existing account goes to [completeAgain] instead,
  * which stores the tokens for that account.
  */
-class RealSignInController(
+public class RealSignInController(
     private val steps: SignInSteps,
     private val scope: CoroutineScope,
     private val completeAgain: (suspend (accountId: String, TokenSet) -> Account)? = null,
@@ -216,7 +216,7 @@ class RealSignInController(
 }
 
 /** [SignInSteps] backed by the auth layer's [AuthMethods]. */
-class AuthSignInSteps(
+public class AuthSignInSteps(
     private val methods: AuthMethods,
     /** Where the success page's "Return to Headroom" link points. */
     private val returnUrl: String = RETURN_URL,
@@ -245,7 +245,7 @@ class AuthSignInSteps(
         (methods.forProvider(provider) as AuthMethod.ApiKey).tokens(key)
 
     /** Starts the ZCode sign-in that a Z.AI account's resets need. It shows no code. */
-    suspend fun startZCode(): DeviceSession {
+    public suspend fun startZCode(): DeviceSession {
         val flow = methods.zCodeSignIn
         val prompt = flow.start()
         return DeviceAdapter(prompt) { flow.awaitTokens(prompt) }
@@ -273,7 +273,7 @@ class AuthSignInSteps(
         override suspend fun awaitTokens(): TokenSet = await()
     }
 
-    companion object {
-        const val RETURN_URL: String = "headroom://signed-in"
+    public companion object {
+        public const val RETURN_URL: String = "headroom://signed-in"
     }
 }
