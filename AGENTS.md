@@ -8,6 +8,8 @@ It has Material 3 Expressive UI, adaptive layouts, Remote Compose widgets for th
 screens, and a notification when a weekly limit resets.
 
 - Android 16 (API 36) and later only. `compileSdk` and `targetSdk` are 37.
+- An iOS app (SwiftUI, iOS 18 and later) in `iosApp/` shares the Kotlin business logic through
+  Kotlin Multiplatform. See [iosApp/README.md](iosApp/README.md).
 - Kotlin, Jetpack Compose, Material 3 Expressive, Remote Compose. No Views, no Glance.
 - Plain constructor injection. There is no DI framework.
 
