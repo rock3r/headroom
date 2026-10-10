@@ -28,11 +28,13 @@ class AndroidResetReminderNotifierTest {
     private val codex = Account("codex", Provider.Codex, "sam@example.com")
     private val grok = Account("grok", Provider.Grok, "sam")
 
+    private var zone = ZoneId.of("UTC")
+
     private fun notifier(is24Hour: Boolean = true) =
         AndroidResetReminderNotifier(
             context,
-            ZoneId.of("UTC"),
-            Locale.US,
+            zone = { zone },
+            locale = { Locale.US },
             is24Hour = { is24Hour },
             clock = { now },
         ) { accountId ->
@@ -82,6 +84,22 @@ class AndroidResetReminderNotifierTest {
 
         assertEquals(
             "Your ChatGPT Codex reset expires today at 9:05 PM",
+            shadowOf(posted()).contentTitle,
+        )
+    }
+
+    @Test
+    fun `reads the time zone when it posts, so a trip shows the local time`() {
+        val notifier = notifier()
+        zone = ZoneId.of("Europe/Rome")
+
+        notifier.notifyExpiring(
+            listOf(ExpiringReset(codex, "credits", Instant.parse("2026-10-11T06:18:00Z"))),
+            states(codex),
+        )
+
+        assertEquals(
+            "Your ChatGPT Codex reset expires tomorrow at 08:18",
             shadowOf(posted()).contentTitle,
         )
     }

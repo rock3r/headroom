@@ -24,8 +24,9 @@ import java.util.Locale
  */
 internal class AndroidResetReminderNotifier(
     private val context: Context,
-    private val zone: ZoneId = ZoneId.systemDefault(),
-    private val locale: Locale = Locale.getDefault(),
+    /** Read when a reminder is posted, so a reminder after a trip shows the local time. */
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
+    private val locale: () -> Locale = Locale::getDefault,
     /** Whether the user's clock shows 24 hours, read when a reminder is posted. */
     private val is24Hour: () -> Boolean = { DateFormat.is24HourFormat(context) },
     private val clock: () -> Instant = Instant::now,
@@ -96,6 +97,8 @@ internal class AndroidResetReminderNotifier(
 
     /** "today at 06:18", "tomorrow at 06:18", or "on Mon 12 Oct at 06:18". */
     private fun whenText(at: Instant): String {
+        val zone = zone()
+        val locale = locale()
         val time = at.atZone(zone)
         val clockTime = DateTimeFormatter.ofPattern(timePattern(), locale).format(time)
         val today = clock().atZone(zone).toLocalDate()
