@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
@@ -93,7 +95,8 @@ fun chartWindowTag(windowId: String): String = "chart-window-$windowId"
  * One account in depth: the hero ring (weekly outside, session inside), every window, the pace
  * chart drawn to scale, and the per-window reset alert switches. The ring, the numbers and the
  * chart text show how much is used or how much is left, as the state's display says; the chart
- * itself always plots usage against even pace.
+ * itself always plots usage against even pace. With [revealResets], it scrolls the Resets card into
+ * view once the card shows, then calls [onRevealResets].
  */
 @Composable
 fun DetailScreen(
@@ -107,6 +110,8 @@ fun DetailScreen(
     resets: AccountResets = AccountResets(),
     resetHandlers: ResetHandlers = ResetHandlers(),
     onSignInAgain: (accountId: String) -> Unit = {},
+    revealResets: Boolean = false,
+    onRevealResets: () -> Unit = {},
 ) {
     val account = state.account
     val container =
@@ -121,6 +126,7 @@ fun DetailScreen(
         // Not saved: the detail pane restores saved state from whichever account it showed last,
         // so a saved scroll would open the next account part way down. Details open at the top.
         val scrollState = remember(account.id) { ScrollState(initial = 0) }
+        val resetsRequester = remember { BringIntoViewRequester() }
         StatusBarBlurBox(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier =
@@ -194,6 +200,7 @@ fun DetailScreen(
                 // A stale account's resets are as old as its usage: faded with it, and with no
                 // action until the user signs in again.
                 resets.of(account.id)?.let { availability ->
+                    RevealResetsEffect(revealResets, resetsRequester, onRevealResets)
                     ResetsCard(
                         provider = account.provider,
                         availability = availability,
@@ -202,7 +209,7 @@ fun DetailScreen(
                         onAsk = { resetHandlers.onAsk(account.id) },
                         redeemEnabled = resets.canRedeem(account.provider),
                         stale = stale,
-                        modifier = content,
+                        modifier = content.bringIntoViewRequester(resetsRequester),
                     )
                 }
                 AlertSection(account, formatter, onAlertChange, content)

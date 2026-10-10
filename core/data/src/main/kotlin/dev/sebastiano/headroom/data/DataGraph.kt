@@ -27,14 +27,18 @@ import dev.sebastiano.headroom.data.prefs.DataStoreSettingsRepository
 import dev.sebastiano.headroom.data.reset.AlarmResetScheduler
 import dev.sebastiano.headroom.data.reset.AndroidResetLog
 import dev.sebastiano.headroom.data.reset.AndroidResetNotifier
+import dev.sebastiano.headroom.data.reset.AndroidResetReminderNotifier
 import dev.sebastiano.headroom.data.reset.ResetAlarm
 import dev.sebastiano.headroom.data.reset.ResetAlarmPlanner
 import dev.sebastiano.headroom.data.reset.ResetCheckWorker
 import dev.sebastiano.headroom.data.reset.ResetChecker
 import dev.sebastiano.headroom.data.reset.ResetIsland
+import dev.sebastiano.headroom.data.reset.ResetReminderAlarm
+import dev.sebastiano.headroom.data.reset.ResetReminders
 import dev.sebastiano.headroom.data.reset.SharedPreferencesAttemptTargetStore
 import dev.sebastiano.headroom.data.reset.SharedPreferencesResetAttemptStore
 import dev.sebastiano.headroom.data.reset.SharedPreferencesResetLedger
+import dev.sebastiano.headroom.data.reset.SharedPreferencesResetReminderLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
 import dev.sebastiano.headroom.data.sync.SyncWorker
 import dev.sebastiano.headroom.model.Account
@@ -212,6 +216,16 @@ public class DataGraph(
             )
         }
 
+    private val resetReminders =
+        ResetReminders(
+            repository = repository,
+            settings = { settings.settings.first() },
+            ledger = SharedPreferencesResetReminderLedger(appContext),
+            notifier = AndroidResetReminderNotifier(appContext),
+            schedule = ResetReminderAlarm(appContext)::schedule,
+            clock = clock,
+        )
+
     public val workerFactory: WorkerFactory =
         HeadroomWorkerFactory(
             resetChecker =
@@ -224,11 +238,13 @@ public class DataGraph(
                     },
                 ),
             repository = repository,
+            resetReminders = resetReminders,
         )
 
     /**
      * Keeps the periodic sync on the period from the settings, and reset alarms in step with
-     * accounts and alert switches. Reset alarms do not depend on the sync period.
+     * accounts and alert switches. Reset alarms do not depend on the sync period. The reset
+     * reminder's alarm follows the resets the accounts hold and the settings.
      */
     @OptIn(FlowPreview::class)
     public fun start() {
@@ -242,6 +258,11 @@ public class DataGraph(
             combine(repository.accounts, alertStore.data) { _, _ -> Unit }
                 .debounce(RESCHEDULE_DEBOUNCE_MS)
                 .collect { rescheduleResetAlarms() }
+        }
+        scope.launch {
+            combine(repository.accounts, settings.settings) { _, _ -> Unit }
+                .debounce(RESCHEDULE_DEBOUNCE_MS)
+                .collect { resetReminders.reschedule() }
         }
     }
 
@@ -261,6 +282,11 @@ public class DataGraph(
                 enabled[accountId to window.id] == true
             }
         scheduler.replaceAll(clock(), alarms)
+    }
+
+    /** Plans the reminder that a reset expires soon again, for example after a reboot. */
+    internal suspend fun rescheduleResetReminders() {
+        resetReminders.reschedule()
     }
 
     internal fun markAlarmFired(alarm: ResetAlarm) {

@@ -47,6 +47,7 @@ class DataStoreSettingsRepositoryTest {
         settings.setResetConfetti(false)
         settings.setResetIsland(true)
         settings.setRedeemClaudeResets(true)
+        settings.setResetExpiryReminders(false)
         assertEquals(
             AppSettings(
                 QuotaDisplay.Left,
@@ -59,8 +60,21 @@ class DataStoreSettingsRepositoryTest {
                 resetConfetti = false,
                 resetIsland = true,
                 redeemClaudeResets = true,
+                resetExpiryReminders = false,
             ),
             DataStoreSettingsRepository(store).settings.first(),
+        )
+    }
+
+    @Test
+    fun `reset reminders are on by default and stay off once turned off`() = runTest {
+        val store = store()
+        val settings = DataStoreSettingsRepository(store)
+        assertEquals(true, settings.settings.first().resetExpiryReminders)
+        settings.setResetExpiryReminders(false)
+        assertEquals(
+            false,
+            DataStoreSettingsRepository(store).settings.first().resetExpiryReminders,
         )
     }
 

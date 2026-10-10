@@ -15,11 +15,16 @@
             android:name=".reset.MuteAlertReceiver"
             android:exported="false" />
         <receiver
+            android:name=".reset.ResetReminderReceiver"
+            android:exported="false" />
+        <receiver
             android:name=".reset.RescheduleReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <!-- A reset reminder moved to the next morning follows the new local time. -->
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
 
