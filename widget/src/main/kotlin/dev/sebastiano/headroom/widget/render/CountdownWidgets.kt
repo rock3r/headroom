@@ -102,9 +102,9 @@ internal fun CountdownWidget(
 }
 
 /**
- * The lock screen layout: a row of small rings with the provider logo inside, the percentage and
- * name below, and the next reset underneath. It is readable without unlocking and uses light marks
- * on a dark, translucent card whatever the style.
+ * The lock screen layout: a row of small rings with the number inside and the name below, and the
+ * next reset underneath. It is readable without unlocking and uses light marks on a dark,
+ * translucent card whatever the style.
  */
 @RemoteComposable
 @Composable
@@ -176,21 +176,22 @@ private fun LockScreenGauge(
                 }
                 if (gauge.stale) drawSignInBadge(signIn)
             }
-            // A stale ring shows a "!" badge in place of its logo: only the name goes under a ring.
+            // The number goes inside the ring, or a "!" badge when the sign-in expired: only the
+            // name goes under a ring.
             if (!gauge.stale) {
-                ProviderLogoIcon(gauge.provider, render.pxValue(LOCK_LOGO), colors.onSurface)
+                WidgetText(
+                    text = gauge.shownPercent.toString(),
+                    color = colors.onSurface,
+                    fontSize = render.sp(LOCK_NUMBER),
+                    fontWeight = FontWeight.ExtraBold,
+                )
             }
         }
-        WidgetText(
-            text = render.strings.percent(gauge.shownPercent),
-            color = colors.onSurface,
-            fontSize = render.sp(LOCK_NUMBER),
-            fontWeight = FontWeight.ExtraBold,
-        )
         WidgetText(
             gauge.name,
             colors.onSurfaceVariant,
             render.sp(LOCK_NAME),
+            modifier = RemoteModifier.padding(top = render.px(NAME_GAP)),
             fontWeight = FontWeight.Medium,
         )
     }
@@ -205,8 +206,7 @@ private const val LINE = 1.2f
 private const val DETAIL = 11f
 private const val LOCK_CORNER = 24f
 private const val LOCK_PADDING = 10f
-private const val LOCK_RING = 44f
-private const val LOCK_LOGO = 22f
+private const val LOCK_RING = 52f
 private const val LOCK_NUMBER = 15f
 private const val LOCK_NAME = 10f
 private const val LOCK_FOOTER = 11.5f

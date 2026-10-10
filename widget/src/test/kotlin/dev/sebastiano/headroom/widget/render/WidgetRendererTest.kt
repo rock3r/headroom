@@ -288,19 +288,27 @@ class WidgetRendererTest {
     }
 
     @Test
-    fun `lock screen uses the compact rings with a reset footer`() = runTest {
-        val doc =
-            capture(
-                WidgetConfig(WidgetStyle.Bars),
-                WidgetSize(300f, 120f),
-                WidgetHostCategory.Keyguard,
-            )
+    fun `lock screen uses compact rings with the number inside, the name below and a reset footer`() =
+        runTest {
+            val doc =
+                capture(
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(300f, 120f),
+                    WidgetHostCategory.Keyguard,
+                )
 
-        doc.assertText("71%", "34%", "88%", "Claude", "Codex", "Grok")
-        doc.assertText("Next weekly reset: Grok, Mon 03:28")
-        doc.assertNoText("Copilot")
-        doc.assertDrawsLogos(Provider.Claude, Provider.Codex, Provider.Grok)
-    }
+            listOf("71", "34", "88", "Claude", "Codex", "Grok").forEach {
+                assertTrue(doc.drawsText(it), "No \"$it\" on the lock screen")
+            }
+            doc.assertText("Next weekly reset: Grok, Mon 03:28")
+            doc.assertNoText("Copilot")
+            // Only the name goes under a ring: no percentage line, and no logo in the ring.
+            assertFalse(doc.drawsText("71%"))
+            val drawn = pathCommands(documentOperations(doc.bytes))
+            listOf(Provider.Claude, Provider.Codex, Provider.Grok).forEach {
+                assertFalse(logoCommands(it.logo.pathData) in drawn, "The $it logo is drawn")
+            }
+        }
 
     @Test
     fun `bars and rings show a counter on an account with resets it can use now`() = runTest {
@@ -377,12 +385,13 @@ class WidgetRendererTest {
         }
 
     @Test
-    fun `an expired account's small ring shows a centred badge, and only its name below`() =
+    fun `an expired account's small ring or shape shows a centred badge instead of a Sign in line`() =
         runTest {
             val expired = DemoData.accountsWithExpiredSignIn(now)
             listOf(
                     WidgetConfig(WidgetStyle.Rings) to (WidgetSize(160f, 160f) to HOME),
                     WidgetConfig(WidgetStyle.Rings) to (WidgetSize(300f, 120f) to LOCK),
+                    WidgetConfig(WidgetStyle.Shape) to (WidgetSize(160f, 160f) to HOME),
                 )
                 .forEach { (config, sizeAndHost) ->
                     val (size, host) = sizeAndHost
@@ -390,7 +399,13 @@ class WidgetRendererTest {
                     val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
                     assertTrue(doc.drawsText("!"), "No sign-in badge in $config $host")
                     assertFalse(doc.drawsText("Sign in"), "A Sign in line in $config $host")
-                    assertTrue(doc.drawsText("Claude"), "No name under the ring in $config $host")
+                    // Small shapes carry the logo instead of a name.
+                    if (config.style == WidgetStyle.Rings) {
+                        assertTrue(
+                            doc.drawsText("Claude"),
+                            "No name under the ring in $config $host",
+                        )
+                    }
                     WidgetRenderer.remoteViews(doc).playAt(size)
                 }
         }

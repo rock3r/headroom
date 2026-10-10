@@ -282,8 +282,22 @@ private fun SmallRing(
             gauge.name,
             colors.onSurfaceVariant,
             render.sp(SMALL_NAME),
+            modifier = RemoteModifier.padding(top = render.px(NAME_GAP)),
             fontWeight = FontWeight.SemiBold,
         )
+    }
+}
+
+/**
+ * The "!" badge of a gauge whose sign-in expired, on its own, for a layout that is not a canvas.
+ */
+@RemoteComposable
+@Composable
+internal fun SignInBadge(render: RenderContext, modifier: RemoteModifier = RemoteModifier) {
+    val radius = render.pxValue(SIGN_IN_BADGE)
+    val style = render.signInBadgeStyle(radius, render.textPx(SIGN_IN_BADGE_TEXT))
+    RemoteBox(modifier.width((radius * 2f).rf).height((radius * 2f).rf)) {
+        RemoteCanvas(RemoteModifier.fillMaxSize()) { drawSignInBadge(style) }
     }
 }
 
@@ -308,6 +322,8 @@ private const val LABEL_LINE = 1.4f
 private const val HERO_COUNTER = 10f
 private const val HERO_COUNTER_TEXT = 12f
 private const val SMALL_COUNTER = 7f
+/** Space between a small ring and the name under it. */
+internal const val NAME_GAP = 4f
 internal const val SIGN_IN_BADGE = 9f
 internal const val SIGN_IN_BADGE_TEXT = 13f
 /** Space between the rows of the ring grid. */
