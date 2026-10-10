@@ -11,6 +11,7 @@ class ResetEventDetectorTest {
     private val soon = now.plus(Duration.ofDays(2))
     private val later = now.plus(Duration.ofDays(9))
     private val past = now.minus(Duration.ofHours(1))
+    private val redeemedAt = now.minus(Duration.ofHours(2))
 
     private val weekly =
         QuotaWindow(
@@ -123,7 +124,7 @@ class ResetEventDetectorTest {
             detect(
                 availability(pool(soon, later)),
                 availability(pool(later)),
-                pending = listOf(PendingRedeem(7, "credits")),
+                pending = listOf(PendingRedeem(7, "credits", redeemedAt)),
             )
 
         assertEquals(emptyList(), changes.events)
@@ -136,7 +137,7 @@ class ResetEventDetectorTest {
             detect(
                 availability(pool(past, later)),
                 availability(pool(later)),
-                pending = listOf(PendingRedeem(7, "credits")),
+                pending = listOf(PendingRedeem(7, "credits", redeemedAt)),
             )
 
         assertEquals(emptyList(), changes.events)
@@ -149,7 +150,11 @@ class ResetEventDetectorTest {
             detect(
                 availability(pool(soon)),
                 availability(pool(soon)),
-                pending = listOf(PendingRedeem(7, "credits"), PendingRedeem(8, "other")),
+                pending =
+                    listOf(
+                        PendingRedeem(7, "credits", redeemedAt),
+                        PendingRedeem(8, "other", redeemedAt),
+                    ),
             )
 
         assertEquals(emptyList(), changes.settledRedeems)
@@ -161,7 +166,7 @@ class ResetEventDetectorTest {
             detect(
                 availability(pool(soon, soon, soon, later)),
                 availability(pool(later)),
-                pending = listOf(PendingRedeem(7, "credits")),
+                pending = listOf(PendingRedeem(7, "credits", redeemedAt)),
             )
 
         assertEquals(listOf(7L), changes.settledRedeems)
@@ -226,5 +231,36 @@ class ResetEventDetectorTest {
             ResetGivenBack.measure(ResetScope.ofWindows("session"), listOf(weekly, session), now)
 
         assertEquals(mapOf(WindowKind.Session to 40.0), measured)
+    }
+
+    @Test
+    fun `a redeem takes the soonest reset still valid then, and a later one gone was used elsewhere`() {
+        val changes =
+            detect(
+                availability(pool(past, soon, later)),
+                availability(pool(later)),
+                pending = listOf(PendingRedeem(7, "credits", redeemedAt)),
+            )
+
+        assertEquals(listOf(7L), changes.settledRedeems)
+        val event = changes.events.single()
+        assertEquals(ResetEventKind.Used, event.kind)
+        assertEquals(ResetUseSource.Elsewhere, event.source)
+        assertEquals(soon, event.expiresAt)
+    }
+
+    @Test
+    fun `a redeem never takes a reset that had expired before it, and waits instead`() {
+        val longAgo = redeemedAt.minus(Duration.ofHours(1))
+
+        val changes =
+            detect(
+                availability(pool(longAgo, later)),
+                availability(pool(later)),
+                pending = listOf(PendingRedeem(7, "credits", redeemedAt)),
+            )
+
+        assertEquals(emptyList(), changes.settledRedeems)
+        assertEquals(ResetEventKind.Expired, changes.events.single().kind)
     }
 }

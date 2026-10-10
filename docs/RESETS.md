@@ -258,7 +258,8 @@ pool by pool. Every provider lists one expiry date per reset, so a reset is matc
 - `ResetCenter` records a redeem that works in Headroom straight away, before it refreshes the
   usage (`RoomResetEventLog.redeemed`). The attempt key is unique, so a retry, an `already_used`
   answer or a "Check again" records it once. A later sync then finds its reset gone and settles the
-  redeem instead of adding a second use. A redeem that no sync settles within a day is no longer
+  redeem instead of adding a second use. The redeem settles the gone reset that expires first after
+  the redeem, because the providers use the soonest reset first. A redeem that no sync settles within a day is no longer
   matched.
 - Any other use counts as a use "elsewhere", for example in Claude Code or on chatgpt.com.
 - Nothing is recorded when the resets could not be read, when Z.AI needs its ZCode sign-in, when

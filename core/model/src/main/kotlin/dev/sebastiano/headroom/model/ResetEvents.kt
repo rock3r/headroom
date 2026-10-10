@@ -103,7 +103,12 @@ public object ResetGivenBack {
 }
 
 /** A redeem that worked in Headroom, which no sync has matched to a reset that is gone yet. */
-public data class PendingRedeem(val id: Long, val poolId: String)
+public data class PendingRedeem(
+    val id: Long,
+    val poolId: String,
+    /** When the redeem worked: a reset that had expired by then cannot be the one it used. */
+    val at: Instant,
+)
 
 /** What a sync found: the resets used or expired, and the redeems they settle. */
 public data class ResetChanges(
@@ -119,9 +124,9 @@ public data class ResetChanges(
  * - A reset that is gone after its expiry date expired.
  * - A reset that is gone before its expiry date was used. When the provider gives no expiry date, a
  *   lower count means a use.
- * - Redeems that worked in Headroom ([PendingRedeem]) were already recorded. Each one settles one
- *   reset gone from its pool, the soonest to expire first, as the providers use those first. Any
- *   other use happened elsewhere.
+ * - Redeems that worked in Headroom ([PendingRedeem]) were already recorded. Each one settles the
+ *   reset gone from its pool that expires first after the redeem, as the providers use those first.
+ *   A redeem with no such reset waits for a later sync. Any other use happened elsewhere.
  *
  * A use elsewhere in the last minutes before its expiry date looks like an expiry: Headroom cannot
  * tell them apart.
@@ -144,13 +149,19 @@ public object ResetEventDetector {
         previous.pools.forEach { before ->
             val after = current.pools.firstOrNull { it.id == before.id }
             val gone = goneResets(before, after)
-            val (used, expired) = gone.partition { expiry -> expiry == null || expiry > now }
-            val redeems = pendingRedeems.filter { it.poolId == before.id }
-            val settledCount = minOf(redeems.size, gone.size)
-            settled += redeems.take(settledCount).map { it.id }
-            val settledFromUsed = minOf(settledCount, used.size)
-            val usedElsewhere = used.drop(settledFromUsed)
-            val stillExpired = expired.drop(settledCount - settledFromUsed)
+            val left = gone.toMutableList()
+            pendingRedeems
+                .filter { it.poolId == before.id }
+                .sortedBy { it.at }
+                .forEach { redeem ->
+                    val index = left.indexOfFirst { expiry -> expiry == null || expiry > redeem.at }
+                    if (index >= 0) {
+                        left.removeAt(index)
+                        settled += redeem.id
+                    }
+                }
+            val (usedElsewhere, stillExpired) =
+                left.partition { expiry -> expiry == null || expiry > now }
 
             fun event(kind: ResetEventKind, expiry: Instant?) =
                 ResetEvent(

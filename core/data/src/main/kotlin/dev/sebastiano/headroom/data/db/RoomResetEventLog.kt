@@ -86,7 +86,14 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
                             previous = previous.account.resetsJson?.let(ResetsCodec::decode),
                             current = current,
                             previousWindows = previous.windows.map { it.toDomain() },
-                            pendingRedeems = pending.map { PendingRedeem(it.id, it.poolId) },
+                            pendingRedeems =
+                                pending.map {
+                                    PendingRedeem(
+                                        it.id,
+                                        it.poolId,
+                                        Instant.ofEpochMilli(it.atEpochMs),
+                                    )
+                                },
                             now = now,
                         )
                     return FoundResetEvents(
