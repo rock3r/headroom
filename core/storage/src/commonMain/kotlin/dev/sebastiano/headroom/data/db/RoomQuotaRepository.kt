@@ -1,9 +1,9 @@
 package dev.sebastiano.headroom.data.db
 
+import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.QuotaErrorKind
-import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.UsagePoint
 import kotlin.time.Duration
@@ -36,7 +36,7 @@ internal class RoomQuotaRepository(
     private val fetch: suspend (Account) -> QuotaResult,
     private val clock: () -> Instant,
     scope: CoroutineScope,
-) : QuotaRepository {
+) : AccountsRepository {
     private val refreshing = MutableStateFlow<Set<String>>(emptySet())
     private val inFlight = mutableMapOf<String, CompletableDeferred<Unit>>()
     private val inFlightLock = Mutex()
@@ -47,7 +47,7 @@ internal class RoomQuotaRepository(
             }
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
-    suspend fun addAccount(account: Account) {
+    override suspend fun addAccount(account: Account) {
         order.insertAccountLast(
             AccountEntity(
                 id = account.id,
@@ -61,21 +61,21 @@ internal class RoomQuotaRepository(
     }
 
     /** Names the account. A blank [nickname] removes the name, so the provider's name shows. */
-    suspend fun renameAccount(accountId: String, nickname: String?) {
+    override suspend fun renameAccount(accountId: String, nickname: String?) {
         dao.setNickname(accountId, nickname?.trim()?.ifEmpty { null })
     }
 
     /** Stores what the provider now calls the account, for example a changed email address. */
-    suspend fun relabelAccount(accountId: String, label: String) {
+    override suspend fun relabelAccount(accountId: String, label: String) {
         dao.setLabel(accountId, label)
     }
 
     /** Stores the order the user put the accounts in, in one transaction. */
-    suspend fun reorderAccounts(orderedIds: List<String>) {
+    override suspend fun reorderAccounts(orderedIds: List<String>) {
         order.reorderAccounts(orderedIds)
     }
 
-    suspend fun removeAccount(accountId: String) {
+    override suspend fun removeAccount(accountId: String) {
         dao.deleteAccount(accountId)
     }
 

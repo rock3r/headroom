@@ -23,7 +23,6 @@ import dev.sebastiano.headroom.quota.ResetAsker
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
 import dev.sebastiano.headroom.quota.ResetRedeemer
-import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -31,6 +30,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
 
 class SyncedResetProviderTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")
@@ -173,7 +173,7 @@ class SyncedResetProviderTest {
     }
 
     @Test
-    fun `once turned on, a Claude redeem uses the account's credential and the grant`() = runTest {
+    fun `once turned on a Claude redeem uses the account's credential and the grant`() = runTest {
         signIn(claude)
         settings = AppSettings(redeemClaudeResets = true)
 
@@ -187,7 +187,7 @@ class SyncedResetProviderTest {
     }
 
     @Test
-    fun `only a Claude redeem reads the settings, and settings that cannot be read mean off`() =
+    fun `only a Claude redeem reads the settings and settings that cannot be read mean off`() =
         runTest {
             signIn(codex)
             signIn(claude)
@@ -215,7 +215,7 @@ class SyncedResetProviderTest {
         }
 
     @Test
-    fun `a check reads what an unconfirmed attempt did, with the same key`() = runTest {
+    fun `a check reads what an unconfirmed attempt did with the same key`() = runTest {
         signIn(claude)
         settings = AppSettings(redeemClaudeResets = true)
 
@@ -292,7 +292,7 @@ class SyncedResetProviderTest {
     }
 
     @Test
-    fun `the resets are read from committed storage, so a sync that just ended shows`() = runTest {
+    fun `the resets are read from committed storage so a sync that just ended shows`() = runTest {
         var committed = emptyList<AccountState>()
         val fromStorage =
             SyncedResetProvider(

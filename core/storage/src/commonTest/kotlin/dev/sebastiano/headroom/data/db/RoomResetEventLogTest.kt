@@ -1,7 +1,5 @@
 package dev.sebastiano.headroom.data.db
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaResult
@@ -30,11 +28,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@RunWith(RobolectricTestRunner::class)
 class RoomResetEventLogTest {
     private var now = Instant.parse("2026-10-10T12:00:00Z")
     private val account = Account("codex-1", Provider.Codex, "sam@example.com")
@@ -45,13 +40,7 @@ class RoomResetEventLogTest {
 
     @BeforeTest
     fun setUp() {
-        db =
-            Room.inMemoryDatabaseBuilder(
-                    ApplicationProvider.getApplicationContext(),
-                    HeadroomDatabase::class.java,
-                )
-                .allowMainThreadQueries()
-                .build()
+        db = inMemoryDatabase()
         snapshot = snapshot(resets(soon, later), weeklyUsed = 90.0)
     }
 
@@ -140,7 +129,7 @@ class RoomResetEventLogTest {
         }
 
     @Test
-    fun `a redeem in Headroom is recorded once, with the usage it gave back`() =
+    fun `a redeem in Headroom is recorded once with the usage it gave back`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)
             now = now.plus(10.minutes)

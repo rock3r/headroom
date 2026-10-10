@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.prefs
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dev.sebastiano.headroom.data.db.TestDirectory
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.MotionPreference
 import dev.sebastiano.headroom.model.OverviewSort
@@ -10,21 +11,24 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.model.ThemeMode
 import dev.sebastiano.headroom.model.ThemePalette
-import java.io.File
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import org.junit.Rule
-import org.junit.rules.TemporaryFolder
 
 class DataStoreSettingsRepositoryTest {
-    @get:Rule val folder = TemporaryFolder()
+    private val folder = TestDirectory()
+
+    @AfterTest
+    fun tearDown() {
+        folder.close()
+    }
 
     private fun TestScope.store() =
-        PreferenceDataStoreFactory.create(scope = backgroundScope) {
-            File(folder.root, "settings.preferences_pb")
+        PreferenceDataStoreFactory.createWithPath(scope = backgroundScope) {
+            folder.path / "settings.preferences_pb"
         }
 
     @Test

@@ -18,33 +18,38 @@ class KmpLibraryConventionPlugin : Plugin<Project> {
         with(target) {
             pluginManager.apply("org.jetbrains.kotlin.multiplatform")
             pluginManager.apply("com.android.lint")
-
-            extensions.configure<KotlinMultiplatformExtension> {
-                jvmToolchain(HeadroomSdk.JVM_TOOLCHAIN)
-                explicitApi()
-
-                jvm()
-                iosArm64()
-                iosSimulatorArm64()
-
-                sourceSets.named("commonTest") {
-                    dependencies {
-                        implementation(libs.library("kotlin-test"))
-                        implementation(libs.library("kotlinx-coroutines-test"))
-                    }
-                }
-                sourceSets.named("jvmTest") {
-                    dependencies {
-                        implementation(project.dependencies.platform(libs.library("junit5-bom")))
-                        implementation(libs.library("kotlin-test-junit5"))
-                        runtimeOnly(libs.library("junit5-launcher"))
-                    }
-                }
-            }
+            configureKmpTargets()
             extensions.configure<Lint> { configureZeroTolerance() }
-
-            tasks.withType<Test>().configureEach { useJUnitPlatform() }
-
             configureQuality()
         }
+}
+
+/**
+ * The JVM and iOS targets, explicit API mode and the test libraries every multiplatform module
+ * shares. `commonTest` runs on the JVM with JUnit 5 and on the iOS simulator.
+ */
+internal fun Project.configureKmpTargets() {
+    extensions.configure<KotlinMultiplatformExtension> {
+        jvmToolchain(HeadroomSdk.JVM_TOOLCHAIN)
+        explicitApi()
+
+        jvm()
+        iosArm64()
+        iosSimulatorArm64()
+
+        sourceSets.named("commonTest") {
+            dependencies {
+                implementation(libs.library("kotlin-test"))
+                implementation(libs.library("kotlinx-coroutines-test"))
+            }
+        }
+        sourceSets.named("jvmTest") {
+            dependencies {
+                implementation(project.dependencies.platform(libs.library("junit5-bom")))
+                implementation(libs.library("kotlin-test-junit5"))
+                runtimeOnly(libs.library("junit5-launcher"))
+            }
+        }
+    }
+    tasks.withType<Test>().configureEach { useJUnitPlatform() }
 }

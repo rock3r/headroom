@@ -1,9 +1,8 @@
 package dev.sebastiano.headroom.data.db
 
-import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
+import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import androidx.sqlite.execSQL
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetAttemptKey
@@ -14,28 +13,27 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
-@RunWith(RobolectricTestRunner::class)
 class HeadroomDatabaseMigrationTest {
-    private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val file = context.getDatabasePath(NAME)
+    private val directory = TestDirectory()
+    private val file = directory.path / NAME
 
     @AfterTest
     fun tearDown() {
-        context.deleteDatabase(NAME)
+        directory.close()
     }
+
+    /** Opens an old version of the database file directly, without Room. */
+    private fun oldDatabase(): SQLiteConnection = BundledSQLiteDriver().open(file.toString())
 
     @Test
     fun `accounts saved before nicknames existed survive the upgrade`() = runTest {
-        file.parentFile?.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { v1 ->
-            VERSION_1_SCHEMA.forEach(v1::execSQL)
+        oldDatabase().use { v1 ->
+            VERSION_1_SCHEMA.forEach { v1.execSQL(it) }
             v1.execSQL(
                 "INSERT INTO accounts (id, provider, label) VALUES ('a1', 'claude', 'sam@example.com')"
             )
-            v1.version = 1
+            v1.execSQL("PRAGMA user_version = 1")
         }
 
         val db = openCurrent()
@@ -51,9 +49,8 @@ class HeadroomDatabaseMigrationTest {
 
     @Test
     fun `windows saved before credit amounts existed survive the upgrade`() = runTest {
-        file.parentFile?.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { v2 ->
-            VERSION_1_SCHEMA.forEach(v2::execSQL)
+        oldDatabase().use { v2 ->
+            VERSION_1_SCHEMA.forEach { v2.execSQL(it) }
             v2.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
             v2.execSQL(
                 "INSERT INTO accounts (id, provider, label, nickname) " +
@@ -63,7 +60,7 @@ class HeadroomDatabaseMigrationTest {
                 "INSERT INTO windows (accountId, windowId, position, label, kind, usedPercent, " +
                     "isUnlimited) VALUES ('a1', 'ai_credits', 0, 'Monthly', 'Monthly', 25.0, 0)"
             )
-            v2.version = 2
+            v2.execSQL("PRAGMA user_version = 2")
         }
 
         val db = openCurrent()
@@ -84,9 +81,8 @@ class HeadroomDatabaseMigrationTest {
     @Test
     fun `accounts saved before they could be reordered keep the order they were added in`() =
         runTest {
-            file.parentFile?.mkdirs()
-            SQLiteDatabase.openOrCreateDatabase(file, null).use { v3 ->
-                VERSION_1_SCHEMA.forEach(v3::execSQL)
+            oldDatabase().use { v3 ->
+                VERSION_1_SCHEMA.forEach { v3.execSQL(it) }
                 v3.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
                 v3.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
                 v3.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
@@ -97,7 +93,7 @@ class HeadroomDatabaseMigrationTest {
                         "INSERT INTO accounts (id, provider, label) VALUES ('$id', 'claude', '$id')"
                     )
                 }
-                v3.version = 3
+                v3.execSQL("PRAGMA user_version = 3")
             }
 
             val db = openCurrent()
@@ -111,11 +107,10 @@ class HeadroomDatabaseMigrationTest {
         }
 
     @Test
-    fun `windows saved before credits and unknown windows existed are recognised, with no expiry`() =
+    fun `windows saved before credits and unknown windows existed are recognised with no expiry`() =
         runTest {
-            file.parentFile?.mkdirs()
-            SQLiteDatabase.openOrCreateDatabase(file, null).use { v4 ->
-                VERSION_1_SCHEMA.forEach(v4::execSQL)
+            oldDatabase().use { v4 ->
+                VERSION_1_SCHEMA.forEach { v4.execSQL(it) }
                 v4.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
                 v4.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
                 v4.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
@@ -129,7 +124,7 @@ class HeadroomDatabaseMigrationTest {
                         "usedPercent, isUnlimited) " +
                         "VALUES ('a1', 'seven_day', 0, 'Weekly', 'Weekly', 71.0, 0)"
                 )
-                v4.version = 4
+                v4.execSQL("PRAGMA user_version = 4")
             }
 
             val db = openCurrent()
@@ -145,9 +140,8 @@ class HeadroomDatabaseMigrationTest {
 
     @Test
     fun `accounts saved before resets were stored have none`() = runTest {
-        file.parentFile?.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { v5 ->
-            VERSION_1_SCHEMA.forEach(v5::execSQL)
+        oldDatabase().use { v5 ->
+            VERSION_1_SCHEMA.forEach { v5.execSQL(it) }
             v5.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
             v5.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
             v5.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
@@ -156,7 +150,7 @@ class HeadroomDatabaseMigrationTest {
             v5.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
             v5.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
             v5.execSQL("INSERT INTO accounts (id, provider, label) VALUES ('a1', 'grok', 'a1')")
-            v5.version = 5
+            v5.execSQL("PRAGMA user_version = 5")
         }
 
         val db = openCurrent()
@@ -171,9 +165,8 @@ class HeadroomDatabaseMigrationTest {
 
     @Test
     fun `accounts saved before the reset history existed start with an empty one`() = runTest {
-        file.parentFile?.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { v6 ->
-            VERSION_1_SCHEMA.forEach(v6::execSQL)
+        oldDatabase().use { v6 ->
+            VERSION_1_SCHEMA.forEach { v6.execSQL(it) }
             v6.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
             v6.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
             v6.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
@@ -183,7 +176,7 @@ class HeadroomDatabaseMigrationTest {
             v6.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
             v6.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
             v6.execSQL("INSERT INTO accounts (id, provider, label) VALUES ('a1', 'codex', 'a1')")
-            v6.version = 6
+            v6.execSQL("PRAGMA user_version = 6")
         }
 
         val db = openCurrent()
@@ -198,9 +191,8 @@ class HeadroomDatabaseMigrationTest {
 
     @Test
     fun `accounts saved before failed reset reads were stored count as read`() = runTest {
-        file.parentFile?.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { v7 ->
-            VERSION_1_SCHEMA.forEach(v7::execSQL)
+        oldDatabase().use { v7 ->
+            VERSION_1_SCHEMA.forEach { v7.execSQL(it) }
             v7.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
             v7.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
             v7.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
@@ -214,7 +206,7 @@ class HeadroomDatabaseMigrationTest {
                 "INSERT INTO accounts (id, provider, label, resetsJson) " +
                     "VALUES ('a1', 'zai', 'a1', NULL)"
             )
-            v7.version = 7
+            v7.execSQL("PRAGMA user_version = 7")
         }
 
         val db = openCurrent()
@@ -227,19 +219,7 @@ class HeadroomDatabaseMigrationTest {
         }
     }
 
-    private fun openCurrent(): HeadroomDatabase =
-        Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
-            .addMigrations(
-                HeadroomDatabase.MIGRATION_1_2,
-                HeadroomDatabase.MIGRATION_2_3,
-                HeadroomDatabase.MIGRATION_3_4,
-                HeadroomDatabase.MIGRATION_4_5,
-                HeadroomDatabase.MIGRATION_5_6,
-                HeadroomDatabase.MIGRATION_6_7,
-                HeadroomDatabase.MIGRATION_7_8,
-            )
-            .allowMainThreadQueries()
-            .build()
+    private fun openCurrent(): HeadroomDatabase = databaseAt(file)
 
     private companion object {
         const val NAME = "migration-test.db"

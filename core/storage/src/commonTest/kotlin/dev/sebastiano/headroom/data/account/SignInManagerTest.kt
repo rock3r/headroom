@@ -73,16 +73,15 @@ class SignInManagerTest {
         )
 
     @Test
-    fun `completing a sign-in stores the credential, adds the account and refreshes it`() =
-        runTest {
-            val store = InMemoryTokenStore()
-            val accounts = MemoryAccounts()
-            val account = SignInManager(store, accounts) { "new-id" }.complete(tokens)
-            assertEquals(Account("new-id", Provider.Claude, "sam@example.com"), account)
-            assertEquals("access", store.load("new-id")?.accessToken)
-            assertEquals(listOf(account), accounts.state.value.map { it.account })
-            assertEquals(listOf<String?>("new-id"), accounts.refreshed)
-        }
+    fun `completing a sign-in stores the credential adds the account and refreshes it`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        val account = SignInManager(store, accounts) { "new-id" }.complete(tokens)
+        assertEquals(Account("new-id", Provider.Claude, "sam@example.com"), account)
+        assertEquals("access", store.load("new-id")?.accessToken)
+        assertEquals(listOf(account), accounts.state.value.map { it.account })
+        assertEquals(listOf<String?>("new-id"), accounts.refreshed)
+    }
 
     @Test
     fun `an account without a label is named after its provider`() = runTest {
@@ -104,7 +103,7 @@ class SignInManagerTest {
     }
 
     @Test
-    fun `signing in again keeps the account and its name, and replaces the credential`() = runTest {
+    fun `signing in again keeps the account and its name and replaces the credential`() = runTest {
         val store = InMemoryTokenStore()
         val accounts = MemoryAccounts()
         SignInManager(store, accounts) { "first" }
@@ -186,7 +185,7 @@ class SignInManagerTest {
     }
 
     @Test
-    fun `without a provider account id, a different email means a different account`() = runTest {
+    fun `without a provider account id a different email means a different account`() = runTest {
         val store = InMemoryTokenStore()
         val accounts = MemoryAccounts()
         SignInManager(store, accounts) { "first" }.complete(tokens)
@@ -201,7 +200,7 @@ class SignInManagerTest {
     }
 
     @Test
-    fun `a sign-in that names no account, such as an API key, is accepted`() = runTest {
+    fun `a sign-in that names no account such as an API key is accepted`() = runTest {
         val store = InMemoryTokenStore()
         val accounts = MemoryAccounts()
         val key = TokenSet(Provider.ZAi, CredentialKind.ApiKey, "old-key", null, null, label = null)

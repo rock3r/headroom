@@ -23,6 +23,7 @@ include(
     ":core:quota",
     ":core:auth",
     ":core:data",
+    ":core:storage",
     ":core:designsystem",
     ":widget",
 )

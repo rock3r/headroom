@@ -16,7 +16,7 @@ import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
 import dev.sebastiano.headroom.quota.ResetLogRedaction
-import java.io.IOException
+import kotlinx.io.IOException
 
 /**
  * The resets of the signed-in accounts. Their availability comes from the last sync, which reads it
