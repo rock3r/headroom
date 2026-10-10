@@ -2,11 +2,13 @@ package dev.sebastiano.headroom.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.island.IslandMode
 import dev.sebastiano.headroom.ui.settings.ResetIslandSetupContent
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -29,6 +31,7 @@ class ResetIslandStepsTest {
                     mode = IslandMode.None,
                     starting = false,
                     restricted = true,
+                    accessibilityAvailable = true,
                     onOpenAppInfo = {},
                     onOpenAccessibility = {},
                     onOpenOverlaySettings = {},
@@ -47,5 +50,35 @@ class ResetIslandStepsTest {
             turnOn.fetchSemanticsNode().positionInRoot.y <
                 allow.fetchSemanticsNode().positionInRoot.y
         )
+    }
+
+    @Test
+    fun `without the accessibility service, display over other apps is the only way`() {
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                ResetIslandSetupContent(
+                    mode = IslandMode.None,
+                    starting = false,
+                    restricted = true,
+                    accessibilityAvailable = false,
+                    onOpenAppInfo = {},
+                    onOpenAccessibility = {},
+                    onOpenOverlaySettings = {},
+                    onTry = {},
+                    onDone = {},
+                )
+            }
+        }
+
+        rule.onNodeWithText("Allow display over other apps").performScrollTo().assertIsDisplayed()
+        listOf(
+                "Open accessibility settings",
+                "Open App info",
+                "Why it needs accessibility access",
+                "Blocked by your device's admin? Use Display over other apps instead",
+            )
+            .forEach { text ->
+                assertEquals(0, rule.onAllNodesWithText(text).fetchSemanticsNodes().size, text)
+            }
     }
 }

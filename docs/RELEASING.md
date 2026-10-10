@@ -1,10 +1,10 @@
 # Releasing
 
 A release is a git tag. Pushing a tag such as `v1.0.0` starts the
-[Release workflow](../.github/workflows/release.yml). It builds a minified APK, signs it with the
-release key, checks the signature, and smoke-tests the APK on an emulator. Then it attaches the
-APK and its SHA-256 checksum to a GitHub release for that tag. If the smoke test fails, the
-workflow does not publish the release.
+[Release workflow](../.github/workflows/release.yml). It builds a minified APK and the Play bundle,
+signs both with the release key, checks the signatures, and smoke-tests the APK on an emulator.
+Then it attaches the APK and its SHA-256 checksum to a GitHub release for that tag, and uploads the
+bundle to Google Play. If the smoke test fails, the workflow publishes nothing.
 
 ## Steps
 
@@ -12,7 +12,10 @@ workflow does not publish the release.
    The workflow stops if the tag and `versionName` do not match.
 2. Write the release notes in `docs/release-notes/<version>.md`. Without that file, GitHub writes
    the notes from the commits.
-3. Update the Claude Code version that Headroom sends to Claude:
+3. Write the short Play Store notes in `app/src/main/play/release-notes/en-US/default.txt`: a few
+   plain-text lines, 500 characters at most. The workflow stops before building if they are
+   longer. Left unchanged, Play shows the previous release's notes again.
+4. Update the Claude Code version that Headroom sends to Claude:
 
    ```bash
    scripts/update-claude-code-version.sh
@@ -22,16 +25,25 @@ workflow does not publish the release.
    version`), writes it to `ClaudeCodeIdentity.VERSION` in `:core:quota`, and prints the change.
    Claude lists usage-limit resets only for recent Claude Code clients. With an old version, the
    Claude resets disappear from the app. See [RESETS.md](RESETS.md#claude).
-4. Run `./gradlew check`, commit, and push `main`.
-5. Tag the commit and push the tag:
+5. Run `./gradlew check`, commit, and push `main`.
+6. Tag the commit and push the tag:
 
    ```bash
    git tag -a v1.0.0 -m "Headroom 1.0.0"
    git push origin v1.0.0
    ```
 
-6. Wait for the workflow to finish, then check the release page. If the smoke test failed, see
-   [The smoke test](#the-smoke-test).
+7. Wait for the workflow to finish, then check the release page and the Play Console. If the
+   smoke test failed, see [The smoke test](#the-smoke-test).
+
+## Google Play
+
+The Play Store gets a separate build, the `play` build type, made with `./gradlew :app:bundlePlay`.
+It leaves out what Play policy refuses. The last step of the workflow uploads it with Gradle Play
+Publisher to the track in the `PLAY_TRACK` repository variable, or to production when the variable
+is not set. It runs after the GitHub release, so a Play failure leaves the GitHub release in place;
+fix the cause and re-run the failed job. [PLAY-STORE.md](PLAY-STORE.md) explains the differences
+between the builds, the store listing and the Play Console settings.
 
 ## The smoke test
 
@@ -99,6 +111,7 @@ their accounts.
 | The key alias | `headroom` |
 | The certificate's SHA-256 | `81:5F:AA:26:1D:76:B2:B3:37:E4:AB:D0:F3:BA:31:84:AD:05:FB:8E:BD:65:01:42:43:47:22:69:BC:DA:5F:C2` |
 | The copy that CI uses | GitHub Actions secrets `HEADROOM_KEYSTORE_BASE64`, `HEADROOM_KEYSTORE_PASSWORD`, `HEADROOM_KEY_ALIAS` and `HEADROOM_KEY_PASSWORD` |
+| Play App Signing | The same key, uploaded to the Play Console with PEPK, so Play and GitHub installs update each other |
 
 The keystore and the key share one password. The workflow checks that each APK is signed with the
 certificate above, and fails if it is not.

@@ -360,6 +360,9 @@
     <string name="island_setup_overlay_limit_place">The status bar icons can show on top of the pill where they meet it.</string>
     <string name="island_setup_overlay_limit_lock">It does not show on the lock screen. A reset that arrives while the phone is locked uses a normal pop-up notification.</string>
     <string name="island_setup_overlay_limit_tap">You can tap it to open Headroom, or swipe it up to hide it.</string>
+    <string name="island_setup_overlay_only_why_title">Why it needs a permission</string>
+    <string name="island_setup_overlay_only_why_body">Headroom draws the pill with the Display over other apps permission, and uses it for nothing else.</string>
+    <string name="island_setup_overlay_only_not_body">It does not read your screen. It does not read other apps. It only draws the pill when a limit resets.</string>
     <string name="island_setup_overlay_button">Allow display over other apps</string>
     <string name="island_setup_done_body">It will show up when a limit resets and Headroom is in the background. You can turn the service off in accessibility settings at any time.</string>
     <string name="island_setup_done_body_overlay">It grows out of the camera when a limit resets and Headroom is in the background. It does not show on the lock screen. You can take the permission away in Settings at any time.</string>

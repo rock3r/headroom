@@ -61,8 +61,9 @@ internal class AlarmResetScheduler(
     }
 
     // The manifest declares USE_EXACT_ALARM, which grants exact alarms without the user-toggled
-    // SCHEDULE_EXACT_ALARM, and the call is guarded by canScheduleExactAlarms(). Lint only knows
-    // about SCHEDULE_EXACT_ALARM.
+    // SCHEDULE_EXACT_ALARM, and the call is guarded by canScheduleExactAlarms(). The Play build
+    // declares SCHEDULE_EXACT_ALARM instead, so there the alarm is inexact until the user allows
+    // it. Lint only knows about SCHEDULE_EXACT_ALARM.
     @SuppressLint("MissingPermission")
     private fun schedule(alarm: ResetAlarm) {
         val intent = pendingIntent(alarm.requestCode, ResetAlarmReceiver.intent(context, alarm))
