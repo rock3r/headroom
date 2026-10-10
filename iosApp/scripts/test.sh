@@ -23,4 +23,5 @@ xcodebuild \
     -scheme Headroom \
     -destination "platform=iOS Simulator,id=$device" \
     -derivedDataPath build \
+    -collect-test-diagnostics never \
     test

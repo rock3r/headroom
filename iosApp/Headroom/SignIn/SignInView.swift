@@ -46,7 +46,7 @@ struct SignInView: View {
 
     private func startSigningInAgain() {
         if case let .again(accountId, providerId) = mode {
-            model.startSignIn(providerId: providerId, accountId: accountId)
+            model.headroom.signIn.start(providerId: providerId, accountId: accountId)
         }
     }
 
@@ -65,6 +65,6 @@ struct SignInView: View {
 
     private func stop() {
         browser.close()
-        model.cancelSignIn()
+        model.headroom.signIn.cancel()
     }
 }

@@ -8,6 +8,7 @@ struct WindowSummary: View {
     let providerId: String
     var stale = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -15,10 +16,16 @@ struct WindowSummary: View {
                 Text(window.label)
                     .font(.subheadline)
                 Spacer()
-                Text("\(Int(window.leftPercent.rounded()))% left")
-                    .font(.subheadline.monospacedDigit())
-                    .bold()
-                    .foregroundStyle(window.needsAttention ? .red : .primary)
+                Group {
+                    if model.showsLeft {
+                        Text("\(Int(window.leftPercent.rounded()))% left")
+                    } else {
+                        Text("\(Int(window.usedPercent.rounded()))% used")
+                    }
+                }
+                .font(.subheadline.monospacedDigit())
+                .bold()
+                .foregroundStyle(window.needsAttention ? .red : .primary)
             }
             QuotaBar(
                 window: window,

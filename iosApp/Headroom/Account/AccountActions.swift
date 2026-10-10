@@ -41,11 +41,11 @@ struct AccountActions: View {
     }
 
     private func rename() {
-        model.rename(accountId: account.id, nickname: nickname)
+        model.headroom.accounts.rename(accountId: account.id, nickname: nickname)
     }
 
     private func remove() {
-        model.remove(accountId: account.id)
+        model.headroom.accounts.remove(accountId: account.id)
         dismiss()
     }
 }
