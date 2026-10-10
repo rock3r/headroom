@@ -265,7 +265,8 @@ stored resets may be stale after the refresh of an account with a due reset in t
 In both cases the worker posts nothing and runs again later (`ResetReminderRetryPolicy`). It
 waits 5, 15, 30 and 60 minutes. When the retries run out, it posts from the stored resets. It also
 posts from the stored resets when the next wait would end less than 12 hours (`MIN_NOTICE`) before
-the soonest due reset expires. A retry does not count as a reminder, so the rule of one reminder
+the soonest due reset of an account with stale resets expires. The resets of the other accounts
+do not count, because their refresh read them fresh. A retry does not count as a reminder, so the rule of one reminder
 per day still holds.
 
 `SharedPreferencesResetReminderLedger` stores which

@@ -299,4 +299,21 @@ class ResetRemindersTest {
             assertEquals(ReminderOutcome.Done, outcome)
             assertEquals(1, posted.size)
         }
+
+    @Test
+    fun `the retry cutoff uses only the resets of accounts that may be stale`() = runTest {
+        val soon = now.plus(Duration.ofHours(12)).plus(Duration.ofMinutes(2))
+        val stale = codex(tomorrow)
+        val repository = FakeRepository(listOf(codex(soon, id = "healthy"), stale))
+        repository.afterRefresh =
+            listOf(
+                codex(id = "healthy"),
+                stale.copy(snapshot = stale.snapshot!!.copy(resetsReadFailed = true)),
+            )
+
+        val outcome = reminders(repository).remind()
+
+        assertEquals(ReminderOutcome.Retry(Duration.ofMinutes(5)), outcome)
+        assertEquals(emptyList(), posted)
+    }
 }

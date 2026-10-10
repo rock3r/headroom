@@ -93,8 +93,9 @@ internal object ResetReminderRetryPolicy {
         )
 
     /**
-     * The reminder never waits past this long before the soonest due reset expires. After that it
-     * goes out from the stored resets, as a stale reminder is better than none.
+     * The reminder never waits past this long before the soonest due reset of a stale account
+     * expires. After that it goes out from the stored resets, as a stale reminder is better than
+     * none.
      */
     val MIN_NOTICE: Duration = Duration.ofHours(12)
 
@@ -155,17 +156,17 @@ internal class ResetReminders(
         refreshed.forEach { repository.refresh(it) }
         if (before.isNotEmpty()) {
             val accounts = repository.current()
-            val stale = accounts.any { it.account.id in refreshed && it.hasStaleResets() }
+            val stale =
+                accounts
+                    .filter { it.account.id in refreshed && it.hasStaleResets() }
+                    .map { it.account.id }
+                    .toSet()
+            // Only the stale accounts' resets set the cutoff: a healthy account's reset is fresh.
             val retry =
-                if (stale) {
-                    ResetReminderRetryPolicy.delayAfterAttempt(
-                        attempt,
-                        clock(),
-                        before.minOf { it.expiresAt },
-                    )
-                } else {
-                    null
-                }
+                before
+                    .filter { it.account.id in stale }
+                    .minOfOrNull { it.expiresAt }
+                    ?.let { ResetReminderRetryPolicy.delayAfterAttempt(attempt, clock(), it) }
             // The retry plans the next check itself, so the alarm is not set here.
             if (retry != null) return ReminderOutcome.Retry(retry)
             val due = due(accounts)
