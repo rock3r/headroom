@@ -132,10 +132,38 @@ class RoomQuotaRepositoryTest {
             snapshot = claude.snapshot!!.copy(resets = null, resetsReadFailed = true)
             repo.refresh()
             assertEquals(resets, repo.current().single().snapshot!!.resets)
+            assertEquals(true, repo.current().single().snapshot!!.resetsReadFailed)
 
             snapshot = claude.snapshot!!.copy(resets = null)
             repo.refresh()
             assertNull(repo.current().single().snapshot!!.resets)
+        }
+
+    @Test
+    fun `a failed reset read is kept until a sync reads the resets again`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var result: QuotaResult =
+                QuotaResult.Success(claude.snapshot!!.copy(resets = null, resetsReadFailed = true))
+            val repo = repo({ result }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.refresh()
+            assertEquals(
+                true,
+                repo.accounts
+                    .first { it.firstOrNull()?.snapshot != null }
+                    .single()
+                    .snapshot!!
+                    .resetsReadFailed,
+            )
+
+            // A failed sync reads nothing, so it does not change what is known about the resets.
+            result = QuotaResult.Failure(QuotaErrorKind.Network, "offline")
+            repo.refresh()
+            assertEquals(true, repo.current().single().snapshot!!.resetsReadFailed)
+
+            result = QuotaResult.Success(claude.snapshot!!.copy(resets = resets))
+            repo.refresh()
+            assertEquals(false, repo.current().single().snapshot!!.resetsReadFailed)
         }
 
     @Test

@@ -14,7 +14,7 @@ import androidx.sqlite.execSQL
             UsagePointEntity::class,
             ResetEventEntity::class,
         ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 internal abstract class HeadroomDatabase : RoomDatabase() {
@@ -113,6 +113,19 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                     connection.execSQL(
                         "CREATE UNIQUE INDEX IF NOT EXISTS `index_reset_events_attemptKey` " +
                             "ON `reset_events` (`attemptKey`)"
+                    )
+                }
+            }
+
+        /**
+         * Version 8 stores whether the last sync could not read the resets. Existing accounts count
+         * as read.
+         */
+        val MIGRATION_7_8: Migration =
+            object : Migration(7, 8) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL(
+                        "ALTER TABLE accounts ADD COLUMN resetsReadFailed INTEGER NOT NULL DEFAULT 0"
                     )
                 }
             }

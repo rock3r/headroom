@@ -131,6 +131,7 @@ internal class RoomQuotaRepository(
                             resetsJson =
                                 if (snapshot.resetsReadFailed) entity.resetsJson
                                 else snapshot.resets?.let(ResetsCodec::encode),
+                            resetsReadFailed = snapshot.resetsReadFailed,
                         ),
                     windows =
                         snapshot.windows.mapIndexed { index, window ->

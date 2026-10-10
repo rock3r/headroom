@@ -24,7 +24,9 @@ Each sync reads an account's resets together with its usage, with the same crede
 adds the result to the snapshot (`QuotaSnapshot.resets`).
 
 - A reset read that fails never fails the sync. The snapshot sets `resetsReadFailed`, and Room
-  keeps the resets it stored last.
+  keeps the resets it stored last. Room also keeps the flag (`accounts.resetsReadFailed`, database
+  version 8), so the stored snapshot shows that its resets are older than its usage. The next sync
+  that works sets the flag again. A sync that fails leaves it as it was.
 - Room stores the resets as JSON on the account row (`accounts.resetsJson`, database version 6).
 - The screens read the resets from the stored snapshot. Opening a screen makes no network call.
 - A demo account never reaches a provider. Debug builds give the demo accounts fake resets
@@ -253,9 +255,14 @@ inexact alarm for the next check (`ResetReminderAlarm`); a reboot, an app update
 The alarm starts `ResetReminderWorker`, which refreshes the accounts with due resets first, so a
 reset used on another device is left out.
 
-The worker has no network constraint, because an offline phone must still get the reminder. When
-the refresh of an account with a due reset fails with `QuotaErrorKind.Network`, the stored resets
-may be stale. The worker then posts nothing and runs again later (`ResetReminderRetryPolicy`). It
+The worker has no network constraint, because an offline phone must still get the reminder. The
+stored resets may be stale after the refresh of an account with a due reset in two cases:
+
+- The refresh fails with `QuotaErrorKind.Network`.
+- The refresh works but cannot read the resets (`QuotaSnapshot.resetsReadFailed`). An example is a
+  Z.AI account whose usage works while the ZCode sign-in endpoint does not answer.
+
+In both cases the worker posts nothing and runs again later (`ResetReminderRetryPolicy`). It
 waits 5, 15, 30 and 60 minutes. When the retries run out, it posts from the stored resets. It also
 posts from the stored resets when the next wait would end less than 12 hours (`MIN_NOTICE`) before
 the soonest due reset expires. A retry does not count as a reminder, so the rule of one reminder

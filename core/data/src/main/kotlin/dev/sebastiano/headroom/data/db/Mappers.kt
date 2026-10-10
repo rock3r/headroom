@@ -28,6 +28,7 @@ internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
                     QuotaBalance(amount, account.balanceUnit.orEmpty())
                 },
             resets = account.resetsJson?.let(ResetsCodec::decode),
+            resetsReadFailed = account.resetsReadFailed,
         )
     }
     return AccountState(
