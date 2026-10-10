@@ -6,7 +6,7 @@
 |---|---|---|
 | `:core:model` | Kotlin Multiplatform (JVM, iOS) | Quota types, pace maths, reset alert policy, countdown formatting, repository contracts, demo data |
 | `:core:quota` | Kotlin Multiplatform (JVM, iOS) | One fetcher per provider: calls the provider's usage endpoint and parses it into the model |
-| `:core:auth` | Kotlin/JVM | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
+| `:core:auth` | Kotlin Multiplatform (JVM, iOS) | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
 | `:core:data` | Android library | Room history, DataStore settings, encrypted token store, sync, reset alarms, notifications |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
 | `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
@@ -25,8 +25,13 @@ targets, its code in `src/commonMain` and its tests in `src/commonTest`. The And
 JVM target. Common code uses `kotlin.time`, `kotlinx-datetime` and `kotlinx-atomicfu` locks in place
 of `java.time` and `synchronized`, and Okio for hashing. HTTP goes through Ktor
 (`KtorQuotaHttpClient`), with the OkHttp engine on the JVM and Android and the Darwin engine on
-iOS. `:core:model` and `:core:quota` are multiplatform; `:core:auth` and the shared parts of
+iOS. `:core:model`, `:core:quota` and `:core:auth` are multiplatform; the shared parts of
 `:core:data` follow.
+
+The OAuth loopback listener (`LoopbackServer`) keeps its HTTP handling in common code, over a small
+socket interface: `ServerSocket` on the JVM and POSIX sockets on iOS, always bound to the loopback
+address. On iOS the sign-in page must open in `ASWebAuthenticationSession`, never in Safari: Safari
+puts Headroom in the background, iOS suspends it, and the listener stops answering.
 
 ## Data flow
 
