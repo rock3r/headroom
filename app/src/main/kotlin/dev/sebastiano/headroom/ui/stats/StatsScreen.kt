@@ -96,6 +96,7 @@ fun StatsScreen(
                 return@LazyVerticalStaggeredGrid
             }
             item { ResetsCard(stats.resets) }
+            stats.resetUsage?.let { usage -> item { ResetUsageCard(usage) } }
             item { SharesCard(stats.shares) }
             item { HeatmapCard(stats.heatmap, stats.coverage, formatter) }
             item { HighlightsRow(stats, formatter) }

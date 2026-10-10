@@ -238,6 +238,44 @@
     <string name="stats_sparkline_description">%1$s over the last 7 days: lowest %2$d%%, highest %3$d%%, %4$d%% now</string>
     <string name="stats_sparkline_empty">No history in the last 7 days</string>
     <string name="stats_sparklines_empty">No accounts to chart yet.</string>
+    <string name="stats_reset_usage_title">Usage limit resets</string>
+    <string name="stats_reset_usage_four_weeks">4 weeks</string>
+    <string name="stats_reset_usage_three_months">3 months</string>
+    <string name="stats_reset_usage_twelve_months">12 months</string>
+    <string name="stats_reset_usage_used">used</string>
+    <string name="stats_reset_usage_expired">expired unused</string>
+    <string name="stats_reset_usage_sources">%1$s, %2$s.</string>
+    <plurals name="stats_reset_usage_in_headroom">
+        <item quantity="one">%d in Headroom</item>
+        <item quantity="other">%d in Headroom</item>
+    </plurals>
+    <plurals name="stats_reset_usage_elsewhere">
+        <item quantity="one">%d elsewhere</item>
+        <item quantity="other">%d elsewhere</item>
+    </plurals>
+    <string name="stats_reset_usage_given_back">Gave back %1$s.</string>
+    <string name="stats_reset_usage_given_back_estimated">Gave back about %1$s.</string>
+    <string name="stats_reset_usage_and">" and "</string>
+    <string name="stats_reset_usage_limit_session">%1$s times the session limit</string>
+    <string name="stats_reset_usage_limit_daily">%1$s times the daily limit</string>
+    <string name="stats_reset_usage_limit_weekly">%1$s times the weekly limit</string>
+    <string name="stats_reset_usage_limit_monthly">%1$s times the monthly limit</string>
+    <string name="stats_reset_usage_provider">%1$s, %2$s</string>
+    <plurals name="stats_reset_usage_used_count">
+        <item quantity="one">%d used</item>
+        <item quantity="other">%d used</item>
+    </plurals>
+    <plurals name="stats_reset_usage_expired_count">
+        <item quantity="one">%d expired</item>
+        <item quantity="other">%d expired</item>
+    </plurals>
+    <plurals name="stats_reset_usage_expired_unused_count">
+        <item quantity="one">%d expired unused</item>
+        <item quantity="other">%d expired unused</item>
+    </plurals>
+    <string name="stats_reset_usage_description">Usage limit resets in the last %1$s: %2$s, %3$s.</string>
+    <string name="stats_reset_usage_empty">No resets were used or expired in this period.</string>
+    <string name="stats_reset_usage_note">A reset counts as used when it is gone before its expiry date. \"Gave back\" adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.</string>
 
     <!-- Widgets -->
     <string name="widget_rings_title">Rings · 2×2</string>

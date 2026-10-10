@@ -79,6 +79,45 @@ internal data class UsagePointEntity(
     val usedPercent: Double,
 )
 
+/**
+ * One usage-limit reset that was used or expired: see [RoomResetEventLog]. A redeem in Headroom is
+ * stored with its [attemptKey], unique, so a retry never records it twice, and [settled] false
+ * until a sync finds its reset gone. Every other row is settled. The given-back columns hold the
+ * used percent of each kind of limit the reset restored, or null when it is unknown.
+ */
+@Entity(
+    tableName = "reset_events",
+    foreignKeys =
+        [
+            ForeignKey(
+                entity = AccountEntity::class,
+                parentColumns = ["id"],
+                childColumns = ["accountId"],
+                onDelete = ForeignKey.CASCADE,
+            )
+        ],
+    indices =
+        [Index("accountId"), Index("atEpochMs"), Index(value = ["attemptKey"], unique = true)],
+)
+internal data class ResetEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val accountId: String,
+    val provider: String,
+    val poolId: String,
+    val poolLabel: String,
+    val kind: String,
+    val atEpochMs: Long,
+    val expiresAtEpochMs: Long?,
+    val source: String?,
+    val givenBackSession: Double?,
+    val givenBackDaily: Double?,
+    val givenBackWeekly: Double?,
+    val givenBackMonthly: Double?,
+    val givenBackEstimated: Boolean,
+    val attemptKey: String?,
+    val settled: Boolean,
+)
+
 internal data class AccountWithWindows(
     @Embedded val account: AccountEntity,
     @Relation(parentColumn = "id", entityColumn = "accountId") val windows: List<WindowEntity>,

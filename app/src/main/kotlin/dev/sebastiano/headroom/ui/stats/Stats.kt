@@ -28,6 +28,8 @@ data class Stats(
     val leftOver: LeftOver? = null,
     val biggestDay: BiggestDay? = null,
     val sparklines: List<Sparkline> = emptyList(),
+    /** How the usage-limit resets were spent. Null when no account has resets. */
+    val resetUsage: ResetUsageStats? = null,
 )
 
 /** How much history the stats are based on: whole days since the oldest point. */

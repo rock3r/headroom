@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.ResetEventLog
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineDispatcher
@@ -31,8 +32,9 @@ data class StatsUiState(
 )
 
 /**
- * Stats from the history of each account's main limit. The history covers every sync of the last
- * weeks, so the maths runs on [computeDispatcher], off the main thread.
+ * Stats from the history of each account's main limit, and from the reset history. The history
+ * covers every sync of the last weeks, so the maths runs on [computeDispatcher], off the main
+ * thread.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class StatsViewModel(
@@ -42,7 +44,17 @@ class StatsViewModel(
     clock: () -> Instant,
     zone: ZoneId,
     computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** The resets used and expired, kept for [ResetPeriod.TwelveMonths]. */
+    resetEvents: ResetEventLog = ResetEventLog.None,
 ) : ViewModel() {
+    private val resets =
+        combine(
+            repository.accounts.map { accounts -> accounts.any { it.snapshot?.resets != null } },
+            resetEvents.events(clock().minus(ResetPeriod.TwelveMonths.length)),
+        ) { hasResets, events ->
+            hasResets to events
+        }
+
     val state: StateFlow<StatsUiState> =
         repository.accounts
             .map { accounts ->
@@ -65,8 +77,17 @@ class StatsViewModel(
                 }
             }
             .combine(isDemo) { sources, demo -> sources to demo }
-            .mapLatest { (sources, demo) ->
-                StatsUiState(loading = false, isDemo = demo, stats = stats(sources, clock(), zone))
+            .combine(resets) { (sources, demo), resets -> Triple(sources, demo, resets) }
+            .mapLatest { (sources, demo, resets) ->
+                val (hasResets, events) = resets
+                val now = clock()
+                StatsUiState(
+                    loading = false,
+                    isDemo = demo,
+                    stats =
+                        stats(sources, now, zone)
+                            .copy(resetUsage = resetUsage(events, now, hasResets)),
+                )
             }
             .flowOn(computeDispatcher)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), StatsUiState())

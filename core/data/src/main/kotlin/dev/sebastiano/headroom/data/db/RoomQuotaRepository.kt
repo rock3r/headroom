@@ -146,6 +146,14 @@ internal class RoomQuotaRepository(
                             )
                         },
                     pruneBeforeEpochMs = now.minus(HISTORY_RETENTION).toEpochMilli(),
+                    // Resets that could not be read are compared with nothing: they record no
+                    // event.
+                    resetEvents =
+                        RoomResetEventLog.finder(
+                            provider = snapshot.provider,
+                            current = snapshot.resets.takeUnless { snapshot.resetsReadFailed },
+                            now = now,
+                        ),
                 )
             }
             // An update, not an upsert: a removed account must stay removed. An expired sign-in

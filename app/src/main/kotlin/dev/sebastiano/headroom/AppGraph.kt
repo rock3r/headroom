@@ -7,9 +7,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.sebastiano.headroom.appdata.DemoAwareResetEvents
 import dev.sebastiano.headroom.appdata.DemoAwareResetHistory
 import dev.sebastiano.headroom.appdata.DemoAwareUsageHistory
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
+import dev.sebastiano.headroom.appdata.DemoResetEvents
 import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.HistoryResetHistory
@@ -29,6 +31,7 @@ import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetAttemptMemory
 import dev.sebastiano.headroom.model.ResetAttemptStore
+import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.prototype.PrototypeTools
@@ -72,6 +75,7 @@ import kotlinx.coroutines.flow.map
  * - [widgetPinner]: the widget module supplies the `AppWidgetProvider` for each style.
  * - [resetHistory]: the data layer answers it from the Room history.
  * - [usageHistory]: the Room history of each window, or demo history in demo mode, for the stats.
+ * - [resetEvents]: the resets used and expired, from Room, or demo events in demo mode.
  * - [settings]: the data layer's DataStore settings, or settings in memory without it.
  * - [resetIsland]: whether the reset island's accessibility service is ready, and a way to show it.
  * - [resetProvider]: reads and redeems usage limit resets. Prototype: fake data in debug builds,
@@ -121,6 +125,8 @@ class AppGraph(
     val demoAccounts: FakeQuotaRepository? = null,
     /** The ZCode sign-in that Z.AI resets need; null without the data layer. */
     val zCodeSignIn: ZCodeSignIn? = null,
+    /** The resets used and expired, for the Stats tab; redeems in Headroom are recorded here. */
+    val resetEvents: ResetEventLog = ResetEventLog.None,
 ) {
     /** The resets of every account, read through the reset provider. */
     val resets: ResetCenter =
@@ -129,6 +135,7 @@ class AppGraph(
             accounts = quotaRepository.accounts,
             scope = resetScope,
             refreshUsage = { accountId -> quotaRepository.refresh(accountId) },
+            recordRedeem = resetEvents::redeemed,
         )
 
     /** The keys of unsettled redeem attempts, so a retry never uses a second reset. */
@@ -161,6 +168,7 @@ class AppGraph(
                 clock = clock,
                 zone = zone,
                 computeDispatcher = statsDispatcher,
+                resetEvents = resetEvents,
             )
         }
     }
@@ -188,6 +196,18 @@ class AppGraph(
          * layer, and demo data only while there are none. Without one (instrumented tests,
          * previews) it runs on fakes.
          */
+        /** The recorded reset history, or demo events while the demo accounts show. */
+        private fun resetEvents(
+            isDemo: StateFlow<Boolean>,
+            data: DataGraph?,
+            clock: () -> Instant,
+        ): ResetEventLog =
+            DemoAwareResetEvents(
+                isDemo = isDemo,
+                real = data?.resetEvents ?: ResetEventLog.None,
+                demo = DemoResetEvents(clock),
+            )
+
         fun create(
             context: Context,
             clock: () -> Instant = Instant::now,
@@ -285,6 +305,7 @@ class AppGraph(
                 tileSettings = tileSettings,
                 prototypes = prototypeTools,
                 demoAccounts = demoAccounts,
+                resetEvents = resetEvents(repository.isDemo, data, clock),
                 zCodeSignIn =
                     if (data == null || steps == null) null
                     else

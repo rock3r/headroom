@@ -4,6 +4,10 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.ResetAttemptKey
+import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -165,6 +169,33 @@ class HeadroomDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `accounts saved before the reset history existed start with an empty one`() = runTest {
+        file.parentFile?.mkdirs()
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { v6 ->
+            VERSION_1_SCHEMA.forEach(v6::execSQL)
+            v6.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+            v6.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+            v6.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+            v6.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+            v6.execSQL("ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+            v6.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
+            v6.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
+            v6.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
+            v6.execSQL("INSERT INTO accounts (id, provider, label) VALUES ('a1', 'codex', 'a1')")
+            v6.version = 6
+        }
+
+        val db = openCurrent()
+        try {
+            val log = RoomResetEventLog(db.quotaDao(), clock = { Instant.EPOCH })
+            log.redeemed(Account("a1", Provider.Codex, "a1"), "credits", ResetAttemptKey("k"))
+            assertEquals(1, log.events(Instant.EPOCH).first().size)
+        } finally {
+            db.close()
+        }
+    }
+
     private fun openCurrent(): HeadroomDatabase =
         Room.databaseBuilder(context, HeadroomDatabase::class.java, NAME)
             .addMigrations(
@@ -173,6 +204,7 @@ class HeadroomDatabaseMigrationTest {
                 HeadroomDatabase.MIGRATION_3_4,
                 HeadroomDatabase.MIGRATION_4_5,
                 HeadroomDatabase.MIGRATION_5_6,
+                HeadroomDatabase.MIGRATION_6_7,
             )
             .allowMainThreadQueries()
             .build()

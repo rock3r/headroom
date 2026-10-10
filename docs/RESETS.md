@@ -258,6 +258,67 @@ id, the pool id and the expiry time, and no token.
 Tapping the notification opens the detail of the soonest reset's account and scrolls its Resets
 card into view (`ResetReminderIntents`, `OpenAccountRequest.showResets`).
 
+## Reset history
+
+Headroom keeps a history of the resets that were used or expired, for the "Usage limit resets"
+card of the Stats tab.
+
+### Where it is stored
+
+- Room stores it in the `reset_events` table of `headroom.db` (database version 7), next to the
+  usage history. Like every app file, it is excluded from backup and device transfer.
+- A row holds the account id, the provider, the pool id and label, "used" or "expired", the time
+  Headroom saw it, the reset's expiry date, where a used reset was used, what it gave back, and
+  the attempt key of a redeem in Headroom. It holds no token.
+- Rows are kept for 365 days: each sync deletes older ones. Removing an account deletes its rows,
+  as it deletes its usage history.
+
+### How a reset is recorded
+
+`ResetEventDetector` in `:core:model` compares the resets a sync read with the ones stored before,
+pool by pool. Every provider lists one expiry date per reset, so a reset is matched by its date.
+
+- A reset that is gone after its expiry date counts as expired.
+- A reset that is gone before its expiry date counts as used. When the provider gives no expiry
+  date, a lower count counts as a use.
+- `ResetCenter` records a redeem that works in Headroom straight away, before it refreshes the
+  usage (`RoomResetEventLog.redeemed`). The attempt key is unique, so a retry, an `already_used`
+  answer or a "Check again" records it once. A later sync then finds its reset gone and settles the
+  redeem instead of adding a second use. The redeem settles the gone reset that expires first after
+  the redeem, because the providers use the soonest reset first.
+- A sync can store between the provider using a reset and Headroom recording the redeem. It then
+  records that reset as used elsewhere. The redeem record runs in one transaction with the syncs,
+  and takes over a use elsewhere of the same pool recorded in the last 5 minutes, so the reset
+  counts once. It keeps that row's expiry and its estimate of the usage before the reset. The
+  takeover matches by pool, not by reset, because the stored resets no longer show which reset the
+  redeem used. When a use elsewhere and a redeem in Headroom of the same pool fall within those 5
+  minutes, both still count, but their "in Headroom" and "elsewhere" labels can swap.
+- A redeem stays pending until a sync settles it, however long that takes. A first sync after days
+  offline still counts its reset once.
+- Any other use counts as a use "elsewhere", for example in Claude Code or on chatgpt.com.
+- Nothing is recorded when the resets could not be read, when Z.AI needs its ZCode sign-in, when
+  the account is outside the provider's program, or on the first read of an account.
+
+A use elsewhere in the minutes before its expiry date looks like an expiry: Headroom cannot tell
+them apart.
+
+### What a reset gave back
+
+"Gave back" is the used percent of each limit that a reset cleared, added up per kind of limit
+(`ResetGivenBack`). When a reset covers several limits of one kind, such as Claude's weekly ones,
+the highest counts. A limit that reset on its own since the usage was read counts nothing.
+
+| Reset | Measured from | Marked "about" |
+|---|---|---|
+| Used in Headroom | The usage stored at the moment of the redeem | When that usage is more than 30 minutes old |
+| Used elsewhere | The usage of the last sync before the reset was found gone | Always |
+
+The estimate for a use elsewhere can be wrong in both directions: usage may have grown after the
+last sync, and some of the limit may have been used again after the reset. When one sync finds
+several uses of one pool, only the first one gets an estimate, because the usage was close to
+zero after it. All of this was checked with unit tests and demo data only, not with real
+accounts.
+
 ## Logs
 
 The reset clients write one line per request to logcat, under the tag `HeadroomResets`:
