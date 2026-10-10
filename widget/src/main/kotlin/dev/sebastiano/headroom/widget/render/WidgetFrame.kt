@@ -47,7 +47,7 @@ internal fun WidgetCard(
                 .clip(RemoteRoundedCornerShape(render.px(cornerDesign)))
                 .background(render.colors.background.rc)
                 .clickable(render.taps.refresh())
-                .semantics { contentDescription = render.strings.refreshAction().rs },
+                .semantics { contentDescription = render.strings.refreshAction.rs },
         contentAlignment = contentAlignment,
         content = content,
     )

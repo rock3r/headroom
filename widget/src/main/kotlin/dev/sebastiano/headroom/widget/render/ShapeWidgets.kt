@@ -35,7 +35,7 @@ internal fun SingleShapeWidget(
         modifier =
             modifier.fillMaxSize().clickable(render.taps.refresh()).semantics {
                 contentDescription =
-                    (strings.gaugeDescription(gauge) + " " + strings.refreshAction()).rs
+                    (strings.gaugeDescription(gauge) + " " + strings.refreshAction).rs
             },
         contentAlignment = RemoteAlignment.Center,
     ) {

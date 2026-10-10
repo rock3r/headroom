@@ -72,6 +72,8 @@ public data class Gauge(
     val display: QuotaDisplay = QuotaDisplay.Used,
     /** The account's sign-in expired: these are old numbers, drawn faded and never wavy. */
     val stale: Boolean = false,
+    /** How many resets the account can use now. Zero shows no badge. */
+    val resetsAvailable: Int = 0,
 ) {
     /** The number the widget shows, and how much of its ring or bar is filled: 0 to 100. */
     val shownPercent: Int
@@ -269,6 +271,8 @@ public sealed interface WidgetUiState {
                 reset =
                     resetLabel(window, isSession, now).takeUnless { stale && window.hasReset(now) },
                 stale = stale,
+                // A stale account cannot use its resets until it signs in again.
+                resetsAvailable = if (stale) 0 else state.snapshot?.resets?.availableNow ?: 0,
             )
         }
 

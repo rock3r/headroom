@@ -31,6 +31,14 @@ adds the result to the snapshot (`QuotaSnapshot.resets`).
   (`FakeResetProvider`); release builds give them none. `RealOrDemoResetProvider` in `:app` sends
   each account to the right side.
 
+## Widgets
+
+The Bars and Rings widgets, on the home screen and the lock screen, show a short badge such as
+"2 resets" on an account that has resets it can use now. The count is
+`ResetAvailability.availableNow`, the same number the app shows. The badge is hidden when the count
+is zero and when the account's sign-in expired. A Bars row too short for a second line shows no
+badge. The widget pictures are in `docs/screenshots/widgets/widget-resets-*.png`.
+
 ## Endpoints
 
 These are the calls the reset clients in `:core:quota` make. The shapes come from the providers'

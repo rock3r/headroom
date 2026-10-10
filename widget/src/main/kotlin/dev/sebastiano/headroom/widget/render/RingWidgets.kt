@@ -18,13 +18,16 @@ import androidx.compose.remote.creation.compose.modifier.height
 import androidx.compose.remote.creation.compose.modifier.padding
 import androidx.compose.remote.creation.compose.modifier.semantics
 import androidx.compose.remote.creation.compose.modifier.width
+import androidx.compose.remote.creation.compose.state.RemoteString
 import androidx.compose.remote.creation.compose.state.RemoteTextUnit
 import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.remote.creation.compose.state.rememberMutableRemoteBoolean
 import androidx.compose.remote.creation.compose.state.rf
 import androidx.compose.remote.creation.compose.state.rs
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.WidgetUiState
 
@@ -121,29 +124,48 @@ internal fun SingleRingWidget(
                             contentDescription = strings.openAction(gauge.name, gauge.stale).rs
                         },
                 )
-                val bigPx = render.textPx(BIG)
-                val labelPx = render.textPx(LABEL)
-                RemoteBox(
-                    RemoteModifier.width(render.px(NUMBER_BOX_WIDTH))
-                        .height((bigPx * NUMBER_LINE + labelPx * LABEL_LINE).rf)
-                ) {
-                    RemoteCanvas(RemoteModifier.fillMaxSize()) {
-                        with(RestrictedRemoteApis) {
-                            drawCentredText(
-                                number,
-                                width / 2f.rf,
-                                (bigPx * NUMBER_LINE / 2f).rf,
-                                textPaint(colors.onSurface, bigPx, bold = true),
-                            )
-                            drawCentredText(
-                                word,
-                                width / 2f.rf,
-                                (bigPx * NUMBER_LINE + labelPx * LABEL_LINE / 2f).rf,
-                                textPaint(wordColor, labelPx, bold = true),
-                            )
-                        }
-                    }
-                }
+                RingNumber(number, word, colors.onSurface, wordColor, render)
+                ResetsBadge(gauge, render, render.sp(LABEL))
+            }
+        }
+    }
+}
+
+/**
+ * The big number and the word under it, drawn on a canvas because they change when the ring flips,
+ * see [RestrictedRemoteApis].
+ */
+@RemoteComposable
+@Composable
+private fun RingNumber(
+    number: RemoteString,
+    word: RemoteString,
+    numberColor: Color,
+    wordColor: Color,
+    render: RenderContext,
+    modifier: RemoteModifier = RemoteModifier,
+) {
+    val bigPx = render.textPx(BIG)
+    val labelPx = render.textPx(LABEL)
+    RemoteBox(
+        modifier
+            .width(render.px(NUMBER_BOX_WIDTH))
+            .height((bigPx * NUMBER_LINE + labelPx * LABEL_LINE).rf)
+    ) {
+        RemoteCanvas(RemoteModifier.fillMaxSize()) {
+            with(RestrictedRemoteApis) {
+                drawCentredText(
+                    number,
+                    width / 2f.rf,
+                    (bigPx * NUMBER_LINE / 2f).rf,
+                    textPaint(numberColor, bigPx, bold = true),
+                )
+                drawCentredText(
+                    word,
+                    width / 2f.rf,
+                    (bigPx * NUMBER_LINE + labelPx * LABEL_LINE / 2f).rf,
+                    textPaint(wordColor, labelPx, bold = true),
+                )
             }
         }
     }
@@ -246,7 +268,31 @@ private fun SmallRing(
             fontWeight = FontWeight.SemiBold,
         )
         if (gauge.stale) SignInLabel(render, render.sp(SMALL_NAME))
+        ResetsBadge(gauge, render, render.sp(SMALL_NAME))
     }
+}
+
+/**
+ * The compact "2 resets" badge on an account with resets it can use now. It draws nothing when the
+ * account has none.
+ */
+@RemoteComposable
+@Composable
+internal fun ResetsBadge(
+    gauge: Gauge,
+    render: RenderContext,
+    fontSize: RemoteTextUnit,
+    modifier: RemoteModifier = RemoteModifier,
+    textAlign: TextAlign = TextAlign.Center,
+) {
+    if (gauge.resetsAvailable <= 0) return
+    WidgetText(
+        text = render.strings.resets(gauge.resetsAvailable).label,
+        color = render.colorsFor(gauge).accent(gauge.provider),
+        fontSize = fontSize,
+        modifier = modifier,
+        textAlign = textAlign,
+    )
 }
 
 /** The compact "Sign in" label under a stale gauge. It is never faded. */

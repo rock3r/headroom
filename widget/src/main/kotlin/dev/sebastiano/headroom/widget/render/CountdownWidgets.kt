@@ -187,6 +187,7 @@ private fun LockScreenGauge(
                 fontWeight = FontWeight.Medium,
             )
         }
+        ResetsBadge(gauge, render, render.sp(LOCK_NAME))
     }
 }
 

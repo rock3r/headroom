@@ -190,14 +190,28 @@ private fun BarRow(
                 )
             }
         }
-        WidgetText(
-            text = strings.percent(gauge.shownPercent),
-            color = colors.onSurface,
-            fontSize = (VALUE_SP * scale).sp.asRemoteTextUnit(),
+        RemoteColumn(
             modifier = RemoteModifier.width(render.fixedPx(VALUE_WIDTH * scale)),
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.End,
-        )
+            verticalArrangement = RemoteArrangement.Center,
+            horizontalAlignment = RemoteAlignment.End,
+        ) {
+            WidgetText(
+                text = strings.percent(gauge.shownPercent),
+                color = colors.onSurface,
+                fontSize = (VALUE_SP * scale).sp.asRemoteTextUnit(),
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+            )
+            // Compact rows have no room for a second line.
+            if (metrics.rowDp >= BarsMetrics.MIN_ROW_DP) {
+                ResetsBadge(
+                    gauge,
+                    render,
+                    (RESET_SP * scale).sp.asRemoteTextUnit(),
+                    textAlign = TextAlign.End,
+                )
+            }
+        }
     }
 }
 

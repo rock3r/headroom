@@ -32,6 +32,7 @@ import dev.sebastiano.headroom.widget.testing.hostActionIds
 import dev.sebastiano.headroom.widget.testing.logoCommands
 import dev.sebastiano.headroom.widget.testing.maxVariableId
 import dev.sebastiano.headroom.widget.testing.pathCommands
+import dev.sebastiano.headroom.widget.testing.withResets
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
@@ -299,6 +300,42 @@ class WidgetRendererTest {
         doc.assertText("Next weekly reset: Grok, Mon 03:28")
         doc.assertNoText("Copilot")
         doc.assertDrawsLogos(Provider.Claude, Provider.Codex, Provider.Grok)
+    }
+
+    @Test
+    fun `bars and rings show a badge on an account with resets it can use now`() = runTest {
+        val withResets = accounts.withResets()
+        val layouts =
+            listOf(
+                Triple(WidgetConfig(WidgetStyle.Bars), WidgetSize(320f, 140f), HOME),
+                Triple(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f), HOME),
+                Triple(
+                    WidgetConfig(WidgetStyle.Rings, listOf("demo-codex")),
+                    WidgetSize(160f, 160f),
+                    HOME,
+                ),
+                Triple(WidgetConfig(WidgetStyle.Rings), WidgetSize(160f, 160f), HOME),
+                Triple(WidgetConfig(WidgetStyle.Rings), WidgetSize(300f, 120f), LOCK),
+            )
+        layouts.forEach { (config, size, host) ->
+            val state = WidgetUiState.from(withResets, config, now, size, host)
+            val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+            val label = "$config $size $host"
+            assertContains(doc.text(), "2 resets", message = label)
+            assertContains(doc.text(), "2 resets available now.", message = label)
+            WidgetRenderer.remoteViews(doc).playAt(size)
+        }
+    }
+
+    @Test
+    fun `no badge shows without resets`() = runTest {
+        listOf(
+                capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f)),
+                capture(WidgetConfig(WidgetStyle.Rings)),
+                capture(WidgetConfig(WidgetStyle.Rings, listOf("demo-codex"))),
+                capture(WidgetConfig(WidgetStyle.Rings), WidgetSize(300f, 120f), LOCK),
+            )
+            .forEach { it.assertNoText("available now") }
     }
 
     @Test

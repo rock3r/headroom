@@ -24,6 +24,12 @@
         <item quantity="other">+%1$d more</item>
     </plurals>
 
+    <!-- Resets -->
+    <plurals name="widget_resets_badge">
+        <item quantity="one">%1$d reset</item>
+        <item quantity="other">%1$d resets</item>
+    </plurals>
+
     <!-- Countdown and lock screen -->
     <string name="widget_countdown_title">Next %1$s reset</string>
     <string name="widget_countdown_none">No reset coming up</string>
@@ -50,6 +56,10 @@
     <plurals name="widget_cd_more_accounts">
         <item quantity="one">%1$d more account. Open Headroom.</item>
         <item quantity="other">%1$d more accounts. Open Headroom.</item>
+    </plurals>
+    <plurals name="widget_cd_resets_available">
+        <item quantity="one">%1$d reset available now.</item>
+        <item quantity="other">%1$d resets available now.</item>
     </plurals>
     <string name="widget_cd_flip">Switch between the %1$s and session numbers</string>
 </resources>
