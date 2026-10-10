@@ -1,4 +1,4 @@
-package dev.sebastiano.headroom.ui.stats
+package dev.sebastiano.headroom.model.stats
 
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.model.Provider
@@ -11,7 +11,7 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 /** The spans the reset stat can cover. The longest is as long as the reset history is kept. */
-enum class ResetPeriod(val length: Duration) {
+public enum class ResetPeriod(public val length: Duration) {
     FourWeeks(FOUR_WEEKS_DAYS.days),
     ThreeMonths(THREE_MONTHS_DAYS.days),
     TwelveMonths(TWELVE_MONTHS_DAYS.days),
@@ -23,13 +23,13 @@ private const val TWELVE_MONTHS_DAYS = 365L
 
 /** How the usage-limit resets were spent, for each [ResetPeriod]. */
 @Immutable
-data class ResetUsageStats(val periods: Map<ResetPeriod, ResetUsage>) {
-    fun of(period: ResetPeriod): ResetUsage = periods.getValue(period)
+public data class ResetUsageStats(val periods: Map<ResetPeriod, ResetUsage>) {
+    public fun of(period: ResetPeriod): ResetUsage = periods.getValue(period)
 }
 
 /** The resets used and expired in one period, in total and per provider. */
 @Immutable
-data class ResetUsage(
+public data class ResetUsage(
     val used: Int,
     val usedInHeadroom: Int,
     val expired: Int,
@@ -42,7 +42,7 @@ data class ResetUsage(
 }
 
 @Immutable
-data class ProviderResetUsage(
+public data class ProviderResetUsage(
     val provider: Provider,
     val used: Int,
     val usedInHeadroom: Int,
@@ -56,7 +56,7 @@ data class ProviderResetUsage(
  * comes from usage that may have been out of date.
  */
 @Immutable
-data class GivenBack(val byKind: Map<WindowKind, Double>, val estimated: Boolean) {
+public data class GivenBack(val byKind: Map<WindowKind, Double>, val estimated: Boolean) {
     val isEmpty: Boolean
         get() = byKind.isEmpty()
 }
@@ -69,7 +69,7 @@ private val GIVEN_BACK_ORDER =
  * The reset stat from the reset history. It is null, so the card is left out, when there is no
  * event and no account has resets ([hasResets]).
  */
-internal fun resetUsage(
+public fun resetUsage(
     events: List<ResetEvent>,
     now: Instant,
     hasResets: Boolean,

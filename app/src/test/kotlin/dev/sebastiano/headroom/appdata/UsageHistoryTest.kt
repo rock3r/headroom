@@ -5,6 +5,7 @@ import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.stats.ResetPeaks
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
