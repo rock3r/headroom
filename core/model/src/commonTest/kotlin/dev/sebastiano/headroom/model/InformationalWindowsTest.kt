@@ -64,7 +64,7 @@ class InformationalWindowsTest {
         )
 
     @Test
-    fun `credits and unknown windows are informational, other windows are not`() {
+    fun `credits and unknown windows are informational other windows are not`() {
         assertTrue(credit.isInformational)
         assertTrue(unknown.isInformational)
         assertFalse(weekly.isInformational)

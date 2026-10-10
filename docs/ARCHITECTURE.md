@@ -4,7 +4,7 @@
 
 | Module | Kind | Contents |
 |---|---|---|
-| `:core:model` | Kotlin/JVM | Quota types, pace maths, reset alert policy, countdown formatting, repository contracts, demo data |
+| `:core:model` | Kotlin Multiplatform (JVM, iOS) | Quota types, pace maths, reset alert policy, countdown formatting, repository contracts, demo data |
 | `:core:quota` | Kotlin/JVM | One fetcher per provider: calls the provider's usage endpoint and parses it into the model |
 | `:core:auth` | Kotlin/JVM | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
 | `:core:data` | Android library | Room history, DataStore settings, encrypted token store, sync, reset alarms, notifications |
@@ -16,6 +16,15 @@ Dependencies point down: `:app` → `:widget`, `:core:designsystem`, `:core:data
 `:core:quota`, `:core:auth` → `:core:model`. `:widget` also uses `:core:designsystem`, for the
 colour palettes it shares with the app. The JVM modules have no Android dependencies, so their
 tests run fast on the JVM.
+
+### Kotlin Multiplatform
+
+The business logic is moving into Kotlin Multiplatform modules, so a SwiftUI iOS app can share it.
+A multiplatform module (`headroom.kmp.library`) has JVM, `iosArm64` and `iosSimulatorArm64`
+targets, its code in `src/commonMain` and its tests in `src/commonTest`. The Android modules use the
+JVM target. Common code uses `kotlin.time`, `kotlinx-datetime` and `kotlinx-atomicfu` locks in place
+of `java.time` and `synchronized`. `:core:model` is the first such module; `:core:quota`,
+`:core:auth` and the shared parts of `:core:data` follow.
 
 ## Data flow
 

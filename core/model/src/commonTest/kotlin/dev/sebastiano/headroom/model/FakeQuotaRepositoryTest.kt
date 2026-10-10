@@ -14,7 +14,7 @@ class FakeQuotaRepositoryTest {
             .associate { it.id to it.usedPercent }
 
     @Test
-    fun `a reset on the provider's side shows on the next refresh, only for the windows it cleared`() =
+    fun `a reset on the provider's side shows on the next refresh only for the windows it cleared`() =
         runTest {
             val repository = FakeQuotaRepository({ now })
             val before = usage(repository, "demo-claude")

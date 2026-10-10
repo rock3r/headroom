@@ -57,7 +57,7 @@ jobs:
           scripts/ci-resources.sh 30 &
           resources=$!
           trap 'kill "$resources"' EXIT
-          ./gradlew check -x test -x testDebugUnitTest --continue
+          ./gradlew check -x test -x testDebugUnitTest -x allTests --continue
 
       - name: Upload reports
         if: always()
@@ -89,13 +89,42 @@ jobs:
           scripts/ci-resources.sh 30 &
           resources=$!
           trap 'kill "$resources"' EXIT
-          ./gradlew test -x :app:test -x :app:testDebugUnitTest --continue
+          ./gradlew test jvmTest -x :app:test -x :app:testDebugUnitTest --continue
 
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: library-unit-test-reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+          retention-days: 7
+
+  ios-tests:
+    name: Unit tests (iOS simulator)
+    needs: changes
+    if: needs.changes.outputs.tests == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
+        with:
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      # The shared modules' commonTest sources, run on Kotlin/Native. Only macOS can build them.
+      - name: Run iOS simulator tests
+        run: ./gradlew iosSimulatorArm64Test --continue
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: ios-test-reports
           path: |
             **/build/reports/
             **/build/test-results/
