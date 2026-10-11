@@ -12,6 +12,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
@@ -90,14 +91,41 @@ class KtorAuthHttpClientTest {
         )
         val client = KtorAuthHttpClient(timeout = 1.seconds)
 
-        assertFailsWith<AuthException.Network> {
-            client.execute(AuthHttpRequest(method = "GET", url = server.url("/slow").toString()))
+        try {
+            assertFailsWith<AuthException.Network> {
+                client.execute(
+                    AuthHttpRequest(method = "GET", url = server.url("/slow").toString())
+                )
+            }
+        } finally {
+            client.close()
         }
     }
 
     @Test
     fun `clients with the default timeout share one HttpClient`() {
         assertSame(KtorAuthHttpClient().client, KtorAuthHttpClient().client)
+    }
+
+    @Test
+    fun `closing a custom-timeout wrapper releases its client`() = runTest {
+        val owned = KtorAuthHttpClient(timeout = 5.seconds)
+        val job = checkNotNull(owned.client.coroutineContext[Job])
+
+        owned.close()
+        owned.close()
+        job.join()
+
+        assertTrue(job.isCompleted)
+    }
+
+    @Test
+    fun `closing default and injected wrappers leaves the borrowed client running`() {
+        val shared = KtorAuthHttpClient()
+        shared.close()
+        KtorAuthHttpClient(shared.client).close()
+
+        assertTrue(checkNotNull(shared.client.coroutineContext[Job]).isActive)
     }
 
     @Test
@@ -187,7 +215,7 @@ class KtorAuthHttpClientTest {
             assertEquals(2, contexts.size)
             assertSame(contexts[0], contexts[1])
         } finally {
-            redirected.client.close()
+            redirected.close()
         }
     }
 
