@@ -11,9 +11,9 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.HomeViewModel
-import dev.sebastiano.headroom.ui.home.ResetBurst
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,22 +1,23 @@
 import HeadroomKit
 import SwiftUI
+import WidgetKit
 
-/// The settings, each change saved by HeadroomKit at once.
+/// The settings, in the Android order, each change saved by HeadroomKit at once.
 struct SettingsForm: View {
     let settings: SettingsUi
     @Environment(AppModel.self) private var model
+    @State private var controlMode = ControlSettings.mode
 
     var body: some View {
         Form {
+            Text("Accounts, display and updates")
+                .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
             Section("Accounts") {
                 NavigationLink {
                     AccountsSettings()
                 } label: {
-                    LabeledContent("Your accounts") {
-                        if let overview = model.overview, !overview.isDemo {
-                            Text("\(overview.accounts.count)")
-                        }
-                    }
+                    AccountsRow()
                 }
             }
             Section {
@@ -31,7 +32,7 @@ struct SettingsForm: View {
                     ? "Numbers, rings and bars show how much of each limit you have left."
                     : "Numbers, rings and bars show how much of each limit you have used.")
             }
-            Section {
+            Section("Appearance") {
                 Picker("Theme", selection: binding(settings.theme) { settingsApi.setTheme(id: $0) }) {
                     Text("System").tag("system")
                     Text("Light").tag("light")
@@ -44,25 +45,22 @@ struct SettingsForm: View {
                         } icon: {
                             Image(systemName: "circle.fill")
                                 .foregroundStyle(Appearance.tint(palette.id) ?? .accentColor)
+                                .accessibilityHidden(true)
                         }
                         .tag(palette.id)
                     }
                 }
-                Toggle("Reduce motion", isOn: Binding(get: { settings.reduceMotion }, set: { settingsApi.setReduceMotion(enabled: $0) }))
-            } header: {
-                Text("Appearance")
-            } footer: {
-                Text("Turns Headroom's own animations off. Always on when Reduce Motion is on in your device's Accessibility settings.")
+                Toggle(isOn: Binding(get: { settings.reduceMotion }, set: { settingsApi.setReduceMotion(enabled: $0) })) {
+                    Text("Reduce motion")
+                    Text("Short fades instead of moving transitions, and no looping animations. Always on when animations are off on your device.")
+                }
             }
-            Section {
+            DelightsSettings(settings: settings)
+            Section("Resets") {
                 switchRow("resetExpiryReminders", "Remind me before a reset expires", settings.resetExpiryReminders,
                           body: "A notification about a day before a reset you can use expires. At most one a day, for every reset that expires soon.")
                 switchRow("redeemClaudeResets", "Redeem Claude resets (experimental)", settings.redeemClaudeResets,
                           body: "Use Claude's saved resets from Headroom. Claude has not published this API, so it may fail or stop working.")
-                switchRow("resetIsland", "Reset Live Activity", settings.resetIsland,
-                          body: "When a limit resets within a few hours, its countdown shows on the Lock Screen and in the Dynamic Island.")
-            } header: {
-                Text("Resets")
             }
             Section {
                 Picker("Update", selection: binding(settings.syncFrequency) { settingsApi.setSyncFrequency(id: $0) }) {
@@ -78,14 +76,44 @@ struct SettingsForm: View {
             } footer: {
                 Text("iOS decides when background updates run, no sooner than this. Reset alerts arrive on time whatever you choose here.")
             }
+            WidgetsSettings()
             Section {
-                Text("Touch and hold your Home Screen or Lock Screen, tap Edit, then Add Widget, and choose Headroom. The Next reset control is in Control Center's gallery.")
-                    .foregroundStyle(.secondary)
+                Picker("Control Center", selection: $controlMode) {
+                    VStack(alignment: .leading) {
+                        Text("Show the next reset")
+                        Text("For example, \"Claude · in 2d 4h\"")
+                    }
+                    .tag(ControlSettings.nextReset)
+                    VStack(alignment: .leading) {
+                        Text("Show the tightest quota")
+                        Text("For example, \"Grok · 88% used\"")
+                    }
+                    .tag(ControlSettings.tightest)
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
             } header: {
-                Text("Widgets")
+                Text("Control Center")
+            } footer: {
+                Text("Add the Headroom control from Control Center's gallery: touch and hold an empty space in Control Center, then tap Add a Control.")
+            }
+            .onChange(of: controlMode) { _, mode in
+                ControlSettings.mode = mode
+                ControlCenter.shared.reloadAllControls()
             }
             Section("About") {
-                LabeledContent("Version", value: Self.version)
+                NavigationLink {
+                    LicencesView()
+                } label: {
+                    VStack(alignment: .leading) {
+                        Text("Open-source licences")
+                        Text("The libraries Headroom is built with")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text("Version \(Self.version)")
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -95,7 +123,8 @@ struct SettingsForm: View {
     }
 
     private func binding(_ value: String, _ set: @escaping @MainActor (String) -> Void) -> Binding<String> {
-        Binding(get: { value }, set: set)
+        // A closure rather than `set` itself: Swift 6.3 (Xcode 26) crashes converting the function.
+        Binding(get: { value }, set: { newValue in set(newValue) })
     }
 
     private func switchRow(_ id: String, _ title: LocalizedStringKey, _ isOn: Bool, body: LocalizedStringKey) -> some View {

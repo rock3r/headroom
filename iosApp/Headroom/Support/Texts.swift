@@ -1,3 +1,4 @@
+import HeadroomKit
 import SwiftUI
 
 /// The text for HeadroomKit's ids, worded as in the Android app. They are `LocalizedStringKey`s, so
@@ -35,6 +36,42 @@ enum Texts {
     }
 
     static func windowKind(_ id: String) -> LocalizedStringKey {
+        switch id {
+        case "session": "Session"
+        case "daily": "Daily"
+        case "weekly": "Weekly"
+        case "monthly": "Monthly"
+        case "credit": "Credit"
+        default: "Limit"
+        }
+    }
+
+    /// What the big number on a card measures: "weekly used", "session left".
+    static func quotaLabel(_ kind: String, left: Bool) -> LocalizedStringKey {
+        switch (kind, left) {
+        case ("weekly", false): "weekly used"
+        case ("monthly", false): "monthly used"
+        case ("daily", false): "daily used"
+        case ("session", false): "session used"
+        case ("credit", false): "credit used"
+        case (_, false): "used"
+        case ("weekly", true): "weekly left"
+        case ("monthly", true): "monthly left"
+        case ("daily", true): "daily left"
+        case ("session", true): "session left"
+        case ("credit", true): "credit left"
+        case (_, true): "left"
+        }
+    }
+
+    /// "62% used" or "38% left".
+    static func percent(_ window: WindowUi, left: Bool) -> String {
+        left
+            ? String(localized: "\(Int(window.leftPercent.rounded()))% left")
+            : String(localized: "\(Int(window.usedPercent.rounded()))% used")
+    }
+
+    static func windowKindResource(_ id: String) -> LocalizedStringResource {
         switch id {
         case "session": "Session"
         case "daily": "Daily"

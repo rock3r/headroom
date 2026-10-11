@@ -15,7 +15,7 @@ final class SignInFlowTests: XCTestCase {
     func testTheDemoOverviewShowsExampleAccounts() {
         XCTAssertTrue(app.staticTexts["Demo data"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Claude"].exists)
-        XCTAssertTrue(app.staticTexts["Over pace"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'over pace'")).firstMatch.exists)
     }
 
     func testAddingAnAccountOffersEveryProvider() {

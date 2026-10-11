@@ -3,20 +3,28 @@ package dev.sebastiano.headroom.shared
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.Countdown
+import dev.sebastiano.headroom.model.ExpiryLine
 import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.Pace
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetAvailability
+import dev.sebastiano.headroom.model.ResetNote
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
+import dev.sebastiano.headroom.model.ResetTiming
 import dev.sebastiano.headroom.model.TileSubtitle
 import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.model.canRedeemResets
+import dev.sebastiano.headroom.model.expiryLines
+import dev.sebastiano.headroom.model.hasFooter
+import dev.sebastiano.headroom.model.holdsNone
 import dev.sebastiano.headroom.model.logo
+import dev.sebastiano.headroom.model.notes
+import dev.sebastiano.headroom.model.showsSummary
 import dev.sebastiano.headroom.signin.SignInKind
 import dev.sebastiano.headroom.signin.SignInState
 import kotlin.time.Duration.Companion.seconds
@@ -45,12 +53,22 @@ public data class OverviewUi(
     val nextResetTile: TileUi?,
     /** "Grok · 88% used", for the control and the widgets. */
     val tightestTile: TileUi?,
+    /** The account ids in the user's own order, whatever [sort] says. */
+    val yourOrder: List<String>,
+    /** The time this overview was worked out at, for countdowns that match it. */
+    val nowEpochSeconds: Long,
 )
 
 /**
  * A subtitle in two halves, an account and a value, as the Android Quick Settings tile shows it.
  */
-public data class TileUi(val name: String, val value: String)
+public data class TileUi(
+    val name: String,
+    /** A countdown such as `2d 4h`, or a whole percentage such as `88`. */
+    val value: String,
+    /** `countdown`, `used` or `left`: how the app words [value]. */
+    val kind: String,
+)
 
 public data class NextResetUi(
     val accountId: String,
@@ -58,7 +76,14 @@ public data class NextResetUi(
     val providerName: String,
     val windowLabel: String,
     val resetsAtEpochSeconds: Long,
+    val windowId: String,
+    /** The window's kind, such as `weekly`: a weekly one is "Next weekly reset". */
+    val kind: String,
+    val alertOn: Boolean,
 )
+
+/** An amount left to spend, such as AI credits, in [unit]. */
+public data class BalanceUi(val amount: Double, val unit: String)
 
 public data class AccountUi(
     val id: String,
@@ -84,6 +109,11 @@ public data class AccountUi(
     val needsAttention: Boolean,
     /** The account's usage-limit resets, or null when its provider has none. */
     val resets: AccountResetsUi?,
+    val balance: BalanceUi?,
+    /** Each window is its own allowance, as JetBrains licences: the card lists them all. */
+    val separateAllowances: Boolean,
+    /** Its weekly limit reset while the app was open: "Just reset" for the rest of the session. */
+    val justReset: Boolean,
 )
 
 /** An account's usage-limit resets. */
@@ -98,6 +128,16 @@ public data class AccountResetsUi(
     val requiresSignIn: Boolean,
     /** Headroom can use them: false for Claude unless the experimental setting is on. */
     val canRedeem: Boolean,
+    /** Why the account cannot have resets, in the provider's words. The pools are then empty. */
+    val ineligibleReason: String?,
+    /** The card's "Available now" count adds to the pool rows: several pools, or some queued. */
+    val showsSummary: Boolean,
+    /** The account holds no reset at all, counting the queued and paused ones. */
+    val holdsNone: Boolean,
+    /** The card's footer notes: `waitingForLimit` and `queued`. */
+    val notes: List<String>,
+    /** The card has a footer: a note, or a button to use or ask for a reset. */
+    val hasFooter: Boolean,
 )
 
 public data class ResetPoolUi(
@@ -115,7 +155,22 @@ public data class ResetPoolUi(
     val scopeWindows: List<String>,
     val soonestExpiryEpochSeconds: Long?,
     val canUseNow: Boolean,
+    /** How many resets the pool started with, when the provider says. */
+    val total: Int?,
+    /** When each reset expires, soonest first, at most four lines and then "and N more". */
+    val expiryLines: List<ExpiryLineUi>,
+    /** A reset from it can be used far from a limit, where it is wasted: the sheet warns. */
+    val anyTime: Boolean,
+    /** The ids of the windows in a `windows` scope, for the words of what it refills. */
+    val scopeWindowIds: List<String>,
+    /** The account's windows a reset from it clears, for the redeem sheet's bars. */
+    val clearsWindowIds: List<String>,
+    /** The redeem sheet offers it: to use now, or to say why not yet. */
+    val isOffered: Boolean,
 )
+
+/** One line of a pool's expiry list: [kind] is `at`, `noExpiry` or `more`. */
+public data class ExpiryLineUi(val kind: String, val atEpochSeconds: Long?, val count: Int)
 
 public data class WindowUi(
     val id: String,
@@ -143,6 +198,12 @@ public data class WindowUi(
     val canAlert: Boolean,
     /** The reset alert is on. Always false when [canAlert] is false. */
     val alertOn: Boolean,
+    /** False for a window the app does not know: it shows "About this quota". */
+    val isRecognised: Boolean,
+    /** The pace chip: `over`, `under`, `on` or `justReset`, or null without a pace. */
+    val paceChip: String?,
+    /** How many points over or under pace, for "5 pts over pace". */
+    val pacePoints: Int,
 )
 
 /** A provider the user can add, and how it signs in. */
@@ -210,12 +271,15 @@ internal object UiMapping {
         now: Instant,
         settings: AppSettings = AppSettings(),
         alerts: AlertStates = AlertStates.Defaults,
+        justReset: Set<String> = emptySet(),
     ): OverviewUi =
         OverviewUi(
             accounts =
                 accounts.sortedFor(settings.overviewSort).map {
-                    account(it, now, settings, alerts)
+                    account(it, now, settings, alerts, it.account.id in justReset)
                 },
+            yourOrder = accounts.map { it.account.id },
+            nowEpochSeconds = now.epochSeconds,
             isDemo = isDemo,
             display = settings.quotaDisplay.id(),
             sort = settings.overviewSort.id(),
@@ -230,6 +294,9 @@ internal object UiMapping {
                         providerName = next.account.provider.displayName,
                         windowLabel = next.window.label,
                         resetsAtEpochSeconds = checkNotNull(next.window.resetsAt).epochSeconds,
+                        windowId = next.window.id,
+                        kind = next.window.kind.id(),
+                        alertOn = alerts.isOn(next.account.id, next.window),
                     )
                 },
         )
@@ -239,13 +306,20 @@ internal object UiMapping {
         now: Instant,
         settings: AppSettings = AppSettings(),
         alerts: AlertStates = AlertStates.Defaults,
+        justReset: Boolean = false,
     ): AccountUi {
         val snapshot = state.snapshot
         val primary = state.primaryWindow
         // The pace of a stale account is worked out at the time of its last good sync.
         val paceTime = if (state.isSignInExpired) snapshot?.fetchedAt ?: now else now
         val windows = snapshot?.windows.orEmpty().sortedByDescending { it.id == primary?.id }
-        val windowUis = windows.map { window(it, paceTime, alerts.isOn(state.account.id, it)) }
+        val windowUis =
+            windows
+                .map { window(it, paceTime, alerts.isOn(state.account.id, it)) }
+                .map {
+                    if (justReset && it.id == primary?.id) it.copy(paceChip = PaceChip.JUST_RESET)
+                    else it
+                }
         return AccountUi(
             id = state.account.id,
             providerId = state.account.provider.id,
@@ -261,6 +335,9 @@ internal object UiMapping {
             updatedAtEpochSeconds = snapshot?.fetchedAt?.epochSeconds,
             needsAttention = windowUis.any { it.needsAttention },
             resets = snapshot?.resets?.let { resets(state, it, settings) },
+            balance = snapshot?.balance?.let { BalanceUi(it.amount, it.unit) },
+            separateAllowances = state.account.provider.windowsAreSeparateAllowances,
+            justReset = justReset,
         )
     }
 
@@ -278,6 +355,17 @@ internal object UiMapping {
             canAskForMore = resets.canAskForMore,
             requiresSignIn = resets.requiresSignIn,
             canRedeem = provider.canRedeemResets(settings),
+            ineligibleReason = resets.ineligibleReason,
+            showsSummary = resets.showsSummary,
+            holdsNone = resets.holdsNone,
+            notes =
+                resets.notes.map {
+                    when (it) {
+                        ResetNote.WaitingForLimit -> "waitingForLimit"
+                        ResetNote.Queued -> "queued"
+                    }
+                },
+            hasFooter = resets.hasFooter,
         )
     }
 
@@ -295,7 +383,20 @@ internal object UiMapping {
                 },
             soonestExpiryEpochSeconds = pool.soonestExpiry?.epochSeconds,
             canUseNow = pool.canUseNow,
+            total = pool.total,
+            expiryLines = expiryLines(pool).map(::expiryLine),
+            anyTime = pool.timing == ResetTiming.AnyTime,
+            scopeWindowIds = pool.scope.windowIds.sorted(),
+            clearsWindowIds = windows.filter { pool.scope.covers(it.id, it.kind) }.map { it.id },
+            isOffered = pool.isOffered,
         )
+
+    private fun expiryLine(line: ExpiryLine): ExpiryLineUi =
+        when (line) {
+            is ExpiryLine.At -> ExpiryLineUi("at", line.at.epochSeconds, line.count)
+            is ExpiryLine.NoExpiry -> ExpiryLineUi("noExpiry", null, line.count)
+            is ExpiryLine.More -> ExpiryLineUi("more", null, line.count)
+        }
 
     /** Which sentence says what a reset gives back, as the Android app's `ResetCopy` picks it. */
     private fun scopeId(provider: Provider, scope: ResetScope): String {
@@ -319,13 +420,15 @@ internal object UiMapping {
         display: QuotaDisplay,
     ): TileUi? =
         when (val subtitle = TileSubtitle.of(mode, accounts, now, display)) {
-            is TileSubtitle.Reset -> TileUi(subtitle.name, subtitle.countdown)
-            is TileSubtitle.Tightest -> TileUi(subtitle.name, "${subtitle.percent}%")
+            is TileSubtitle.Reset -> TileUi(subtitle.name, subtitle.countdown, "countdown")
+            is TileSubtitle.Tightest ->
+                TileUi(subtitle.name, subtitle.percent.toString(), display.name.lowercase())
             null -> null
         }
 
     fun window(window: QuotaWindow, now: Instant, alertOn: Boolean = false): WindowUi {
         val hasPace = Pace.expectedPercent(window, now) != null
+        val chip = PaceChip.of(window, now)
         return WindowUi(
             id = window.id,
             label = window.label,
@@ -344,6 +447,9 @@ internal object UiMapping {
             amountUnit = window.amountUnit,
             canAlert = ResetPolicy.canAlert(window),
             alertOn = ResetPolicy.canAlert(window) && alertOn,
+            isRecognised = window.isRecognised,
+            paceChip = chip?.first,
+            pacePoints = chip?.second ?: 0,
         )
     }
 

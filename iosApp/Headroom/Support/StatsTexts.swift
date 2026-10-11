@@ -20,6 +20,14 @@ enum StatsTexts {
         }
     }
 
+    static func periodResource(_ id: String) -> LocalizedStringResource {
+        switch id {
+        case "fourWeeks": "4 weeks"
+        case "threeMonths": "3 months"
+        default: "12 months"
+        }
+    }
+
     /// "1.5 times the weekly limit".
     static func givenBack(kind: String, times: Double) -> String {
         let count = times.formatted(.number.precision(.fractionLength(0...1)))

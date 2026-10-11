@@ -1,4 +1,4 @@
-package dev.sebastiano.headroom.ui.home
+package dev.sebastiano.headroom.model
 
 import kotlin.time.Instant
 
@@ -8,12 +8,12 @@ import kotlin.time.Instant
  * refresh that failed for every account leaves the fetch times alone, so it does not count. Data
  * that changes without a refresh, such as stored data loading, does not count either.
  */
-class FreshDataTrigger {
+public class FreshDataTrigger {
     private var refreshing = false
     private var syncedAtStart: Instant? = null
 
     /** Records the latest state and returns true when it ends a refresh that brought new data. */
-    fun update(isRefreshing: Boolean, lastSyncedAt: Instant?): Boolean {
+    public fun update(isRefreshing: Boolean, lastSyncedAt: Instant?): Boolean {
         val started = isRefreshing && !refreshing
         val ended = !isRefreshing && refreshing
         refreshing = isRefreshing

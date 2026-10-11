@@ -7,21 +7,25 @@ struct RedeemChoosePool: View {
     let onChoose: (ResetPoolUi) -> Void
 
     var body: some View {
-        List {
-            Section("Which limit do you want to reset?") {
-                ForEach(pools) { pool in
-                    Button {
-                        onChoose(pool)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(pool.label) · ^[\(pool.available) available](inflect: true)")
-                            Text(RedeemTexts.scope(pool))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Which limit do you want to reset?")
+                .font(.title2.bold())
+            ForEach(pools) { pool in
+                Button {
+                    onChoose(pool)
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(pool.label) · ^[\(pool.available) available](inflect: true)")
+                            .font(.headline)
+                        Text(RedeemTexts.scope(pool))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
-                    .disabled(!pool.canUseNow)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(.fill.tertiary, in: .rect(cornerRadius: 16))
                 }
+                .buttonStyle(.plain)
             }
         }
     }

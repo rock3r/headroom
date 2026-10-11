@@ -9,8 +9,9 @@ import UserNotifications
 /// do, so the alerts are scheduled for the reset time the provider announced.
 @MainActor
 final class NotificationScheduler {
-    static let resetCategory = "reset"
     static let signInCategory = "signIn"
+    static let reminderCategory = "reminder"
+    static let openAction = "open"
     static let muteAction = "mute"
     static let signInAction = "signIn"
 
@@ -23,19 +24,30 @@ final class NotificationScheduler {
     }
 
     func requestAuthorization() async {
-        center.setNotificationCategories([
-            UNNotificationCategory(
-                identifier: Self.resetCategory,
-                actions: [UNNotificationAction(identifier: Self.muteAction, title: String(localized: "Mute this limit"))],
-                intentIdentifiers: []
-            ),
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+    }
+
+    /// The actions of every notification: "Open" and "Mute <account>" on a reset alert, as on
+    /// Android. iOS names an action in its category, so each account's alerts get their own.
+    private func registerCategories(_ alerts: [ResetAlertUi]) {
+        let open = UNNotificationAction(identifier: Self.openAction, title: String(localized: "Open"), options: .foreground)
+        var categories: Set<UNNotificationCategory> = [
             UNNotificationCategory(
                 identifier: Self.signInCategory,
                 actions: [UNNotificationAction(identifier: Self.signInAction, title: String(localized: "Sign in"), options: .foreground)],
                 intentIdentifiers: []
             ),
-        ])
-        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            UNNotificationCategory(identifier: Self.reminderCategory, actions: [open], intentIdentifiers: []),
+        ]
+        for alert in alerts {
+            let mute = UNNotificationAction(identifier: Self.muteAction, title: String(localized: "Mute \(alert.accountName)"))
+            categories.insert(UNNotificationCategory(identifier: Self.category(alert), actions: [open, mute], intentIdentifiers: []))
+        }
+        center.setNotificationCategories(categories)
+    }
+
+    private static func category(_ alert: ResetAlertUi) -> String {
+        "reset:\(alert.accountId)"
     }
 
     func reschedule() async {
@@ -44,6 +56,7 @@ final class NotificationScheduler {
             reminded: defaults.stringArray(forKey: Keys.reminded) ?? []
         ) else { return }
 
+        registerCategories(plan.resetAlerts)
         let wanted = plan.resetAlerts.map(\.id) + plan.reminders.map(\.id)
         let pending = await center.pendingNotificationRequests().map(\.identifier)
         let stale = pending.filter { ($0.hasPrefix("reset:") || $0.hasPrefix("reminder:")) && !wanted.contains($0) }
@@ -78,7 +91,7 @@ final class NotificationScheduler {
             content.body = String(localized: "You have your full limit again.")
         }
         content.sound = .default
-        content.categoryIdentifier = Self.resetCategory
+        content.categoryIdentifier = Self.category(alert)
         content.threadIdentifier = "resets"
         content.userInfo = ["accountId": alert.accountId, "windowId": alert.windowId]
         return UNNotificationRequest(identifier: alert.id, content: content, trigger: trigger(alert.fireAtEpochSeconds))
@@ -90,13 +103,21 @@ final class NotificationScheduler {
             content.title = String(localized: "Your \(reset.accountName) reset expires \(Self.when(reset.expiresAtEpochSeconds))")
             content.body = String(localized: "Use it before then, or it's lost.")
         } else {
-            content.title = String(localized: "^[\(reminder.resets.count) reset](inflect: true) expire soon")
+            let count = reminder.resets.count
+            content.title = count == 1
+                ? String(localized: "1 reset expires soon")
+                : String(localized: "\(count) resets expire soon")
             content.body = reminder.resets
                 .map { String(localized: "\($0.accountName): \(Self.when($0.expiresAtEpochSeconds))") }
                 .joined(separator: "\n")
         }
         content.sound = .default
         content.threadIdentifier = "reminders"
+        content.categoryIdentifier = Self.reminderCategory
+        // A tap opens the account whose reset expires first, at its resets, as on Android.
+        if let soonest = reminder.resets.min(by: { $0.expiresAtEpochSeconds < $1.expiresAtEpochSeconds }) {
+            content.userInfo = ["accountId": soonest.accountId, "resets": true]
+        }
         return UNNotificationRequest(identifier: reminder.id, content: content, trigger: trigger(reminder.fireAtEpochSeconds))
     }
 

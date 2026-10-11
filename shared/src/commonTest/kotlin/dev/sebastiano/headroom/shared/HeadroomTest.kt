@@ -12,9 +12,11 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.signin.BrowserSession
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.SignInKind
@@ -23,6 +25,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -107,6 +111,47 @@ class HeadroomTest {
     fun `providers say how each one signs in`() {
         assertEquals(Provider.entries.map { it.id }, headroom.providers.map { it.id })
         assertTrue(headroom.providers.all { it.signIn == "apiKey" })
+    }
+
+    @Test
+    fun `a refresh with new numbers shimmers and a live weekly reset bursts once`() {
+        val account = Account("a1", Provider.Claude, "sam@example.com")
+        fun synced(used: Double, at: Instant) =
+            AccountState(
+                account,
+                QuotaSnapshot(
+                    Provider.Claude,
+                    "a1",
+                    null,
+                    listOf(
+                        QuotaWindow(
+                            "seven_day",
+                            "Weekly",
+                            WindowKind.Weekly,
+                            used,
+                            now + 3.days,
+                            7.days,
+                        )
+                    ),
+                    at,
+                ),
+            )
+        val events = mutableListOf<DelightUi>()
+        val watch = headroom.watchDelights { events += it }
+        repository.accounts.value = listOf(synced(80.0, now))
+        scope.runCurrent()
+
+        repository.accounts.value = listOf(synced(80.0, now).copy(isRefreshing = true))
+        scope.runCurrent()
+        repository.accounts.value = listOf(synced(2.0, now + 1.minutes))
+        scope.runCurrent()
+        watch.cancel()
+
+        assertEquals(
+            listOf(DelightUi.Burst("a1", fromNextReset = true), DelightUi.Shimmer),
+            events,
+        )
+        assertTrue(latestOverview().accounts.single().justReset)
     }
 
     @Test

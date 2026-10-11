@@ -1,9 +1,5 @@
-package dev.sebastiano.headroom.ui.home
+package dev.sebastiano.headroom.model
 
-import dev.sebastiano.headroom.model.AccountState
-import dev.sebastiano.headroom.model.NextReset
-import dev.sebastiano.headroom.model.QuotaWindow
-import dev.sebastiano.headroom.model.WindowKind
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
@@ -14,7 +10,7 @@ import kotlin.time.Instant
  * when the next reset card was counting down to it, so the confetti bursts from that card rather
  * than from the account's own card. [windowId] is the window that reset.
  */
-data class ResetBurst(
+public data class ResetBurst(
     val accountId: String,
     val fromNextReset: Boolean,
     val windowId: String? = null,
@@ -31,17 +27,17 @@ data class ResetBurst(
  * it was fetched at or after [sessionStart]. On a cold start the stored data comes first, fetched
  * before the app opened, so a reset that the first refresh finds happened while the app was closed.
  */
-class ResetTracker(private val sessionStart: Instant = Instant.DISTANT_PAST) {
+public class ResetTracker(private val sessionStart: Instant = Instant.DISTANT_PAST) {
     private val lastSeen = mutableMapOf<String, Seen>()
     private val justReset = mutableSetOf<String>()
     private var previous: List<AccountState> = emptyList()
 
     /** The live resets that the last [update] found, in the accounts' order. */
-    var lastLiveResets: List<ResetBurst> = emptyList()
+    public var lastLiveResets: List<ResetBurst> = emptyList()
         private set
 
     /** Records [accounts] and returns the ids of the accounts that reset during this session. */
-    fun update(accounts: List<AccountState>): Set<String> {
+    public fun update(accounts: List<AccountState>): Set<String> {
         val live = mutableListOf<ResetBurst>()
         accounts.forEach { state ->
             val window =

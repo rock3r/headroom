@@ -5,24 +5,25 @@ struct SnapshotEntry: TimelineEntry {
     let snapshot: WidgetSnapshot
 }
 
-/// Reads the snapshot the app wrote. The widget redraws when the app writes a new one, at the next
-/// reset, and every half hour so "resets in" stays close.
-struct SnapshotProvider: TimelineProvider {
+/// Reads the snapshot the app wrote, for the accounts the widget was set up with. The widget redraws
+/// when the app writes a new one, at the next reset, and every half hour so "resets in" stays close.
+struct SnapshotProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> SnapshotEntry {
         SnapshotEntry(date: .now, snapshot: .preview)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (SnapshotEntry) -> Void) {
+    func snapshot(for configuration: AccountsConfiguration, in context: Context) async -> SnapshotEntry {
         let snapshot = WidgetSnapshot.load()
-        completion(SnapshotEntry(date: .now, snapshot: context.isPreview && snapshot.isDemo ? .preview : snapshot))
+        let shown = context.isPreview && snapshot.accounts.isEmpty ? .preview : snapshot
+        return SnapshotEntry(date: .now, snapshot: shown.selecting(configuration.accounts?.map(\.id)))
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<SnapshotEntry>) -> Void) {
-        let snapshot = WidgetSnapshot.load()
+    func timeline(for configuration: AccountsConfiguration, in context: Context) async -> Timeline<SnapshotEntry> {
+        let snapshot = WidgetSnapshot.load().selecting(configuration.accounts?.map(\.id))
         var next = Date.now.addingTimeInterval(30 * 60)
         if let reset = snapshot.nextReset?.resetsAt, reset > .now, reset < next {
             next = reset
         }
-        completion(Timeline(entries: [SnapshotEntry(date: .now, snapshot: snapshot)], policy: .after(next)))
+        return Timeline(entries: [SnapshotEntry(date: .now, snapshot: snapshot)], policy: .after(next))
     }
 }

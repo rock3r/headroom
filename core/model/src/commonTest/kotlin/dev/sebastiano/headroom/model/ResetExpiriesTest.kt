@@ -1,10 +1,5 @@
-package dev.sebastiano.headroom.ui.resets
+package dev.sebastiano.headroom.model
 
-import dev.sebastiano.headroom.R
-import dev.sebastiano.headroom.model.ResetAvailability
-import dev.sebastiano.headroom.model.ResetPool
-import dev.sebastiano.headroom.model.ResetPoolStatus
-import dev.sebastiano.headroom.model.ResetScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,7 +21,7 @@ class ResetExpiriesTest {
     ) = ResetPool(id, id, available, ResetScope.Unknown, expiries, status = status)
 
     @Test
-    fun `each reset's expiry, soonest first, grouping the same time`() {
+    fun `each reset's expiry soonest first grouping the same time`() {
         val lines = expiryLines(pool(3, listOf(thursday, monday, thursday)))
 
         assertEquals(
@@ -43,7 +38,7 @@ class ResetExpiriesTest {
     }
 
     @Test
-    fun `the list stops at four lines, then says how many more`() {
+    fun `the list stops at four lines then says how many more`() {
         val lines = expiryLines(pool(7, listOf(monday, thursday, friday, saturday, sunday, sunday)))
 
         assertEquals(
@@ -81,7 +76,7 @@ class ResetExpiriesTest {
     }
 
     @Test
-    fun `an account holds no resets only when every pool, queued ones too, is empty`() {
+    fun `an account holds no resets only when every pool queued ones too is empty`() {
         assertTrue(ResetAvailability(listOf(pool(0, emptyList()))).holdsNone)
         assertFalse(
             ResetAvailability(
@@ -107,11 +102,11 @@ class ResetExpiriesTest {
                 )
             )
 
-        assertTrue(footerNotes(ready).isEmpty())
+        assertTrue(ready.notes.isEmpty())
         assertTrue(ready.hasFooter)
         assertFalse(paused.hasFooter)
         assertTrue(ResetAvailability(emptyList(), canAskForMore = true).hasFooter)
-        assertEquals(1, footerNotes(queued).size)
+        assertEquals(listOf(ResetNote.Queued), queued.notes)
     }
 
     @Test
@@ -125,7 +120,7 @@ class ResetExpiriesTest {
 
         assertEquals(0, notYet.availableNow)
         assertEquals(2, waiting.availableNow)
-        assertFalse(R.string.resets_waiting_note in footerNotes(notYet))
-        assertTrue(R.string.resets_waiting_note in footerNotes(waiting))
+        assertFalse(ResetNote.WaitingForLimit in notYet.notes)
+        assertTrue(ResetNote.WaitingForLimit in waiting.notes)
     }
 }

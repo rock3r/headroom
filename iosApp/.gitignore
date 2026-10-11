@@ -4,3 +4,6 @@ build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+
+# Your own team and bundle id prefix: see Signing.xcconfig.
+Local.xcconfig
