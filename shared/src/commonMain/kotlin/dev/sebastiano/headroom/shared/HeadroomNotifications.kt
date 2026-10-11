@@ -55,7 +55,12 @@ public data class ReminderUi(
     val resets: List<ReminderItemUi>,
 )
 
-public data class ReminderItemUi(val accountName: String, val expiresAtEpochSeconds: Long)
+public data class ReminderItemUi(
+    val accountName: String,
+    val expiresAtEpochSeconds: Long,
+    /** The account to open on a tap, at its resets. */
+    val accountId: String,
+)
 
 public data class SignInAlertUi(
     val accountId: String,
@@ -195,6 +200,7 @@ internal object NotificationPlanner {
                                     ReminderItemUi(
                                         state.displayName(accounts),
                                         reset.expiresAt.epochSeconds,
+                                        reset.account.id,
                                     )
                                 },
                         ),

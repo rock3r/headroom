@@ -66,6 +66,7 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
     private val alertPreferences = parts.alerts
     private val settingsRepository = parts.settings
     private val onClose = parts.onClose
+    private val delights = Delights(sources.accounts, clock(), scope)
 
     /** Adding an account, or signing one in again. */
     public val signIn: HeadroomSignIn =
@@ -114,6 +115,13 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
     public fun watchOverview(onChange: (OverviewUi) -> Unit): Watch =
         scope.watch(overview(), onChange)
 
+    /**
+     * Calls [onEvent] when a refresh brings new numbers or a weekly limit resets while the app is
+     * open, until [Watch.cancel]. Each moment arrives once.
+     */
+    public fun watchDelights(onEvent: (DelightUi) -> Unit): Watch =
+        scope.watch(delights.events, onEvent)
+
     /** Syncs [accountId], or every account when it is null. The overview shows the result. */
     public fun refresh(accountId: String?) {
         scope.launch { sources.refresh(accountId) }
@@ -137,13 +145,13 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
      */
     private fun overview(): Flow<OverviewUi> =
         combine(
-                sources.accounts,
+                delights.tracked,
                 sources.isDemo,
                 settingsRepository.settings,
                 AlertStates.of(sources.accounts, alertPreferences),
                 ticks(),
-            ) { accounts, demo, settings, alerts, now ->
-                UiMapping.overview(accounts, demo, now, settings, alerts)
+            ) { tracked, demo, settings, alerts, now ->
+                UiMapping.overview(tracked.accounts, demo, now, settings, alerts, tracked.justReset)
             }
             .distinctUntilChanged()
 

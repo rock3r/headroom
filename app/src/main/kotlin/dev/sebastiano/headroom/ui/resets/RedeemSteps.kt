@@ -42,6 +42,7 @@ import dev.sebastiano.headroom.model.RedeemStep
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetTiming
+import dev.sebastiano.headroom.model.expiryLines
 import dev.sebastiano.headroom.model.redeemsResetsExperimentally
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.asFraction

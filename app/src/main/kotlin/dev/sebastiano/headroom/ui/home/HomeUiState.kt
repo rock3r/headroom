@@ -8,6 +8,7 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.time.Instant
 

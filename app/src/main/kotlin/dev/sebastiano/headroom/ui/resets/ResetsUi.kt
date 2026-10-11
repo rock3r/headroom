@@ -46,6 +46,9 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.canRedeemResets
+import dev.sebastiano.headroom.model.hasFooter
+import dev.sebastiano.headroom.model.holdsNone
+import dev.sebastiano.headroom.model.showsSummary
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ListCard

@@ -32,14 +32,23 @@ import kotlinx.coroutines.launch
 /** The Resets tab. */
 public data class ResetsTabUi(
     val isDemo: Boolean,
-    /** Windows with their reset alert on, out of [alertWindows] that can alert. */
+    /** Upcoming resets with their alert on, out of the [alertWindows] upcoming ones. */
     val alertsOn: Int,
     val alertWindows: Int,
-    /** Accounts holding resets, or able to ask for one, as on the overview. */
+    /**
+     * Accounts holding resets the redeem sheet can offer, in the user's order. An expired sign-in's
+     * resets are as old as its usage, so it is left out.
+     */
     val withResets: List<AccountUi>,
-    /** Every window that can alert, soonest reset first. */
+    /**
+     * Every window that can alert and resets later, soonest first, leaving out accounts whose
+     * sign-in expired.
+     */
     val upcoming: List<UpcomingResetUi>,
-    /** How much each account's main limit was used when it reset. */
+    /**
+     * How much each window was used when it reset: every window that can alert, or an account's
+     * main window when none can, in the user's order.
+     */
     val history: List<ResetHistoryUi>,
 )
 
@@ -51,6 +60,8 @@ public data class UpcomingResetUi(
     val windowLabel: String,
     val resetsAtEpochSeconds: Long,
     val alertOn: Boolean,
+    /** The account's label when another account has the same name: "Claude (sam@work)". */
+    val accountLabel: String?,
 )
 
 public data class ResetHistoryUi(
@@ -62,6 +73,9 @@ public data class ResetHistoryUi(
     val peaks: List<Double>,
     /** Used so far in the current window. */
     val current: Double,
+    val windowId: String,
+    /** The account's label when another account has the same name. */
+    val accountLabel: String?,
 )
 
 /** One step of the redeem sheet, as [RedeemStep]. */
@@ -141,11 +155,19 @@ internal constructor(
     public fun watchTab(onChange: (ResetsTabUi) -> Unit): Watch = scope.watch(tab(), onChange)
 
     private fun tab(): Flow<ResetsTabUi> = overview.flatMapLatest { view ->
-        val mains = view.accounts.mapNotNull { account -> account.primary?.let { account to it } }
+        val windows =
+            view.accounts.flatMap { account ->
+                ResetsMapping.historyWindows(account).map { account.id to it.id }
+            }
         val peaks =
-            if (mains.isEmpty()) flowOf(emptyList())
-            else combine(mains.map { (a, w) -> sources.resetPeaks(a.id, w.id) }) { it.toList() }
-        peaks.map { all -> ResetsMapping.tab(view, mains.zip(all)) }
+            if (windows.isEmpty()) flowOf(emptyMap())
+            else
+                combine(windows.map { (a, w) -> sources.resetPeaks(a, w) }) { all ->
+                    windows.zip(all.toList()).toMap()
+                }
+        peaks.map { all ->
+            ResetsMapping.tab(view) { accountId, windowId -> all[accountId to windowId].orEmpty() }
+        }
     }
 }
 
@@ -319,54 +341,79 @@ internal constructor(
 }
 
 internal object ResetsMapping {
+    /**
+     * The Resets tab, as the Android Resets screen picks its rows: [peaks] gives how much of a
+     * window was used at each of its past resets.
+     */
     fun tab(
         view: OverviewUi,
-        mains: List<Pair<Pair<AccountUi, WindowUi>, List<Double>>>,
+        peaks: (accountId: String, windowId: String) -> List<Double>,
     ): ResetsTabUi {
-        val alertable =
-            view.accounts.flatMap { account ->
-                account.windows.filter { it.canAlert }.map { account to it }
-            }
+        val inYourOrder = yourOrder(view)
+        val sharedNames =
+            view.accounts.groupingBy { it.title }.eachCount().filterValues { it > 1 }.keys
+        fun AccountUi.distinctLabel(): String? = label.takeIf {
+            title in sharedNames && it != title
+        }
+        // A stale account's resets get no alert, so they are not listed as upcoming.
+        val upcoming =
+            view.accounts
+                .filterNot { it.signInExpired }
+                .flatMap { account ->
+                    account.windows
+                        .filter { window ->
+                            window.canAlert &&
+                                (window.resetsAtEpochSeconds ?: 0) > view.nowEpochSeconds
+                        }
+                        .map { account to it }
+                }
+                .sortedBy { (_, window) -> window.resetsAtEpochSeconds }
         return ResetsTabUi(
             isDemo = view.isDemo,
-            alertsOn = alertable.count { (_, window) -> window.alertOn },
-            alertWindows = alertable.size,
+            alertsOn = upcoming.count { (_, window) -> window.alertOn },
+            alertWindows = upcoming.size,
             withResets =
-                view.accounts.filter { account ->
-                    val resets = account.resets ?: return@filter false
-                    resets.availableNow > 0 ||
-                        resets.queued > 0 ||
-                        resets.canAskForMore ||
-                        resets.requiresSignIn
+                inYourOrder.filter { account ->
+                    !account.signInExpired && account.resets?.pools?.any { it.isOffered } == true
                 },
             upcoming =
-                alertable
-                    .mapNotNull { (account, window) ->
-                        val resetsAt = window.resetsAtEpochSeconds ?: return@mapNotNull null
-                        UpcomingResetUi(
-                            account.id,
-                            account.title,
-                            account.providerId,
-                            window.id,
-                            window.label,
-                            resetsAt,
-                            window.alertOn,
-                        )
-                    }
-                    .sortedBy { it.resetsAtEpochSeconds },
-            history =
-                mains.map { (main, peaks) ->
-                    val (account, window) = main
-                    ResetHistoryUi(
+                upcoming.map { (account, window) ->
+                    UpcomingResetUi(
                         account.id,
                         account.title,
                         account.providerId,
+                        window.id,
                         window.label,
-                        peaks,
-                        window.usedPercent,
+                        checkNotNull(window.resetsAtEpochSeconds),
+                        window.alertOn,
+                        account.distinctLabel(),
                     )
                 },
+            history =
+                inYourOrder.flatMap { account ->
+                    historyWindows(account).map { window ->
+                        ResetHistoryUi(
+                            account.id,
+                            account.title,
+                            account.providerId,
+                            window.label,
+                            peaks(account.id, window.id),
+                            window.usedPercent,
+                            window.id,
+                            account.distinctLabel(),
+                        )
+                    }
+                },
         )
+    }
+
+    /** Every window of [account] that can alert, or its main window when none can. */
+    fun historyWindows(account: AccountUi): List<WindowUi> =
+        account.windows.filter { it.canAlert }.ifEmpty { listOfNotNull(account.primary) }
+
+    private fun yourOrder(view: OverviewUi): List<AccountUi> {
+        val byId = view.accounts.associateBy { it.id }
+        return view.yourOrder.mapNotNull { byId[it] }
     }
 
     fun finished(outcome: RedeemOutcome): RedeemUi.Finished =
