@@ -55,14 +55,19 @@ final class NotificationScheduler {
         for reminder in plan.reminders {
             try? await center.add(request(reminder))
         }
+        // A warning iOS did not take, say with notifications turned off, is not marked as sent, so
+        // the next plan offers it again.
+        var unsent: Set<String> = []
+        let canNotify = await Self.canNotify(center)
         for alert in plan.signInAlerts {
-            try? await center.add(request(alert))
+            if canNotify, (try? await center.add(request(alert))) != nil { continue }
+            unsent.insert(alert.accountId)
         }
         let cancelled = plan.signInCancels.map { "signIn:\($0)" }
         center.removeDeliveredNotifications(withIdentifiers: cancelled)
         center.removePendingNotificationRequests(withIdentifiers: cancelled)
 
-        defaults.set(plan.signInNotified, forKey: Keys.signInNotified)
+        defaults.set(plan.signInNotified.filter { !unsent.contains($0) }, forKey: Keys.signInNotified)
         defaults.set(plan.reminded, forKey: Keys.reminded)
     }
 
@@ -119,6 +124,14 @@ final class NotificationScheduler {
     private func trigger(_ epochSeconds: Int64) -> UNNotificationTrigger {
         let interval = max(Date(epochSeconds: epochSeconds).timeIntervalSinceNow, 1)
         return UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
+    }
+
+    /// Whether the user lets Headroom post notifications.
+    private static func canNotify(_ center: UNUserNotificationCenter) async -> Bool {
+        switch await center.notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral: true
+        default: false
+        }
     }
 
     /// "today at 14:00", "tomorrow at 14:00" or "on 3 Oct at 14:00".
