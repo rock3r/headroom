@@ -1,5 +1,7 @@
 package dev.sebastiano.headroom.auth
 
+import io.ktor.client.plugins.HttpSend
+import io.ktor.client.plugins.plugin
 import java.net.ServerSocket
 import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
@@ -8,8 +10,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotSame
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -94,6 +98,97 @@ class KtorAuthHttpClientTest {
     @Test
     fun `clients with the default timeout share one HttpClient`() {
         assertSame(KtorAuthHttpClient().client, KtorAuthHttpClient().client)
+    }
+
+    @Test
+    fun `POST redirects retain the body only for 307 and 308`() = runTest {
+        for (status in listOf(300, 301, 302, 303, 307, 308)) {
+            server.enqueue(
+                MockResponse.Builder().code(status).addHeader("Location", "/moved").build()
+            )
+            server.enqueue(MockResponse(code = 200, body = "done"))
+
+            val response =
+                client.execute(
+                    AuthHttpRequest(
+                        method = "POST",
+                        url = server.url("/token").toString(),
+                        body = "grant_type=refresh_token",
+                        contentType = "application/x-www-form-urlencoded",
+                    )
+                )
+
+            assertEquals(200, response.status)
+            server.takeRequest()
+            val followed = server.takeRequest()
+            val keepsBody = status == 307 || status == 308
+            assertEquals(if (keepsBody) "POST" else "GET", followed.method)
+            assertEquals("/moved", followed.target)
+            if (keepsBody) {
+                assertEquals("grant_type=refresh_token", followed.body?.utf8())
+                assertEquals("application/x-www-form-urlencoded", followed.headers["Content-Type"])
+            } else {
+                assertEquals(0L, followed.bodySize)
+                assertNull(followed.headers["Content-Type"])
+            }
+        }
+    }
+
+    @Test
+    fun `a POST redirected to a different port strips Authorization`() = runTest {
+        MockWebServer().use { destination ->
+            destination.start()
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(307)
+                    .addHeader("Location", destination.url("/token"))
+                    .build()
+            )
+            destination.enqueue(MockResponse(code = 200, body = "done"))
+
+            val response =
+                client.execute(
+                    AuthHttpRequest(
+                        method = "POST",
+                        url = server.url("/token").toString(),
+                        headers = mapOf("Authorization" to "Bearer fixture-token"),
+                        body = "{}",
+                        contentType = "application/json",
+                    )
+                )
+
+            assertEquals(200, response.status)
+            assertNull(destination.takeRequest().headers["Authorization"])
+        }
+    }
+
+    @Test
+    fun `redirects retain the original request execution context`() = runTest {
+        val redirected = KtorAuthHttpClient(timeout = 5.seconds)
+        try {
+            val contexts = mutableListOf<Job>()
+            redirected.client.plugin(HttpSend).intercept { request ->
+                contexts += request.executionContext
+                execute(request)
+            }
+            server.enqueue(MockResponse.Builder().code(307).addHeader("Location", "/moved").build())
+            server.enqueue(MockResponse(code = 200, body = "done"))
+
+            val response =
+                redirected.execute(
+                    AuthHttpRequest(
+                        method = "POST",
+                        url = server.url("/token").toString(),
+                        body = "{}",
+                    )
+                )
+
+            assertEquals(200, response.status)
+            assertEquals(2, contexts.size)
+            assertSame(contexts[0], contexts[1])
+        } finally {
+            redirected.client.close()
+        }
     }
 
     @Test
