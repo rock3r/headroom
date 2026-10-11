@@ -126,17 +126,25 @@ internal object NotificationPlanner {
                 },
             signInCancels = signIn.cancel.toList(),
             signInNotified = signIn.notified.toList(),
-            reminded =
-                (reminded + reminders.flatMap { it.keys })
-                    .filterTo(mutableSetOf()) { key ->
-                        // Forget reminders of resets that expired: they can never be due again.
-                        key.substringAfterLast('/').toLongOrNull()?.let {
-                            it > now.toEpochMilliseconds()
-                        } ?: false
-                    }
-                    .toList(),
+            reminded = reminded(reminded, reminders.flatMap { it.keys }.toSet(), now),
         )
     }
+
+    /**
+     * The resets handed to the system, for the next plan: the ones planned now, and the ones whose
+     * reminder has gone out. A pending reminder left out of this plan, because the user turned
+     * reminders off, is forgotten, so it is planned again if they turn them back on. Resets that
+     * expired are forgotten too: they can never be due again.
+     */
+    private fun reminded(before: Set<String>, planned: Set<String>, now: Instant): List<String> =
+        (before + planned).filter { key ->
+            val expiresAt = expiryOf(key) ?: return@filter false
+            expiresAt > now && (key in planned || expiresAt - ResetReminderPolicy.LEAD <= now)
+        }
+
+    /** When the reset with this reminder [key] expires. */
+    private fun expiryOf(key: String): Instant? =
+        key.substringAfterLast('/').toLongOrNull()?.let(Instant::fromEpochMilliseconds)
 
     private fun resetAlerts(
         accounts: List<AccountState>,
@@ -168,7 +176,8 @@ internal object NotificationPlanner {
     /**
      * The usable resets that expire, one reminder a day before each, grouped by the local day the
      * reminder falls on: at most one notification a day, as on Android. A reminder already due goes
-     * out at once, unless an earlier plan covered its reset.
+     * out at once, unless an earlier plan covered its reset. One an earlier plan scheduled for
+     * later is planned again, as the scheduler cancels what a plan leaves out.
      */
     private fun reminders(
         accounts: List<AccountState>,
@@ -178,7 +187,7 @@ internal object NotificationPlanner {
         reminded: Set<String>,
     ): List<PlannedReminder> =
         ResetReminderPolicy.expiringResets(accounts, settings, now)
-            .filter { it.key !in reminded }
+            .filter { it.key !in reminded || it.expiresAt - ResetReminderPolicy.LEAD > now }
             .map { reset ->
                 reset to maxOf(reset.expiresAt - ResetReminderPolicy.LEAD, now + DUE_DELAY)
             }
