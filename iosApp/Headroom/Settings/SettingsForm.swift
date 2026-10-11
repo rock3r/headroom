@@ -123,7 +123,8 @@ struct SettingsForm: View {
     }
 
     private func binding(_ value: String, _ set: @escaping @MainActor (String) -> Void) -> Binding<String> {
-        Binding(get: { value }, set: set)
+        // A closure rather than `set` itself: Swift 6.3 (Xcode 26) crashes converting the function.
+        Binding(get: { value }, set: { newValue in set(newValue) })
     }
 
     private func switchRow(_ id: String, _ title: LocalizedStringKey, _ isOn: Bool, body: LocalizedStringKey) -> some View {
