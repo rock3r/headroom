@@ -31,7 +31,7 @@ class SignInExpiryTest {
     }
 
     @Test
-    fun `the first expiry posts, and a repeated failure does not`() {
+    fun `the first expiry posts and a repeated failure does not`() {
         val first = SignInAlertPolicy.decide(listOf(expired(claude), codex), notified = emptySet())
         assertEquals(listOf("demo-claude"), first.post.map { it.account.id })
         assertEquals(emptySet(), first.cancel)
@@ -58,7 +58,7 @@ class SignInExpiryTest {
     }
 
     @Test
-    fun `a good sync cancels the alert, and a later expiry posts again`() {
+    fun `a good sync cancels the alert and a later expiry posts again`() {
         val recovered = SignInAlertPolicy.decide(listOf(claude), setOf("demo-claude"))
         assertEquals(setOf("demo-claude"), recovered.cancel)
         assertEquals(emptySet(), recovered.notified)

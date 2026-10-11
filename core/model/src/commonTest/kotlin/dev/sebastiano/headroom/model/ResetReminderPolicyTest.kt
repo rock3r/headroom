@@ -61,7 +61,7 @@ class ResetReminderPolicyTest {
     }
 
     @Test
-    fun `lists every reset the user can use that is still to expire, soonest first`() {
+    fun `lists every reset the user can use that is still to expire soonest first`() {
         val resets =
             ResetReminderPolicy.expiringResets(
                 listOf(
@@ -101,7 +101,7 @@ class ResetReminderPolicyTest {
     }
 
     @Test
-    fun `includes Claude's resets once the user turned redeeming on, and resets that wait for a limit`() {
+    fun `includes Claude's resets once the user turned redeeming on and resets that wait for a limit`() {
         val resets =
             ResetReminderPolicy.expiringResets(
                 listOf(
@@ -165,7 +165,7 @@ class ResetReminderPolicyTest {
     }
 
     @Test
-    fun `after a reminder today, the next one waits for tomorrow morning`() {
+    fun `after a reminder today the next one waits for tomorrow morning`() {
         // 22:00 tomorrow in Rome: its reminder would fall at 22:00 today.
         val tomorrowNight = Instant.parse("2026-10-11T20:00:00Z")
 
