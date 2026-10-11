@@ -158,7 +158,8 @@ internal object UiMapping {
         // The pace of a stale account is worked out at the time of its last good sync.
         val paceTime = if (state.isSignInExpired) snapshot?.fetchedAt ?: now else now
         val windows = snapshot?.windows.orEmpty().sortedByDescending { it.id == primary?.id }
-        val windowUis = windows.map { window(it, paceTime) }
+        val windowUis = windows.map { window(it, paceTime, isStale = state.isSignInExpired) }
+        val primaryUi = windowUis.firstOrNull { it.id == primary?.id }
         return AccountUi(
             id = state.account.id,
             providerId = state.account.provider.id,
@@ -166,17 +167,19 @@ internal object UiMapping {
             title = state.account.name,
             label = state.account.label,
             plan = snapshot?.planLabel,
-            primary = windowUis.firstOrNull { it.id == primary?.id },
+            primary = primaryUi,
             windows = windowUis,
             isRefreshing = state.isRefreshing,
             signInExpired = state.isSignInExpired,
             error = state.lastError?.name?.replaceFirstChar { it.lowercase() },
             updatedAtEpochSeconds = snapshot?.fetchedAt?.epochSeconds,
-            needsAttention = windowUis.any { it.needsAttention },
+            // As on Android: the primary window decides, and stale data never asks for attention.
+            needsAttention = primaryUi?.needsAttention ?: false,
         )
     }
 
-    fun window(window: QuotaWindow, now: Instant): WindowUi {
+    /** [isStale] when the account's sign-in expired: its numbers may be long out of date. */
+    fun window(window: QuotaWindow, now: Instant, isStale: Boolean = false): WindowUi {
         val hasPace = Pace.expectedPercent(window, now) != null
         return WindowUi(
             id = window.id,
@@ -188,7 +191,7 @@ internal object UiMapping {
             expiresAtEpochSeconds = window.expiresAt?.epochSeconds,
             pace = if (hasPace) Pace.status(window, now).id() else null,
             expectedPercent = Pace.expectedPercent(window, now),
-            needsAttention = Pace.needsAttention(window, now),
+            needsAttention = !isStale && Pace.needsAttention(window, now),
             isInformational = window.isInformational,
             isUnlimited = window.isUnlimited,
             usedAmount = window.usedAmount,

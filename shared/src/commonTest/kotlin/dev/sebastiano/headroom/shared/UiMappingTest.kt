@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.shared
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.signin.SignInKind
 import dev.sebastiano.headroom.signin.SignInState
@@ -64,6 +65,33 @@ class UiMappingTest {
 
         assertEquals("under", codex.primary?.pace)
         assertFalse(codex.needsAttention)
+    }
+
+    @Test
+    fun `only the primary window decides whether the account needs attention`() {
+        val claude = DemoData.accounts(now).first()
+        val primary = checkNotNull(claude.primaryWindow)
+        val windows =
+            listOf(
+                primary.copy(usedPercent = 0.0),
+                primary.copy(id = "other", kind = WindowKind.Session),
+            )
+        val state = claude.copy(snapshot = checkNotNull(claude.snapshot).copy(windows = windows))
+
+        val account = UiMapping.account(state, now)
+
+        assertTrue(account.windows.single { it.id == "other" }.needsAttention)
+        assertFalse(account.needsAttention)
+    }
+
+    @Test
+    fun `stale quotas of an expired sign-in never need attention`() {
+        val claude = DemoData.accounts(now).first().copy(lastError = QuotaErrorKind.Auth)
+
+        val account = UiMapping.account(claude, now)
+
+        assertFalse(account.needsAttention)
+        assertTrue(account.windows.none { it.needsAttention })
     }
 
     @Test
