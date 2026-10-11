@@ -25,6 +25,7 @@ class NotificationPlannerTest {
         settings: AppSettings = AppSettings(),
         signInNotified: Set<String> = emptySet(),
         reminded: Set<String> = emptySet(),
+        now: Instant = this.now,
     ) =
         NotificationPlanner.plan(
             accounts,
@@ -83,17 +84,43 @@ class NotificationPlannerTest {
     }
 
     @Test
-    fun `a reset already reminded about is not reminded again`() {
-        val expires = now + 3.days
-        val withResets = accounts.map { state ->
-            if (state.account.provider != Provider.Codex) state
-            else state.copy(snapshot = state.snapshot!!.copy(resets = resets(expires)))
-        }
+    fun `a reminder stays planned until it goes out`() {
+        val withResets = withCodexResets(now + 3.days)
 
         val first = plan(accounts = withResets)
         val second = plan(accounts = withResets, reminded = first.reminded.toSet())
 
+        assertEquals(1, first.reminders.size)
+        assertEquals(first.reminders, second.reminders)
+    }
+
+    @Test
+    fun `a reset already reminded about is not reminded again`() {
+        val withResets = withCodexResets(now + 3.days)
+        val first = plan(accounts = withResets)
+        // The reminder went out at its time, a day before the reset expires.
+        val later = now + 2.days + 1.hours
+
+        val second = plan(accounts = withResets, reminded = first.reminded.toSet(), now = later)
+
         assertTrue(second.reminders.isEmpty())
+    }
+
+    @Test
+    fun `reminders turned off and on again come back`() {
+        val withResets = withCodexResets(now + 3.days)
+        val first = plan(accounts = withResets)
+
+        val off =
+            plan(
+                accounts = withResets,
+                settings = AppSettings(resetExpiryReminders = false),
+                reminded = first.reminded.toSet(),
+            )
+        val on = plan(accounts = withResets, reminded = off.reminded.toSet())
+
+        assertTrue(off.reminders.isEmpty())
+        assertEquals(first.reminders, on.reminders)
     }
 
     @Test
@@ -106,6 +133,11 @@ class NotificationPlannerTest {
         val plan = plan(accounts = withResets, settings = AppSettings(resetExpiryReminders = false))
 
         assertTrue(plan.reminders.isEmpty())
+    }
+
+    private fun withCodexResets(vararg expiries: Instant) = accounts.map { state ->
+        if (state.account.provider != Provider.Codex) state
+        else state.copy(snapshot = state.snapshot!!.copy(resets = resets(*expiries)))
     }
 
     private fun resets(vararg expiries: Instant) =
