@@ -3,6 +3,35 @@ import Testing
 @testable import HeadroomApp
 
 struct WidgetSnapshotTests {
+    @Test func `current snapshots round trip with all reset candidates`() throws {
+        let reset = WidgetSnapshot.NextReset(accountId: "a", accountTitle: "a", providerId: "claude",
+            windowLabel: "Weekly", kind: "weekly", resetsAt: .now.addingTimeInterval(100))
+        let original = WidgetSnapshot(isDemo: false, showsLeft: true, accounts: snapshot.accounts,
+            nextReset: reset, nextResetTile: .init(name: "a", value: "soon"), tightestTile: nil,
+            resetCandidates: [reset])
+        let decoded = try JSONDecoder().decode(WidgetSnapshot.self, from: JSONEncoder().encode(original))
+        #expect(decoded == original)
+        #expect(decoded.inlineDestination == DeepLink.account("a"))
+    }
+
+    @Test func `ambiguous legacy resets open overview and cannot be assigned to a selected account`() throws {
+        let data = Data(#"{"isDemo":false,"showsLeft":false,"accounts":[{"id":"a","providerId":"claude","title":"Work","usedPercent":40,"needsAttention":false,"signInExpired":false},{"id":"b","providerId":"claude","title":"Work","usedPercent":60,"needsAttention":false,"signInExpired":false}],"nextReset":{"accountTitle":"Work","providerId":"claude","windowLabel":"Weekly","resetsAt":2000000000}}"#.utf8)
+        let decoded = try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+        #expect(decoded.at(.now).nextReset != nil)
+        #expect(decoded.inlineDestination == DeepLink.overview)
+        #expect(decoded.selecting(["a"]).nextReset == nil)
+    }
+
+    @Test func `a snapshot from the previous app version retains its usage and reset`() throws {
+        let data = Data(#"{"isDemo":false,"showsLeft":false,"accounts":[{"id":"a","providerId":"claude","title":"Work","windowLabel":"Weekly","usedPercent":40,"resetsAt":2000000000,"needsAttention":false,"signInExpired":false}],"nextReset":{"accountTitle":"Work","providerId":"claude","windowLabel":"Weekly","resetsAt":2000000000},"nextResetTile":{"name":"Work","value":"in 2d"}}"#.utf8)
+        let decoded = try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+        #expect(decoded.accounts[0].name == "Work")
+        #expect(decoded.accounts[0].usedPercent == 40)
+        #expect(decoded.accounts[0].resetsAvailable == 0)
+        #expect(decoded.selecting(nil).nextReset?.accountId == "a")
+        #expect(decoded.selecting(nil).nextResetTile?.name == "Work")
+    }
+
     @Test func `elapsed per-account reset dates are cleared without republishing`() throws {
         let original = snapshot
         let date = try #require(original.accounts[0].resetsAt)

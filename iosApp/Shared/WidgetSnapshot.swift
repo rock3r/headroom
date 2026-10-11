@@ -45,6 +45,10 @@ struct WidgetSnapshot: Codable, Equatable {
         let windowLabel: String
         let kind: String
         let resetsAt: Date
+
+        var destination: URL {
+            accountId.isEmpty ? DeepLink.overview : DeepLink.account(accountId)
+        }
     }
 
     /// "Claude" and "in 2d 4h": the account and the value, as the Android tile shows them.
@@ -94,7 +98,7 @@ struct WidgetSnapshot: Codable, Equatable {
 
     /// The inline presentation shows one account, so its tap opens that account or its sign-in.
     var inlineDestination: URL {
-        if let nextReset { return DeepLink.account(nextReset.accountId) }
+        if let nextReset { return nextReset.destination }
         guard let account = tightest else { return DeepLink.overview }
         return account.signInExpired ? DeepLink.signIn(account.id) : DeepLink.account(account.id)
     }
@@ -106,9 +110,15 @@ struct WidgetSnapshot: Codable, Equatable {
         let chosen = ids.flatMap { $0.isEmpty ? nil : $0.compactMap { byId[$0] } } ?? accounts
         let eligibleIds = Set(chosen.filter { !$0.signInExpired }.map(\.id))
         let candidates = resetCandidates ?? legacyCandidates
-        let eligible = candidates.filter {
-            eligibleIds.contains($0.accountId) && $0.resetsAt > date &&
-                ($0.kind == "weekly" || $0.kind == "monthly")
+        let includesAll = ids == nil || ids?.isEmpty == true
+        let eligible = candidates.filter { candidate in
+            let isLegacyGlobal = resetCandidates == nil && candidate == nextReset && candidate.kind == "other"
+            let belongsToSelection = eligibleIds.contains(candidate.accountId) ||
+                (isLegacyGlobal && candidate.accountId.isEmpty && includesAll && chosen.contains { account in
+                    !account.signInExpired && account.providerId == candidate.providerId
+                })
+            return belongsToSelection && candidate.resetsAt > date &&
+                (candidate.kind == "weekly" || candidate.kind == "monthly" || isLegacyGlobal)
         }
         let weekly = eligible.filter { $0.kind == "weekly" }
         let next = (weekly.isEmpty ? eligible : weekly).min { $0.resetsAt < $1.resetsAt }
@@ -127,5 +137,76 @@ struct WidgetSnapshot: Codable, Equatable {
             account.resetsAt.map { NextReset(accountId: account.id, accountTitle: account.name,
                 providerId: account.providerId, windowLabel: "", kind: account.kind, resetsAt: $0) }
         } + (nextReset.map { [$0] } ?? [])
+    }
+}
+
+// Keep reading the App Group file written before the widget parity update. Decoders live in
+// extensions so callers retain the memberwise initializers; encoders write only the current keys.
+extension WidgetSnapshot.Account {
+    private enum CodingKeys: String, CodingKey {
+        case id, providerId, name, kind, usedPercent, expectedPercent, resetsAt, needsAttention
+        case signInExpired, sessionUsedPercent, resetsAvailable, logo
+    }
+    private enum LegacyKeys: String, CodingKey { case title }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        providerId = try values.decode(String.self, forKey: .providerId)
+        name = try values.decodeIfPresent(String.self, forKey: .name) ?? legacy.decode(String.self, forKey: .title)
+        // A translated legacy window label cannot reliably identify its kind.
+        kind = try values.decodeIfPresent(String.self, forKey: .kind) ?? "other"
+        usedPercent = try values.decode(Double.self, forKey: .usedPercent)
+        expectedPercent = try values.decodeIfPresent(Double.self, forKey: .expectedPercent)
+        resetsAt = try values.decodeIfPresent(Date.self, forKey: .resetsAt)
+        needsAttention = try values.decode(Bool.self, forKey: .needsAttention)
+        signInExpired = try values.decode(Bool.self, forKey: .signInExpired)
+        sessionUsedPercent = try values.decodeIfPresent(Double.self, forKey: .sessionUsedPercent)
+        resetsAvailable = try values.decodeIfPresent(Int.self, forKey: .resetsAvailable) ?? 0
+        logo = try values.decodeIfPresent(WidgetSnapshot.Logo.self, forKey: .logo)
+    }
+}
+
+extension WidgetSnapshot.NextReset {
+    private enum CodingKeys: String, CodingKey {
+        case accountId, accountTitle, providerId, windowLabel, kind, resetsAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        accountId = try values.decodeIfPresent(String.self, forKey: .accountId) ?? ""
+        accountTitle = try values.decode(String.self, forKey: .accountTitle)
+        providerId = try values.decode(String.self, forKey: .providerId)
+        windowLabel = try values.decode(String.self, forKey: .windowLabel)
+        kind = try values.decodeIfPresent(String.self, forKey: .kind) ?? "other"
+        resetsAt = try values.decode(Date.self, forKey: .resetsAt)
+    }
+}
+
+extension WidgetSnapshot {
+    private enum CodingKeys: String, CodingKey {
+        case isDemo, showsLeft, accounts, nextReset, nextResetTile, tightestTile, resetCandidates
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        isDemo = try values.decode(Bool.self, forKey: .isDemo)
+        showsLeft = try values.decode(Bool.self, forKey: .showsLeft)
+        accounts = try values.decode([Account].self, forKey: .accounts)
+        let storedReset = try values.decodeIfPresent(NextReset.self, forKey: .nextReset)
+        if let storedReset, storedReset.accountId.isEmpty {
+            let matching = accounts.filter {
+                $0.providerId == storedReset.providerId && $0.name == storedReset.accountTitle
+            }
+            nextReset = NextReset(accountId: matching.count == 1 ? matching[0].id : "",
+                accountTitle: storedReset.accountTitle, providerId: storedReset.providerId,
+                windowLabel: storedReset.windowLabel, kind: storedReset.kind, resetsAt: storedReset.resetsAt)
+        } else {
+            nextReset = storedReset
+        }
+        nextResetTile = try values.decodeIfPresent(Tile.self, forKey: .nextResetTile)
+        tightestTile = try values.decodeIfPresent(Tile.self, forKey: .tightestTile)
+        resetCandidates = try values.decodeIfPresent([NextReset].self, forKey: .resetCandidates)
     }
 }

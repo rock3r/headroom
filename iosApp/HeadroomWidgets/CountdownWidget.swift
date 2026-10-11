@@ -34,7 +34,7 @@ private struct CompatibleCountdownView: View {
         } else if let next = snapshot.nextReset {
             if family == .accessoryInline {
                 Text("\(next.accountTitle) · \(next.resetsAt, style: .relative)")
-                    .widgetURL(DeepLink.account(next.accountId))
+                    .widgetURL(next.destination)
             } else {
                 VStack(alignment: .leading) {
                     Text("\(next.accountTitle) · \(WidgetTexts.nextReset(next.kind))")
@@ -42,7 +42,7 @@ private struct CompatibleCountdownView: View {
                     Text(next.resetsAt, style: .relative)
                         .monospacedDigit()
                 }
-                .widgetURL(DeepLink.account(next.accountId))
+                .widgetURL(next.destination)
             }
         } else {
             Text("No reset coming up")
@@ -72,7 +72,7 @@ struct CountdownView: View {
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .widgetURL(DeepLink.account(next.accountId))
+            .widgetURL(next.destination)
         } else {
             Text("No reset coming up")
                 .font(.footnote)
