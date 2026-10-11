@@ -1,0 +1,84 @@
+# The iOS app's Xcode project, for XcodeGen. Generate it with `xcodegen` in this folder; the
+# .xcodeproj is not checked in.
+name: Headroom
+options:
+  bundleIdPrefix: dev.sebastiano
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Set your team to run on a device. The simulator needs none.
+    DEVELOPMENT_TEAM: ""
+targets:
+  Headroom:
+    type: application
+    platform: iOS
+    sources:
+      - path: Headroom
+    preBuildScripts:
+      - name: Build HeadroomKit
+        basedOnDependencyAnalysis: false
+        script: |
+          # Builds the Kotlin framework for this configuration and SDK, into
+          # shared/build/xcode-frameworks, where FRAMEWORK_SEARCH_PATHS finds it.
+          if [ "$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED" != "YES" ]; then
+            export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
+          fi
+          cd "$SRCROOT/.."
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+    settings:
+      base:
+        PRODUCT_NAME: Headroom
+        # The module would otherwise be "Headroom", the name of HeadroomKit's main class.
+        PRODUCT_MODULE_NAME: HeadroomApp
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sebastiano.headroom
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Headroom
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        INFOPLIST_FILE: Headroom/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        OTHER_LDFLAGS: -framework HeadroomKit
+  HeadroomTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HeadroomTests
+    dependencies:
+      - target: Headroom
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Headroom.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Headroom
+        FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+  HeadroomUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: HeadroomUITests
+    dependencies:
+      - target: Headroom
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Headroom
+schemes:
+  Headroom:
+    build:
+      targets:
+        Headroom: all
+        HeadroomTests: [test]
+        HeadroomUITests: [test]
+    test:
+      targets:
+        - HeadroomTests
+        - HeadroomUITests
