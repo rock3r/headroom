@@ -28,8 +28,16 @@ enum WidgetPublisher {
     ]
 
     static func publish(overview: OverviewUi, providers: [ProviderUi]) {
+        let snapshot = makeSnapshot(overview: overview, providers: providers)
+        guard snapshot != WidgetSnapshot.load() else { return }
+        snapshot.save()
+        WidgetCenter.shared.reloadAllTimelines()
+        ControlCenter.shared.reloadAllControls()
+    }
+
+    static func makeSnapshot(overview: OverviewUi, providers: [ProviderUi]) -> WidgetSnapshot {
         let repeated = Dictionary(grouping: overview.accounts, by: \.providerId).filter { $0.value.count > 1 }.keys
-        let snapshot = WidgetSnapshot(
+        return WidgetSnapshot(
             isDemo: overview.isDemo,
             showsLeft: overview.display == "left",
             accounts: overview.accounts.map { account in
@@ -71,15 +79,12 @@ enum WidgetPublisher {
             resetCandidates: overview.accounts.flatMap { account in
                 account.windows.compactMap { window -> WidgetSnapshot.NextReset? in
                     guard window.canAlert, let at = window.resetsAtEpochSeconds else { return nil }
-                    return .init(accountId: account.id, accountTitle: account.title,
+                    return .init(accountId: account.id,
+                        accountTitle: name(account, repeated: repeated.contains(account.providerId)),
                         providerId: account.providerId, windowLabel: window.label, kind: window.kind,
                         resetsAt: Date(epochSeconds: at.int64Value))
                 }
             }
         )
-        guard snapshot != WidgetSnapshot.load() else { return }
-        snapshot.save()
-        WidgetCenter.shared.reloadAllTimelines()
-        ControlCenter.shared.reloadAllControls()
     }
 }

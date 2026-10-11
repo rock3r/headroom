@@ -25,7 +25,7 @@ struct AvailableResetsRow: View {
                             Text(scope(resets))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
-                            if let expiry = resets.pools.compactMap({ $0.soonestExpiryEpochSeconds?.int64Value }).min() {
+                            if let expiry = Self.soonestExpiry(in: resets.pools) {
                                 Text("The first one expires \(Formats.long(Date(epochSeconds: expiry)))")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
@@ -56,6 +56,10 @@ struct AvailableResetsRow: View {
                 }
             }
         }
+    }
+
+    static func soonestExpiry(in pools: [ResetPoolUi]) -> Int64? {
+        pools.filter(\.isOffered).compactMap { $0.soonestExpiryEpochSeconds?.int64Value }.min()
     }
 
     /// The single pool's scope, or the neutral line for several.

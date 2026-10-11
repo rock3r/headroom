@@ -1,8 +1,32 @@
 import Foundation
+import HeadroomKit
 import Testing
 @testable import HeadroomApp
 
 struct WidgetSnapshotTests {
+    @MainActor @Test func `published reset candidates use the distinct widget account names`() throws {
+        let accounts = [sharedAccount("work", label: "work@example.invalid"),
+                        sharedAccount("home", label: "home@example.invalid")]
+        let overview = OverviewUi(accounts: accounts, isDemo: false, nextReset: nil, display: "used",
+            sort: "yourOrder", nextResetTile: nil, tightestTile: nil, yourOrder: ["work", "home"], nowEpochSeconds: 0)
+        let published = WidgetPublisher.makeSnapshot(overview: overview, providers: [])
+        #expect(published.resetCandidates?.map(\.accountTitle) == published.accounts.map(\.name))
+        #expect(published.selecting(["work"]).nextReset?.accountTitle == "work@example.invalid")
+        #expect(published.selecting(["home"]).nextReset?.accountTitle == "home@example.invalid")
+    }
+
+    private func sharedAccount(_ id: String, label: String) -> AccountUi {
+        let window = WindowUi(id: "weekly", label: "Weekly", kind: "weekly", usedPercent: 40, leftPercent: 60,
+            resetsAtEpochSeconds: KotlinLong(value: 2_000_000_000), expiresAtEpochSeconds: nil, pace: nil,
+            expectedPercent: nil, needsAttention: false, isInformational: false, isUnlimited: false,
+            usedAmount: nil, limitAmount: nil, amountUnit: nil, canAlert: true, alertOn: false,
+            isRecognised: true, paceChip: nil, pacePoints: 0)
+        return AccountUi(id: id, providerId: "claude", providerName: "Claude", title: "Claude", label: label,
+            plan: nil, primary: window, windows: [window], isRefreshing: false, signInExpired: false, error: nil,
+            updatedAtEpochSeconds: nil, needsAttention: false, resets: nil, balance: nil,
+            separateAllowances: false, justReset: false)
+    }
+
     @Test func `current snapshots round trip with all reset candidates`() throws {
         let reset = WidgetSnapshot.NextReset(accountId: "a", accountTitle: "a", providerId: "claude",
             windowLabel: "Weekly", kind: "weekly", resetsAt: .now.addingTimeInterval(100))
