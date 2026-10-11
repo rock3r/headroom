@@ -18,13 +18,19 @@ open Headroom.xcodeproj
 The app target's first build phase runs `./gradlew :shared:embedAndSignAppleFrameworkForXcode`, so
 Xcode builds the Kotlin framework for the right configuration and simulator or device by itself.
 
-To run on a device, set two values in `project.yml`, then run `xcodegen` again:
+To run on a device, create `iosApp/Local.xcconfig`, which git ignores, with your team and a bundle
+id prefix of your own, then run `xcodegen` again:
 
-- `DEVELOPMENT_TEAM`: your team id.
-- `BUNDLE_ID_PREFIX`: a prefix of your own, such as `com.example`. Bundle ids and App Groups belong
-  to the team that registered them first, so `dev.sebastiano` only signs with its owner's team. The
-  app becomes `<prefix>.headroom`, the widgets `<prefix>.headroom.widgets`, and the App Group they
-  share `group.<prefix>.headroom`. Xcode's automatic signing registers all three.
+```
+DEVELOPMENT_TEAM = ABCDE12345
+BUNDLE_ID_PREFIX = com.example
+```
+
+Bundle ids and App Groups belong to the team that registered them first, so `dev.sebastiano`, the
+default in `Signing.xcconfig`, only signs with its owner's team. The app becomes `<prefix>.headroom`,
+the widgets `<prefix>.headroom.widgets`, and the App Group they share `group.<prefix>.headroom`. Run
+it from Xcode the first time: automatic signing registers all three with your account, which
+`xcodebuild` on the command line cannot do.
 
 ## Testing
 
