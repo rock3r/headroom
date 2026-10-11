@@ -1,11 +1,15 @@
 package dev.sebastiano.headroom.quota
 
+import io.ktor.client.plugins.HttpSend
+import io.ktor.client.plugins.plugin
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -191,6 +195,7 @@ class KtorQuotaHttpClientTest {
         assertEquals("GET", followed.method)
         assertEquals("/moved", followed.target)
         assertEquals(0L, followed.bodySize)
+        assertNull(followed.headers["Content-Type"])
     }
 
     @Test
@@ -220,5 +225,122 @@ class KtorQuotaHttpClientTest {
     @Test
     fun `clients made without an HttpClient share one`() {
         assertSame(KtorQuotaHttpClient().httpClient, KtorQuotaHttpClient().httpClient)
+    }
+
+    @Test
+    fun `redirects to a different port do not forward Authorization`() = runTest {
+        MockWebServer().use { destination ->
+            destination.start()
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(307)
+                    .addHeader("Location", destination.url("/moved"))
+                    .build()
+            )
+            destination.enqueue(MockResponse(code = 200, body = "done"))
+
+            val response =
+                client.execute(
+                    QuotaHttpRequest(
+                        url = server.url("/redeem").toString(),
+                        method = "POST",
+                        headers = mapOf("Authorization" to "Bearer fixture-token"),
+                        body = "{}",
+                    )
+                )
+
+            assertEquals(200, response.statusCode)
+            assertEquals("Bearer fixture-token", server.takeRequest().headers["Authorization"])
+            assertNull(destination.takeRequest().headers["Authorization"])
+        }
+    }
+
+    @Test
+    fun `redirects on the same authority retain Authorization`() = runTest {
+        server.enqueue(MockResponse.Builder().code(307).addHeader("Location", "/moved").build())
+        server.enqueue(MockResponse(code = 200, body = "done"))
+
+        client.execute(
+            QuotaHttpRequest(
+                url = server.url("/redeem").toString(),
+                method = "POST",
+                headers = mapOf("Authorization" to "Bearer fixture-token"),
+                body = "{}",
+            )
+        )
+
+        server.takeRequest()
+        assertEquals("Bearer fixture-token", server.takeRequest().headers["Authorization"])
+    }
+
+    @Test
+    fun `GET HEAD and POST requests follow HTTP 300 redirects`() = runTest {
+        for (method in listOf("GET", "HEAD", "POST")) {
+            server.enqueue(MockResponse.Builder().code(300).addHeader("Location", "/moved").build())
+            server.enqueue(MockResponse(code = 200, body = if (method == "HEAD") "" else "done"))
+
+            val response =
+                client.execute(
+                    QuotaHttpRequest(
+                        url = server.url("/original").toString(),
+                        method = method,
+                        body = if (method == "POST") "{}" else null,
+                    )
+                )
+
+            assertEquals(200, response.statusCode)
+            server.takeRequest()
+            val followed = server.takeRequest()
+            assertEquals(if (method == "HEAD") "HEAD" else "GET", followed.method)
+            assertEquals("/moved", followed.target)
+            assertEquals(0L, followed.bodySize)
+        }
+    }
+
+    @Test
+    fun `a redirected GET retains its Content-Type header`() = runTest {
+        server.enqueue(MockResponse.Builder().code(302).addHeader("Location", "/moved").build())
+        server.enqueue(MockResponse(code = 200, body = "{}"))
+
+        client.execute(
+            QuotaHttpRequest(
+                url = server.url("/profile").toString(),
+                headers = mapOf("Content-Type" to "application/json"),
+            )
+        )
+
+        server.takeRequest()
+        val followed = server.takeRequest()
+        assertEquals("GET", followed.method)
+        assertEquals("application/json", followed.headers["Content-Type"])
+        assertEquals(0L, followed.bodySize)
+    }
+
+    @Test
+    fun `redirects retain the original request execution context`() = runTest {
+        val httpClient = KtorQuotaHttpClient.defaultHttpClient()
+        try {
+            val contexts = mutableListOf<Job>()
+            httpClient.plugin(HttpSend).intercept { request ->
+                contexts += request.executionContext
+                execute(request)
+            }
+            server.enqueue(MockResponse.Builder().code(307).addHeader("Location", "/moved").build())
+            server.enqueue(MockResponse(code = 200, body = "done"))
+
+            KtorQuotaHttpClient(httpClient)
+                .execute(
+                    QuotaHttpRequest(
+                        url = server.url("/redeem").toString(),
+                        method = "POST",
+                        body = "{}",
+                    )
+                )
+
+            assertEquals(2, contexts.size)
+            assertSame(contexts[0], contexts[1])
+        } finally {
+            httpClient.close()
+        }
     }
 }

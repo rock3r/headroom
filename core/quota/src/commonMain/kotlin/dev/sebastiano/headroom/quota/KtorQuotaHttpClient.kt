@@ -23,6 +23,7 @@ import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.isSecure
 import io.ktor.http.takeFrom
+import io.ktor.utils.io.InternalAPI
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.io.IOException
@@ -85,9 +86,9 @@ public class KtorQuotaHttpClient(internal val httpClient: HttpClient = sharedHtt
         private val sharedHttpClient: HttpClient by lazy { defaultHttpClient() }
 
         private const val MAX_REDIRECTS = 20
-        private val REDIRECTS = setOf(301, 302, 303, 307, 308)
+        private val REDIRECTS = setOf(300, 301, 302, 303, 307, 308)
         private val KEEPS_METHOD = setOf(307, 308)
-        private val FOLLOWED_BY_KTOR = setOf(HttpMethod.Get, HttpMethod.Head)
+        private val BODYLESS_METHODS = setOf(HttpMethod.Get, HttpMethod.Head)
 
         /**
          * A client with the platform's engine and a [DEFAULT_TIMEOUT] for each call. It follows
@@ -96,23 +97,26 @@ public class KtorQuotaHttpClient(internal val httpClient: HttpClient = sharedHtt
         public fun defaultHttpClient(): HttpClient =
             HttpClient(platformHttpEngine) {
                     expectSuccess = false
+                    followRedirects = false
                     install(HttpTimeout) {
                         requestTimeoutMillis = DEFAULT_TIMEOUT.inWholeMilliseconds
                     }
                 }
                 .apply {
                     plugin(HttpSend).intercept { request ->
-                        val call = execute(request)
-                        if (request.method in FOLLOWED_BY_KTOR) call
-                        else followRedirects(request, call)
+                        followRedirects(request, execute(request))
                     }
                 }
 
         /**
          * Follows the redirects of [origin], as OkHttp did: 307 and 308 send the request again, any
-         * other redirect turns it into a GET without the body. Like Ktor, it does not follow a
-         * redirect from HTTPS to HTTP, and drops the Authorization header for another host.
+         * other redirect turns a body-bearing method into a GET without the body. Like Ktor, it
+         * does not follow a redirect from HTTPS to HTTP, and drops Authorization when the scheme,
+         * host or port changes.
          */
+        // Ktor's context-preserving clone is internal, but is required to keep the original call's
+        // timeout and cancellation attached to every follow-up, as Ktor's own redirect plugin does.
+        @OptIn(InternalAPI::class)
         private suspend fun Sender.followRedirects(
             request: HttpRequestBuilder,
             origin: HttpClientCall,
@@ -126,14 +130,19 @@ public class KtorQuotaHttpClient(internal val httpClient: HttpClient = sharedHtt
                 val from = call.request.url
                 val next =
                     HttpRequestBuilder().apply {
-                        takeFrom(builder)
+                        takeFromWithExecutionContext(builder)
                         url.parameters.clear()
                         url.takeFrom(location)
-                        if (status !in KEEPS_METHOD) {
+                        if (status !in KEEPS_METHOD && method !in BODYLESS_METHODS) {
                             method = HttpMethod.Get
                             setBody(EmptyContent)
+                            headers.remove(HttpHeaders.ContentType)
+                            headers.remove(HttpHeaders.ContentLength)
+                            headers.remove(HttpHeaders.TransferEncoding)
                         }
-                        if (url.host != from.host) headers.remove(HttpHeaders.Authorization)
+                        if (!url.build().hasSameOriginAs(from)) {
+                            headers.remove(HttpHeaders.Authorization)
+                        }
                     }
                 if (from.protocol.isSecure() && !next.url.protocol.isSecure()) return call
                 builder = next
@@ -141,6 +150,11 @@ public class KtorQuotaHttpClient(internal val httpClient: HttpClient = sharedHtt
             }
             return call
         }
+
+        private fun Url.hasSameOriginAs(other: Url): Boolean =
+            protocol == other.protocol &&
+                host.equals(other.host, ignoreCase = true) &&
+                port == other.port
 
         /** [url] when it is an absolute http or https URL with a host, as OkHttp required. */
         private fun httpUrlOrNull(url: String): Url? {
