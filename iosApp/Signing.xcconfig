@@ -1,0 +1,17 @@
+// Signing for a device. The simulator needs none of it.
+//
+// Bundle ids and App Groups belong to the team that registered them first, so to run Headroom on
+// your own device, put your team and a bundle id prefix of your own in Local.xcconfig, next to this
+// file. It is not checked in:
+//
+//     DEVELOPMENT_TEAM = ABCDE12345
+//     BUNDLE_ID_PREFIX = com.example
+//
+// The app becomes <prefix>.headroom, the widgets <prefix>.headroom.widgets, and the App Group they
+// share group.<prefix>.headroom. Xcode's automatic signing registers all three.
+
+DEVELOPMENT_TEAM =
+BUNDLE_ID_PREFIX = dev.sebastiano
+CODE_SIGN_STYLE = Automatic
+
+#include? "Local.xcconfig"
