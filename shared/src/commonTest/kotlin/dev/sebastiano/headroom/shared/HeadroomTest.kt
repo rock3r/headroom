@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.shared
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.auth.TokenStore
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.model.Account
@@ -25,9 +26,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HeadroomTest {
@@ -126,6 +129,25 @@ class HeadroomTest {
     }
 
     @Test
+    fun `a sign-out the keychain refuses keeps the account and the app running`() {
+        val refusing =
+            Headroom(
+                repository = repository,
+                signInManager = SignInManager(RefusingTokenStore(), repository),
+                signInSteps = ApiKeySteps,
+                scope = scope,
+                clock = { now },
+            )
+        repository.add(Account("a1", Provider.Claude, "sam@example.com"))
+
+        refusing.removeAccount("a1")
+        scope.runCurrent()
+
+        assertTrue(scope.isActive)
+        assertEquals(listOf("a1"), repository.accounts.value.map { it.account.id })
+    }
+
+    @Test
     fun `providers say how each one signs in`() {
         assertEquals(Provider.entries.map { it.id }, headroom.providers.map { it.id })
         assertTrue(headroom.providers.all { it.signIn == "apiKey" })
@@ -185,4 +207,10 @@ private class MemoryAccountsRepository : AccountsRepository {
 
     override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
         flowOf(emptyList())
+}
+
+/** A keychain that refuses to delete, as iOS's can. */
+private class RefusingTokenStore(private val store: TokenStore = InMemoryTokenStore()) :
+    TokenStore by store {
+    override suspend fun delete(accountId: String) = throw IOException("Refused")
 }
