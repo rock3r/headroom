@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -166,5 +167,10 @@ class KtorQuotaHttpClientTest {
                 )
             )
         }
+    }
+
+    @Test
+    fun `clients made without an HttpClient share one`() {
+        assertSame(KtorQuotaHttpClient().httpClient, KtorQuotaHttpClient().httpClient)
     }
 }

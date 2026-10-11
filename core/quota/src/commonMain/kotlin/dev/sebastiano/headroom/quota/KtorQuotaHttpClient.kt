@@ -22,8 +22,11 @@ import kotlinx.io.IOException
 /**
  * [QuotaHttpClient] backed by Ktor. The engine is the platform's: OkHttp on Android and the JVM,
  * URLSession on iOS. The call is cancelled when the calling coroutine is cancelled.
+ *
+ * Without an [httpClient], every instance shares one for the whole process: a Ktor client owns its
+ * engine's threads and connections until it is closed, so one per instance would leak them.
  */
-public class KtorQuotaHttpClient(private val httpClient: HttpClient = defaultHttpClient()) :
+public class KtorQuotaHttpClient(internal val httpClient: HttpClient = sharedHttpClient) :
     QuotaHttpClient {
 
     override suspend fun execute(request: QuotaHttpRequest): QuotaHttpResponse {
@@ -70,6 +73,8 @@ public class KtorQuotaHttpClient(private val httpClient: HttpClient = defaultHtt
     public companion object {
         private val DEFAULT_TIMEOUT: Duration = 30.seconds
         private val BODY_HEADERS = setOf("content-type", "content-length")
+
+        private val sharedHttpClient: HttpClient by lazy { defaultHttpClient() }
 
         /** A client with the platform's engine and a [DEFAULT_TIMEOUT] for each call. */
         public fun defaultHttpClient(): HttpClient =
