@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.shared
 
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.model.logo
@@ -96,6 +97,30 @@ class UiMappingTest {
     }
 
     @Test
+    fun `the tightest control excludes stale usage from expired sign-ins`() {
+        val accounts =
+            DemoData.accounts(now).map { state ->
+                if (state.account.provider == Provider.Grok)
+                    state.copy(lastError = QuotaErrorKind.Auth)
+                else state
+            }
+        val valid = accounts.filterNot { it.isSignInExpired }
+
+        assertEquals(
+            UiMapping.overview(valid, isDemo = false, now).tightestTile,
+            UiMapping.overview(accounts, isDemo = false, now).tightestTile,
+        )
+        assertNull(
+            UiMapping.overview(
+                    accounts.map { it.copy(lastError = QuotaErrorKind.Auth) },
+                    isDemo = false,
+                    now,
+                )
+                .tightestTile
+        )
+    }
+
+    @Test
     fun `an expired sign-in is marked and its error is an id`() {
         val expired = DemoData.accountsWithExpiredSignIn(now).first()
 
@@ -104,6 +129,33 @@ class UiMappingTest {
         assertTrue(account.signInExpired)
         assertEquals("auth", account.error)
         assertEquals(now.minus(2.hours).epochSeconds, account.updatedAtEpochSeconds)
+    }
+
+    @Test
+    fun `balance-only quotas keep their amount and unit without a primary window`() {
+        val state = DemoData.accounts(now).first()
+        val account =
+            UiMapping.account(
+                state.copy(
+                    snapshot =
+                        state.snapshot!!.copy(
+                            windows = emptyList(),
+                            balance = QuotaBalance(12.5, "credits"),
+                        )
+                ),
+                now,
+            )
+
+        assertNull(account.primary)
+        assertTrue(account.windows.isEmpty())
+        assertEquals(BalanceUi(12.5, "credits"), account.balance)
+    }
+
+    @Test
+    fun `unknown quotas retain recognition separately from known credits`() {
+        val weekly = DemoData.accounts(now).first().primaryWindow!!
+        assertFalse(UiMapping.window(weekly.copy(isRecognised = false), now).isRecognised)
+        assertTrue(UiMapping.window(weekly.copy(kind = WindowKind.Credit), now).isRecognised)
     }
 
     @Test

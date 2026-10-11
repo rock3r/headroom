@@ -28,17 +28,18 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate, Send
         guard let accountId = info["accountId"] as? String else { return }
         let windowId = info["windowId"] as? String
         let signIn = info["signIn"] as? Bool ?? false
+        let resets = info["resets"] as? Bool ?? false
         let action = response.actionIdentifier
-        await handle(accountId: accountId, windowId: windowId, signIn: signIn, action: action)
+        await handle(accountId: accountId, windowId: windowId, signIn: signIn, resets: resets, action: action)
     }
 
     @MainActor
-    private func handle(accountId: String, windowId: String?, signIn: Bool, action: String) async {
+    private func handle(accountId: String, windowId: String?, signIn: Bool, resets: Bool, action: String) async {
         if action == NotificationScheduler.muteAction, let windowId {
             // The notification handler must remain alive until DataStore commits the preference.
             try? await model.headroom.accounts.setAlertAndWait(accountId: accountId, windowId: windowId, enabled: false)
         } else if action != UNNotificationDismissActionIdentifier {
-            model.open(signIn ? .signIn(accountId: accountId) : .account(accountId))
+            model.open(signIn ? .signIn(accountId: accountId) : resets ? .accountResets(accountId) : .account(accountId))
         }
     }
 }

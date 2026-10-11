@@ -21,9 +21,28 @@ struct RootView: View {
                 StatsView()
             }
         }
-        .onChange(of: model.route) { _, route in
-            // The overview opens the account a notification is about.
-            if route != nil { tab = .overview }
+        // A sidebar on a wide screen, as the Android navigation rail; a tab bar on a phone.
+        .tabViewStyle(.sidebarAdaptable)
+        .overlay {
+            RefreshShimmer(trigger: model.delights.shimmers)
+                .ignoresSafeArea()
+        }
+        .onChange(of: model.route, initial: true) { _, route in
+            switch route {
+            case .overviewTab:
+                tab = .overview
+            case .resetsTab:
+                tab = .resets
+                model.route = nil
+            case .statsTab:
+                tab = .stats
+                model.route = nil
+            case .some:
+                // The overview opens the account a notification or a widget is about.
+                tab = .overview
+            case nil:
+                break
+            }
         }
     }
 }

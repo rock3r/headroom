@@ -8,6 +8,6 @@ struct RedeemBusy: View {
         ProgressView {
             Text(text)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 120)
     }
 }

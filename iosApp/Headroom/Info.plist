@@ -5,6 +5,18 @@
 	<!-- The App Group the widgets read the snapshot from. -->
 	<key>HeadroomAppGroup</key>
 	<string>$(HEADROOM_APP_GROUP)</string>
+	<!-- Widgets and notifications open accounts with headroom:// links. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>dev.sebastiano.headroom</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>headroom</string>
+			</array>
+		</dict>
+	</array>
 	<!-- The reset Live Activity. -->
 	<key>NSSupportsLiveActivities</key>
 	<true/>

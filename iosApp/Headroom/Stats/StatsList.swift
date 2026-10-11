@@ -1,28 +1,31 @@
 import HeadroomKit
 import SwiftUI
 
-/// The Stats tab's cards. A card without enough history says what it is waiting for.
+/// The Stats tab's cards, in the Android order. A card without enough history says what it is
+/// waiting for.
 struct StatsList: View {
     let stats: StatsUi
 
     var body: some View {
         List {
-            Section {
-                Text(subtitle)
-                    .foregroundStyle(.secondary)
-            } footer: {
-                Text("Each account counts its main limit: the weekly one, or the longest.")
-            }
+            Text(subtitle)
+                .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
             ResetScoreCard(score: stats.resetScore)
-            SharesCard(shares: stats.shares)
-            HeatmapCard(heatmap: stats.heatmap, coverageDays: stats.coverageDays?.intValue)
-            ClosestCallCard(closestCall: stats.closestCall, allHits: allHits)
-            BiggestDayCard(biggestDay: stats.biggestDay)
-            LeftOverCard(leftOver: stats.leftOver)
-            SparklinesCard(sparklines: stats.sparklines)
             if let usage = stats.resetUsage, !usage.isEmpty {
                 ResetUsageCard(periods: usage)
             }
+            SharesCard(shares: stats.shares)
+            HeatmapCard(heatmap: stats.heatmap, coverageDays: stats.coverageDays?.intValue)
+            Section {
+                HighlightsRow(closestCall: stats.closestCall, allHits: allHits, biggestDay: stats.biggestDay)
+            }
+            LeftOverCard(leftOver: stats.leftOver)
+            SparklinesCard(sparklines: stats.sparklines)
+            Text("Each account counts its main limit: the weekly one, or the longest.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
         }
     }
 

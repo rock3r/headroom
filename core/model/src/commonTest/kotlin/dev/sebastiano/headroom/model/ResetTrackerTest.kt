@@ -1,14 +1,11 @@
-package dev.sebastiano.headroom.ui
+package dev.sebastiano.headroom.model
 
-import dev.sebastiano.headroom.model.AccountState
-import dev.sebastiano.headroom.model.DemoData
-import dev.sebastiano.headroom.ui.home.ResetBurst
-import dev.sebastiano.headroom.ui.home.ResetTracker
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 class ResetTrackerTest {
     private val accounts = DemoData.accounts(FIXED_NOW)
@@ -98,7 +95,7 @@ class ResetTrackerTest {
     }
 
     @Test
-    fun `a reset seen while the app is open bursts once, from the next reset card it counted down`() {
+    fun `a reset seen while the app is open bursts once from the next reset card it counted down`() {
         val tracker = ResetTracker(sessionStart = FIXED_NOW)
         tracker.update(accounts)
         assertEquals(emptyList(), tracker.lastLiveResets)
@@ -140,3 +137,5 @@ class ResetTrackerTest {
         assertEquals(emptyList(), tracker.lastLiveResets)
     }
 }
+
+private val FIXED_NOW: Instant = Instant.parse("2026-09-27T12:32:00Z")

@@ -10,6 +10,14 @@ struct HeadroomApp: App {
         let model = AppModel.live()
         _model = State(initialValue: model)
         _services = State(initialValue: AppServices(model: model))
+        #if DEBUG
+        // UI tests and screenshots open a screen directly: `-openURL headroom://account/<id>`.
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-openURL"), index + 1 < arguments.count,
+           let url = URL(string: arguments[index + 1]) {
+            model.open(url)
+        }
+        #endif
     }
 
     var body: some Scene {
@@ -22,6 +30,7 @@ struct HeadroomApp: App {
                     // "Reduce motion" in Settings turns Headroom's own animations off.
                     if model.settings?.reduceMotion == true { transaction.disablesAnimations = true }
                 }
+                .onOpenURL { url in model.open(url) }
                 .task(id: ServicesInput(overview: model.overview, settings: model.settings)) {
                     // Waits for the numbers to settle: a sync changes them several times.
                     try? await Task.sleep(for: .seconds(1))

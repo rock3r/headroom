@@ -11,10 +11,32 @@ enum RedeemTexts {
         case "grok": "Resets your current weekly usage pool."
         case "zaiFiveHour": "Resets your current 5-hour limit."
         case "zaiWeek": "Resets your current weekly limit."
-        case "windows" where !pool.scopeWindows.isEmpty:
-            "Refills \(pool.scopeWindows.formatted(.list(type: .and)))."
+        case "windows" where !pool.scopeWindowIds.isEmpty:
+            "Refills \(refills(pool.scopeWindowIds))."
         default: "Resets your current usage limits."
         }
+    }
+
+    /// "your 5-hour session and your weekly limit", from the window ids a reset clears.
+    private static func refills(_ ids: [String]) -> String {
+        let parts = ids.map(clears)
+        guard let first = parts.first else { return "" }
+        return parts.dropFirst().reduce(first) { all, next in String(localized: "\(all) and \(next)") }
+    }
+
+    private static func clears(_ windowId: String) -> String {
+        switch windowId {
+        case "five_hour": String(localized: "your 5-hour session")
+        case "seven_day": String(localized: "your weekly limit")
+        case "seven_day_opus": String(localized: "your weekly Opus limit")
+        case "seven_day_sonnet": String(localized: "your weekly Sonnet limit")
+        default: String(localized: "your \(windowId.replacingOccurrences(of: "_", with: " ")) limit")
+        }
+    }
+
+    /// The service a provider's resets need a separate sign-in to, such as Z.AI's ZCode.
+    static func signInService(_ providerId: String, providerName: String) -> String {
+        providerId == "zai" ? "ZCode" : providerName
     }
 
     /// Why a pool cannot be used now, or nil when it can.

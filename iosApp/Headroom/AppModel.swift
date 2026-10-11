@@ -15,12 +15,18 @@ final class AppModel {
     private(set) var redeemStep: any RedeemUi = RedeemUiIdle.shared
     private(set) var zCodeStep: any ZCodeUi = ZCodeUiIdle.shared
     let providers: [ProviderUi]
+    let delights = DelightCenter()
     /// Where a notification tap asked to go, until the overview goes there.
     var route: Route?
 
     enum Route: Equatable {
+        case overviewTab
         case account(String)
+        /// The account's detail, scrolled to its resets, as from a reset reminder.
+        case accountResets(String)
         case signIn(accountId: String)
+        case resetsTab
+        case statsTab
     }
 
     @ObservationIgnored let headroom: Headroom
@@ -36,6 +42,7 @@ final class AppModel {
         watch(headroom.signIn.watch) { $0.signInStep = $1 }
         watch(headroom.resets.redeem.watch) { $0.redeemStep = $1 }
         watch(headroom.resets.zCode.watch) { $0.zCodeStep = $1 }
+        watch(headroom.watchDelights) { $0.play($1) }
     }
 
     /// Opens Headroom with its database in Application Support and the sign-ins in the Keychain.
@@ -55,8 +62,42 @@ final class AppModel {
         })
     }
 
+    /// Plays a delight HeadroomKit reported, when its switch is on.
+    private func play(_ delight: any DelightUi) {
+        let reduced = settings?.reduceMotion ?? false
+        switch delight {
+        case is DelightUiShimmer:
+            delights.shimmer(enabled: settings?.refreshShimmer ?? true, reduced: reduced)
+        case let burst as DelightUiBurst:
+            delights.burst(accountId: burst.accountId, fromNextReset: burst.fromNextReset,
+                           providerId: account(id: burst.accountId)?.providerId ?? "",
+                           enabled: settings?.resetConfetti ?? true, reduced: reduced)
+        default:
+            break
+        }
+    }
+
+    /// "Try" in Settings: plays the shimmer over Settings even while its switch is off, but not with
+    /// motion reduced.
+    func tryShimmer() {
+        delights.previewShimmer(reduced: settings?.reduceMotion ?? false)
+    }
+
+    /// "Try" in Settings: confetti from the button, in the first account's colours.
+    func tryConfetti() {
+        delights.previewBurst(providerId: overview?.accounts.first?.providerId ?? "",
+                              reduced: settings?.reduceMotion ?? false)
+    }
+
     func open(_ route: Route) {
         self.route = route
+    }
+
+    /// Follows a `headroom://` link from a widget: `account/<id>`, `account/<id>/resets`,
+    /// `signin/<id>` or `resets`.
+    func open(_ url: URL) {
+        guard url.scheme == "headroom" else { return }
+        if let route = DeepLink.route(url) { open(route) }
     }
 
     func provider(id: String) -> ProviderUi? {
