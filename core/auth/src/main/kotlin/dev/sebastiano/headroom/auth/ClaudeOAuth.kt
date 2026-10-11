@@ -2,8 +2,10 @@ package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
 import java.security.SecureRandom
-import java.time.Clock
-import java.time.Duration
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Claude sign-in, the same way the official Claude Code CLI does it: a loopback redirect to
@@ -79,7 +81,7 @@ internal class ClaudeOAuth(
             kind = CredentialKind.OAuth,
             accessToken = json.requireString("access_token", context),
             refreshToken = json.string("refresh_token"),
-            expiresAt = clock.instant().plusSeconds(expiresIn).minus(EXPIRY_MARGIN),
+            expiresAt = clock.now() + expiresIn.seconds - EXPIRY_MARGIN,
             providerAccountId = account?.string("uuid"),
             label = account?.string("email_address"),
             extras =
@@ -99,6 +101,6 @@ internal class ClaudeOAuth(
         const val SCOPES =
             "org:create_api_key user:profile user:inference user:sessions:claude_code " +
                 "user:mcp_servers user:file_upload user:plugins"
-        val EXPIRY_MARGIN: Duration = Duration.ofMinutes(5)
+        val EXPIRY_MARGIN: Duration = 5.minutes
     }
 }

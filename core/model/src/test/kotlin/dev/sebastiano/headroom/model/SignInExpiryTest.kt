@@ -1,10 +1,10 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class SignInExpiryTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")

@@ -5,11 +5,12 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -81,7 +82,7 @@ class GrokQuotaFetcherTest {
         assertEquals("Weekly", weekly.label)
         assertEquals(37.5, weekly.usedPercent)
         assertEquals(WindowKind.Weekly, weekly.kind)
-        assertEquals(Duration.ofDays(7), weekly.length)
+        assertEquals(7.days, weekly.length)
         assertEquals(Instant.parse("2026-04-07T09:00:00Z"), weekly.resetsAt)
         // The plan was in the billing payload, so the user profile is not requested.
         assertEquals(listOf(WEEKLY_TARGET), requestedTargets())
@@ -117,7 +118,7 @@ class GrokQuotaFetcherTest {
             "https://cli-chat-proxy.grok.com/v1/billing?format=credits",
             client.requests.first().url,
         )
-        assertEquals(Duration.ofSeconds(5), client.requests.last().timeout)
+        assertEquals(5.seconds, client.requests.last().timeout)
     }
 
     @Test
@@ -147,7 +148,7 @@ class GrokQuotaFetcherTest {
         assertEquals("Monthly", monthly.label)
         assertEquals(30.0, monthly.usedPercent)
         assertEquals(WindowKind.Monthly, monthly.kind)
-        assertEquals(Duration.ofDays(30), monthly.length)
+        assertEquals(30.days, monthly.length)
         assertEquals(Instant.parse("2026-05-01T00:00:00Z"), monthly.resetsAt)
         assertEquals(listOf(WEEKLY_TARGET, MONTHLY_TARGET), requestedTargets())
     }

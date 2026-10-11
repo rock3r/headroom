@@ -3,8 +3,8 @@ package dev.sebastiano.headroom.data.reset
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Instant
 
 /** One scheduled check, a few seconds after a window is due to reset. */
 internal data class ResetAlarm(
@@ -40,7 +40,7 @@ internal object ResetAlarmPlanner {
                     val eligible =
                         resetsAt != null &&
                             // Keep a window inside its grace seconds: its alarm has not fired yet.
-                            resetsAt.plus(GRACE).isAfter(now) &&
+                            resetsAt + GRACE > now &&
                             ResetPolicy.canAlert(window) &&
                             isEnabled(state.account.id, window)
                     if (eligible && resetsAt != null) {

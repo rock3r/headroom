@@ -1,7 +1,6 @@
 package dev.sebastiano.headroom.designsystem
 
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Instant
 
 /**
  * Maps a quota window onto a plot area: time from [start] to [end] runs left to right, and usage
@@ -10,16 +9,16 @@ import java.time.Instant
  */
 class PaceChartGeometry(
     private val start: Instant,
-    private val end: Instant,
+    end: Instant,
     private val left: Float,
     private val top: Float,
     private val right: Float,
     private val bottom: Float,
 ) {
-    private val spanMillis = Duration.between(start, end).toMillis().coerceAtLeast(1L).toFloat()
+    private val spanMillis = (end - start).inWholeMilliseconds.coerceAtLeast(1L).toFloat()
 
     fun x(at: Instant): Float {
-        val fraction = Duration.between(start, at).toMillis() / spanMillis
+        val fraction = (at - start).inWholeMilliseconds / spanMillis
         return left + fraction.coerceIn(0f, 1f) * (right - left)
     }
 

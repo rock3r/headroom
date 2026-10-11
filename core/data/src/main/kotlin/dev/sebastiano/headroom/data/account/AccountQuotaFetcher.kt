@@ -15,7 +15,8 @@ import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetRead
 import dev.sebastiano.headroom.quota.ZCodeSignIn
 import java.io.IOException
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
@@ -92,7 +93,7 @@ public class AccountQuotaFetcher(
     /** [zCodeSignIn] for a sync: unavailable when it takes longer than [ZCODE_SIGN_IN_WAIT]. */
     private suspend fun syncZCodeSignIn(account: Account): ZCodeSignIn? {
         if (account.provider != Provider.ZAi) return null
-        return withTimeoutOrNull(ZCODE_SIGN_IN_WAIT.toMillis()) { zCodeSignIn(account) }
+        return withTimeoutOrNull(ZCODE_SIGN_IN_WAIT.inWholeMilliseconds) { zCodeSignIn(account) }
             ?: ZCodeSignIn.Unavailable
     }
 
@@ -155,6 +156,6 @@ public class AccountQuotaFetcher(
          * answers does so well within it. Past it, the sync reads no resets and keeps the stored
          * ones.
          */
-        public val ZCODE_SIGN_IN_WAIT: Duration = Duration.ofSeconds(5)
+        public val ZCODE_SIGN_IN_WAIT: Duration = 5.seconds
     }
 }

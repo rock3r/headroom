@@ -11,10 +11,12 @@ import dev.sebastiano.headroom.data.R
 import dev.sebastiano.headroom.data.ResetReminderIntents
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.ExpiringReset
-import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 
 /**
  * Posts the day's reminder that resets expire soon, on its own channel at default importance. One
@@ -29,7 +31,7 @@ internal class AndroidResetReminderNotifier(
     private val locale: () -> Locale = Locale::getDefault,
     /** Whether the user's clock shows 24 hours, read when a reminder is posted. */
     private val is24Hour: () -> Boolean = { DateFormat.is24HourFormat(context) },
-    private val clock: () -> Instant = Instant::now,
+    private val clock: () -> Instant = Clock.System::now,
     private val openResets: (accountId: String) -> Intent? = {
         ResetReminderIntents.open(context, it)
     },
@@ -99,9 +101,9 @@ internal class AndroidResetReminderNotifier(
     private fun whenText(at: Instant): String {
         val zone = zone()
         val locale = locale()
-        val time = at.atZone(zone)
+        val time = at.toJavaInstant().atZone(zone)
         val clockTime = DateTimeFormatter.ofPattern(timePattern(), locale).format(time)
-        val today = clock().atZone(zone).toLocalDate()
+        val today = clock().toJavaInstant().atZone(zone).toLocalDate()
         return when (time.toLocalDate()) {
             today -> context.getString(R.string.reset_reminder_today, clockTime)
             today.plusDays(1) -> context.getString(R.string.reset_reminder_tomorrow, clockTime)

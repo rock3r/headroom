@@ -1,23 +1,19 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 
 /** A clock that only moves when a test (or a fake sleep) moves it. */
-internal class MutableClock(var now: Instant) : Clock() {
-    override fun getZone(): ZoneId = ZoneOffset.UTC
-
-    override fun withZone(zone: ZoneId?): Clock = this
-
-    override fun instant(): Instant = now
+internal class MutableClock(var now: Instant) : Clock {
+    override fun now(): Instant = now
 }
 
 class DeviceCodeFlowTest {
@@ -31,24 +27,24 @@ class DeviceCodeFlowTest {
         private val script: MutableList<() -> DevicePoll>,
     ) : DeviceCodeSpec {
         val polls = mutableListOf<Instant>()
-        var clock: Clock = Clock.systemUTC()
+        var clock: Clock = Clock.System
         override val provider = Provider.Kimi
 
         override suspend fun requestCode() = grant
 
         override suspend fun poll(grant: DeviceCodeGrant): DevicePoll {
-            polls += clock.instant()
+            polls += clock.now()
             return script.removeAt(0).invoke()
         }
     }
 
-    private fun grant(expiresIn: Duration? = Duration.ofMinutes(10)) =
+    private fun grant(expiresIn: Duration? = 10.minutes) =
         DeviceCodeGrant(
             userCode = "ABCD-EFGH",
             deviceCode = "device-secret",
             verificationUri = "https://example.com/device",
             verificationUriComplete = "https://example.com/device?code=ABCD-EFGH",
-            interval = Duration.ofSeconds(5),
+            interval = 5.seconds,
             expiresIn = expiresIn,
         )
 
@@ -68,13 +64,13 @@ class DeviceCodeFlowTest {
         assertEquals("ABCD-EFGH", prompt.userCode)
         assertEquals("https://example.com/device", prompt.verificationUri)
         assertEquals("https://example.com/device?code=ABCD-EFGH", prompt.verificationUriComplete)
-        assertEquals(start.plus(Duration.ofMinutes(10)), prompt.expiresAt)
+        assertEquals(start.plus(10.minutes), prompt.expiresAt)
     }
 
     @Test
     fun `a provider without an expiry gets fifteen minutes`() = runTest {
         val prompt = flow(ScriptedSpec(grant(expiresIn = null), mutableListOf())).start()
-        assertEquals(start.plus(Duration.ofMinutes(15)), prompt.expiresAt)
+        assertEquals(start.plus(15.minutes), prompt.expiresAt)
     }
 
     @Test
@@ -93,7 +89,7 @@ class DeviceCodeFlowTest {
         val result = flow.awaitTokens(flow.start())
 
         assertEquals(tokens, result)
-        assertEquals(List(3) { Duration.ofSeconds(5) }, sleeps)
+        assertEquals(List(3) { 5.seconds }, sleeps)
     }
 
     @Test
@@ -111,19 +107,18 @@ class DeviceCodeFlowTest {
 
         flow.awaitTokens(flow.start())
 
-        assertEquals(listOf(5L, 10L, 15L).map(Duration::ofSeconds), sleeps)
+        assertEquals(listOf(5L, 10L, 15L).map { it.seconds }, sleeps)
     }
 
     @Test
     fun `stops polling once the code has expired`() = runTest {
-        val spec =
-            ScriptedSpec(grant(Duration.ofSeconds(12)), MutableList(10) { { DevicePoll.Pending } })
+        val spec = ScriptedSpec(grant(12.seconds), MutableList(10) { { DevicePoll.Pending } })
         val flow = flow(spec)
 
         assertFailsWith<AuthException.TimedOut> { flow.awaitTokens(flow.start()) }
 
         assertEquals(3, spec.polls.size)
-        assertEquals(listOf(5L, 5L, 2L).map(Duration::ofSeconds), sleeps)
+        assertEquals(listOf(5L, 5L, 2L).map { it.seconds }, sleeps)
     }
 
     @Test

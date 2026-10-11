@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetEventLog
-import java.time.Instant
 import java.time.ZoneId
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

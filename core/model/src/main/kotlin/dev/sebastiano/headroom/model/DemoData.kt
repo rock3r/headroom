@@ -3,17 +3,20 @@
 
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 /**
  * Example accounts for demo mode, screenshots and tests. The numbers match the design mockups:
  * Claude over pace, Codex under pace, Grok close to its limit, Copilot on a monthly window.
  */
 public object DemoData {
-    private val WEEK: Duration = Duration.ofDays(7)
-    private val SESSION: Duration = Duration.ofHours(5)
-    private val MONTH: Duration = Duration.ofDays(30)
+    private val WEEK: Duration = 7.days
+    private val SESSION: Duration = 5.hours
+    private val MONTH: Duration = 30.days
 
     public fun accounts(now: Instant): List<AccountState> =
         listOf(
@@ -25,23 +28,23 @@ public object DemoData {
                     "seven_day",
                     "Weekly · all models",
                     71.0,
-                    now.plus(Duration.ofMinutes(3988)),
+                    now.plus(3988.minutes),
                 ),
-                weekly("seven_day_opus", "Weekly · Opus", 52.0, now.plus(Duration.ofMinutes(3988))),
-                session("five_hour", 38.0, now.plus(Duration.ofMinutes(72))),
+                weekly("seven_day_opus", "Weekly · Opus", 52.0, now.plus(3988.minutes)),
+                session("five_hour", 38.0, now.plus(72.minutes)),
             ),
             state(
                 Account("demo-codex", Provider.Codex, "sam@example.com"),
                 "Pro",
                 now,
-                weekly("secondary", "Weekly", 34.0, now.plus(Duration.ofMinutes(5988))),
-                session("primary", 12.0, now.plus(Duration.ofMinutes(185))),
+                weekly("secondary", "Weekly", 34.0, now.plus(5988.minutes)),
+                session("primary", 12.0, now.plus(185.minutes)),
             ),
             state(
                 Account("demo-grok", Provider.Grok, "sam"),
                 "SuperGrok",
                 now,
-                weekly("weekly", "Weekly credits", 88.0, now.plus(Duration.ofMinutes(928))),
+                weekly("weekly", "Weekly credits", 88.0, now.plus(928.minutes)),
             ),
             state(
                 Account("demo-copilot", Provider.Copilot, "sam-dev"),
@@ -52,7 +55,7 @@ public object DemoData {
                     label = "Monthly · premium requests",
                     kind = WindowKind.Monthly,
                     usedPercent = 58.0,
-                    resetsAt = now.plus(Duration.ofMinutes(5008)),
+                    resetsAt = now.plus(5008.minutes),
                     length = MONTH,
                 ),
             ),
@@ -69,20 +72,20 @@ public object DemoData {
                     Account("demo-kimi", Provider.Kimi, "sam"),
                     "Moderato",
                     now,
-                    weekly("weekly", "Weekly", 23.0, now.plus(Duration.ofMinutes(7488))),
+                    weekly("weekly", "Weekly", 23.0, now.plus(7488.minutes)),
                 ),
                 state(
                     Account("demo-zai", Provider.ZAi, "sam@example.com"),
                     "GLM Coding Pro",
                     now,
-                    weekly("weekly", "Weekly", 46.0, now.plus(Duration.ofMinutes(2968))),
-                    session("five_hour", 64.0, now.plus(Duration.ofMinutes(140))),
+                    weekly("weekly", "Weekly", 46.0, now.plus(2968.minutes)),
+                    session("five_hour", 64.0, now.plus(140.minutes)),
                 ),
                 state(
                     Account("demo-opencode", Provider.OpenCodeGo, "sam"),
                     "Go",
                     now,
-                    weekly("weekly", "Weekly", 9.0, now.plus(Duration.ofMinutes(9208))),
+                    weekly("weekly", "Weekly", 9.0, now.plus(9208.minutes)),
                 ),
                 state(
                     Account("demo-jetbrains", Provider.JetBrains, "sam@example.com"),
@@ -93,7 +96,7 @@ public object DemoData {
                         label = "Monthly credits",
                         kind = WindowKind.Monthly,
                         usedPercent = 77.0,
-                        resetsAt = now.plus(Duration.ofDays(11)),
+                        resetsAt = now.plus(11.days),
                         length = MONTH,
                     ),
                 ),
@@ -104,7 +107,7 @@ public object DemoData {
      * before [now]. For previews and pictures of the expired state.
      */
     public fun accountsWithExpiredSignIn(now: Instant): List<AccountState> {
-        val stale = accounts(now.minus(Duration.ofHours(2))).first()
+        val stale = accounts(now.minus(2.hours)).first()
         return listOf(stale.copy(lastError = QuotaErrorKind.Auth)) + accounts(now).drop(1)
     }
 

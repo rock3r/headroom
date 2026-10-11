@@ -80,10 +80,10 @@ import dev.sebastiano.headroom.ui.overview.AnimatedPercent
 import dev.sebastiano.headroom.ui.resets.AccountResets
 import dev.sebastiano.headroom.ui.resets.ResetHandlers
 import dev.sebastiano.headroom.ui.resets.ResetsCard
-import java.time.Duration
-import java.time.Instant
 import java.time.format.TextStyle
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 const val DETAIL_TAG: String = "detail"
 
@@ -372,7 +372,7 @@ private fun WindowList(
                                 expiresAt?.let {
                                     stringResource(R.string.detail_expires_at, formatter.date(it))
                                 }
-                            resetsAt != null && account.signInExpired && !resetsAt.isAfter(now) ->
+                            resetsAt != null && account.signInExpired && resetsAt <= now ->
                                 stringResource(R.string.stale_window_reset_long)
                             resetsAt != null -> resetLine(window, resetsAt, now, formatter)
                             else -> null
@@ -459,7 +459,7 @@ private fun resetLine(window: WindowSummary, at: Instant, now: Instant, formatte
     when {
         window.kind == WindowKind.Session || window.kind == WindowKind.Daily ->
             stringResource(R.string.detail_resets_in_no_alert, formatter.countdown(now, at))
-        Duration.between(now, at) < Duration.ofDays(1) ->
+        (at - now) < 1.days ->
             stringResource(R.string.detail_resets_in, formatter.countdown(now, at))
         else -> stringResource(R.string.detail_resets_at, formatter.long(at))
     }

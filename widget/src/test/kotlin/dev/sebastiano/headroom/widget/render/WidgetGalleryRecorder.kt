@@ -18,9 +18,9 @@ import dev.sebastiano.headroom.widget.WidgetUiState
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import dev.sebastiano.headroom.widget.testing.withResets
 import java.io.File
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.Assume.assumeTrue
 import org.junit.Test

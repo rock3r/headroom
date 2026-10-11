@@ -1,9 +1,10 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 class SettingsTest {
     @Test
@@ -22,11 +23,11 @@ class SettingsTest {
     fun `sync frequencies run from the WorkManager minimum to six hours, or not at all`() {
         assertEquals(
             listOf(
-                Duration.ofMinutes(15),
-                Duration.ofMinutes(30),
-                Duration.ofHours(1),
-                Duration.ofHours(3),
-                Duration.ofHours(6),
+                15.minutes,
+                30.minutes,
+                1.hours,
+                3.hours,
+                6.hours,
             ),
             SyncFrequency.entries.mapNotNull { it.period },
         )

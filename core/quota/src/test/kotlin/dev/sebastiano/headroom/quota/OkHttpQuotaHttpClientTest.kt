@@ -1,10 +1,10 @@
 package dev.sebastiano.headroom.quota
 
 import java.io.IOException
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -130,7 +130,7 @@ class OkHttpQuotaHttpClientTest {
             client.execute(
                 QuotaHttpRequest(
                     url = server.url("/").toString(),
-                    timeout = Duration.ofMillis(200),
+                    timeout = 200.milliseconds,
                 )
             )
         }

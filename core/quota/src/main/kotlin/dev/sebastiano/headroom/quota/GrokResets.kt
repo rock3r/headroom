@@ -8,8 +8,8 @@ import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
 import java.io.IOException
-import java.time.Clock
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * SuperGrok usage-limit reset tokens: the "Redeem" card of grok.com's Settings → Usage. They are
@@ -140,7 +140,7 @@ internal class GrokResets(
         val now = now()
         val unexpired =
             tokens
-                .filter { it.id.isNotBlank() && (it.validUntil ?: Instant.MIN).isAfter(now) }
+                .filter { it.id.isNotBlank() && (it.validUntil ?: Instant.DISTANT_PAST) > now }
                 .sortedBy { it.validUntil }
         resetCall.done(
             "HTTP 200, grpc-status 0, ${tokens.size} tokens, ${unexpired.size} unexpired$suffix"
@@ -174,7 +174,7 @@ internal class GrokResets(
             "TE" to "trailers",
         )
 
-    private fun now(): Instant = clock.instant()
+    private fun now(): Instant = clock.now()
 
     /** A call either gives the unexpired tokens, or the outcome to report. */
     private sealed interface Answer {

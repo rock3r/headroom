@@ -36,7 +36,6 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.providerColors
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Duration
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -177,13 +176,12 @@ internal fun SparklineChart(line: Sparkline, color: Color, modifier: Modifier = 
     val entrance = rememberEntrance(line.points)
     val baseline = MaterialTheme.colorScheme.outlineVariant
     Canvas(modifier = modifier) {
-        val span = Duration.between(line.start, line.end).toMillis().toFloat()
+        val span = (line.end - line.start).inWholeMilliseconds.toFloat()
         if (span <= 0f) return@Canvas
         val dot = SparkDot.toPx()
         val top = dot
         val bottom = size.height - dot
-        fun x(point: UsagePoint) =
-            Duration.between(line.start, point.at).toMillis() / span * size.width
+        fun x(point: UsagePoint) = (point.at - line.start).inWholeMilliseconds / span * size.width
         fun y(point: UsagePoint) =
             bottom - (point.usedPercent / LIMIT).toFloat().coerceIn(0f, 1f) * (bottom - top)
         drawLine(baseline, Offset(0f, bottom), Offset(size.width, bottom), 1.dp.toPx())

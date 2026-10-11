@@ -16,6 +16,7 @@ import dev.sebastiano.headroom.data.reset.ResetReminderWorker
 import dev.sebastiano.headroom.data.reset.ResetReminders
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.SyncFrequency
+import kotlin.time.toJavaDuration
 
 /**
  * Refreshes every account. Runs on the period the user picked in the settings, at least every 15
@@ -47,7 +48,7 @@ internal class SyncWorker(
                 return
             }
             val request =
-                PeriodicWorkRequestBuilder<SyncWorker>(period)
+                PeriodicWorkRequestBuilder<SyncWorker>(period.toJavaDuration())
                     .setConstraints(
                         Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                     )

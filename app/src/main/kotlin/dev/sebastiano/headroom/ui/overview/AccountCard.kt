@@ -49,8 +49,8 @@ import dev.sebastiano.headroom.ui.components.windowKindLabel
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
-import java.time.Instant
 import kotlin.math.roundToInt
+import kotlin.time.Instant
 
 /**
  * One account on the overview: the big number, the primary window's bar with its pace tick, the
@@ -203,7 +203,7 @@ private fun resetLabel(
     format: (Instant) -> String,
 ): String? {
     val resetsAt = window.resetsAt ?: return null
-    return if (stale && !resetsAt.isAfter(now)) stringResource(R.string.stale_window_reset)
+    return if (stale && resetsAt <= now) stringResource(R.string.stale_window_reset)
     else format(resetsAt)
 }
 

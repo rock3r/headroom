@@ -3,8 +3,10 @@ package dev.sebastiano.headroom.auth
 import dev.sebastiano.headroom.model.Provider
 import java.net.URI
 import java.net.URISyntaxException
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * GitHub Copilot sign-in: GitHub's device flow gives a GitHub token, which is then exchanged for a
@@ -36,9 +38,8 @@ internal class CopilotDeviceAuth(
             deviceCode = json.requireString("device_code", context),
             verificationUri = trustedWebUri(json.requireString("verification_uri", context)),
             verificationUriComplete = null,
-            interval =
-                Duration.ofSeconds((json.long("interval") ?: DEFAULT_INTERVAL).coerceAtLeast(1)),
-            expiresIn = json.long("expires_in")?.let(Duration::ofSeconds),
+            interval = ((json.long("interval") ?: DEFAULT_INTERVAL).coerceAtLeast(1)).seconds,
+            expiresIn = json.long("expires_in")?.seconds,
         )
     }
 
@@ -95,7 +96,7 @@ internal class CopilotDeviceAuth(
                 )
                 .successJson(context)
         val expiresAt =
-            json.long("expires_at")?.let(Instant::ofEpochSecond)
+            json.long("expires_at")?.let(Instant::fromEpochSeconds)
                 ?: throw AuthException.InvalidResponse("$context response has no expires_at")
         return TokenSet(
             provider = provider,
@@ -126,7 +127,7 @@ internal class CopilotDeviceAuth(
         const val GITHUB_API_BASE_URL = "https://api.github.com"
         const val DEVICE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code"
         const val DEFAULT_INTERVAL = 5L
-        val EXPIRY_MARGIN: Duration = Duration.ofMinutes(5)
+        val EXPIRY_MARGIN: Duration = 5.minutes
     }
 }
 

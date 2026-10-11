@@ -26,7 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.WidgetUiState
-import java.time.Duration
+import kotlin.time.Duration
 
 /**
  * Time left until the next weekly reset across the chosen accounts. The number ticks inside the

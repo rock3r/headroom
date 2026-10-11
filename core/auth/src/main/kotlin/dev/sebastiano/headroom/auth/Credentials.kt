@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
+import kotlin.time.Instant
 
 /** How a credential was obtained. */
 public enum class CredentialKind {
@@ -78,7 +78,7 @@ public data class StoredCredential(
     val revision: Long = 0,
 ) {
     /** True once [expiresAt] has been reached. Credentials without an expiry never expire. */
-    public fun isExpired(now: Instant): Boolean = expiresAt?.let { !it.isAfter(now) } ?: false
+    public fun isExpired(now: Instant): Boolean = expiresAt?.let { it <= now } ?: false
 
     /** The ChatGPT account id Codex requests need, when this is a Codex credential. */
     val chatGptAccountId: String?

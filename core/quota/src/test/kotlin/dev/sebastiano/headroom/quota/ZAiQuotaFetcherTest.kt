@@ -5,11 +5,12 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -74,13 +75,13 @@ class ZAiQuotaFetcherTest {
         val fiveHour = snapshot.windows[0]
         assertEquals(25.0, fiveHour.usedPercent)
         assertEquals(WindowKind.Session, fiveHour.kind)
-        assertEquals(Duration.ofHours(5), fiveHour.length)
-        assertEquals(Instant.ofEpochMilli(1_775_235_600_000), fiveHour.resetsAt)
+        assertEquals(5.hours, fiveHour.length)
+        assertEquals(Instant.fromEpochMilliseconds(1_775_235_600_000), fiveHour.resetsAt)
         val weekly = snapshot.windows[1]
         assertEquals(7.0, weekly.usedPercent)
         assertEquals(WindowKind.Weekly, weekly.kind)
-        assertEquals(Duration.ofDays(7), weekly.length)
-        assertEquals(Instant.ofEpochMilli(1_775_728_800_000), weekly.resetsAt)
+        assertEquals(7.days, weekly.length)
+        assertEquals(Instant.fromEpochMilliseconds(1_775_728_800_000), weekly.resetsAt)
     }
 
     @Test

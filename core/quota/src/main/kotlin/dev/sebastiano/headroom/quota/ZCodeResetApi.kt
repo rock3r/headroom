@@ -6,9 +6,10 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.WindowKind
 import java.io.IOException
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -57,7 +58,7 @@ internal class ZCodeResetApi(
                         HTTP_UNAUTHORIZED,
                         HTTP_FORBIDDEN -> ZCodeStatus.Refused
                         HTTP_TOO_MANY_REQUESTS ->
-                            ZCodeStatus.RateLimited(retryAfter(answer.headers, clock.instant()))
+                            ZCodeStatus.RateLimited(retryAfter(answer.headers, clock.now()))
                         else -> ZCodeStatus.Failed
                     }
                 Envelope.Unreachable -> ZCodeStatus.Unreachable
@@ -98,7 +99,7 @@ internal class ZCodeResetApi(
                         HTTP_UNAUTHORIZED,
                         HTTP_FORBIDDEN -> ZCodeUse.Refused
                         HTTP_TOO_MANY_REQUESTS ->
-                            ZCodeUse.RateLimited(retryAfter(answer.headers, clock.instant()))
+                            ZCodeUse.RateLimited(retryAfter(answer.headers, clock.now()))
                         else -> ZCodeUse.Failed(QuotaErrorKind.Unknown)
                     }
                 Envelope.Unreachable -> ZCodeUse.Failed(QuotaErrorKind.Network)
@@ -227,15 +228,15 @@ internal class ZCodeResetApi(
             (card as? JsonObject)?.let { instantOf(it, "expire_at") }
         }
         if (expiries.any { it == null }) return null
-        val now = clock.instant()
-        return expiries.filterNotNull().filter { it.isAfter(now) }.sorted()
+        val now = clock.now()
+        return expiries.filterNotNull().filter { it > now }.sorted()
     }
 
     /** ZCode sends times in epoch milliseconds; seconds are read as seconds. */
     private fun instantOf(json: JsonObject, key: String): Instant? {
         val value = (json[key] as? JsonPrimitive)?.longOrNull ?: return null
-        return if (value >= MILLIS_THRESHOLD) Instant.ofEpochMilli(value)
-        else Instant.ofEpochSecond(value)
+        return if (value >= MILLIS_THRESHOLD) Instant.fromEpochMilliseconds(value)
+        else epochSecondsToInstant(value)
     }
 
     /**
@@ -290,7 +291,7 @@ internal class ZCodeResetApi(
         const val DEPENDENCY_FAILED = 2007L
         const val MILLIS_THRESHOLD = 1_000_000_000_000L
         const val NEXT_TRY_AT = "next_try_at"
-        val HISTORY_READ_TIMEOUT: Duration = Duration.ofSeconds(5)
+        val HISTORY_READ_TIMEOUT: Duration = 5.seconds
         val HTTP_STATUSES_FIRST = setOf(HTTP_UNAUTHORIZED, HTTP_FORBIDDEN, HTTP_TOO_MANY_REQUESTS)
     }
 }

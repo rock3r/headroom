@@ -24,11 +24,12 @@ import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
 import dev.sebastiano.headroom.quota.ResetRedeemer
 import java.io.IOException
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 
 class SyncedResetProviderTest {
@@ -241,7 +242,7 @@ class SyncedResetProviderTest {
             RedeemOutcome.SignInAgain,
             provider.redeem(codex, "codex", ResetAttemptKey("key-1")),
         )
-        signIn(codex, expiresAt = now.minusSeconds(1))
+        signIn(codex, expiresAt = now - 1.seconds)
         assertEquals(
             RedeemOutcome.SignInAgain,
             provider.redeem(codex, "codex", ResetAttemptKey("key-2")),

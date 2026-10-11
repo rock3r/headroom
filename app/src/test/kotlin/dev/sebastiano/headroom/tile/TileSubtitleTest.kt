@@ -2,10 +2,10 @@ package dev.sebastiano.headroom.tile
 
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaDisplay
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.time.Instant
 
 class TileSubtitleTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")

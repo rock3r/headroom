@@ -12,13 +12,14 @@ import dev.sebastiano.headroom.model.ResetEvent
 import dev.sebastiano.headroom.model.ResetEventKind
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetUseSource
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,7 +76,7 @@ class StatsViewModelTest {
                     poolId = "credits",
                     poolLabel = "Reset credits",
                     kind = ResetEventKind.Used,
-                    at = now.minusSeconds(60),
+                    at = now - 60.seconds,
                     source = ResetUseSource.Headroom,
                 )
             val log = FakeResetEvents(listOf(event))
@@ -85,7 +86,7 @@ class StatsViewModelTest {
 
             val usage = stats.state.value.stats.resetUsage
             assertEquals(1, usage?.of(ResetPeriod.FourWeeks)?.used)
-            assertEquals(now.minus(Duration.ofDays(365)), log.askedSince)
+            assertEquals(now.minus(365.days), log.askedSince)
         }
 
     @Test

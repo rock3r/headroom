@@ -2,16 +2,17 @@ package dev.sebastiano.headroom.ui.stats
 
 import dev.sebastiano.headroom.appdata.ResetPeaks
 import java.time.DayOfWeek
-import java.time.Duration
-import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 /** The heatmap needs this much history, so that every day of the week has had a turn. */
-private val MIN_HEATMAP_SPAN: Duration = Duration.ofDays(BurnHeatmap.DAYS.toLong())
+private val MIN_HEATMAP_SPAN: Duration = (BurnHeatmap.DAYS.toLong()).days
 
 /** The sparklines show this recent span. */
-internal val SPARKLINE_SPAN: Duration = Duration.ofDays(BurnHeatmap.DAYS.toLong())
+internal val SPARKLINE_SPAN: Duration = (BurnHeatmap.DAYS.toLong()).days
 
 /** Every stat, from each account's main limit and its history. Pure, so it can run anywhere. */
 internal fun stats(sources: List<StatsSource>, now: Instant, zone: ZoneId): Stats {
@@ -35,7 +36,7 @@ internal val StatsSource.statAccount: StatAccount
 internal fun coverage(sources: List<StatsSource>, now: Instant): Coverage? {
     val oldest =
         sources.flatMap { source -> source.points.map { it.at } }.minOrNull() ?: return null
-    return Coverage(days = Duration.between(oldest, now).toDays().toInt().coerceAtLeast(0))
+    return Coverage(days = (now - oldest).inWholeDays.toInt().coerceAtLeast(0))
 }
 
 /** Every reset in the history of every account, oldest first. */
@@ -104,7 +105,7 @@ internal fun heatmap(sources: List<StatsSource>, zone: ZoneId): BurnHeatmap? {
     val times = sources.flatMap { source -> source.points.map { it.at } }
     val first = times.minOrNull() ?: return null
     val last = times.maxOrNull() ?: return null
-    if (Duration.between(first, last) < MIN_HEATMAP_SPAN) return null
+    if (last - first < MIN_HEATMAP_SPAN) return null
     val cells = DoubleArray(BurnHeatmap.DAYS * BurnHeatmap.HOURS)
     sources.forEach { source ->
         hourlyBurn(source.points, zone).forEach { (hour, amount) -> cells[hour.cell] += amount }
@@ -133,7 +134,7 @@ internal fun sparklines(sources: List<StatsSource>, now: Instant): List<Sparklin
     return sources.map { source ->
         Sparkline(
             account = source.statAccount,
-            points = source.points.filter { !it.at.isBefore(start) && !it.at.isAfter(now) },
+            points = source.points.filter { it.at in start..now },
             start = start,
             end = now,
             current = source.window.usedPercent,

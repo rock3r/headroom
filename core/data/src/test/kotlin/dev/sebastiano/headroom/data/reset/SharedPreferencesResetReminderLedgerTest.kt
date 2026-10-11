@@ -2,10 +2,10 @@ package dev.sebastiano.headroom.data.reset
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
@@ -27,7 +27,7 @@ class SharedPreferencesResetReminderLedgerTest {
                         "codex/credits/1" to Instant.parse("2026-10-11T06:18:00Z"),
                         "grok/tokens/2" to Instant.parse("2026-10-11T20:00:00Z"),
                     ),
-                lastDay = LocalDate.of(2026, 10, 10),
+                lastDay = LocalDate(2026, 10, 10),
             )
 
         SharedPreferencesResetReminderLedger(context).save(record)
@@ -38,11 +38,13 @@ class SharedPreferencesResetReminderLedgerTest {
     @Test
     fun `a new save replaces what was stored`() {
         val ledger = SharedPreferencesResetReminderLedger(context)
-        ledger.save(ReminderRecord(mapOf("old" to Instant.EPOCH), LocalDate.of(2026, 10, 9)))
+        ledger.save(
+            ReminderRecord(mapOf("old" to Instant.fromEpochSeconds(0)), LocalDate(2026, 10, 9))
+        )
         val next =
             ReminderRecord(
                 mapOf("new" to Instant.parse("2026-10-12T00:00:00Z")),
-                LocalDate.of(2026, 10, 11),
+                LocalDate(2026, 10, 11),
             )
 
         ledger.save(next)

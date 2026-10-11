@@ -2,16 +2,19 @@ package dev.sebastiano.headroom.ui.stats
 
 import dev.sebastiano.headroom.appdata.ResetPeaks
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Duration
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.toJavaInstant
+import kotlin.time.toKotlinInstant
 
 /**
  * Longer than this between two syncs, the history cannot say when the use happened, so the hourly
  * stats leave it out. The totals still count it.
  */
-private val MAX_GAP: Duration = Duration.ofHours(MAX_GAP_HOURS)
+private val MAX_GAP: Duration = MAX_GAP_HOURS.hours
 
 private const val MAX_GAP_HOURS = 12L
 
@@ -39,8 +42,8 @@ internal fun hourlyBurn(points: List<UsagePoint>, zone: ZoneId): Map<LocalDateTi
     val hours = mutableMapOf<LocalDateTime, Double>()
     points.zipWithNext { from, to ->
         val amount = burned(from, to)
-        val gap = Duration.between(from.at, to.at)
-        if (amount > 0.0 && !gap.isNegative && gap <= MAX_GAP) {
+        val gap = to.at - from.at
+        if (amount > 0.0 && !gap.isNegative() && gap <= MAX_GAP) {
             spread(from, to, amount, zone) { hour, share -> hours.merge(hour, share, Double::plus) }
         }
     }
@@ -55,18 +58,21 @@ private fun spread(
     zone: ZoneId,
     add: (LocalDateTime, Double) -> Unit,
 ) {
-    val gap = Duration.between(from.at, to.at)
-    if (gap.isZero) {
-        add(to.at.atZone(zone).truncatedTo(ChronoUnit.HOURS).toLocalDateTime(), amount)
+    val gap = to.at - from.at
+    if (gap == Duration.ZERO) {
+        add(
+            to.at.toJavaInstant().atZone(zone).truncatedTo(ChronoUnit.HOURS).toLocalDateTime(),
+            amount,
+        )
         return
     }
     var cursor = from.at
     while (cursor < to.at) {
-        val hour = cursor.atZone(zone).truncatedTo(ChronoUnit.HOURS)
-        val next = minOf(hour.plusHours(1).toInstant(), to.at)
+        val hour = cursor.toJavaInstant().atZone(zone).truncatedTo(ChronoUnit.HOURS)
+        val next = minOf(hour.plusHours(1).toInstant().toKotlinInstant(), to.at)
         add(
             hour.toLocalDateTime(),
-            amount * Duration.between(cursor, next).toMillis() / gap.toMillis(),
+            amount * (next - cursor).inWholeMilliseconds / gap.inWholeMilliseconds,
         )
         cursor = next
     }

@@ -6,14 +6,15 @@ import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -28,12 +29,8 @@ class ZAiResetsTest {
     private val log = RecordingResetLog()
     private var now = FIXED_NOW
     private val clock =
-        object : Clock() {
-            override fun instant(): Instant = now
-
-            override fun getZone() = ZoneOffset.UTC
-
-            override fun withZone(zone: java.time.ZoneId?) = this
+        object : Clock {
+            override fun now(): Instant = now
         }
     private lateinit var resets: ZAiResets
 
@@ -264,7 +261,7 @@ class ZAiResetsTest {
         )
 
         val history = http.requests.single { it.url.endsWith("/history/read") }
-        assertEquals(Duration.ofSeconds(5), history.timeout)
+        assertEquals(5.seconds, history.timeout)
     }
 
     @Test
@@ -406,7 +403,7 @@ class ZAiResetsTest {
         server.enqueue(
             jsonResponse("").newBuilder().code(429).addHeader("Retry-After", "30").build()
         )
-        assertEquals(RedeemOutcome.RateLimited(FIXED_NOW.plusSeconds(30)), redeem())
+        assertEquals(RedeemOutcome.RateLimited(FIXED_NOW + 30.seconds), redeem())
 
         server.enqueueJson(fixture("zai/reset_status_week_only.json"))
         server.enqueueJson(used())
@@ -483,9 +480,9 @@ class ZAiResetsTest {
 
     @Test
     fun `a decline names the next try, and asking again before it stays local`() = runTest {
-        val next = FIXED_NOW.plus(Duration.ofHours(3))
+        val next = FIXED_NOW.plus(3.hours)
         server.enqueueJson(
-            """{"code":3301,"msg":"no opportunity","data":{"next_try_at":${next.toEpochMilli()}}}"""
+            """{"code":3301,"msg":"no opportunity","data":{"next_try_at":${next.toEpochMilliseconds()}}}"""
         )
 
         assertEquals(AskOutcome.NotYet(next), resets.ask(credentials()))
@@ -499,9 +496,9 @@ class ZAiResetsTest {
 
     @Test
     fun `a decline on an HTTP error is still a decline`() = runTest {
-        val next = FIXED_NOW.plus(Duration.ofHours(1))
+        val next = FIXED_NOW.plus(1.hours)
         server.enqueueJson(
-            """{"code":3301,"data":{"granted":false,"next_try_at":${next.toEpochMilli()}}}""",
+            """{"code":3301,"data":{"granted":false,"next_try_at":${next.toEpochMilliseconds()}}}""",
             code = 400,
         )
         assertEquals(AskOutcome.NotYet(next), resets.ask(credentials()))
@@ -509,16 +506,16 @@ class ZAiResetsTest {
 
     @Test
     fun `a decline holds asks off for at least 5 minutes`() = runTest {
-        val soon = FIXED_NOW.plus(Duration.ofMinutes(1))
-        server.enqueueJson("""{"code":3301,"data":{"next_try_at":${soon.toEpochMilli()}}}""")
+        val soon = FIXED_NOW.plus(1.minutes)
+        server.enqueueJson("""{"code":3301,"data":{"next_try_at":${soon.toEpochMilliseconds()}}}""")
         assertEquals(
-            AskOutcome.NotYet(FIXED_NOW.plus(Duration.ofMinutes(5))),
+            AskOutcome.NotYet(FIXED_NOW.plus(5.minutes)),
             resets.ask(credentials()),
         )
 
         server.enqueueJson("""{"code":3301,"data":{}}""")
-        now = FIXED_NOW.plus(Duration.ofMinutes(5))
-        assertEquals(AskOutcome.NotYet(now.plus(Duration.ofMinutes(10))), resets.ask(credentials()))
+        now = FIXED_NOW.plus(5.minutes)
+        assertEquals(AskOutcome.NotYet(now.plus(10.minutes)), resets.ask(credentials()))
     }
 
     @Test
@@ -536,7 +533,7 @@ class ZAiResetsTest {
         assertEquals(AskOutcome.Throttled, resets.ask(credentials()))
 
         assertEquals(
-            AskOutcome.NotYet(FIXED_NOW.plus(Duration.ofMinutes(10))),
+            AskOutcome.NotYet(FIXED_NOW.plus(10.minutes)),
             resets.ask(credentials()),
         )
         assertEquals(1, server.requestCount)

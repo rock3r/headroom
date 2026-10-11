@@ -56,7 +56,7 @@ import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.addWidgetTag
 import dev.sebastiano.headroom.ui.stats.STATS_TAG
 import dev.sebastiano.headroom.widgets.WidgetStyle
-import java.time.Duration
+import kotlin.time.Duration.Companion.days
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -633,7 +633,7 @@ private fun creditWindows(): List<QuotaWindow> =
             usedAmount = 102.0,
             limitAmount = 250.0,
             amountUnit = "USD",
-            expiresAt = FIXED_NOW.plus(Duration.ofDays(39)),
+            expiresAt = FIXED_NOW.plus(39.days),
         ),
         QuotaWindow(
             id = "cinder_cove",
@@ -642,7 +642,7 @@ private fun creditWindows(): List<QuotaWindow> =
             usedPercent = 15.0,
             resetsAt = null,
             length = null,
-            expiresAt = FIXED_NOW.plus(Duration.ofDays(64)),
+            expiresAt = FIXED_NOW.plus(64.days),
         ),
     )
 

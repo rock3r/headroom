@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
 
 /**

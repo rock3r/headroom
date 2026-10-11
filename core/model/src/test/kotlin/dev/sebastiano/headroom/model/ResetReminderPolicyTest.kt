@@ -1,17 +1,18 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
 
 class ResetReminderPolicyTest {
-    private val zone = ZoneId.of("Europe/Rome")
+    private val zone = TimeZone.of("Europe/Rome")
     private val now = Instant.parse("2026-10-10T08:00:00Z") // 10:00 in Rome
-    private val today = LocalDate.of(2026, 10, 10)
+    private val today = LocalDate(2026, 10, 10)
 
     private fun account(provider: Provider, id: String = "acc-${provider.id}") =
         Account(id = id, provider = provider, label = "sam@example.com")
@@ -65,7 +66,7 @@ class ResetReminderPolicyTest {
             ResetReminderPolicy.expiringResets(
                 listOf(
                     state(Provider.Codex, pool(inTwoDays, tomorrow)),
-                    state(Provider.Grok, pool(now.minusSeconds(1), id = "gone")),
+                    state(Provider.Grok, pool(now - 1.seconds, id = "gone")),
                 ),
                 AppSettings(),
                 now,
@@ -207,7 +208,7 @@ class ResetReminderPolicyTest {
 
     @Test
     fun `a check leaves out the resets already reminded about`() {
-        val resets = expiring(tomorrow, tomorrow.plusSeconds(60))
+        val resets = expiring(tomorrow, tomorrow + 60.seconds)
 
         val due = ResetReminderPolicy.due(resets, setOf(resets.first().key), null, now, zone)
 

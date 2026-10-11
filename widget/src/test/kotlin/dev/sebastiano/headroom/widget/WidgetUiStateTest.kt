@@ -12,12 +12,13 @@ import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.widget.testing.pool
 import dev.sebastiano.headroom.widget.testing.withResets
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import org.junit.Test
 
 class WidgetUiStateTest {
@@ -53,7 +54,7 @@ class WidgetUiStateTest {
         assertTrue(ring.gauge.stale)
         assertEquals(false, ring.gauge.needsAttention)
         assertEquals(false, ring.wavy)
-        val syncedAt = now.minus(Duration.ofHours(2))
+        val syncedAt = now.minus(2.hours)
         val expected =
             dev.sebastiano.headroom.model.Pace.expectedPercent(
                 accounts.first().primaryWindow!!,
@@ -299,8 +300,8 @@ class WidgetUiStateTest {
             )
 
         assertEquals(UsageShape.Cookie, weekly.gauge.shape)
-        assertEquals(ResetLabel.At(now.plus(Duration.ofMinutes(5988))), weekly.gauge.reset)
-        assertEquals(ResetLabel.In(Duration.ofMinutes(185)), session.gauge.reset)
+        assertEquals(ResetLabel.At(now.plus(5988.minutes)), weekly.gauge.reset)
+        assertEquals(ResetLabel.In(185.minutes), session.gauge.reset)
     }
 
     @Test
@@ -322,8 +323,8 @@ class WidgetUiStateTest {
             )
 
         assertEquals("demo-grok", all.next?.accountId)
-        assertEquals(now.plus(Duration.ofMinutes(928)), all.next?.resetsAt)
-        assertEquals(Duration.ofMinutes(928), all.next?.remaining)
+        assertEquals(now.plus(928.minutes), all.next?.resetsAt)
+        assertEquals(928.minutes, all.next?.remaining)
         assertEquals(GaugeWindow.Weekly, all.next?.window)
         assertEquals("demo-claude", onlyClaude.next?.accountId)
     }
@@ -339,12 +340,12 @@ class WidgetUiStateTest {
                 usedPercent = 99.0,
                 resetsAt = null,
                 length = null,
-                expiresAt = now.plus(Duration.ofMinutes(5)),
+                expiresAt = now.plus(5.minutes),
             )
         val unknown =
             weekly.copy(
                 id = "nimbus_quill",
-                resetsAt = now.plus(Duration.ofMinutes(5)),
+                resetsAt = now.plus(5.minutes),
                 isRecognised = false,
             )
         fun claudeWith(vararg windows: QuotaWindow) =

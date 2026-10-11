@@ -4,10 +4,11 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -167,7 +168,7 @@ class CodexResetsTest {
                 MockResponse(code = 401) to RedeemOutcome.SignInAgain,
                 MockResponse(code = 403) to RedeemOutcome.SignInAgain,
                 MockResponse.Builder().code(429).addHeader("Retry-After", "30").build() to
-                    RedeemOutcome.RateLimited(FIXED_NOW.plusSeconds(30)),
+                    RedeemOutcome.RateLimited(FIXED_NOW + 30.seconds),
                 MockResponse(code = 500) to RedeemOutcome.Failed(QuotaErrorKind.Unknown),
                 jsonResponse("not json") to RedeemOutcome.Failed(QuotaErrorKind.Parse),
             )

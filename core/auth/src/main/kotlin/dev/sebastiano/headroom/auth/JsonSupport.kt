@@ -1,8 +1,9 @@
 package dev.sebastiano.headroom.auth
 
-import java.time.Duration
-import java.time.Instant
 import java.util.Base64
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -51,7 +52,7 @@ private const val JWT_PARTS = 3
 
 /** `now + ttl - min(maxSkew, ttl / 2)`: refresh a little early, but never before half the ttl. */
 internal fun expiryWithSkew(now: Instant, expiresInSeconds: Long, maxSkew: Duration): Instant {
-    val ttl = Duration.ofSeconds(expiresInSeconds)
-    val skew = minOf(maxSkew, ttl.dividedBy(2))
-    return now.plus(ttl).minus(skew)
+    val ttl = expiresInSeconds.seconds
+    val skew = minOf(maxSkew, ttl / 2)
+    return now + ttl - skew
 }

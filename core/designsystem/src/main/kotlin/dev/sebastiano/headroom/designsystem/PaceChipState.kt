@@ -4,9 +4,9 @@ import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.model.Pace
 import dev.sebastiano.headroom.model.PaceStatus
 import dev.sebastiano.headroom.model.QuotaWindow
-import java.time.Instant
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.Instant
 
 /** What the pace chip says about one window. */
 @Immutable

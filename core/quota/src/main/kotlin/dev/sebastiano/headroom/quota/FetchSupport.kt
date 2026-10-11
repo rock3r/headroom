@@ -3,11 +3,15 @@ package dev.sebastiano.headroom.quota
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import java.io.IOException
-import java.time.DateTimeException
-import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.format.DateTimeParseException
 import java.util.Locale
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.UtcOffset
+import kotlinx.datetime.format.DateTimeComponents
+import kotlinx.datetime.format.alternativeParsing
+import kotlinx.datetime.format.char
+import kotlinx.datetime.format.optional
+import kotlinx.datetime.parse
 import kotlinx.serialization.json.Json
 
 internal const val HTTP_OK = 200
@@ -77,7 +81,8 @@ internal fun parseFailure(providerName: String): QuotaResult.Failure =
 /**
  * Runs a non-suspending parse step and returns `null` when the payload has an unexpected shape.
  * JSON syntax errors are [IllegalArgumentException]s; wrong element types are
- * [IllegalArgumentException]s or [IllegalStateException]s; bad dates are [DateTimeException]s.
+ * [IllegalArgumentException]s or [IllegalStateException]s; bad dates are
+ * [IllegalArgumentException]s.
  */
 internal inline fun <T : Any> parseOrNull(block: () -> T?): T? =
     try {
@@ -86,18 +91,54 @@ internal inline fun <T : Any> parseOrNull(block: () -> T?): T? =
         null
     } catch (_: IllegalStateException) {
         null
-    } catch (_: DateTimeException) {
-        null
     }
 
+/**
+ * The instant [seconds] (plus [nanos]) after the epoch. Unlike [Instant.fromEpochSeconds], which
+ * clamps, a time outside the range of [Instant] is an [IllegalArgumentException], so a parse step
+ * reports it as a bad payload.
+ */
+internal fun epochSecondsToInstant(seconds: Long, nanos: Long = 0): Instant {
+    val instant = Instant.fromEpochSeconds(seconds, nanos)
+    require(instant.epochSeconds - nanos.floorDiv(NANOS_PER_SECOND) == seconds) {
+        "Epoch seconds out of range: $seconds"
+    }
+    return instant
+}
+
+private const val NANOS_PER_SECOND = 1_000_000_000L
+
+/**
+ * ISO-8601 date and time with an offset, where the seconds are optional as ISO-8601 allows.
+ * [Instant.parse] requires them.
+ */
+private val ISO_INSTANT = DateTimeComponents.Format {
+    date(LocalDate.Formats.ISO)
+    alternativeParsing({ char('t') }) { char('T') }
+    hour()
+    char(':')
+    minute()
+    optional {
+        char(':')
+        second()
+        optional {
+            char('.')
+            secondFraction(1, MAX_FRACTION_DIGITS)
+        }
+    }
+    offset(UtcOffset.Formats.ISO)
+}
+
+private const val MAX_FRACTION_DIGITS = 9
+
 /** Parses an ISO-8601 instant with a `Z` suffix or a numeric offset. */
-internal fun parseInstant(text: String): Instant = OffsetDateTime.parse(text).toInstant()
+internal fun parseInstant(text: String): Instant = Instant.parse(text, ISO_INSTANT)
 
 /** Like [parseInstant], but `null` for text that is not an instant. */
 internal fun parseInstantOrNull(text: String): Instant? =
     try {
         parseInstant(text)
-    } catch (_: DateTimeParseException) {
+    } catch (_: IllegalArgumentException) {
         null
     }
 

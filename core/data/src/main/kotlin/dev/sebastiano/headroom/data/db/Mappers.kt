@@ -8,13 +8,13 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
     val provider = Provider.fromId(account.provider) ?: return null
     val domainAccount = Account(account.id, provider, account.label, account.nickname)
-    val fetchedAt = account.fetchedAtEpochMs?.let(Instant::ofEpochMilli)
+    val fetchedAt = account.fetchedAtEpochMs?.let(Instant::fromEpochMilliseconds)
     val snapshot = fetchedAt?.let {
         QuotaSnapshot(
             provider = provider,
@@ -46,14 +46,14 @@ internal fun WindowEntity.toDomain() =
         label = label,
         kind = runCatching { WindowKind.valueOf(kind) }.getOrDefault(WindowKind.Other),
         usedPercent = usedPercent,
-        resetsAt = resetsAtEpochMs?.let(Instant::ofEpochMilli),
-        length = lengthSeconds?.let(Duration::ofSeconds),
+        resetsAt = resetsAtEpochMs?.let(Instant::fromEpochMilliseconds),
+        length = lengthSeconds?.seconds,
         group = groupLabel,
         isUnlimited = isUnlimited,
         usedAmount = usedAmount,
         limitAmount = limitAmount,
         amountUnit = amountUnit,
-        expiresAt = expiresAtEpochMs?.let(Instant::ofEpochMilli),
+        expiresAt = expiresAtEpochMs?.let(Instant::fromEpochMilliseconds),
         isRecognised = isRecognised,
     )
 
@@ -65,13 +65,13 @@ internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
         label = label,
         kind = kind.name,
         usedPercent = usedPercent,
-        resetsAtEpochMs = resetsAt?.toEpochMilli(),
-        lengthSeconds = length?.seconds,
+        resetsAtEpochMs = resetsAt?.toEpochMilliseconds(),
+        lengthSeconds = length?.inWholeSeconds,
         groupLabel = group,
         isUnlimited = isUnlimited,
         usedAmount = usedAmount,
         limitAmount = limitAmount,
         amountUnit = amountUnit,
-        expiresAtEpochMs = expiresAt?.toEpochMilli(),
+        expiresAtEpochMs = expiresAt?.toEpochMilliseconds(),
         isRecognised = isRecognised,
     )

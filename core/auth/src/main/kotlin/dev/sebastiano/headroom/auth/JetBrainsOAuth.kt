@@ -1,8 +1,9 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * JetBrains AI sign-in with the public `junie-cli` client. The registered redirect is
@@ -72,7 +73,7 @@ internal class JetBrainsOAuth(
         val expiresIn =
             json.long("expires_in")?.takeIf { it > 0 }
                 ?: throw AuthException.InvalidResponse("$context response has no expiry")
-        val expiresAt = expiryWithSkew(clock.instant(), expiresIn, EXPIRY_MARGIN)
+        val expiresAt = expiryWithSkew(clock.now(), expiresIn, EXPIRY_MARGIN)
         val tokens = json.toTokenSet(provider, context, expiresAt, requireRefresh)
         // The quota fetcher trades the ID token for a JetBrains AI token. A refresh without one
         // leaves no extra, so the stored token stays.
@@ -89,6 +90,6 @@ internal class JetBrainsOAuth(
         const val SCOPE = "offline_access openid jb-authn-service"
         const val FIRST_PORT = 62345
         const val LAST_PORT = 62364
-        val EXPIRY_MARGIN: Duration = Duration.ofMinutes(5)
+        val EXPIRY_MARGIN: Duration = 5.minutes
     }
 }

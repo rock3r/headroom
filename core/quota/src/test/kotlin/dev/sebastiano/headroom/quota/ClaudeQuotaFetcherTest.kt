@@ -4,13 +4,14 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -99,11 +100,11 @@ class ClaudeQuotaFetcherTest {
         )
         val session = snapshot.windows[0]
         assertEquals(38.0, session.usedPercent)
-        assertEquals(Duration.ofHours(5), session.length)
+        assertEquals(5.hours, session.length)
         assertEquals(Instant.parse("2026-04-03T17:00:00Z"), session.resetsAt)
         val fable = snapshot.windows[2]
         assertEquals(23.0, fable.usedPercent)
-        assertEquals(Duration.ofDays(7), fable.length)
+        assertEquals(7.days, fable.length)
         assertEquals(Instant.parse("2026-04-08T09:00:00Z"), fable.resetsAt)
         val unknown = snapshot.windows.last()
         assertNull(unknown.length)
@@ -255,7 +256,7 @@ class ClaudeQuotaFetcherTest {
             val haiku = snapshot.windows.single { it.id == "weekly_scoped_haiku" }
             assertEquals(WindowKind.Weekly, haiku.kind)
             assertEquals(9.0, haiku.usedPercent)
-            assertEquals(Duration.ofDays(7), haiku.length)
+            assertEquals(7.days, haiku.length)
             assertEquals(Instant.parse("2026-10-07T10:00:00Z"), haiku.resetsAt)
             assertTrue(haiku.isRecognised)
         }

@@ -10,7 +10,7 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.ui.ResetFormatter
-import java.time.Instant
+import kotlin.time.Instant
 
 /** One line of a pool's expiry list. */
 internal sealed interface ExpiryLine {

@@ -10,7 +10,7 @@ import dev.sebastiano.headroom.HeadroomApplication
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.model.QuotaDisplay
-import java.time.Instant
+import kotlin.time.Clock
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -33,7 +33,7 @@ class HeadroomTileService : TileService() {
                 TileSubtitle.of(
                     mode = app.tileSettings.subtitle.value,
                     accounts = app.graph.quotaRepository.accounts.value,
-                    now = Instant.now(),
+                    now = Clock.System.now(),
                     display = display,
                 )
             val tile = qsTile ?: return@launch

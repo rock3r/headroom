@@ -13,10 +13,10 @@ import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.homeUiState
 import dev.sebastiano.headroom.ui.overview.AccountCard
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,8 +38,8 @@ class AllowanceRowsTest {
             label = label,
             kind = kind,
             usedPercent = used,
-            resetsAt = now.plus(Duration.ofDays(3)),
-            length = if (kind == WindowKind.Weekly) Duration.ofDays(7) else Duration.ofDays(30),
+            resetsAt = now.plus(3.days),
+            length = if (kind == WindowKind.Weekly) 7.days else 30.days,
         )
 
     private fun account(provider: Provider, windows: List<QuotaWindow>) =

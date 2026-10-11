@@ -1,8 +1,11 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Which limits a reset restores. A provider names them by window id ([windowIds], as Claude's
@@ -271,7 +274,7 @@ public object ResetRefresh {
      * moment to apply a reset (Grok documents about two seconds), and a fetch that comes too early
      * reads the old usage.
      */
-    public val DELAY: Duration = Duration.ofSeconds(2)
+    public val DELAY: Duration = 2.seconds
 }
 
 /** A provider with no resets. Every provider without its own [ResetProvider] behaves like this. */
@@ -339,7 +342,7 @@ public interface ResetAttemptStore {
  * across restarts: only the account, the pool, the key and the time.
  */
 public class ResetAttemptMemory(
-    private val clock: () -> Instant = Instant::now,
+    private val clock: () -> Instant = Clock.System::now,
     private val lifetime: (Provider) -> Duration = { DEFAULT_LIFETIME },
     private val store: ResetAttemptStore = ResetAttemptStore.None,
 ) {
@@ -372,12 +375,12 @@ public class ResetAttemptMemory(
     }
 
     private fun isFresh(attempt: ResetAttempt, provider: Provider?): Boolean {
-        val age = Duration.between(attempt.at, clock())
+        val age = (clock() - attempt.at)
         val limit = provider?.let(lifetime) ?: DEFAULT_LIFETIME
         return age < limit
     }
 
     public companion object {
-        public val DEFAULT_LIFETIME: Duration = Duration.ofMinutes(10)
+        public val DEFAULT_LIFETIME: Duration = 10.minutes
     }
 }

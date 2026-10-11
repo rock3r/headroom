@@ -8,8 +8,8 @@ import dev.sebastiano.headroom.model.ResetEventKind
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetUseSource
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +57,7 @@ class DemoResetEvents(private val clock: () -> Instant) : ResetEventLog {
                 poolId = "demo",
                 poolLabel = "Resets",
                 kind = ResetEventKind.Used,
-                at = now.minus(Duration.ofDays(daysAgo)),
+                at = now.minus(daysAgo.days),
                 source = source,
                 givenBack = mapOf(WindowKind.Weekly to weekly),
                 givenBackEstimated = source == ResetUseSource.Elsewhere,

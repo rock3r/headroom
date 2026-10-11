@@ -1,7 +1,8 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * ChatGPT Codex sign-in, the same way the official Codex CLI does it: PKCE with a redirect to
@@ -75,7 +76,7 @@ internal class CodexOAuth(
     ): TokenSet {
         val json = http.postForm(tokenEndpoint, form).successJson(context)
         val expiresAt =
-            clock.instant().plusSeconds(json.long("expires_in") ?: DEFAULT_EXPIRES_IN_SECONDS)
+            clock.now() + (json.long("expires_in") ?: DEFAULT_EXPIRES_IN_SECONDS).seconds
         val tokens = json.toTokenSet(provider, context, expiresAt, requireRefresh = firstSignIn)
         val accountId =
             json.string("id_token")?.let(::chatGptAccountId) ?: chatGptAccountId(tokens.accessToken)

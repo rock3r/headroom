@@ -51,7 +51,8 @@ import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.quota.QuotaFetchers
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.combine
@@ -89,7 +90,7 @@ public interface DataGraphOwner {
 public class DataGraph(
     context: Context,
     private val scope: CoroutineScope,
-    private val clock: () -> Instant = Instant::now,
+    private val clock: () -> Instant = Clock.System::now,
     /** Where sign-in tokens live. Defaults to the encrypted on-device store. */
     public val tokenStore: TokenStore = EncryptedTokenStore(context, TinkCredentialCipher(context)),
     /** How each provider signs in and refreshes its tokens. */

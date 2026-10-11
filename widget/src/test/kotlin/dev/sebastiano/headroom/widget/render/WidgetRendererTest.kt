@@ -34,8 +34,6 @@ import dev.sebastiano.headroom.widget.testing.logoCommands
 import dev.sebastiano.headroom.widget.testing.maxVariableId
 import dev.sebastiano.headroom.widget.testing.pathCommands
 import dev.sebastiano.headroom.widget.testing.withResets
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertContains
@@ -45,6 +43,11 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlin.time.toJavaDuration
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -612,14 +615,14 @@ class WidgetRendererTest {
 
         fun tap(xDp: Float, yDp: Float) {
             // Wait between gestures: the Android 17 player ignores a second tap that comes quickly.
-            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP)
+            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP.toJavaDuration())
             touch(MotionEvent.ACTION_DOWN, xDp, yDp)
             touch(MotionEvent.ACTION_UP, xDp, yDp)
             settle()
         }
 
         fun drag(xDp: Float, fromYDp: Float, toYDp: Float) {
-            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP)
+            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP.toJavaDuration())
             touch(MotionEvent.ACTION_DOWN, xDp, fromYDp)
             (1..DRAG_STEPS).forEach { step ->
                 touch(MotionEvent.ACTION_MOVE, xDp, fromYDp + (toYDp - fromYDp) * step / DRAG_STEPS)
@@ -629,7 +632,7 @@ class WidgetRendererTest {
         }
 
         private fun touch(action: Int, xDp: Float, yDp: Float) {
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(TOUCH_STEP_MS))
+            shadowOf(Looper.getMainLooper()).idleFor(TOUCH_STEP_MS.milliseconds.toJavaDuration())
             val time = SystemClock.uptimeMillis()
             val event = MotionEvent.obtain(time, time, action, xDp * density, yDp * density, 0)
             view.dispatchTouchEvent(event)
@@ -756,7 +759,7 @@ class WidgetRendererTest {
         const val TAP_MS = 50L
         const val DRAG_STEPS = 10
         const val TOUCH_STEP_MS = 16L
-        val GESTURE_GAP: Duration = Duration.ofSeconds(1)
+        val GESTURE_GAP: Duration = 1.seconds
         const val SCROLL_OPERATION = "ScrollModifierOperation"
     }
 }

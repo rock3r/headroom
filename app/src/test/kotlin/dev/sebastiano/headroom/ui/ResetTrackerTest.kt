@@ -4,9 +4,11 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.ui.home.ResetBurst
 import dev.sebastiano.headroom.ui.home.ResetTracker
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 
 class ResetTrackerTest {
     private val accounts = DemoData.accounts(FIXED_NOW)
@@ -53,7 +55,7 @@ class ResetTrackerTest {
         tracker.update(accounts)
         assertEquals(
             setOf("demo-grok"),
-            tracker.update(accounts.withGrok(used = 88.0, resetShift = Duration.ofDays(7))),
+            tracker.update(accounts.withGrok(used = 88.0, resetShift = 7.days)),
         )
     }
 
@@ -69,10 +71,10 @@ class ResetTrackerTest {
     fun `an account stays just reset for the rest of the session`() {
         val tracker = ResetTracker()
         tracker.update(accounts)
-        tracker.update(accounts.withGrok(used = 0.0, resetShift = Duration.ofDays(7)))
+        tracker.update(accounts.withGrok(used = 0.0, resetShift = 7.days))
         assertEquals(
             setOf("demo-grok"),
-            tracker.update(accounts.withGrok(used = 2.0, resetShift = Duration.ofDays(7))),
+            tracker.update(accounts.withGrok(used = 2.0, resetShift = 7.days)),
         )
     }
 
@@ -101,7 +103,7 @@ class ResetTrackerTest {
         tracker.update(accounts)
         assertEquals(emptyList(), tracker.lastLiveResets)
 
-        val reset = accounts.withGrok(used = 1.0, resetShift = Duration.ofDays(7))
+        val reset = accounts.withGrok(used = 1.0, resetShift = 7.days)
         tracker.update(reset)
         // Grok's weekly reset was the soonest, so the next reset card was counting down to it.
         assertEquals(
@@ -130,9 +132,9 @@ class ResetTrackerTest {
         // On a cold start the stored data comes first, fetched before the app opened, and the
         // first refresh then shows the reset. The card still says "Just reset", without confetti.
         val tracker = ResetTracker(sessionStart = FIXED_NOW)
-        tracker.update(DemoData.accounts(FIXED_NOW.minus(Duration.ofHours(2))))
+        tracker.update(DemoData.accounts(FIXED_NOW.minus(2.hours)))
 
-        val justReset = tracker.update(accounts.withGrok(used = 1.0, Duration.ofDays(7)))
+        val justReset = tracker.update(accounts.withGrok(used = 1.0, 7.days))
 
         assertEquals(setOf("demo-grok"), justReset)
         assertEquals(emptyList(), tracker.lastLiveResets)

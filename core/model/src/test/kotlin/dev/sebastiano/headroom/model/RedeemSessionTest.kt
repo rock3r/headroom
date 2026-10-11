@@ -1,11 +1,12 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
@@ -163,9 +164,9 @@ class RedeemSessionTest {
         val memory = ResetAttemptMemory(clock = { now })
         memory.remember(account, "five_hour", ResetAttemptKey("a"))
 
-        now = NOW.plusSeconds(9 * 60)
+        now = NOW + (9 * 60).seconds
         assertEquals(ResetAttemptKey("a"), memory.recall(account, "five_hour"))
-        now = NOW.plusSeconds(10 * 60)
+        now = NOW + (10 * 60).seconds
         assertEquals(null, memory.recall(account, "five_hour"))
     }
 

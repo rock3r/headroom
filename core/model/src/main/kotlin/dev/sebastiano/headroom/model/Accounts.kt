@@ -1,6 +1,6 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Instant
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -35,7 +35,7 @@ public data class AccountState(
                 snapshot?.windows.orEmpty().filterNot { it.isUnlimited || it.isInformational }
             return windows.firstOrNull { it.kind == WindowKind.Weekly }
                 ?: windows.firstOrNull { it.kind == WindowKind.Monthly }
-                ?: windows.maxByOrNull { it.length?.toMillis() ?: 0L }
+                ?: windows.maxByOrNull { it.length?.inWholeMilliseconds ?: 0L }
         }
 
     /**
@@ -92,9 +92,7 @@ public data class NextReset(val account: Account, val window: QuotaWindow) {
                         state.snapshot?.windows.orEmpty().mapNotNull { window ->
                             val resetsAt = window.resetsAt
                             if (
-                                resetsAt != null &&
-                                    resetsAt.isAfter(now) &&
-                                    ResetPolicy.canAlert(window)
+                                resetsAt != null && resetsAt > now && ResetPolicy.canAlert(window)
                             ) {
                                 Candidate(NextReset(state.account, window), resetsAt)
                             } else {

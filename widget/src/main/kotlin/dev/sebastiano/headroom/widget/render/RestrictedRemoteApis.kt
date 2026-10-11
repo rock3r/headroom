@@ -11,7 +11,7 @@ import androidx.compose.remote.creation.compose.state.deltaFromReferenceInMinute
 import androidx.compose.remote.creation.compose.state.floor
 import androidx.compose.remote.creation.compose.state.rf
 import androidx.compose.remote.creation.compose.state.rs
-import java.time.Instant
+import kotlin.time.Instant
 
 /**
  * The only place in the widget module that calls restricted Remote Compose APIs.
@@ -40,7 +40,8 @@ internal object RestrictedRemoteApis {
     // RemoteLong(Long) and deltaFromReferenceInMinutes are restricted in alpha20; see above.
     @SuppressLint("RestrictedApi")
     fun liveCountdown(resetsAt: Instant, whenPassed: String): RemoteString {
-        val totalMinutes = floor(deltaFromReferenceInMinutes(RemoteLong(resetsAt.toEpochMilli())))
+        val totalMinutes =
+            floor(deltaFromReferenceInMinutes(RemoteLong(resetsAt.toEpochMilliseconds())))
         val days = floor(totalMinutes / MINUTES_PER_DAY.rf)
         val hours = floor(totalMinutes / MINUTES_PER_HOUR.rf) % HOURS_PER_DAY.rf
         val minutes = totalMinutes % MINUTES_PER_HOUR.rf

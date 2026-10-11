@@ -1,14 +1,14 @@
 package dev.sebastiano.headroom.ui
 
 import dev.sebastiano.headroom.ui.home.FreshDataTrigger
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 class FreshDataTriggerTest {
-    private val before: Instant = FIXED_NOW.minus(Duration.ofMinutes(20))
+    private val before: Instant = FIXED_NOW.minus(20.minutes)
     private val trigger = FreshDataTrigger()
 
     @Test

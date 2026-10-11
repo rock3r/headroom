@@ -2,10 +2,6 @@ package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
 import java.net.ServerSocket
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -13,6 +9,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -36,7 +36,7 @@ class CodexOAuthTest {
         codex =
             CodexOAuth(
                 http = OkHttpAuthHttpClient(),
-                clock = Clock.fixed(now, ZoneOffset.UTC),
+                clock = fixedClock(now),
                 tokenEndpoint = server.url("/oauth/token").toString(),
                 callbackPort = port,
             )
@@ -52,7 +52,7 @@ class CodexOAuthTest {
 
     @Test
     fun `the default listener is the fixed Codex callback port on both loopback families`() {
-        val config = CodexOAuth(OkHttpAuthHttpClient(), Clock.systemUTC()).loopback
+        val config = CodexOAuth(OkHttpAuthHttpClient(), Clock.System).loopback
         assertEquals(1455..1455, config.ports)
         assertEquals("/auth/callback", config.path)
         assertTrue(config.bindIpv6)
@@ -60,7 +60,7 @@ class CodexOAuthTest {
 
     @Test
     fun `the redirect URI uses the localhost host that OpenAI allows`() {
-        val codex = CodexOAuth(OkHttpAuthHttpClient(), Clock.systemUTC())
+        val codex = CodexOAuth(OkHttpAuthHttpClient(), Clock.System)
         assertEquals("http://localhost:1455/auth/callback", codex.loopbackRedirectUri(1455))
     }
 
@@ -133,7 +133,7 @@ class CodexOAuthTest {
         assertEquals(Provider.Codex, tokens.provider)
         assertEquals("ca", tokens.accessToken)
         assertEquals("cr", tokens.refreshToken)
-        assertEquals(now.plus(Duration.ofDays(10)), tokens.expiresAt)
+        assertEquals(now.plus(10.days), tokens.expiresAt)
         assertEquals("acct-123", tokens.extras[CredentialExtras.CHATGPT_ACCOUNT_ID])
         assertEquals("acct-123", tokens.providerAccountId)
         assertEquals("sam@example.com", tokens.label)
@@ -150,7 +150,7 @@ class CodexOAuthTest {
         val tokens = codex.exchange("a", codex.loopbackRedirectUri(port), Pkce.generate(), "s")
 
         assertEquals("acct-9", tokens.extras[CredentialExtras.CHATGPT_ACCOUNT_ID])
-        assertEquals(now.plusSeconds(3600), tokens.expiresAt)
+        assertEquals(now + 3600.seconds, tokens.expiresAt)
     }
 
     @Test
@@ -188,7 +188,7 @@ class CodexOAuthTest {
         )
         assertEquals("new", tokens.accessToken)
         assertEquals("new-r", tokens.refreshToken)
-        assertEquals(now.plusSeconds(100), tokens.expiresAt)
+        assertEquals(now + 100.seconds, tokens.expiresAt)
         assertEquals("acct-123", tokens.extras[CredentialExtras.CHATGPT_ACCOUNT_ID])
     }
 

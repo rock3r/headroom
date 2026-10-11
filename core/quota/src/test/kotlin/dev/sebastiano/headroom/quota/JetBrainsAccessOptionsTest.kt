@@ -5,13 +5,13 @@ import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
 import java.net.URLDecoder
-import java.time.Duration
-import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -164,7 +164,7 @@ class JetBrainsAccessOptionsTest {
         val window = fetchSnapshot().window(LICENSE_LABEL)
 
         assertEquals(WindowKind.Monthly, window.kind)
-        assertEquals(Duration.ofHours(720), window.length)
+        assertEquals(720.hours, window.length)
         assertEquals(Instant.parse("2026-05-01T00:00:00Z"), window.resetsAt)
         assertEquals(0.01187525, window.usedAmount!!, 1e-12)
         assertEquals(10.0, window.limitAmount)
@@ -707,7 +707,7 @@ class JetBrainsAccessOptionsTest {
                 kind = WindowKind.Monthly,
                 usedPercent = 20.0,
                 resetsAt = Instant.parse("2026-05-01T00:00:00Z"),
-                length = Duration.ofHours(720),
+                length = 720.hours,
                 usedAmount = 0.0001,
                 limitAmount = 0.0005,
                 amountUnit = "credits",

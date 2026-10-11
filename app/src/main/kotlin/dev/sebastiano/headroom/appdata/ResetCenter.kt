@@ -8,7 +8,7 @@ import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetRefresh
-import java.time.Duration
+import kotlin.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -112,7 +112,7 @@ class ResetCenter(
         refreshingIds.update { it + account.id }
         scope.launch {
             try {
-                delay(refreshDelay.toMillis())
+                delay(refreshDelay.inWholeMilliseconds)
                 refreshUsage(account.id)
             } finally {
                 refreshingIds.update { it - account.id }

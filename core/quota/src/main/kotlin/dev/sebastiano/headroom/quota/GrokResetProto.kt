@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.quota
 
 import java.io.ByteArrayOutputStream
-import java.time.Instant
+import kotlin.time.Instant
 
 /** One SuperGrok usage-limit reset token: its id and when it stops being valid. */
 internal data class GrokResetToken(val id: String, val validUntil: Instant?)
@@ -64,9 +64,9 @@ internal object GrokResetProto {
                                 message(
                                     VALIDITY_END_FIELD,
                                     ProtoWriter().apply {
-                                        varint(SECONDS_FIELD, until.epochSecond)
-                                        if (until.nano != 0) {
-                                            varint(NANOS_FIELD, until.nano.toLong())
+                                        varint(SECONDS_FIELD, until.epochSeconds)
+                                        if (until.nanosecondsOfSecond != 0) {
+                                            varint(NANOS_FIELD, until.nanosecondsOfSecond.toLong())
                                         }
                                     },
                                 )
@@ -104,7 +104,7 @@ internal object GrokResetProto {
                 else -> reader.skip()
             }
         }
-        return Instant.ofEpochSecond(seconds, nanos)
+        return epochSecondsToInstant(seconds, nanos)
     }
 }
 

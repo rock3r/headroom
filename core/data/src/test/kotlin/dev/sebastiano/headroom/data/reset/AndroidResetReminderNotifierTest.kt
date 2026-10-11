@@ -10,12 +10,12 @@ import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.ExpiringReset
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf

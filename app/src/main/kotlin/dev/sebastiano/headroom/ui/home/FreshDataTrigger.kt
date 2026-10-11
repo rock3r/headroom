@@ -1,6 +1,6 @@
 package dev.sebastiano.headroom.ui.home
 
-import java.time.Instant
+import kotlin.time.Instant
 
 /**
  * Says when a refresh has just brought new data, for the refresh shimmer. That is when the state

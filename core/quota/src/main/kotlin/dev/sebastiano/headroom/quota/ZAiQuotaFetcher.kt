@@ -4,10 +4,11 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
 import java.util.Locale
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -20,7 +21,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class ZAiQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) : QuotaFetcher {
     override val provider: Provider = Provider.ZAi
 
@@ -53,7 +54,7 @@ public class ZAiQuotaFetcher(
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = planLabel,
                 windows = quota.windows,
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
             )
         )
     }
@@ -121,7 +122,9 @@ public class ZAiQuotaFetcher(
 
     /** Values below the threshold are seconds or garbage, not epoch milliseconds. */
     private fun JsonObject.epochMillisOrNull(key: String): Instant? =
-        longOrNull(key)?.takeIf { it >= EPOCH_MILLIS_THRESHOLD }?.let(Instant::ofEpochMilli)
+        longOrNull(key)
+            ?.takeIf { it >= EPOCH_MILLIS_THRESHOLD }
+            ?.let(Instant::fromEpochMilliseconds)
 
     private data class ZAiQuota(val level: String?, val windows: List<QuotaWindow>)
 
@@ -130,7 +133,7 @@ public class ZAiQuotaFetcher(
         const val DEFAULT_BASE_URL = "https://api.z.ai/api"
         const val QUOTA_PATH = "/monitor/usage/quota/limit"
         const val SUBSCRIPTION_PATH = "/biz/subscription/list"
-        val SUBSCRIPTION_TIMEOUT: Duration = Duration.ofSeconds(5)
+        val SUBSCRIPTION_TIMEOUT: Duration = 5.seconds
         const val HOUR_UNIT = 3
         const val WEEK_UNIT = 6
         const val FIVE = 5

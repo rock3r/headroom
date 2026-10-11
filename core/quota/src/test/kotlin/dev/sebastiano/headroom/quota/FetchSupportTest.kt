@@ -2,11 +2,12 @@ package dev.sebastiano.headroom.quota
 
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import java.io.IOException
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 
@@ -65,6 +66,18 @@ class FetchSupportTest {
             Instant.parse("2026-04-10T10:00:00Z"),
             parseInstant("2026-04-10T12:00:00+02:00"),
         )
+    }
+
+    @Test
+    fun `parses instants without seconds, as ISO-8601 allows`() {
+        assertEquals(Instant.parse("2026-04-10T12:00:00Z"), parseInstant("2026-04-10T12:00Z"))
+        assertEquals(Instant.parse("2026-04-10T10:00:00Z"), parseInstant("2026-04-10T12:00+02:00"))
+    }
+
+    @Test
+    fun `text that is not an instant parses to null`() {
+        assertNull(parseInstantOrNull("2026-04-10T12:00:00"))
+        assertNull(parseInstantOrNull("soon"))
     }
 
     @Test

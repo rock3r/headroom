@@ -1,6 +1,8 @@
 package dev.sebastiano.headroom.model
 
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,11 +32,11 @@ public enum class SyncFrequency(
     public val period: Duration?
 ) {
     /** The shortest period WorkManager allows. */
-    Minutes15(Duration.ofMinutes(QUARTER_HOUR_MINUTES)),
-    Minutes30(Duration.ofMinutes(HALF_HOUR_MINUTES)),
-    Hour1(Duration.ofHours(1)),
-    Hours3(Duration.ofHours(THREE_HOURS)),
-    Hours6(Duration.ofHours(SIX_HOURS)),
+    Minutes15(QUARTER_HOUR_MINUTES.minutes),
+    Minutes30(HALF_HOUR_MINUTES.minutes),
+    Hour1(1.hours),
+    Hours3(THREE_HOURS.hours),
+    Hours6(SIX_HOURS.hours),
     /** Only when the user opens the app, pulls to refresh or taps a widget. */
     OnOpen(null),
 }

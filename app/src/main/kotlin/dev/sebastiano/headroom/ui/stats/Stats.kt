@@ -7,8 +7,8 @@ import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
+import kotlin.time.Instant
 
 /**
  * One account's main limit (see [dev.sebastiano.headroom.model.AccountState.primaryWindow]) and its

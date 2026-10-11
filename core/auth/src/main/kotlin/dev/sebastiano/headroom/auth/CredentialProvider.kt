@@ -1,8 +1,8 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -23,7 +23,7 @@ public fun interface TokenRefresher {
 public class CredentialProvider(
     private val store: TokenStore,
     private val refreshers: Map<Provider, TokenRefresher>,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) {
     private val mutexes = ConcurrentHashMap<String, Mutex>()
 
@@ -43,7 +43,7 @@ public class CredentialProvider(
             .computeIfAbsent(accountId) { Mutex() }
             .withLock {
                 val current = store.load(accountId) ?: throw AuthException.NotSignedIn(accountId)
-                if (!current.isExpired(clock.instant())) current else refresh(current)
+                if (!current.isExpired(clock.now())) current else refresh(current)
             }
 
     private suspend fun refresh(current: StoredCredential): StoredCredential {
@@ -71,6 +71,6 @@ public class CredentialProvider(
     private suspend fun newerValid(current: StoredCredential): StoredCredential? {
         val latest =
             store.load(current.accountId) ?: throw AuthException.NotSignedIn(current.accountId)
-        return latest.takeIf { it.revision != current.revision && !it.isExpired(clock.instant()) }
+        return latest.takeIf { it.revision != current.revision && !it.isExpired(clock.now()) }
     }
 }

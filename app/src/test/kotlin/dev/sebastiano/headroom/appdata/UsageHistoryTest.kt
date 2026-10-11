@@ -5,12 +5,13 @@ import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -25,8 +26,8 @@ class UsageHistoryTest {
             label = "Weekly",
             kind = WindowKind.Weekly,
             usedPercent = used,
-            resetsAt = now.plus(Duration.ofDays(3)),
-            length = Duration.ofDays(7),
+            resetsAt = now.plus(3.days),
+            length = 7.days,
         )
 
     @Test
@@ -43,7 +44,7 @@ class UsageHistoryTest {
     fun `demo history stays inside the retention period`() {
         val peaks = List(20) { 50.0 }
         val points = demoUsage(weekly(10.0), peaks, now, ZoneOffset.UTC)
-        assertTrue(points.first().at >= now.minus(Duration.ofDays(60)))
+        assertTrue(points.first().at >= now.minus(60.days))
         assertEquals(List(8) { 50.0 }, ResetPeaks.usedAtResets(points))
     }
 
@@ -52,7 +53,7 @@ class UsageHistoryTest {
         val points = demoUsage(weekly(40.0), listOf(80.0, 70.0), now, ZoneOffset.UTC)
         val daytime =
             points.zipWithNext().sumOf { (a, b) ->
-                val hour = b.at.atZone(ZoneOffset.UTC).hour
+                val hour = b.at.toJavaInstant().atZone(ZoneOffset.UTC).hour
                 if (hour in 9..18) (b.usedPercent - a.usedPercent).coerceAtLeast(0.0) else 0.0
             }
         val total =

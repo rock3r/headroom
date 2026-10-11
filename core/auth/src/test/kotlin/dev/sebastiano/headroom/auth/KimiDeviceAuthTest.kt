@@ -1,16 +1,14 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -26,7 +24,7 @@ class KimiDeviceAuthTest {
         kimi =
             KimiDeviceAuth(
                 http = OkHttpAuthHttpClient(),
-                clock = Clock.fixed(now, ZoneOffset.UTC),
+                clock = fixedClock(now),
                 oauthHost = server.url("/").toString().trimEnd('/'),
             )
     }
@@ -37,7 +35,7 @@ class KimiDeviceAuthTest {
     }
 
     private fun grant() =
-        DeviceCodeGrant("K-1", "kdc", "https://kimi/device", null, Duration.ofSeconds(5), null)
+        DeviceCodeGrant("K-1", "kdc", "https://kimi/device", null, 5.seconds, null)
 
     private fun form(body: String?) = queryPairs("?" + checkNotNull(body))
 
@@ -65,8 +63,8 @@ class KimiDeviceAuthTest {
         assertEquals("K-1", grant.userCode)
         assertEquals("https://www.kimi.com/device", grant.verificationUri)
         assertEquals("https://www.kimi.com/device?user_code=K-1", grant.verificationUriComplete)
-        assertEquals(Duration.ofSeconds(1), grant.interval)
-        assertEquals(Duration.ofSeconds(600), grant.expiresIn)
+        assertEquals(1.seconds, grant.interval)
+        assertEquals(600.seconds, grant.expiresIn)
     }
 
     @Test
@@ -81,7 +79,7 @@ class KimiDeviceAuthTest {
         )
         val grant = kimi.requestCode()
         assertEquals("https://www.kimi.com/device?c=K", grant.verificationUri)
-        assertEquals(Duration.ofSeconds(5), grant.interval)
+        assertEquals(5.seconds, grant.interval)
     }
 
     @Test
@@ -135,7 +133,7 @@ class KimiDeviceAuthTest {
         assertEquals(Provider.Kimi, tokens.provider)
         assertEquals("ka", tokens.accessToken)
         assertEquals("kr", tokens.refreshToken)
-        assertEquals(now.plusSeconds(600), tokens.expiresAt)
+        assertEquals(now + 600.seconds, tokens.expiresAt)
     }
 
     @Test
@@ -159,6 +157,6 @@ class KimiDeviceAuthTest {
             form(server.takeRequest().body?.utf8()),
         )
         assertEquals("new-r", tokens.refreshToken)
-        assertEquals(now.plusSeconds(30), tokens.expiresAt)
+        assertEquals(now + 30.seconds, tokens.expiresAt)
     }
 }

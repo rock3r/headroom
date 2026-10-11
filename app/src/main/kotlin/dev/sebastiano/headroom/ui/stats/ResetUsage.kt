@@ -6,14 +6,15 @@ import dev.sebastiano.headroom.model.ResetEvent
 import dev.sebastiano.headroom.model.ResetEventKind
 import dev.sebastiano.headroom.model.ResetUseSource
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 /** The spans the reset stat can cover. The longest is as long as the reset history is kept. */
 enum class ResetPeriod(val length: Duration) {
-    FourWeeks(Duration.ofDays(FOUR_WEEKS_DAYS)),
-    ThreeMonths(Duration.ofDays(THREE_MONTHS_DAYS)),
-    TwelveMonths(Duration.ofDays(TWELVE_MONTHS_DAYS)),
+    FourWeeks(FOUR_WEEKS_DAYS.days),
+    ThreeMonths(THREE_MONTHS_DAYS.days),
+    TwelveMonths(TWELVE_MONTHS_DAYS.days),
 }
 
 private const val FOUR_WEEKS_DAYS = 28L

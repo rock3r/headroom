@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -21,7 +21,7 @@ public object CredentialCodec {
                 kind = credential.kind,
                 accessToken = credential.accessToken,
                 refreshToken = credential.refreshToken,
-                expiresAtMillis = credential.expiresAt?.toEpochMilli(),
+                expiresAtMillis = credential.expiresAt?.toEpochMilliseconds(),
                 providerAccountId = credential.providerAccountId,
                 label = credential.label,
                 extras = credential.extras,
@@ -48,7 +48,7 @@ public object CredentialCodec {
             kind = surrogate.kind,
             accessToken = surrogate.accessToken,
             refreshToken = surrogate.refreshToken,
-            expiresAt = surrogate.expiresAtMillis?.let(Instant::ofEpochMilli),
+            expiresAt = surrogate.expiresAtMillis?.let(Instant::fromEpochMilliseconds),
             providerAccountId = surrogate.providerAccountId,
             label = surrogate.label,
             extras = surrogate.extras,

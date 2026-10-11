@@ -5,11 +5,11 @@ import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import java.time.format.DateTimeParseException
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
@@ -21,7 +21,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class CopilotQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
 ) : QuotaFetcher {
     override val provider: Provider = Provider.Copilot
 
@@ -55,7 +55,7 @@ public class CopilotQuotaFetcher(
                 accountId = credentials.accountId ?: root.nonBlankStringOrNull("login").orEmpty(),
                 planLabel = root.nonBlankStringOrNull("copilot_plan")?.let(::displayPlanLabel),
                 windows = windows,
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
             )
         )
     }
@@ -81,7 +81,8 @@ public class CopilotQuotaFetcher(
             id = id,
             label = WINDOW_LABELS[id] ?: fallbackWindowLabel(id),
             usedPercent = usedPercent,
-            resetsAt = longOrNull("quota_reset_at")?.let(Instant::ofEpochSecond) ?: defaultResetsAt,
+            resetsAt =
+                longOrNull("quota_reset_at")?.let(::epochSecondsToInstant) ?: defaultResetsAt,
             length = THIRTY_DAYS,
             kind = WindowKind.Monthly,
             isUnlimited = amounts.isUnlimited && !amounts.isExhaustedPool,
@@ -105,8 +106,8 @@ public class CopilotQuotaFetcher(
         return stringOrNull("quota_reset_date")?.let { date ->
             try {
                 parseInstant(date)
-            } catch (_: DateTimeParseException) {
-                LocalDate.parse(date).atStartOfDay(ZoneOffset.UTC).toInstant()
+            } catch (_: IllegalArgumentException) {
+                LocalDate.parse(date).atStartOfDayIn(TimeZone.UTC)
             }
         }
     }

@@ -3,9 +3,9 @@ package dev.sebastiano.headroom.ui
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.ui.home.homeUiState
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 
 class AccountNamesTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")

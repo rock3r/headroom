@@ -5,12 +5,12 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -74,7 +74,7 @@ class CopilotQuotaFetcherTest {
             snapshot.windows.map { it.label },
         )
         assertTrue(snapshot.windows.all { it.kind == WindowKind.Monthly })
-        assertTrue(snapshot.windows.all { it.length == Duration.ofDays(30) })
+        assertTrue(snapshot.windows.all { it.length == 30.days })
         assertTrue(snapshot.windows.all { it.resetsAt == Instant.parse("2026-05-01T00:00:00Z") })
         val credits = snapshot.windows[0]
         assertEquals(2.4, credits.usedPercent, absoluteTolerance = 0.0001)
@@ -102,7 +102,7 @@ class CopilotQuotaFetcherTest {
                     .single()
 
             assertEquals(75.0, window.usedPercent)
-            assertEquals(Instant.ofEpochSecond(1_777_593_600), window.resetsAt)
+            assertEquals(Instant.fromEpochSeconds(1_777_593_600), window.resetsAt)
         }
 
     @Test

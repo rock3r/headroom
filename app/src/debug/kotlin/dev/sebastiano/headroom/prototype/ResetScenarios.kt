@@ -12,8 +12,12 @@ import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.ResetTiming
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * One flow to play on the prototypes page: an account, its fake resets, and how the sheet opens.
@@ -26,7 +30,7 @@ data class ResetScenario(
     val script: FakeResetScript,
     val intent: RedeemIntent = RedeemIntent.Use,
     /** How long each call to the fake provider takes. */
-    val latency: Duration = Duration.ofMillis(1_600),
+    val latency: Duration = 1_600.milliseconds,
 )
 
 /**
@@ -128,7 +132,7 @@ object ResetScenarios {
                 zai,
                 FakeResetScript(
                     zaiPools(now, fiveHour = 0, week = 0),
-                    asks = listOf(AskOutcome.NotYet(now.plus(Duration.ofHours(6)))),
+                    asks = listOf(AskOutcome.NotYet(now.plus(6.hours))),
                 ),
                 RedeemIntent.AskForMore,
             ),
@@ -156,7 +160,7 @@ object ResetScenarios {
                 "The reset takes eight seconds: try to close the sheet while it runs.",
                 claude,
                 FakeResetScript(claudeGrants(now)),
-                latency = Duration.ofSeconds(8),
+                latency = 8.seconds,
             ),
             ResetScenario(
                 "claude-cooldown",
@@ -221,7 +225,7 @@ object ResetScenarios {
                     label = "Usage limit reset",
                     available = available,
                     scope = ResetScope.of(WindowKind.Session, WindowKind.Weekly),
-                    expiries = List(available) { now.plus(Duration.ofDays(3L + it * 7)) },
+                    expiries = List(available) { now.plus((3L + it * 7).days) },
                 )
             )
         )
@@ -234,7 +238,7 @@ object ResetScenarios {
                     label = "Weekly pool reset",
                     available = 1,
                     scope = ResetScope.of(WindowKind.Weekly),
-                    expiries = listOf(now.plus(Duration.ofDays(5))),
+                    expiries = listOf(now.plus(5.days)),
                 )
             )
         )
@@ -247,14 +251,14 @@ object ResetScenarios {
                     label = "5-hour limit",
                     available = fiveHour,
                     scope = ResetScope.of(WindowKind.Session),
-                    expiries = List(fiveHour) { now.plus(Duration.ofDays(2L + it)) },
+                    expiries = List(fiveHour) { now.plus((2L + it).days) },
                 ),
                 ResetPool(
                     id = "week",
                     label = "Weekly limit",
                     available = week,
                     scope = ResetScope.of(WindowKind.Weekly),
-                    expiries = List(week) { now.plus(Duration.ofDays(9)) },
+                    expiries = List(week) { now.plus(9.days) },
                 ),
             ),
             canAskForMore = true,
@@ -270,7 +274,7 @@ object ResetScenarios {
                     available = 1,
                     total = 2,
                     scope = ResetScope.ofWindows("five_hour", "seven_day"),
-                    expiries = listOf(now.plus(Duration.ofDays(12))),
+                    expiries = listOf(now.plus(12.days)),
                     timing = ResetTiming.AtLimit,
                 ),
                 ResetPool(
@@ -294,7 +298,7 @@ object ResetScenarios {
                     available = 1,
                     total = 1,
                     scope = ResetScope.ofWindows("seven_day"),
-                    expiries = listOf(now.plus(Duration.ofDays(20))),
+                    expiries = listOf(now.plus(20.days)),
                     timing = ResetTiming.AnyTime,
                 )
             )
@@ -317,7 +321,7 @@ object ResetScenarios {
                     available = 2,
                     total = 2,
                     scope = ResetScope.ofWindows("five_hour"),
-                    expiries = listOf(now.plus(Duration.ofDays(12))),
+                    expiries = listOf(now.plus(12.days)),
                     status = ResetPoolStatus.WaitingForLimit,
                     timing = ResetTiming.AtLimit,
                 )

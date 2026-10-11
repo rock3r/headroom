@@ -1,15 +1,20 @@
 package dev.sebastiano.headroom.quota
 
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
+import kotlin.time.Clock
+import kotlin.time.Instant
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
 
 internal val FIXED_NOW: Instant = Instant.parse("2026-04-03T12:00:00Z")
-internal val FIXED_CLOCK: Clock = Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
+internal val FIXED_CLOCK: Clock = fixedClock(FIXED_NOW)
+
+/** A clock that always reads [at]. */
+internal fun fixedClock(at: Instant): Clock =
+    object : Clock {
+        override fun now(): Instant = at
+    }
 
 /** Reads a JSON fixture from `src/test/resources`. */
 internal fun fixture(path: String): String =

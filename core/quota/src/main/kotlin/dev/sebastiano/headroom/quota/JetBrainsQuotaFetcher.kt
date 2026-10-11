@@ -4,7 +4,7 @@ import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
-import java.time.Clock
+import kotlin.time.Clock
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -29,7 +29,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class JetBrainsQuotaFetcher(
     private val httpClient: QuotaHttpClient,
-    private val clock: Clock = Clock.systemUTC(),
+    private val clock: Clock = Clock.System,
     private val log: (String) -> Unit = {},
 ) : QuotaFetcher {
     override val provider: Provider = Provider.JetBrains
@@ -65,7 +65,7 @@ public class JetBrainsQuotaFetcher(
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = authInfo.nonBlankStringOrNull("licenseType")?.let(::jetBrainsPlanLabel),
                 windows = windows,
-                fetchedAt = clock.instant(),
+                fetchedAt = clock.now(),
                 // The windows count credits, so the balance only shows when there are none.
                 balance =
                     if (windows.isEmpty()) {

@@ -1,8 +1,6 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -11,6 +9,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -43,11 +44,11 @@ class CopilotDeviceAuthTest {
             "dc-1",
             "https://github.com/login/device",
             null,
-            Duration.ofSeconds(5),
+            5.seconds,
             null,
         )
 
-    private fun copilotToken(expiresAt: Long = now.epochSecond + 1800) =
+    private fun copilotToken(expiresAt: Long = now.epochSeconds + 1800) =
         MockResponse(
             code = 200,
             body = """{"token":"tid=1;exp=2;proxy-ep=proxy.x","expires_at":$expiresAt}""",
@@ -78,7 +79,7 @@ class CopilotDeviceAuthTest {
         assertEquals("WDJB-MJHT", grant.userCode)
         assertEquals("https://github.com/login/device", grant.verificationUri)
         assertNull(grant.verificationUriComplete)
-        assertEquals(Duration.ofSeconds(899), grant.expiresIn)
+        assertEquals(899.seconds, grant.expiresIn)
     }
 
     @Test
@@ -148,13 +149,13 @@ class CopilotDeviceAuthTest {
         assertEquals(Provider.Copilot, tokens.provider)
         assertEquals("tid=1;exp=2;proxy-ep=proxy.x", tokens.accessToken)
         assertEquals("gho_github", tokens.refreshToken)
-        assertEquals(now.plus(Duration.ofMinutes(25)), tokens.expiresAt)
+        assertEquals(now.plus(25.minutes), tokens.expiresAt)
         assertEquals("gho_github", tokens.toCredential("c").gitHubToken)
     }
 
     @Test
     fun `refresh mints a new Copilot token from the GitHub token`() = runTest {
-        server.enqueue(copilotToken(expiresAt = now.epochSecond + 600))
+        server.enqueue(copilotToken(expiresAt = now.epochSeconds + 600))
         val old =
             TokenSet(Provider.Copilot, CredentialKind.OAuth, "old", "gho_github", now)
                 .toCredential("c")
@@ -162,7 +163,7 @@ class CopilotDeviceAuthTest {
         val tokens = copilot.refresh(old)
 
         assertEquals("Bearer gho_github", server.takeRequest().headers["Authorization"])
-        assertEquals(now.plus(Duration.ofMinutes(5)), tokens.expiresAt)
+        assertEquals(now.plus(5.minutes), tokens.expiresAt)
         assertEquals("gho_github", tokens.refreshToken)
     }
 

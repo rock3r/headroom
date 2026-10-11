@@ -1,12 +1,13 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 class StoredCredentialTest {
     private val now = Instant.parse("2026-09-27T12:00:00Z")
@@ -37,7 +38,7 @@ class StoredCredentialTest {
     fun `expiry is inclusive`() {
         val credential = tokens.toCredential("a")
         assertTrue(credential.isExpired(now))
-        assertFalse(credential.isExpired(now.minusSeconds(1)))
+        assertFalse(credential.isExpired(now - 1.seconds))
         assertFalse(credential.copy(expiresAt = null).isExpired(now))
     }
 
