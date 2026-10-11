@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.auth
 
 import java.net.ServerSocket
+import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -70,6 +71,23 @@ class KtorAuthHttpClientTest {
 
         assertFailsWith<AuthException.Network> {
             client.execute(AuthHttpRequest(method = "GET", url = "http://127.0.0.1:$closedPort/"))
+        }
+    }
+
+    @Test
+    fun `a call that keeps trickling in still ends at the timeout`() = runTest {
+        // Data keeps arriving, so no socket timeout fires: only a timeout for the whole call can.
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body("0123456789")
+                .throttleBody(1, 300, TimeUnit.MILLISECONDS)
+                .build()
+        )
+        val client = KtorAuthHttpClient(timeout = 1.seconds)
+
+        assertFailsWith<AuthException.Network> {
+            client.execute(AuthHttpRequest(method = "GET", url = server.url("/slow").toString()))
         }
     }
 

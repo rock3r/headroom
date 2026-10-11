@@ -27,7 +27,9 @@ import kotlinx.io.IOException
 public class KtorAuthHttpClient internal constructor(internal val client: HttpClient) :
     AuthHttpClient {
 
-    /** A client whose connect, read and write steps each fail after [timeout]. */
+    /**
+     * A client whose call, and each of its connect, read and write steps, fails after [timeout].
+     */
     public constructor(
         timeout: Duration = DEFAULT_TIMEOUT
     ) : this(if (timeout == DEFAULT_TIMEOUT) sharedClient else httpClient(timeout))
@@ -81,6 +83,8 @@ public class KtorAuthHttpClient internal constructor(internal val client: HttpCl
                 install(HttpTimeout) {
                     connectTimeoutMillis = timeout.inWholeMilliseconds
                     socketTimeoutMillis = timeout.inWholeMilliseconds
+                    // iOS's engine has no connect timeout: this bounds a stalled connection there.
+                    requestTimeoutMillis = timeout.inWholeMilliseconds
                 }
             }
     }
