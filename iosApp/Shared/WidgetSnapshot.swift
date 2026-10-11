@@ -69,4 +69,11 @@ struct WidgetSnapshot: Codable, Equatable {
     var tightest: Account? {
         accounts.filter { !$0.signInExpired }.max { $0.usedPercent < $1.usedPercent }
     }
+
+    /// A widget may reload while the app still has an old snapshot. Never count down to the past.
+    func at(_ date: Date) -> Self {
+        guard let nextReset, nextReset.resetsAt <= date else { return self }
+        return Self(isDemo: isDemo, showsLeft: showsLeft, accounts: accounts,
+            nextReset: nil, nextResetTile: nil, tightestTile: tightestTile)
+    }
 }

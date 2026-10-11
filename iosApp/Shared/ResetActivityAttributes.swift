@@ -11,5 +11,12 @@ struct ResetActivityAttributes: ActivityAttributes {
         let resetsAt: Date
         /// The limit has reset: the activity says so for a while, then goes.
         let hasReset: Bool
+
+        /// ActivityKit changes isStale at the reset date even while the app is suspended.
+        func displayed(isStale: Bool) -> Self {
+            guard !hasReset && isStale else { return self }
+            return Self(accountTitle: accountTitle, providerId: providerId,
+                windowLabel: windowLabel, resetsAt: resetsAt, hasReset: true)
+        }
     }
 }

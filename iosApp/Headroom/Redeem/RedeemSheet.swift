@@ -8,10 +8,18 @@ struct RedeemSheet: View {
     let askForMore: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var renewingZCode = false
+    @State private var renewingAccount = false
 
     var body: some View {
         NavigationStack {
-            RedeemStepView(step: model.redeemStep, account: account, onClose: close)
+            Group {
+                if renewingZCode {
+                    ZCodeSignInStep(account: account, onSignedIn: { renewingZCode = false })
+                } else {
+                    RedeemStepView(step: model.redeemStep, account: account, onClose: close, onSignIn: renewSignIn)
+                }
+            }
                 .navigationTitle("Resets for \(account.title)")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -43,5 +51,21 @@ struct RedeemSheet: View {
     private func stop() {
         model.headroom.resets.redeem.close()
         model.headroom.resets.zCode.cancel()
+        if renewingAccount { model.open(.signIn(accountId: account.id)) }
+    }
+
+    private func renewSignIn() {
+        let result = (model.redeemStep as? RedeemUiFinished)?.outcome
+            ?? (model.redeemStep as? RedeemUiAnswered)?.answer ?? ""
+        switch ResetReauthentication.target(providerId: account.providerId, result: result) {
+        case .zCode:
+            model.headroom.resets.zCode.cancel()
+            renewingZCode = true
+        case .account:
+            renewingAccount = true
+            close()
+        case nil:
+            break
+        }
     }
 }

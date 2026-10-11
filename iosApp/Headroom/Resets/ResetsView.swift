@@ -5,13 +5,21 @@ import SwiftUI
 /// alerts, and how much each window had used when it reset.
 struct ResetsView: View {
     @Environment(AppModel.self) private var model
-    @State private var redeeming: AccountUi?
+    @State private var redeeming: Redeeming?
+
+    private struct Redeeming: Identifiable {
+        let account: AccountUi
+        let askForMore: Bool
+        var id: String { account.id }
+    }
 
     var body: some View {
         NavigationStack {
             Group {
                 if let tab = model.resetsTab {
-                    ResetsList(tab: tab, onUse: { redeeming = $0 })
+                    ResetsList(tab: tab,
+                        onUse: { redeeming = Redeeming(account: $0, askForMore: false) },
+                        onAsk: { redeeming = Redeeming(account: $0, askForMore: true) })
                 } else {
                     ProgressView()
                 }
@@ -21,8 +29,8 @@ struct ResetsView: View {
                 AccountDetailView(accountId: accountId)
             }
         }
-        .sheet(item: $redeeming) { account in
-            RedeemSheet(account: account, askForMore: false)
+        .sheet(item: $redeeming) { request in
+            RedeemSheet(account: request.account, askForMore: request.askForMore)
         }
     }
 }

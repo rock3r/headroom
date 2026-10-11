@@ -53,6 +53,8 @@ public data class ReminderUi(
     val id: String,
     val fireAtEpochSeconds: Long,
     val resets: List<ReminderItemUi>,
+    /** The reset keys to record only after iOS accepts this notification. */
+    val resetKeys: List<String>,
 )
 
 public data class ReminderItemUi(val accountName: String, val expiresAtEpochSeconds: Long)
@@ -198,6 +200,7 @@ internal object NotificationPlanner {
                         ReminderUi(
                             id = "reminder:$day",
                             fireAtEpochSeconds = resets.minOf { (_, at) -> at }.epochSeconds,
+                            resetKeys = resets.map { (reset, _) -> reset.key },
                             resets =
                                 resets.map { (reset, _) ->
                                     val state = accounts.first { it.account.id == reset.account.id }

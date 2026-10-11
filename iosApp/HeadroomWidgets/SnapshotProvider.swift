@@ -13,12 +13,12 @@ struct SnapshotProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SnapshotEntry) -> Void) {
-        let snapshot = WidgetSnapshot.load()
+        let snapshot = WidgetSnapshot.load().at(.now)
         completion(SnapshotEntry(date: .now, snapshot: context.isPreview && snapshot.isDemo ? .preview : snapshot))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SnapshotEntry>) -> Void) {
-        let snapshot = WidgetSnapshot.load()
+        let snapshot = WidgetSnapshot.load().at(.now)
         var next = Date.now.addingTimeInterval(30 * 60)
         if let reset = snapshot.nextReset?.resetsAt, reset > .now, reset < next {
             next = reset

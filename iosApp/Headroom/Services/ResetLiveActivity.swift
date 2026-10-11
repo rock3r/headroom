@@ -20,7 +20,7 @@ enum ResetLiveActivity {
         }
         if let current {
             let shown = current.content.state
-            if shown.resetsAt <= .now, shown.resetsAt != next.resetsAt {
+            if shown.resetsAt <= .now {
                 // The reset it counted down to happened: say so, then count down to the next one.
                 await end(current, hasReset: true)
             } else {
@@ -47,7 +47,7 @@ enum ResetLiveActivity {
             resetsAt: shown.resetsAt,
             hasReset: hasReset
         )
-        let dismissal: ActivityUIDismissalPolicy = hasReset ? .after(.now + afterglow) : .immediate
+        let dismissal: ActivityUIDismissalPolicy = hasReset ? .after(shown.resetsAt + afterglow) : .immediate
         await activity.end(ActivityContent(state: state, staleDate: nil), dismissalPolicy: dismissal)
     }
 }

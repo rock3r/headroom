@@ -6,6 +6,7 @@ struct RedeemFinished: View {
     let step: RedeemUiFinished
     let providerName: String
     let onClose: () -> Void
+    let onSignIn: () -> Void
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -19,6 +20,10 @@ struct RedeemFinished: View {
                 }
             }
         } actions: {
+            if step.outcome == "signInAgain" {
+                Button("Sign in again", action: onSignIn)
+                    .buttonStyle(.borderedProminent)
+            }
             if step.canTryAgain {
                 Button("Try again", action: model.headroom.resets.redeem.tryAgain)
                     .buttonStyle(.borderedProminent)

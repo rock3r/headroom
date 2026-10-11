@@ -4,6 +4,7 @@ import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemIntent
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.RedeemSession
@@ -20,7 +21,10 @@ import dev.sebastiano.headroom.signin.ZCodeSignIn
 import dev.sebastiano.headroom.signin.ZCodeSignInState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -97,7 +101,7 @@ public sealed interface RedeemUi {
 
     public data object Asking : RedeemUi
 
-    /** [answer] is `granted`, `notYet`, `throttled`, `failed` or `unsupported`. */
+    /** [answer] is `granted`, `notYet`, `throttled`, `signInAgain`, `failed` or `unsupported`. */
     public data class Answered(val answer: String, val retryAfterEpochSeconds: Long?) : RedeemUi
 
     /** The provider needs its own sign-in (ZCode, for Z.AI) before resets can be used. */
@@ -191,6 +195,7 @@ internal constructor(
     private val scope: CoroutineScope,
 ) {
     private val session = MutableStateFlow<RedeemSession?>(null)
+    private var pendingStart: Job? = null
     private var pools: (ResetPool) -> ResetPoolUi = {
         UiMapping.pool(Provider.Codex, emptyList(), it)
     }
@@ -212,9 +217,12 @@ internal constructor(
      * provider for another.
      */
     public fun start(accountId: String, askForMore: Boolean) {
-        scope.launch {
+        if (isBusy) return
+        pendingStart?.cancel()
+        pendingStart = scope.launch {
             val state =
                 sources.real.current().firstOrNull { it.account.id == accountId } ?: return@launch
+            currentCoroutineContext().ensureActive()
             val availability = state.snapshot?.resets ?: return@launch
             val windows = state.snapshot?.windows.orEmpty()
             pools = { UiMapping.pool(state.account.provider, windows, it) }
@@ -253,7 +261,11 @@ internal constructor(
 
     /** Closes the sheet. Nothing happens while the provider is working: see [isBusy]. */
     public fun close() {
-        if (session.value?.busy != true) session.value = null
+        if (!isBusy) {
+            pendingStart?.cancel()
+            pendingStart = null
+            session.value = null
+        }
     }
 
     private fun run(action: suspend (RedeemSession) -> Unit) {
@@ -386,7 +398,8 @@ internal object ResetsMapping {
                     is AskOutcome.Granted -> "granted"
                     is AskOutcome.NotYet -> "notYet"
                     AskOutcome.Throttled -> "throttled"
-                    is AskOutcome.Failed -> "failed"
+                    is AskOutcome.Failed ->
+                        if (answer.kind == QuotaErrorKind.Auth) "signInAgain" else "failed"
                     AskOutcome.Unsupported -> "unsupported"
                 },
             retryAfterEpochSeconds = (answer as? AskOutcome.NotYet)?.retryAfter?.epochSeconds,

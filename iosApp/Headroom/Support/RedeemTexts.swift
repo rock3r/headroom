@@ -68,6 +68,7 @@ enum RedeemTexts {
 
     static func answerTitle(_ id: String) -> LocalizedStringKey {
         switch id {
+        case "signInAgain": "Sign in again"
         case "granted": "You got a reset card"
         case "notYet": "No reset card yet"
         case "throttled": "Too many requests"
@@ -78,6 +79,7 @@ enum RedeemTexts {
 
     static func answerBody(_ id: String, provider: String) -> LocalizedStringKey {
         switch id {
+        case "signInAgain": "\(provider) no longer accepts your sign-in. Sign in again, then ask for a reset card."
         case "granted": "You can use it now, or keep it for later."
         case "notYet": "\(provider) gives reset cards off-peak, and only once your usage is high enough."
         case "throttled": "\(provider) asked Headroom to slow down. Try again in a while."

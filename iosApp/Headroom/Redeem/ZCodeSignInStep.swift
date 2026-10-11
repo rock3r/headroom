@@ -5,6 +5,7 @@ import SwiftUI
 /// in the same browser sheet as the other sign-ins; once it is done, the redeem starts again.
 struct ZCodeSignInStep: View {
     let account: AccountUi
+    var onSignedIn: () -> Void = {}
     @Environment(AppModel.self) private var model
     @State private var browser = BrowserSignIn()
 
@@ -15,7 +16,10 @@ struct ZCodeSignInStep: View {
                 if let opening, let url = URL(string: opening.url) { browser.open(url) } else { browser.close() }
             }
             .onChange(of: model.zCodeStep is ZCodeUiDone) { _, done in
-                if done { model.headroom.resets.redeem.start(accountId: account.id, askForMore: false) }
+                if done {
+                    model.headroom.resets.redeem.start(accountId: account.id, askForMore: false)
+                    onSignedIn()
+                }
             }
             .onDisappear(perform: browser.close)
     }

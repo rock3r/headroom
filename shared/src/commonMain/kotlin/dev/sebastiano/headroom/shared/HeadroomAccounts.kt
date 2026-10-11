@@ -4,6 +4,7 @@ import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.chartSummary
 import kotlin.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
@@ -47,7 +48,13 @@ internal constructor(
 
     /** Turns the reset alert of a window on or off. */
     public fun setAlert(accountId: String, windowId: String, enabled: Boolean) {
-        scope.launch { alerts.setEnabled(accountId, windowId, enabled) }
+        scope.launch { setAlertAndWait(accountId, windowId, enabled) }
+    }
+
+    /** Returns after storage finishes, for notification actions whose handler must await it. */
+    @Throws(IOException::class, CancellationException::class)
+    public suspend fun setAlertAndWait(accountId: String, windowId: String, enabled: Boolean) {
+        alerts.setEnabled(accountId, windowId, enabled)
     }
 
     /**

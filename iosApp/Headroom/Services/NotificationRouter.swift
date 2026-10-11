@@ -29,12 +29,16 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate, Send
         let windowId = info["windowId"] as? String
         let signIn = info["signIn"] as? Bool ?? false
         let action = response.actionIdentifier
-        await MainActor.run {
-            if action == NotificationScheduler.muteAction, let windowId {
-                model.headroom.accounts.setAlert(accountId: accountId, windowId: windowId, enabled: false)
-            } else if action != UNNotificationDismissActionIdentifier {
-                model.open(signIn ? .signIn(accountId: accountId) : .account(accountId))
-            }
+        await handle(accountId: accountId, windowId: windowId, signIn: signIn, action: action)
+    }
+
+    @MainActor
+    private func handle(accountId: String, windowId: String?, signIn: Bool, action: String) async {
+        if action == NotificationScheduler.muteAction, let windowId {
+            // The notification handler must remain alive until DataStore commits the preference.
+            try? await model.headroom.accounts.setAlertAndWait(accountId: accountId, windowId: windowId, enabled: false)
+        } else if action != UNNotificationDismissActionIdentifier {
+            model.open(signIn ? .signIn(accountId: accountId) : .account(accountId))
         }
     }
 }

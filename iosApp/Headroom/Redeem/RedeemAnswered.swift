@@ -6,6 +6,7 @@ struct RedeemAnswered: View {
     let step: RedeemUiAnswered
     let providerName: String
     let onClose: () -> Void
+    let onSignIn: () -> Void
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -19,6 +20,10 @@ struct RedeemAnswered: View {
                 }
             }
         } actions: {
+            if step.answer == "signInAgain" {
+                Button("Sign in again", action: onSignIn)
+                    .buttonStyle(.borderedProminent)
+            }
             if step.answer == "granted" {
                 Button("Use it now", action: model.headroom.resets.redeem.useNow)
                     .buttonStyle(.borderedProminent)

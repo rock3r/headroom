@@ -52,13 +52,18 @@ final class NotificationScheduler {
         for alert in plan.resetAlerts {
             try? await center.add(request(alert))
         }
-        for reminder in plan.reminders {
-            try? await center.add(request(reminder))
+        let canNotify = await Self.canNotify(center)
+        let reminded = await ReminderDelivery.acceptedKeys(
+            planned: plan.reminded,
+            reminders: plan.reminders.map { .init(id: $0.id, resetKeys: $0.resetKeys) },
+            canNotify: canNotify
+        ) { id in
+            guard let reminder = plan.reminders.first(where: { $0.id == id }) else { return }
+            try await self.center.add(self.request(reminder))
         }
         // A warning iOS did not take, say with notifications turned off, is not marked as sent, so
         // the next plan offers it again.
         var unsent: Set<String> = []
-        let canNotify = await Self.canNotify(center)
         for alert in plan.signInAlerts {
             if canNotify, (try? await center.add(request(alert))) != nil { continue }
             unsent.insert(alert.accountId)
@@ -68,7 +73,7 @@ final class NotificationScheduler {
         center.removePendingNotificationRequests(withIdentifiers: cancelled)
 
         defaults.set(plan.signInNotified.filter { !unsent.contains($0) }, forKey: Keys.signInNotified)
-        defaults.set(plan.reminded, forKey: Keys.reminded)
+        defaults.set(reminded, forKey: Keys.reminded)
     }
 
     private func request(_ alert: ResetAlertUi) -> UNNotificationRequest {
