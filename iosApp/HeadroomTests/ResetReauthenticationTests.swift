@@ -8,4 +8,10 @@ struct ResetReauthenticationTests {
         #expect(ResetReauthentication.target(providerId: "codex", result: "failed") == nil)
         #expect(ResetReauthentication.target(providerId: "zai", result: "granted") == nil)
     }
+
+    @Test func `credential renewal preserves an ask intent`() {
+        #expect(ResetReauthentication.resumeAsk(after: "signInAgain", originalAskForMore: true))
+        #expect(!ResetReauthentication.resumeAsk(after: "signInAgain", originalAskForMore: false))
+        #expect(!ResetReauthentication.resumeAsk(after: "failed", originalAskForMore: true))
+    }
 }

@@ -10,13 +10,20 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.RedeemOutcome
+import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPolicy
+import dev.sebastiano.headroom.model.ResetPool
+import dev.sebastiano.headroom.model.ResetProvider
+import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.signin.BrowserSession
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.SignInKind
@@ -26,6 +33,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,17 +46,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.datetime.TimeZone
 import kotlinx.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HeadroomTest {
-    private val now = Instant.parse("2026-09-27T12:32:00Z")
+    private var now = Instant.parse("2026-09-27T12:32:00Z")
     private val scope = TestScope()
     private val repository = MemoryAccountsRepository()
     private val settings = InMemorySettingsRepository()
     private val alerts = MemoryAlertPreferences()
+    private val resetProvider = CountingResetProvider()
     private val headroom =
         Headroom(
             HeadroomParts(
@@ -57,6 +67,7 @@ class HeadroomTest {
                 signInSteps = ApiKeySteps,
                 settings = settings,
                 alerts = alerts,
+                resetProvider = resetProvider,
                 clock = { now },
                 zone = { TimeZone.UTC },
                 compute = StandardTestDispatcher(scope.testScheduler),
@@ -301,6 +312,66 @@ class HeadroomTest {
         alerts.writeGate!!.complete(Unit)
         scope.runCurrent()
         assertTrue(completed)
+    }
+
+    @Test
+    fun `an open chart advances its pace without new account or history emissions`() {
+        repository.accounts.value = DemoData.accounts(now)
+        val state = repository.accounts.value.first()
+        var chart: ChartUi? = null
+        val watch =
+            headroom.accounts.watchChart(state.account.id, state.primaryWindow!!.id) { chart = it }
+        scope.runCurrent()
+        val before = checkNotNull(chart).expectedPercent
+
+        now += 1.minutes
+        scope.advanceTimeBy(1.minutes.inWholeMilliseconds)
+        scope.runCurrent()
+
+        assertTrue(checkNotNull(chart).expectedPercent > before)
+        watch.cancel()
+    }
+
+    @Test
+    fun `closing a redeem sheet cancels a queued confirmation before the provider runs`() {
+        repository.accounts.value =
+            DemoData.accounts(now).map { state ->
+                state.copy(
+                    snapshot =
+                        state.snapshot!!.copy(
+                            resets =
+                                ResetAvailability(
+                                    listOf(
+                                        ResetPool(
+                                            "weekly",
+                                            "Weekly",
+                                            1,
+                                            ResetScope.of(WindowKind.Weekly),
+                                        )
+                                    )
+                                )
+                        )
+                )
+            }
+        headroom.resets.redeem.start("demo-codex", askForMore = false)
+        scope.runCurrent()
+        headroom.resets.redeem.confirm()
+        headroom.resets.redeem.close()
+        scope.runCurrent()
+        assertEquals(0, resetProvider.redeems)
+    }
+}
+
+private class CountingResetProvider : ResetProvider by NoResets {
+    var redeems = 0
+
+    override suspend fun redeem(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+    ): RedeemOutcome {
+        redeems++
+        return RedeemOutcome.NothingToReset
     }
 }
 

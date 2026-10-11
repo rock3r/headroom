@@ -10,14 +10,15 @@ struct RedeemSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var renewingZCode = false
     @State private var renewingAccount = false
+    @State private var renewingAsk = false
 
     var body: some View {
         NavigationStack {
             Group {
                 if renewingZCode {
-                    ZCodeSignInStep(account: account, onSignedIn: { renewingZCode = false })
+                    ZCodeSignInStep(account: account, askForMore: renewingAsk, onSignedIn: { renewingZCode = false })
                 } else {
-                    RedeemStepView(step: model.redeemStep, account: account, onClose: close, onSignIn: renewSignIn)
+                    RedeemStepView(step: model.redeemStep, account: account, askForMore: askForMore, onClose: close, onSignIn: renewSignIn)
                 }
             }
                 .navigationTitle("Resets for \(account.title)")
@@ -59,6 +60,9 @@ struct RedeemSheet: View {
             ?? (model.redeemStep as? RedeemUiAnswered)?.answer ?? ""
         switch ResetReauthentication.target(providerId: account.providerId, result: result) {
         case .zCode:
+            renewingAsk = ResetReauthentication.resumeAsk(
+                after: result, originalAskForMore: askForMore || model.redeemStep is RedeemUiAnswered
+            )
             model.headroom.resets.zCode.cancel()
             renewingZCode = true
         case .account:

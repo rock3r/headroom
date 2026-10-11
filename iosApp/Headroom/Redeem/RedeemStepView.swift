@@ -5,6 +5,7 @@ import SwiftUI
 struct RedeemStepView: View {
     let step: any RedeemUi
     let account: AccountUi
+    let askForMore: Bool
     let onClose: () -> Void
     let onSignIn: () -> Void
     @Environment(AppModel.self) private var model
@@ -26,7 +27,7 @@ struct RedeemStepView: View {
         case let step as RedeemUiAnswered:
             RedeemAnswered(step: step, providerName: account.providerName, onClose: onClose, onSignIn: onSignIn)
         case is RedeemUiSignInRequired:
-            ZCodeSignInStep(account: account)
+            ZCodeSignInStep(account: account, askForMore: askForMore)
         default:
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

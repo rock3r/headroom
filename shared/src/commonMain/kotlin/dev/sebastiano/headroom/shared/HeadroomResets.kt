@@ -219,6 +219,7 @@ internal constructor(
     public fun start(accountId: String, askForMore: Boolean) {
         if (isBusy) return
         pendingStart?.cancel()
+        session.value = null
         pendingStart = scope.launch {
             val state =
                 sources.real.current().firstOrNull { it.account.id == accountId } ?: return@launch
@@ -270,7 +271,7 @@ internal constructor(
 
     private fun run(action: suspend (RedeemSession) -> Unit) {
         val current = session.value ?: return
-        scope.launch { action(current) }
+        scope.launch { if (session.value === current) action(current) }
     }
 
     private fun ui(step: RedeemStep): RedeemUi =

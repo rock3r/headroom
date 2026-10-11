@@ -3,13 +3,16 @@ package dev.sebastiano.headroom.shared
 import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.chartSummary
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -79,10 +82,20 @@ internal constructor(
                 .flatMapLatest { window ->
                     if (window == null) flowOf(null)
                     else
-                        combine(flowOf(window), sources.history(accountId, window)) { w, points ->
-                            chartSummary(w, points, clock())?.let { StatsMapping.chart(w.id, it) }
+                        combine(flowOf(window), sources.history(accountId, window), clockTicks()) {
+                            w,
+                            points,
+                            now ->
+                            chartSummary(w, points, now)?.let { StatsMapping.chart(w.id, it) }
                         }
                 }
         return scope.watch(chart, onChange)
+    }
+
+    private fun clockTicks() = flow {
+        while (true) {
+            emit(clock())
+            delay(1.minutes)
+        }
     }
 }

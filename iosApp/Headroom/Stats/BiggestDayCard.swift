@@ -15,7 +15,7 @@ struct BiggestDayCard: View {
 
     /// "Sep 27", from HeadroomKit's `yyyy-MM-dd`.
     static func dayText(_ iso: String) -> String {
-        guard let date = try? Date(iso, strategy: .iso8601.year().month().day()) else { return iso }
+        guard let date = LocalCalendarDate.parse(iso) else { return iso }
         return date.formatted(.dateTime.month().day())
     }
 }

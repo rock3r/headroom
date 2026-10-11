@@ -13,6 +13,15 @@ struct WidgetSnapshot: Codable, Equatable {
         let needsAttention: Bool
         let signInExpired: Bool
         let logo: Logo?
+
+        /// A rejected sign-in has historical usage, but no current percentage to announce.
+        var currentUsedPercent: Double? { signInExpired ? nil : usedPercent }
+
+        func at(_ date: Date) -> Self {
+            Self(id: id, providerId: providerId, title: title, windowLabel: windowLabel,
+                 usedPercent: usedPercent, resetsAt: resetsAt.flatMap { $0 > date ? $0 : nil },
+                 needsAttention: needsAttention, signInExpired: signInExpired, logo: logo)
+        }
     }
 
     struct Logo: Codable, Equatable {
@@ -72,8 +81,8 @@ struct WidgetSnapshot: Codable, Equatable {
 
     /// A widget may reload while the app still has an old snapshot. Never count down to the past.
     func at(_ date: Date) -> Self {
-        guard let nextReset, nextReset.resetsAt <= date else { return self }
-        return Self(isDemo: isDemo, showsLeft: showsLeft, accounts: accounts,
-            nextReset: nil, nextResetTile: nil, tightestTile: tightestTile)
+        let upcoming = nextReset.flatMap { $0.resetsAt > date ? $0 : nil }
+        return Self(isDemo: isDemo, showsLeft: showsLeft, accounts: accounts.map { $0.at(date) },
+            nextReset: upcoming, nextResetTile: upcoming == nil ? nil : nextResetTile, tightestTile: tightestTile)
     }
 }

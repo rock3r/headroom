@@ -23,7 +23,8 @@ struct NextResetControl: ControlWidget {
 
         func currentValue() async throws -> WidgetSnapshot.Tile? {
             let snapshot = WidgetSnapshot.load()
-            return snapshot.isDemo ? nil : snapshot.nextResetTile
+            guard !snapshot.isDemo, let reset = snapshot.nextReset else { return nil }
+            return ResetControlTile.make(name: reset.accountTitle, resetsAt: reset.resetsAt)
         }
     }
 }

@@ -26,10 +26,18 @@ struct AccountRing: View {
             Text(account.title)
                 .font(.caption2)
                 .lineLimit(1)
-            Text(PercentText.short(snapshot.shown(account), left: snapshot.showsLeft))
-                .font(.caption.bold().monospacedDigit())
+            if let used = account.currentUsedPercent {
+                Text(PercentText.short(snapshot.showsLeft ? 100 - used : used, left: snapshot.showsLeft))
+                    .font(.caption.bold().monospacedDigit())
+            } else {
+                Text("!")
+                    .font(.caption.bold())
+                    .foregroundStyle(.red)
+            }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(account.title), \(PercentText.short(snapshot.shown(account), left: snapshot.showsLeft))")
+        .accessibilityLabel(account.signInExpired
+            ? Text("\(account.title), sign-in expired")
+            : Text("\(account.title), \(PercentText.short(snapshot.shown(account), left: snapshot.showsLeft))"))
     }
 }
