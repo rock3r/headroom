@@ -12,8 +12,10 @@ enum ResetLiveActivity {
     /// Shows the reset in `next`, or ends the activity when there is none or the user turned it off.
     static func update(next: ResetActivityAttributes.ContentState?, enabled: Bool) async {
         let current = Activity<ResetActivityAttributes>.activities.first
-        guard enabled, ActivityAuthorizationInfo().areActivitiesEnabled, let next else {
-            if let current { await end(current, hasReset: false) }
+        let allowed = enabled && ActivityAuthorizationInfo().areActivitiesEnabled
+        guard allowed, let next else {
+            // With no reset left to count down to, the one it showed may just have happened: say so.
+            if let current { await end(current, hasReset: allowed && current.content.state.resetsAt <= .now) }
             return
         }
         if let current {
