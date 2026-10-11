@@ -1,0 +1,192 @@
+{
+ "schema": "cav-board/1",
+ "bpm": 128,
+ "fps": 60,
+ "seconds": 73.25,
+ "width": 1920,
+ "height": 1080,
+ "style": {
+  "prompt": "Headroom app-native Material 3 Expressive: paper surfaces, cobalt primary, rounded Google Sans Flex, quota bars, rings, cookie avatars",
+  "palette": [
+   "#f8fafe",
+   "#1a1c22",
+   "#305eb7",
+   "#c9dfff",
+   "#fdcdef",
+   "#0d0f14",
+   "#3ddc84"
+  ]
+ },
+ "shots": [
+  {
+   "id": "s1a",
+   "frames": [
+    0,
+    120
+   ],
+   "what": "Hook: bar fills; 'You're deep in a session.'"
+  },
+  {
+   "id": "s1b",
+   "frames": [
+    120,
+    233
+   ],
+   "what": "'Then\u2026' bar races past pace, goes wavy"
+  },
+  {
+   "id": "s1c",
+   "frames": [
+    233,
+    345
+   ],
+   "what": "Limit reached pill slams in, shake"
+  },
+  {
+   "id": "s1d",
+   "frames": [
+    345,
+    458
+   ],
+   "what": "'Know your headroom.' collapses to a dot"
+  },
+  {
+   "id": "s2a",
+   "frames": [
+    458,
+    570
+   ],
+   "what": "Drop: cobalt burst, icon ring draws on"
+  },
+  {
+   "id": "s2b",
+   "frames": [
+    570,
+    683
+   ],
+   "what": "Centred lockup + tagline"
+  },
+  {
+   "id": "s3a",
+   "frames": [
+    683,
+    908
+   ],
+   "what": "Overview: close on reset card, pan to Claude, pull back; headline"
+  },
+  {
+   "id": "s3b",
+   "frames": [
+    908,
+    1133
+   ],
+   "what": "8 providers, one per beat"
+  },
+  {
+   "id": "s4a",
+   "frames": [
+    1133,
+    1358
+   ],
+   "what": "Crash zoom: bar fills to 71%, pace tick, goes wavy, chip"
+  },
+  {
+   "id": "s4b",
+   "frames": [
+    1358,
+    1583
+   ],
+   "what": "Wavy vs flat"
+  },
+  {
+   "id": "s5a",
+   "frames": [
+    1583,
+    1808
+   ],
+   "what": "Tap \u2192 detail; ring draws, digits roll"
+  },
+  {
+   "id": "s5b",
+   "frames": [
+    1808,
+    2033
+   ],
+   "what": "Pace chart + projection, camera follows"
+  },
+  {
+   "id": "s5c",
+   "frames": [
+    2033,
+    2258
+   ],
+   "what": "'Hit the limit anyway?' Codex at 100%, dims to night"
+  },
+  {
+   "id": "s6a",
+   "frames": [
+    2258,
+    2483
+   ],
+   "what": "Night: 15h 28m until Codex resets. 'Can't wait?'"
+  },
+  {
+   "id": "s6r1",
+   "frames": [
+    2483,
+    2708
+   ],
+   "what": "Resets \u2192 sheet: 'Use a reset' \u2192 tap \u2192 Resetting\u2026; riser push-in"
+  },
+  {
+   "id": "s6r2",
+   "frames": [
+    2708,
+    2933
+   ],
+   "what": "HIT: 'Usage reset', bars refill, confetti, '2 resets left'"
+  },
+  {
+   "id": "s6b",
+   "frames": [
+    2933,
+    3158
+   ],
+   "what": "Or just wait: reset island grows from the cutout"
+  },
+  {
+   "id": "s7a",
+   "frames": [
+    3158,
+    3383
+   ],
+   "what": "Home screen widgets in a phone"
+  },
+  {
+   "id": "s7b",
+   "frames": [
+    3383,
+    3608
+   ],
+   "what": "Lock screen widget"
+  },
+  {
+   "id": "s8",
+   "frames": [
+    3608,
+    3833
+   ],
+   "what": "Palette dolly, focus pull per beat"
+  },
+  {
+   "id": "s9",
+   "frames": [
+    3833,
+    4395
+   ],
+   "what": "Outro: centred lockup, CTA on beats, stinger hit"
+  }
+ ],
+ "grid": "build/grid.json",
+ "previz": "renders/previz.mp4"
+}
