@@ -1,20 +1,28 @@
 package dev.sebastiano.headroom.quota
 
 import io.ktor.client.HttpClient
+import io.ktor.client.call.HttpClientCall
 import io.ktor.client.engine.HttpClientEngineFactory
+import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.Sender
+import io.ktor.client.plugins.plugin
 import io.ktor.client.plugins.timeout
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.headers
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsBytes
+import io.ktor.client.utils.EmptyContent
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.Url
 import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.content.OutgoingContent
+import io.ktor.http.isSecure
+import io.ktor.http.takeFrom
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.io.IOException
@@ -76,12 +84,63 @@ public class KtorQuotaHttpClient(internal val httpClient: HttpClient = sharedHtt
 
         private val sharedHttpClient: HttpClient by lazy { defaultHttpClient() }
 
-        /** A client with the platform's engine and a [DEFAULT_TIMEOUT] for each call. */
+        private const val MAX_REDIRECTS = 20
+        private val REDIRECTS = setOf(301, 302, 303, 307, 308)
+        private val KEEPS_METHOD = setOf(307, 308)
+        private val FOLLOWED_BY_KTOR = setOf(HttpMethod.Get, HttpMethod.Head)
+
+        /**
+         * A client with the platform's engine and a [DEFAULT_TIMEOUT] for each call. It follows
+         * redirects as OkHttp did, for every method: Ktor only follows them for GET and HEAD.
+         */
         public fun defaultHttpClient(): HttpClient =
             HttpClient(platformHttpEngine) {
-                expectSuccess = false
-                install(HttpTimeout) { requestTimeoutMillis = DEFAULT_TIMEOUT.inWholeMilliseconds }
+                    expectSuccess = false
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = DEFAULT_TIMEOUT.inWholeMilliseconds
+                    }
+                }
+                .apply {
+                    plugin(HttpSend).intercept { request ->
+                        val call = execute(request)
+                        if (request.method in FOLLOWED_BY_KTOR) call
+                        else followRedirects(request, call)
+                    }
+                }
+
+        /**
+         * Follows the redirects of [origin], as OkHttp did: 307 and 308 send the request again, any
+         * other redirect turns it into a GET without the body. Like Ktor, it does not follow a
+         * redirect from HTTPS to HTTP, and drops the Authorization header for another host.
+         */
+        private suspend fun Sender.followRedirects(
+            request: HttpRequestBuilder,
+            origin: HttpClientCall,
+        ): HttpClientCall {
+            var call = origin
+            var builder = request
+            repeat(MAX_REDIRECTS) {
+                val status = call.response.status.value
+                val location = call.response.headers[HttpHeaders.Location]
+                if (status !in REDIRECTS || location == null) return call
+                val from = call.request.url
+                val next =
+                    HttpRequestBuilder().apply {
+                        takeFrom(builder)
+                        url.parameters.clear()
+                        url.takeFrom(location)
+                        if (status !in KEEPS_METHOD) {
+                            method = HttpMethod.Get
+                            setBody(EmptyContent)
+                        }
+                        if (url.host != from.host) headers.remove(HttpHeaders.Authorization)
+                    }
+                if (from.protocol.isSecure() && !next.url.protocol.isSecure()) return call
+                builder = next
+                call = execute(next)
             }
+            return call
+        }
 
         /** [url] when it is an absolute http or https URL with a host, as OkHttp required. */
         private fun httpUrlOrNull(url: String): Url? {

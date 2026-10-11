@@ -170,6 +170,54 @@ class KtorQuotaHttpClientTest {
     }
 
     @Test
+    fun `a POST redirected with 302 follows as a GET without the body, as OkHttp did`() = runTest {
+        server.enqueue(MockResponse.Builder().code(302).addHeader("Location", "/moved").build())
+        server.enqueue(MockResponse(code = 200, body = "done"))
+
+        val response =
+            client.execute(
+                QuotaHttpRequest(
+                    url = server.url("/redeem").toString(),
+                    method = "POST",
+                    headers = mapOf("Content-Type" to "application/json"),
+                    body = "{}",
+                )
+            )
+
+        assertEquals(200, response.statusCode)
+        assertEquals("done", response.body)
+        server.takeRequest()
+        val followed = server.takeRequest()
+        assertEquals("GET", followed.method)
+        assertEquals("/moved", followed.target)
+        assertEquals(0L, followed.bodySize)
+    }
+
+    @Test
+    fun `a POST redirected with 307 is sent again with its body`() = runTest {
+        server.enqueue(MockResponse.Builder().code(307).addHeader("Location", "/moved").build())
+        server.enqueue(MockResponse(code = 200, body = "done"))
+
+        val response =
+            client.execute(
+                QuotaHttpRequest(
+                    url = server.url("/redeem").toString(),
+                    method = "POST",
+                    headers = mapOf("Content-Type" to "application/json"),
+                    body = "{\"a\":1}",
+                )
+            )
+
+        assertEquals(200, response.statusCode)
+        server.takeRequest()
+        val followed = server.takeRequest()
+        assertEquals("POST", followed.method)
+        assertEquals("/moved", followed.target)
+        assertEquals("{\"a\":1}", followed.body?.utf8())
+        assertEquals("application/json", followed.headers["Content-Type"]?.substringBefore(';'))
+    }
+
+    @Test
     fun `clients made without an HttpClient share one`() {
         assertSame(KtorQuotaHttpClient().httpClient, KtorQuotaHttpClient().httpClient)
     }
