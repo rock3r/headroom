@@ -76,16 +76,16 @@ final class AppModel {
         }
     }
 
-    /// "Try" in Settings: plays the shimmer even while its switch is off, but not with motion reduced.
+    /// "Try" in Settings: plays the shimmer over Settings even while its switch is off, but not with
+    /// motion reduced.
     func tryShimmer() {
-        delights.shimmer(enabled: true, reduced: settings?.reduceMotion ?? false)
+        delights.previewShimmer(reduced: settings?.reduceMotion ?? false)
     }
 
-    /// "Try" in Settings: confetti from the first account's card.
+    /// "Try" in Settings: confetti from the button, in the first account's colours.
     func tryConfetti() {
-        guard let first = overview?.accounts.first else { return }
-        delights.burst(accountId: first.id, fromNextReset: false, providerId: first.providerId,
-                       enabled: true, reduced: settings?.reduceMotion ?? false)
+        delights.previewBurst(providerId: overview?.accounts.first?.providerId ?? "",
+                              reduced: settings?.reduceMotion ?? false)
     }
 
     func open(_ route: Route) {

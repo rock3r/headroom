@@ -22,6 +22,7 @@ struct DelightsSettings: View {
                 Button("Try", action: model.tryConfetti)
                     .buttonStyle(.bordered)
                     .accessibilityLabel("Try the reset confetti")
+                    .delightAnchor(DelightAnchors.tryConfetti)
                     .disabled(reduced)
             }
             toggle("resetIsland", "Reset Live Activity", settings.resetIsland,

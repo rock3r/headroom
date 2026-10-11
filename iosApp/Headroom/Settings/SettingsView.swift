@@ -23,6 +23,14 @@ struct SettingsView: View {
                 }
             }
         }
+        // The "Try" previews play here: the overview's own layers sit behind this sheet.
+        .overlayPreferenceValue(DelightAnchors.self) { anchors in
+            ConfettiLayer(anchors: anchors, previews: true)
+        }
+        .overlay {
+            RefreshShimmer(trigger: model.delights.previewShimmers)
+                .ignoresSafeArea()
+        }
     }
 
     private func close() {

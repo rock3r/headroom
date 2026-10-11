@@ -4,6 +4,8 @@ import SwiftUI
 /// from the next reset card. The next reset card's key is `DelightAnchors.nextReset`.
 struct DelightAnchors: PreferenceKey {
     static let nextReset = "next-reset"
+    /// The confetti "Try" button in Settings.
+    static let tryConfetti = "try-confetti"
     static let defaultValue: [String: Anchor<CGRect>] = [:]
 
     static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
