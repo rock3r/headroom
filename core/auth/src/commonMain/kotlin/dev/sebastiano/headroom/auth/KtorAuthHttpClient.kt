@@ -20,22 +20,17 @@ import kotlinx.io.IOException
 /**
  * [AuthHttpClient] backed by Ktor: OkHttp on Android and the JVM, URLSession on iOS. Cancelling the
  * coroutine cancels the call.
+ *
+ * Clients with the default timeout share one Ktor client for the whole process: a Ktor client owns
+ * its engine's threads and connections until it is closed, so one per instance would leak them.
  */
-public class KtorAuthHttpClient internal constructor(private val client: HttpClient) :
+public class KtorAuthHttpClient internal constructor(internal val client: HttpClient) :
     AuthHttpClient {
 
     /** A client whose connect, read and write steps each fail after [timeout]. */
     public constructor(
         timeout: Duration = DEFAULT_TIMEOUT
-    ) : this(
-        HttpClient(platformHttpEngine) {
-            expectSuccess = false
-            install(HttpTimeout) {
-                connectTimeoutMillis = timeout.inWholeMilliseconds
-                socketTimeoutMillis = timeout.inWholeMilliseconds
-            }
-        }
-    )
+    ) : this(if (timeout == DEFAULT_TIMEOUT) sharedClient else httpClient(timeout))
 
     override suspend fun execute(request: AuthHttpRequest): AuthHttpResponse {
         val response =
@@ -77,6 +72,17 @@ public class KtorAuthHttpClient internal constructor(private val client: HttpCli
 
     private companion object {
         val DEFAULT_TIMEOUT: Duration = 30.seconds
+
+        val sharedClient: HttpClient by lazy { httpClient(DEFAULT_TIMEOUT) }
+
+        fun httpClient(timeout: Duration): HttpClient =
+            HttpClient(platformHttpEngine) {
+                expectSuccess = false
+                install(HttpTimeout) {
+                    connectTimeoutMillis = timeout.inWholeMilliseconds
+                    socketTimeoutMillis = timeout.inWholeMilliseconds
+                }
+            }
     }
 }
 

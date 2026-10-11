@@ -6,6 +6,9 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -68,5 +71,15 @@ class KtorAuthHttpClientTest {
         assertFailsWith<AuthException.Network> {
             client.execute(AuthHttpRequest(method = "GET", url = "http://127.0.0.1:$closedPort/"))
         }
+    }
+
+    @Test
+    fun `clients with the default timeout share one HttpClient`() {
+        assertSame(KtorAuthHttpClient().client, KtorAuthHttpClient().client)
+    }
+
+    @Test
+    fun `a client with its own timeout gets its own HttpClient`() {
+        assertNotSame(KtorAuthHttpClient().client, KtorAuthHttpClient(timeout = 5.seconds).client)
     }
 }
