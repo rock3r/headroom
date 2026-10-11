@@ -90,6 +90,9 @@ struct OverviewView: View {
     /// Opens the account, or its sign-in, that a notification tap asked for.
     private func follow(_ route: AppModel.Route?) {
         switch route {
+        case .overviewTab:
+            path = []
+            selected = nil
         case let .account(id):
             open(AccountLink(accountId: id))
         case let .accountResets(id):

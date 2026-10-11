@@ -21,8 +21,8 @@ struct DeepLinkTests {
         #expect(DeepLink.route(URL(string: "headroom://stats")!) == .statsTab)
     }
 
-    @Test func `the overview link and unknown links change nothing`() {
-        #expect(DeepLink.route(DeepLink.overview) == nil)
+    @Test func `the overview link opens overview and unknown links change nothing`() {
+        #expect(DeepLink.route(DeepLink.overview) == .overviewTab)
         #expect(DeepLink.route(URL(string: "headroom://somewhere")!) == nil)
     }
 

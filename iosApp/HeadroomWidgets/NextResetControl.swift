@@ -22,9 +22,11 @@ struct NextResetControl: ControlWidget {
         }
 
         func currentValue() async throws -> WidgetSnapshot.Tile? {
-            let snapshot = WidgetSnapshot.load()
+            let snapshot = WidgetSnapshot.load().at(.now)
             guard !snapshot.isDemo else { return nil }
-            return ControlSettings.mode == ControlSettings.tightest ? snapshot.tightestTile : snapshot.nextResetTile
+            if ControlSettings.mode == ControlSettings.tightest { return snapshot.tightestTile }
+            guard let reset = snapshot.nextReset else { return nil }
+            return ResetControlTile.make(name: reset.accountTitle, resetsAt: reset.resetsAt)
         }
     }
 }

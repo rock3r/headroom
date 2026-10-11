@@ -21,6 +21,15 @@ struct WidgetSnapshot: Codable, Equatable {
         let sessionUsedPercent: Double?
         let resetsAvailable: Int
         let logo: Logo?
+
+        var currentUsedPercent: Double? { signInExpired ? nil : usedPercent }
+
+        func at(_ date: Date) -> Self {
+            Self(id: id, providerId: providerId, name: name, kind: kind, usedPercent: usedPercent,
+                 expectedPercent: expectedPercent, resetsAt: resetsAt.flatMap { $0 > date ? $0 : nil },
+                 needsAttention: needsAttention, signInExpired: signInExpired,
+                 sessionUsedPercent: sessionUsedPercent, resetsAvailable: resetsAvailable, logo: logo)
+        }
     }
 
     struct Logo: Codable, Equatable {
@@ -51,6 +60,9 @@ struct WidgetSnapshot: Codable, Equatable {
     let nextReset: NextReset?
     let nextResetTile: Tile?
     let tightestTile: Tile?
+    /// All alertable windows, retained so each selection can match Headroom's weekly priority.
+    /// Missing in snapshots written by older versions.
+    var resetCandidates: [NextReset]? = nil
 
     static let empty = WidgetSnapshot(
         isDemo: true, showsLeft: false, accounts: [], nextReset: nil, nextResetTile: nil, tightestTile: nil
@@ -80,21 +92,40 @@ struct WidgetSnapshot: Codable, Equatable {
         accounts.filter { !$0.signInExpired }.max { $0.usedPercent < $1.usedPercent } ?? accounts.first
     }
 
+    /// The inline presentation shows one account, so its tap opens that account or its sign-in.
+    var inlineDestination: URL {
+        if let nextReset { return DeepLink.account(nextReset.accountId) }
+        guard let account = tightest else { return DeepLink.overview }
+        return account.signInExpired ? DeepLink.signIn(account.id) : DeepLink.account(account.id)
+    }
+
     /// The same snapshot with only `ids`, in that order, or every account when `ids` is nil. The next
     /// reset skips expired sign-ins, whose reset times are stale, as the app's next reset does.
-    func selecting(_ ids: [String]?) -> WidgetSnapshot {
-        guard let ids, !ids.isEmpty else { return self }
+    func selecting(_ ids: [String]?, at date: Date = .now) -> WidgetSnapshot {
         let byId = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
-        let chosen = ids.compactMap { byId[$0] }
-        let next = nextReset.flatMap { next in chosen.contains { $0.id == next.accountId } ? next : nil }
-            ?? chosen.filter { !$0.signInExpired }.compactMap { account in
-                account.resetsAt.map { (account, $0) }
-            }
-            .filter { $0.1 > .now }
-            .min { $0.1 < $1.1 }
-            .map { NextReset(accountId: $0.0.id, accountTitle: $0.0.name, providerId: $0.0.providerId,
-                             windowLabel: "", kind: $0.0.kind, resetsAt: $0.1) }
-        return WidgetSnapshot(isDemo: isDemo, showsLeft: showsLeft, accounts: chosen, nextReset: next,
-                              nextResetTile: nextResetTile, tightestTile: tightestTile)
+        let chosen = ids.flatMap { $0.isEmpty ? nil : $0.compactMap { byId[$0] } } ?? accounts
+        let eligibleIds = Set(chosen.filter { !$0.signInExpired }.map(\.id))
+        let candidates = resetCandidates ?? legacyCandidates
+        let eligible = candidates.filter {
+            eligibleIds.contains($0.accountId) && $0.resetsAt > date &&
+                ($0.kind == "weekly" || $0.kind == "monthly")
+        }
+        let weekly = eligible.filter { $0.kind == "weekly" }
+        let next = (weekly.isEmpty ? eligible : weekly).min { $0.resetsAt < $1.resetsAt }
+        return WidgetSnapshot(isDemo: isDemo, showsLeft: showsLeft, accounts: chosen.map { $0.at(date) }, nextReset: next,
+                              nextResetTile: next == nextReset ? nextResetTile : nil, tightestTile: tightestTile,
+                              resetCandidates: resetCandidates?.filter { candidate in chosen.contains { $0.id == candidate.accountId } })
+    }
+
+    /// Drop elapsed resets even when the app has not published another snapshot.
+    func at(_ date: Date) -> Self {
+        selecting(nil, at: date)
+    }
+
+    private var legacyCandidates: [NextReset] {
+        accounts.compactMap { account in
+            account.resetsAt.map { NextReset(accountId: account.id, accountTitle: account.name,
+                providerId: account.providerId, windowLabel: "", kind: account.kind, resetsAt: $0) }
+        } + (nextReset.map { [$0] } ?? [])
     }
 }

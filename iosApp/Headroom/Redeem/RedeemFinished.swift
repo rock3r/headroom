@@ -6,8 +6,8 @@ struct RedeemFinished: View {
     let step: RedeemUiFinished
     let account: AccountUi
     let onClose: () -> Void
+    let onSignIn: () -> Void
     @Environment(AppModel.self) private var model
-    @State private var signingInAgain = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -25,7 +25,7 @@ struct RedeemFinished: View {
                 Spacer()
                 Button(step.outcome == "success" ? "Done" : "Close", action: onClose)
                 if step.outcome == "signInAgain" {
-                    Button("Sign in again") { signingInAgain = true }
+                    Button("Sign in again", action: onSignIn)
                         .buttonStyle(.borderedProminent)
                 }
                 if step.outcome == "noCredit", account.resets?.canAskForMore == true {
@@ -42,9 +42,6 @@ struct RedeemFinished: View {
                 }
             }
             .padding(.top, 8)
-        }
-        .sheet(isPresented: $signingInAgain) {
-            SignInView(mode: .again(accountId: account.id, providerId: account.providerId))
         }
     }
 

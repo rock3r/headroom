@@ -5,6 +5,7 @@ import SwiftUI
 struct ResetsList: View {
     let tab: ResetsTabUi
     let onUse: (AccountUi) -> Void
+    let onAsk: (AccountUi) -> Void
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -17,7 +18,8 @@ struct ResetsList: View {
             if !tab.withResets.isEmpty {
                 Section("Available resets") {
                     ForEach(tab.withResets) { account in
-                        AvailableResetsRow(account: account, canUse: !tab.isDemo) { onUse(account) }
+                        AvailableResetsRow(account: account, canUse: !tab.isDemo,
+                            onUse: { onUse(account) }, onAsk: { onAsk(account) })
                     }
                 }
             }

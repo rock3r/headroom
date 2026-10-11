@@ -62,10 +62,12 @@ struct UsageShapeView: View {
             .fill(account.needsAttention && !account.signInExpired ? Color.red.opacity(0.85) : colors.accent)
             .aspectRatio(1, contentMode: .fit)
             .overlay {
-                Text(WidgetTexts.percent(snapshot.shown(account.usedPercent)))
-                    .font(.system(big ? .title : .headline, design: .rounded).bold().monospacedDigit())
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.5)
+                if let used = account.currentUsedPercent {
+                    Text(WidgetTexts.percent(snapshot.shown(used)))
+                        .font(.system(big ? .title : .headline, design: .rounded).bold().monospacedDigit())
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.5)
+                }
             }
             .opacity(account.signInExpired ? 0.5 : 1)
             .overlay(alignment: .topTrailing) { WidgetBadge(account: account) }

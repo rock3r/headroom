@@ -285,7 +285,12 @@ internal object UiMapping {
             sort = settings.overviewSort.id(),
             nextResetTile = tile(TileSubtitleMode.NextReset, accounts, now, settings.quotaDisplay),
             tightestTile =
-                tile(TileSubtitleMode.TightestQuota, accounts, now, settings.quotaDisplay),
+                tile(
+                    TileSubtitleMode.TightestQuota,
+                    accounts.filterNot { it.isSignInExpired },
+                    now,
+                    settings.quotaDisplay,
+                ),
             nextReset =
                 NextReset.find(accounts, now)?.let { next ->
                     NextResetUi(

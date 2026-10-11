@@ -9,6 +9,9 @@ struct RedeemSheet: View {
     let askForMore: Bool
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @State private var renewingZCode = false
+    @State private var renewingAccount = false
+    @State private var renewingAsk = false
     /// The pool the sheet is working with, kept once the step no longer names it.
     @State private var pool: ResetPoolUi?
     /// The reset worked: confetti over the bars, then a gloss once the new usage refills them.
@@ -30,7 +33,11 @@ struct RedeemSheet: View {
                                 }
                             }
                         }
-                    RedeemStepView(step: model.redeemStep, account: current, onClose: close)
+                    if renewingZCode {
+                        ZCodeSignInStep(account: current, askForMore: renewingAsk, onSignedIn: { renewingZCode = false })
+                    } else {
+                        RedeemStepView(step: model.redeemStep, account: current, askForMore: askForMore, onClose: close, onSignIn: renewSignIn)
+                    }
                 }
                 .padding()
             }
@@ -117,5 +124,24 @@ struct RedeemSheet: View {
     private func stop() {
         model.headroom.resets.redeem.close()
         model.headroom.resets.zCode.cancel()
+        if renewingAccount { model.open(.signIn(accountId: account.id)) }
+    }
+
+    private func renewSignIn() {
+        let result = (model.redeemStep as? RedeemUiFinished)?.outcome
+            ?? (model.redeemStep as? RedeemUiAnswered)?.answer ?? ""
+        switch ResetReauthentication.target(providerId: account.providerId, result: result) {
+        case .zCode:
+            renewingAsk = ResetReauthentication.resumeAsk(
+                after: result, originalAskForMore: askForMore || model.redeemStep is RedeemUiAnswered
+            )
+            model.headroom.resets.zCode.cancel()
+            renewingZCode = true
+        case .account:
+            renewingAccount = true
+            close()
+        case nil:
+            break
+        }
     }
 }

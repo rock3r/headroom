@@ -29,6 +29,8 @@ struct RootView: View {
         }
         .onChange(of: model.route, initial: true) { _, route in
             switch route {
+            case .overviewTab:
+                tab = .overview
             case .resetsTab:
                 tab = .resets
                 model.route = nil

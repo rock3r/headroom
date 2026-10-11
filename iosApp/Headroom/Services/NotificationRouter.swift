@@ -1,8 +1,8 @@
 import Foundation
 import UserNotifications
 
-/// Shows Headroom's notifications while the app is open, and acts on a tap: "Mute" turns the
-/// window's alert off, and a tap opens the account, its resets, or its sign-in.
+/// Shows Headroom's notifications while the app is open, and acts on a tap: "Mute this limit"
+/// turns the window's alert off, and a tap opens the account, or its sign-in.
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate, Sendable {
     private let model: AppModel
 
@@ -30,12 +30,16 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate, Send
         let signIn = info["signIn"] as? Bool ?? false
         let resets = info["resets"] as? Bool ?? false
         let action = response.actionIdentifier
-        await MainActor.run {
-            if action == NotificationScheduler.muteAction, let windowId {
-                model.headroom.accounts.setAlert(accountId: accountId, windowId: windowId, enabled: false)
-            } else if action != UNNotificationDismissActionIdentifier {
-                model.open(signIn ? .signIn(accountId: accountId) : resets ? .accountResets(accountId) : .account(accountId))
-            }
+        await handle(accountId: accountId, windowId: windowId, signIn: signIn, resets: resets, action: action)
+    }
+
+    @MainActor
+    private func handle(accountId: String, windowId: String?, signIn: Bool, resets: Bool, action: String) async {
+        if action == NotificationScheduler.muteAction, let windowId {
+            // The notification handler must remain alive until DataStore commits the preference.
+            try? await model.headroom.accounts.setAlertAndWait(accountId: accountId, windowId: windowId, enabled: false)
+        } else if action != UNNotificationDismissActionIdentifier {
+            model.open(signIn ? .signIn(accountId: accountId) : resets ? .accountResets(accountId) : .account(accountId))
         }
     }
 }

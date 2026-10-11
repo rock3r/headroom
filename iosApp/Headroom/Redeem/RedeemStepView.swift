@@ -5,7 +5,9 @@ import SwiftUI
 struct RedeemStepView: View {
     let step: any RedeemUi
     let account: AccountUi
+    let askForMore: Bool
     let onClose: () -> Void
+    let onSignIn: () -> Void
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -20,13 +22,13 @@ struct RedeemStepView: View {
         case is RedeemUiChecking:
             RedeemBusy(text: "Checking again…")
         case let step as RedeemUiFinished:
-            RedeemFinished(step: step, account: account, onClose: onClose)
+            RedeemFinished(step: step, account: account, onClose: onClose, onSignIn: onSignIn)
         case is RedeemUiAsking:
             RedeemBusy(text: "Asking \(account.providerName) for a reset card…")
         case let step as RedeemUiAnswered:
-            RedeemAnswered(step: step, providerName: account.providerName, onClose: onClose)
+            RedeemAnswered(step: step, providerName: account.providerName, onClose: onClose, onSignIn: onSignIn)
         case is RedeemUiSignInRequired:
-            ZCodeSignInStep(account: account)
+            ZCodeSignInStep(account: account, askForMore: askForMore)
         default:
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

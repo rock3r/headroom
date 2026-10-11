@@ -4,14 +4,50 @@ import WidgetKit
 /// Time left until the next weekly reset of the chosen accounts.
 struct CountdownWidget: Widget {
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: "dev.sebastiano.headroom.countdown", intent: AccountsConfiguration.self,
+        AppIntentConfiguration(kind: WidgetCompatibility.countdownKind, intent: AccountsConfiguration.self,
                                provider: SnapshotProvider()) { entry in
-            CountdownView(snapshot: entry.snapshot)
-                .containerBackground(.fill.tertiary, for: .widget)
+            CompatibleCountdownView(snapshot: entry.snapshot)
         }
         .configurationDisplayName("Countdown")
         .description("Time left until the next weekly reset of your accounts.")
-        .supportedFamilies([.systemSmall])
+        .supportedFamilies(WidgetCompatibility.countdownFamilies)
+    }
+}
+
+private struct CompatibleCountdownView: View {
+    let snapshot: WidgetSnapshot
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        if family == .systemSmall {
+            CountdownView(snapshot: snapshot)
+                .containerBackground(.fill.tertiary, for: .widget)
+        } else {
+            legacyCountdown
+                .containerBackground(.clear, for: .widget)
+        }
+    }
+
+    @ViewBuilder private var legacyCountdown: some View {
+        if snapshot.isDemo || snapshot.accounts.isEmpty {
+            WidgetEmpty(snapshot: snapshot)
+        } else if let next = snapshot.nextReset {
+            if family == .accessoryInline {
+                Text("\(next.accountTitle) · \(next.resetsAt, style: .relative)")
+                    .widgetURL(DeepLink.account(next.accountId))
+            } else {
+                VStack(alignment: .leading) {
+                    Text("\(next.accountTitle) · \(WidgetTexts.nextReset(next.kind))")
+                        .font(.caption)
+                    Text(next.resetsAt, style: .relative)
+                        .monospacedDigit()
+                }
+                .widgetURL(DeepLink.account(next.accountId))
+            }
+        } else {
+            Text("No reset coming up")
+                .widgetURL(DeepLink.overview)
+        }
     }
 }
 

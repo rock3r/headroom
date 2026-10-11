@@ -67,7 +67,15 @@ enum WidgetPublisher {
                 )
             },
             nextResetTile: overview.nextResetTile.map(tile),
-            tightestTile: overview.tightestTile.map(tile)
+            tightestTile: overview.tightestTile.map(tile),
+            resetCandidates: overview.accounts.flatMap { account in
+                account.windows.compactMap { window -> WidgetSnapshot.NextReset? in
+                    guard window.canAlert, let at = window.resetsAtEpochSeconds else { return nil }
+                    return .init(accountId: account.id, accountTitle: account.title,
+                        providerId: account.providerId, windowLabel: window.label, kind: window.kind,
+                        resetsAt: Date(epochSeconds: at.int64Value))
+                }
+            }
         )
         guard snapshot != WidgetSnapshot.load() else { return }
         snapshot.save()

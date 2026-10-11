@@ -33,8 +33,8 @@ struct RingGauge: View {
                 }
                 .padding(lineWidth * 1.4)
             }
-            if showsNumber {
-                Text(WidgetTexts.percent(snapshot.shown(account.usedPercent)))
+            if showsNumber, let used = account.currentUsedPercent {
+                Text(WidgetTexts.percent(snapshot.shown(used)))
                     .font(.system(.headline, design: .rounded).monospacedDigit())
                     .minimumScaleFactor(0.5)
                     .padding(lineWidth * (account.sessionUsedPercent == nil ? 1.2 : 2.4))

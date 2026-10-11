@@ -28,6 +28,9 @@ enum WidgetTexts {
 
     /// What VoiceOver says about a gauge: "Claude: 62% of the weekly limit used, over pace."
     static func gauge(_ account: WidgetSnapshot.Account, left: Bool) -> String {
+        guard !account.signInExpired else {
+            return String(localized: "\(account.name): sign-in expired.")
+        }
         let value = percent(left ? 100 - account.usedPercent : account.usedPercent)
         let window = windowName(account.kind)
         var text = switch (left, account.needsAttention) {
@@ -40,9 +43,6 @@ enum WidgetTexts {
             text += " " + (account.resetsAvailable == 1
                 ? String(localized: "1 reset available now.")
                 : String(localized: "\(account.resetsAvailable) resets available now."))
-        }
-        if account.signInExpired {
-            text += " " + String(localized: "Sign-in expired, these numbers are out of date.")
         }
         return text
     }

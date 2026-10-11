@@ -84,6 +84,14 @@ class NotificationPlannerTest {
     }
 
     @Test
+    fun `a reminder exposes exactly the reset keys it would mark as sent`() {
+        val plan = plan(accounts = withCodexResets(now + 3.days, now + 3.days + 2.hours))
+
+        assertEquals(plan.reminded.toSet(), plan.reminders.single().resetKeys.toSet())
+        assertEquals(2, plan.reminders.single().resetKeys.size)
+    }
+
+    @Test
     fun `a reminder stays planned until it goes out`() {
         val withResets = withCodexResets(now + 3.days)
 

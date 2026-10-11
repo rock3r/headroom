@@ -46,11 +46,18 @@ struct LockScreenView: View {
                 }
                 .widgetURL(DeepLink.overview)
             default:
-                if let next = snapshot.nextReset {
-                    Text(footer(next))
-                } else if let account = snapshot.tightest {
-                    Text("\(account.name) · \(WidgetTexts.percentUsed(snapshot.shown(account.usedPercent), left: snapshot.showsLeft))")
+                Group {
+                    if let next = snapshot.nextReset {
+                        Text(footer(next))
+                    } else if let account = snapshot.tightest {
+                            if let used = account.currentUsedPercent {
+                                Text("\(account.name) · \(WidgetTexts.percentUsed(snapshot.shown(used), left: snapshot.showsLeft))")
+                            } else {
+                                Text("\(account.name) · Sign in again")
+                            }
+                    }
                 }
+                .widgetURL(snapshot.inlineDestination)
             }
         }
     }

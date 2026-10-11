@@ -10,12 +10,19 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.RedeemOutcome
+import dev.sebastiano.headroom.model.ResetAttemptKey
+import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPolicy
+import dev.sebastiano.headroom.model.ResetPool
+import dev.sebastiano.headroom.model.ResetProvider
+import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.signin.BrowserSession
@@ -30,6 +37,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,17 +48,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.datetime.TimeZone
 import kotlinx.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HeadroomTest {
-    private val now = Instant.parse("2026-09-27T12:32:00Z")
+    private var now = Instant.parse("2026-09-27T12:32:00Z")
     private val scope = TestScope()
     private val repository = MemoryAccountsRepository()
     private val settings = InMemorySettingsRepository()
     private val alerts = MemoryAlertPreferences()
+    private val resetProvider = CountingResetProvider()
     private val headroom =
         Headroom(
             HeadroomParts(
@@ -59,6 +69,7 @@ class HeadroomTest {
                 signInSteps = ApiKeySteps,
                 settings = settings,
                 alerts = alerts,
+                resetProvider = resetProvider,
                 clock = { now },
                 zone = { TimeZone.UTC },
                 compute = StandardTestDispatcher(scope.testScheduler),
@@ -307,6 +318,104 @@ class HeadroomTest {
     }
 
     private fun latestOverview(): OverviewUi = latest(headroom::watchOverview)
+
+    @Test
+    fun `closing a redeem sheet cancels a start waiting for storage`() {
+        repository.stored =
+            DemoData.accounts(now).map { state ->
+                state.copy(
+                    snapshot = state.snapshot!!.copy(resets = ResetAvailability(emptyList()))
+                )
+            }
+        repository.readGate = CompletableDeferred()
+        var step: RedeemUi = RedeemUi.Idle
+        val watch = headroom.resets.redeem.watch { step = it }
+        headroom.resets.redeem.start("demo-codex", askForMore = true)
+        scope.runCurrent()
+
+        headroom.resets.redeem.close()
+        repository.readGate!!.complete(Unit)
+        scope.runCurrent()
+
+        assertEquals(RedeemUi.Idle, step)
+        watch.cancel()
+    }
+
+    @Test
+    fun `the awaited alert mutation completes only after preferences are stored`() {
+        alerts.writeGate = CompletableDeferred()
+        var completed = false
+        scope.launch {
+            headroom.accounts.setAlertAndWait("a", "weekly", enabled = false)
+            completed = true
+        }
+        scope.runCurrent()
+        assertFalse(completed)
+
+        alerts.writeGate!!.complete(Unit)
+        scope.runCurrent()
+        assertTrue(completed)
+    }
+
+    @Test
+    fun `an open chart advances its pace without new account or history emissions`() {
+        repository.accounts.value = DemoData.accounts(now)
+        val state = repository.accounts.value.first()
+        var chart: ChartUi? = null
+        val watch =
+            headroom.accounts.watchChart(state.account.id, state.primaryWindow!!.id) { chart = it }
+        scope.runCurrent()
+        val before = checkNotNull(chart).expectedPercent
+
+        now += 1.minutes
+        scope.advanceTimeBy(1.minutes.inWholeMilliseconds)
+        scope.runCurrent()
+
+        assertTrue(checkNotNull(chart).expectedPercent > before)
+        watch.cancel()
+    }
+
+    @Test
+    fun `closing a redeem sheet cancels a queued confirmation before the provider runs`() {
+        repository.accounts.value =
+            DemoData.accounts(now).map { state ->
+                state.copy(
+                    snapshot =
+                        state.snapshot!!.copy(
+                            resets =
+                                ResetAvailability(
+                                    listOf(
+                                        ResetPool(
+                                            "weekly",
+                                            "Weekly",
+                                            1,
+                                            ResetScope.of(WindowKind.Weekly),
+                                        )
+                                    )
+                                )
+                        )
+                )
+            }
+        headroom.resets.redeem.start("demo-codex", askForMore = false)
+        scope.runCurrent()
+        headroom.resets.redeem.confirm()
+        headroom.resets.redeem.close()
+        scope.runCurrent()
+        assertEquals(0, resetProvider.redeems)
+    }
+}
+
+private class CountingResetProvider : ResetProvider by NoResets {
+    var redeems = 0
+
+    override suspend fun redeem(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+    ): RedeemOutcome {
+        redeems++
+        return RedeemOutcome.NothingToReset
+    }
 }
 
 /** Every provider signs in with an API key, which needs no network. */
@@ -327,8 +436,12 @@ private class MemoryAccountsRepository : AccountsRepository {
 
     /** What storage holds when [accounts] has not published it yet, as Room does at first. */
     var stored: List<AccountState>? = null
+    var readGate: CompletableDeferred<Unit>? = null
 
-    override suspend fun current(): List<AccountState> = stored ?: accounts.value
+    override suspend fun current(): List<AccountState> {
+        readGate?.await()
+        return stored ?: accounts.value
+    }
 
     fun add(account: Account) {
         accounts.update { it + AccountState(account, snapshot = null) }
@@ -362,6 +475,7 @@ private class RefusingTokenStore(private val store: TokenStore = InMemoryTokenSt
 
 /** Alert switches in memory. */
 private class MemoryAlertPreferences : AlertPreferences {
+    var writeGate: CompletableDeferred<Unit>? = null
     private val switches = MutableStateFlow(emptyMap<Pair<String, String>, Boolean>())
 
     override fun isEnabled(accountId: String, window: QuotaWindow): Flow<Boolean> = switches.map {
@@ -369,6 +483,7 @@ private class MemoryAlertPreferences : AlertPreferences {
     }
 
     override suspend fun setEnabled(accountId: String, windowId: String, enabled: Boolean) {
+        writeGate?.await()
         switches.update { it + ((accountId to windowId) to enabled) }
     }
 }

@@ -34,15 +34,28 @@ import kotlinx.io.IOException
  * Clients with the default timeout share one Ktor client for the whole process: a Ktor client owns
  * its engine's threads and connections until it is closed, so one per instance would leak them.
  */
-public class KtorAuthHttpClient internal constructor(internal val client: HttpClient) :
+public class KtorAuthHttpClient
+private constructor(internal val client: HttpClient, private val ownsClient: Boolean) :
     AuthHttpClient {
+
+    internal constructor(client: HttpClient) : this(client, ownsClient = false)
 
     /**
      * A client whose call, and each of its connect, read and write steps, fails after [timeout].
      */
     public constructor(
         timeout: Duration = DEFAULT_TIMEOUT
-    ) : this(if (timeout == DEFAULT_TIMEOUT) sharedClient else httpClient(timeout))
+    ) : this(
+        if (timeout == DEFAULT_TIMEOUT) sharedClient else httpClient(timeout),
+        ownsClient = timeout != DEFAULT_TIMEOUT,
+    )
+
+    /**
+     * Releases a custom-timeout client's engine. Shared or injected clients stay with their owner.
+     */
+    public fun close() {
+        if (ownsClient) client.close()
+    }
 
     override suspend fun execute(request: AuthHttpRequest): AuthHttpResponse {
         val response =

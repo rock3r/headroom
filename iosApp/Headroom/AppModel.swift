@@ -20,6 +20,7 @@ final class AppModel {
     var route: Route?
 
     enum Route: Equatable {
+        case overviewTab
         case account(String)
         /// The account's detail, scrolled to its resets, as from a reset reminder.
         case accountResets(String)

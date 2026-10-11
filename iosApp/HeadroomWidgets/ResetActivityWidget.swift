@@ -6,32 +6,33 @@ import WidgetKit
 struct ResetActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ResetActivityAttributes.self) { context in
-            ResetActivityView(state: context.state)
+            ResetActivityView(state: context.state.displayed(isStale: context.isStale))
                 .padding()
                 .widgetURL(DeepLink.account(context.state.accountId))
         } dynamicIsland: { context in
-            DynamicIsland {
+            let state = context.state.displayed(isStale: context.isStale)
+            return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text(context.state.accountTitle)
+                    Text(state.accountTitle)
                         .font(.headline)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    ResetCountdown(state: context.state)
+                    ResetCountdown(state: state)
                         .font(.headline.monospacedDigit())
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.state.hasReset ? "\(context.state.windowLabel) limit reset" : "\(context.state.windowLabel) limit resets soon")
+                    Text(state.hasReset ? "\(state.windowLabel) limit reset" : "\(state.windowLabel) limit resets soon")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } compactLeading: {
                 Image(systemName: "arrow.counterclockwise")
             } compactTrailing: {
-                ResetCountdown(state: context.state)
+                ResetCountdown(state: state)
                     .monospacedDigit()
                     .frame(maxWidth: 56)
             } minimal: {
-                Image(systemName: context.state.hasReset ? "checkmark" : "arrow.counterclockwise")
+                Image(systemName: state.hasReset ? "checkmark" : "arrow.counterclockwise")
             }
             .widgetURL(DeepLink.account(context.state.accountId))
         }

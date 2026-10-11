@@ -4,14 +4,28 @@ import WidgetKit
 /// Weekly and session usage as rings: one account, or up to four in a grid.
 struct RingsWidget: Widget {
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: "dev.sebastiano.headroom.rings", intent: AccountsConfiguration.self,
+        AppIntentConfiguration(kind: WidgetCompatibility.ringsKind, intent: AccountsConfiguration.self,
                                provider: SnapshotProvider()) { entry in
-            RingsView(snapshot: entry.snapshot)
-                .containerBackground(.fill.tertiary, for: .widget)
+            CompatibleRingsView(snapshot: entry.snapshot)
         }
         .configurationDisplayName("Rings")
         .description("Weekly and session usage as rings. One account, or up to four in a grid.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies(WidgetCompatibility.ringsFamilies)
+    }
+}
+
+private struct CompatibleRingsView: View {
+    let snapshot: WidgetSnapshot
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        if family == .systemSmall || family == .systemMedium {
+            RingsView(snapshot: snapshot)
+                .containerBackground(.fill.tertiary, for: .widget)
+        } else {
+            LockScreenView(snapshot: snapshot)
+                .containerBackground(.clear, for: .widget)
+        }
     }
 }
 
@@ -55,14 +69,19 @@ struct RingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(account.name)
                         .font(.headline)
-                    Text(WidgetTexts.percentUsed(snapshot.shown(account.usedPercent), left: snapshot.showsLeft))
-                        .font(.subheadline)
-                    if let session = account.sessionUsedPercent {
+                    if let used = account.currentUsedPercent {
+                        Text(WidgetTexts.percentUsed(snapshot.shown(used), left: snapshot.showsLeft))
+                            .font(.subheadline)
+                    } else {
+                        Text("Sign in again")
+                            .font(.subheadline)
+                    }
+                    if !account.signInExpired, let session = account.sessionUsedPercent {
                         Text("\(WidgetTexts.windowName("session")) \(WidgetTexts.percent(snapshot.shown(session)))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    if let resetsAt = account.resetsAt {
+                    if !account.signInExpired, let resetsAt = account.resetsAt {
                         Text("Resets \(resetsAt, style: .relative)")
                             .font(.caption)
                             .foregroundStyle(.secondary)

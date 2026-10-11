@@ -69,12 +69,14 @@ struct BarsView: View {
                 }
             }
             .frame(height: 8)
-            Text(WidgetTexts.percent(snapshot.shown(account.usedPercent)))
-                .font(.caption.monospacedDigit().bold())
-                .frame(width: 38, alignment: .trailing)
+            .opacity(account.signInExpired ? 0.6 : 1)
+            if let used = account.currentUsedPercent {
+                Text(WidgetTexts.percent(snapshot.shown(used)))
+                    .font(.caption.monospacedDigit().bold())
+                    .frame(width: 38, alignment: .trailing)
+            }
             WidgetBadge(account: account)
         }
-        .opacity(account.signInExpired ? 0.6 : 1)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(WidgetTexts.gauge(account, left: snapshot.showsLeft))
     }

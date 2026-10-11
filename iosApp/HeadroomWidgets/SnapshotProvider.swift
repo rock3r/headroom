@@ -13,7 +13,7 @@ struct SnapshotProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: AccountsConfiguration, in context: Context) async -> SnapshotEntry {
-        let snapshot = WidgetSnapshot.load()
+        let snapshot = WidgetSnapshot.load().at(.now)
         let shown = context.isPreview && snapshot.accounts.isEmpty ? .preview : snapshot
         return SnapshotEntry(date: .now, snapshot: shown.selecting(configuration.accounts?.map(\.id)))
     }
