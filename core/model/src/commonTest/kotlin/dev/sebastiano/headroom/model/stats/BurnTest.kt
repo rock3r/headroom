@@ -73,4 +73,39 @@ class BurnTest {
         val hours = hourlyBurn(listOf(at(10, 70.0), at(10, 3.0)), TimeZone.UTC)
         assertEquals(mapOf(LocalDateTime.parse("2026-09-21T09:00") to 3.0), hours)
     }
+
+    @Test
+    fun `use in the repeated hour when clocks go back stays in that hour`() {
+        // New York's clocks go back from 2:00 to 1:00 at 06:00 UTC: this is the second 1:00 hour.
+        val hours =
+            hourlyBurn(
+                listOf(
+                    UsagePoint(Instant.parse("2026-11-01T06:10:00Z"), 0.0),
+                    UsagePoint(Instant.parse("2026-11-01T06:50:00Z"), 10.0),
+                ),
+                TimeZone.of("America/New_York"),
+            )
+
+        assertEquals(mapOf(LocalDateTime.parse("2026-11-01T01:00") to 10.0), hours)
+    }
+
+    @Test
+    fun `use across clocks going back fills both 1 am hours`() {
+        val hours =
+            hourlyBurn(
+                listOf(
+                    UsagePoint(Instant.parse("2026-11-01T05:30:00Z"), 0.0),
+                    UsagePoint(Instant.parse("2026-11-01T07:30:00Z"), 40.0),
+                ),
+                TimeZone.of("America/New_York"),
+            )
+
+        assertEquals(
+            mapOf(
+                LocalDateTime.parse("2026-11-01T01:00") to 30.0,
+                LocalDateTime.parse("2026-11-01T02:00") to 10.0,
+            ),
+            hours,
+        )
+    }
 }

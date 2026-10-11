@@ -3,11 +3,13 @@ package dev.sebastiano.headroom.model.stats
 import dev.sebastiano.headroom.model.UsagePoint
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
 /**
@@ -67,13 +69,24 @@ private fun spread(
     }
     var cursor = from.at
     while (cursor < to.at) {
-        val hour = hourStart(cursor, zone)
-        // An hour later on the timeline, as across a daylight saving change the next local hour
-        // can start sooner or later than the clock says.
-        val next = minOf(hour.toInstant(zone) + 1.hours, to.at)
-        add(hour, amount * (next - cursor).inWholeMilliseconds / gap.inWholeMilliseconds)
+        val next = minOf(nextHourStart(cursor, zone), to.at)
+        add(
+            hourStart(cursor, zone),
+            amount * (next - cursor).inWholeMilliseconds / gap.inWholeMilliseconds,
+        )
         cursor = next
     }
+}
+
+/**
+ * When the local hour after the one [at] falls in starts, an hour on from the start of [at]'s hour.
+ * Worked out from [at] itself rather than from its local time, which in the hour repeated when
+ * clocks go back could be either occurrence.
+ */
+private fun nextHourStart(at: Instant, zone: TimeZone): Instant {
+    val local = at.toLocalDateTime(zone)
+    val intoHour = local.minute.minutes + local.second.seconds + local.nanosecond.nanoseconds
+    return at - intoHour + 1.hours
 }
 
 /** The local start of the hour [at] falls in. */
