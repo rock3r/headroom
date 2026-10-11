@@ -5,12 +5,25 @@ import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.auth.TokenStore
 import dev.sebastiano.headroom.data.AccountsRepository
-import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.NoResets
+import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.RedeemOutcome
+import dev.sebastiano.headroom.model.ResetAttemptKey
+import dev.sebastiano.headroom.model.ResetAvailability
+import dev.sebastiano.headroom.model.ResetPolicy
+import dev.sebastiano.headroom.model.ResetPool
+import dev.sebastiano.headroom.model.ResetProvider
+import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.signin.BrowserSession
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.SignInKind
@@ -20,37 +33,53 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.datetime.TimeZone
 import kotlinx.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HeadroomTest {
-    private val now = Instant.parse("2026-09-27T12:32:00Z")
+    private var now = Instant.parse("2026-09-27T12:32:00Z")
     private val scope = TestScope()
     private val repository = MemoryAccountsRepository()
+    private val settings = InMemorySettingsRepository()
+    private val alerts = MemoryAlertPreferences()
+    private val resetProvider = CountingResetProvider()
     private val headroom =
         Headroom(
-            repository = repository,
-            signInManager = SignInManager(InMemoryTokenStore(), repository),
-            signInSteps = ApiKeySteps,
-            scope = scope,
-            clock = { now },
+            HeadroomParts(
+                repository = repository,
+                tokenStore = InMemoryTokenStore(),
+                signInSteps = ApiKeySteps,
+                settings = settings,
+                alerts = alerts,
+                resetProvider = resetProvider,
+                clock = { now },
+                zone = { TimeZone.UTC },
+                compute = StandardTestDispatcher(scope.testScheduler),
+            ),
+            scope,
         )
 
-    private fun latestOverview(): OverviewUi {
-        var latest: OverviewUi? = null
-        val watch = headroom.watchOverview { latest = it }
+    private fun <T> latest(watch: ((T) -> Unit) -> Watch): T {
+        var latest: T? = null
+        val running = watch { latest = it }
         scope.runCurrent()
-        watch.cancel()
+        running.cancel()
         return checkNotNull(latest)
     }
 
@@ -132,15 +161,21 @@ class HeadroomTest {
     fun `a sign-out the keychain refuses keeps the account and the app running`() {
         val refusing =
             Headroom(
-                repository = repository,
-                signInManager = SignInManager(RefusingTokenStore(), repository),
-                signInSteps = ApiKeySteps,
-                scope = scope,
-                clock = { now },
+                HeadroomParts(
+                    repository = repository,
+                    tokenStore = RefusingTokenStore(),
+                    signInSteps = ApiKeySteps,
+                    settings = settings,
+                    alerts = alerts,
+                    clock = { now },
+                    zone = { TimeZone.UTC },
+                    compute = StandardTestDispatcher(scope.testScheduler),
+                ),
+                scope,
             )
         repository.add(Account("a1", Provider.Claude, "sam@example.com"))
 
-        refusing.removeAccount("a1")
+        refusing.accounts.remove("a1")
         scope.runCurrent()
 
         assertTrue(scope.isActive)
@@ -157,10 +192,186 @@ class HeadroomTest {
     fun `removing an account signs it out`() {
         repository.add(Account("a1", Provider.Claude, "sam@example.com"))
 
-        headroom.removeAccount("a1")
+        headroom.accounts.remove("a1")
         scope.runCurrent()
 
         assertTrue(repository.accounts.value.isEmpty())
+    }
+
+    @Test
+    fun `the overview follows the display and sort settings`() {
+        scope.runTestResult {
+            settings.setQuotaDisplay(QuotaDisplay.Left)
+            settings.setOverviewSort(OverviewSort.MostUsedFirst)
+        }
+
+        val overview = latestOverview()
+
+        assertEquals("left", overview.display)
+        assertEquals("mostUsedFirst", overview.sort)
+        val used = overview.accounts.map { it.primary?.usedPercent ?: -1.0 }
+        assertEquals(used.sortedDescending(), used)
+    }
+
+    @Test
+    fun `weekly alerts are on by default and a switch turns one off`() {
+        val claude = latestOverview().accounts.first { it.providerId == "claude" }
+        val weekly = claude.windows.first { it.kind == "weekly" }
+        val session = claude.windows.first { it.kind == "session" }
+        assertTrue(weekly.canAlert && weekly.alertOn)
+        assertFalse(session.canAlert || session.alertOn)
+
+        headroom.accounts.setAlert(claude.id, weekly.id, enabled = false)
+        scope.runCurrent()
+
+        val after = latestOverview().accounts.first { it.providerId == "claude" }
+        assertFalse(after.windows.first { it.id == weekly.id }.alertOn)
+    }
+
+    @Test
+    fun `the settings come back as ids and changes apply`() {
+        assertEquals("used", latest(headroom.settings::watch).quotaDisplay)
+
+        headroom.settings.setQuotaDisplay("left")
+        headroom.settings.setSwitch("resetExpiryReminders", false)
+        headroom.settings.setSyncFrequency("hour1")
+        scope.runCurrent()
+
+        val updated = latest(headroom.settings::watch)
+        assertEquals("left", updated.quotaDisplay)
+        assertFalse(updated.resetExpiryReminders)
+        assertEquals(60, updated.syncMinutes)
+    }
+
+    @Test
+    fun `the demo stats have history to show`() {
+        val stats = latest(headroom.stats::watch)
+
+        assertTrue(stats.isDemo)
+        assertTrue(stats.shares.isNotEmpty())
+        assertTrue(stats.sparklines.isNotEmpty())
+        assertTrue(stats.resetScore != null)
+    }
+
+    @Test
+    fun `the demo resets tab lists upcoming resets and their history`() {
+        val tab = latest(headroom.resets::watchTab)
+
+        assertTrue(tab.isDemo)
+        assertTrue(tab.upcoming.isNotEmpty())
+        assertEquals(tab.upcoming.sortedBy { it.resetsAtEpochSeconds }, tab.upcoming)
+        assertEquals(
+            listOf(82.0, 95.0, 100.0, 88.0, 100.0),
+            tab.history.first { it.providerId == "claude" }.peaks,
+        )
+    }
+
+    @Test
+    fun `the demo has nothing to notify about`() {
+        val plan = scope.runTestResult { headroom.notifications.plan(emptyList(), emptyList()) }
+
+        assertTrue(plan.resetAlerts.isEmpty())
+        assertTrue(plan.signInAlerts.isEmpty())
+    }
+
+    private fun latestOverview(): OverviewUi = latest(headroom::watchOverview)
+
+    @Test
+    fun `closing a redeem sheet cancels a start waiting for storage`() {
+        repository.stored =
+            DemoData.accounts(now).map { state ->
+                state.copy(
+                    snapshot = state.snapshot!!.copy(resets = ResetAvailability(emptyList()))
+                )
+            }
+        repository.readGate = CompletableDeferred()
+        var step: RedeemUi = RedeemUi.Idle
+        val watch = headroom.resets.redeem.watch { step = it }
+        headroom.resets.redeem.start("demo-codex", askForMore = true)
+        scope.runCurrent()
+
+        headroom.resets.redeem.close()
+        repository.readGate!!.complete(Unit)
+        scope.runCurrent()
+
+        assertEquals(RedeemUi.Idle, step)
+        watch.cancel()
+    }
+
+    @Test
+    fun `the awaited alert mutation completes only after preferences are stored`() {
+        alerts.writeGate = CompletableDeferred()
+        var completed = false
+        scope.launch {
+            headroom.accounts.setAlertAndWait("a", "weekly", enabled = false)
+            completed = true
+        }
+        scope.runCurrent()
+        assertFalse(completed)
+
+        alerts.writeGate!!.complete(Unit)
+        scope.runCurrent()
+        assertTrue(completed)
+    }
+
+    @Test
+    fun `an open chart advances its pace without new account or history emissions`() {
+        repository.accounts.value = DemoData.accounts(now)
+        val state = repository.accounts.value.first()
+        var chart: ChartUi? = null
+        val watch =
+            headroom.accounts.watchChart(state.account.id, state.primaryWindow!!.id) { chart = it }
+        scope.runCurrent()
+        val before = checkNotNull(chart).expectedPercent
+
+        now += 1.minutes
+        scope.advanceTimeBy(1.minutes.inWholeMilliseconds)
+        scope.runCurrent()
+
+        assertTrue(checkNotNull(chart).expectedPercent > before)
+        watch.cancel()
+    }
+
+    @Test
+    fun `closing a redeem sheet cancels a queued confirmation before the provider runs`() {
+        repository.accounts.value =
+            DemoData.accounts(now).map { state ->
+                state.copy(
+                    snapshot =
+                        state.snapshot!!.copy(
+                            resets =
+                                ResetAvailability(
+                                    listOf(
+                                        ResetPool(
+                                            "weekly",
+                                            "Weekly",
+                                            1,
+                                            ResetScope.of(WindowKind.Weekly),
+                                        )
+                                    )
+                                )
+                        )
+                )
+            }
+        headroom.resets.redeem.start("demo-codex", askForMore = false)
+        scope.runCurrent()
+        headroom.resets.redeem.confirm()
+        headroom.resets.redeem.close()
+        scope.runCurrent()
+        assertEquals(0, resetProvider.redeems)
+    }
+}
+
+private class CountingResetProvider : ResetProvider by NoResets {
+    var redeems = 0
+
+    override suspend fun redeem(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+    ): RedeemOutcome {
+        redeems++
+        return RedeemOutcome.NothingToReset
     }
 }
 
@@ -182,8 +393,12 @@ private class MemoryAccountsRepository : AccountsRepository {
 
     /** What storage holds when [accounts] has not published it yet, as Room does at first. */
     var stored: List<AccountState>? = null
+    var readGate: CompletableDeferred<Unit>? = null
 
-    override suspend fun current(): List<AccountState> = stored ?: accounts.value
+    override suspend fun current(): List<AccountState> {
+        readGate?.await()
+        return stored ?: accounts.value
+    }
 
     fun add(account: Account) {
         accounts.update { it + AccountState(account, snapshot = null) }
@@ -213,4 +428,29 @@ private class MemoryAccountsRepository : AccountsRepository {
 private class RefusingTokenStore(private val store: TokenStore = InMemoryTokenStore()) :
     TokenStore by store {
     override suspend fun delete(accountId: String) = throw IOException("Refused")
+}
+
+/** Alert switches in memory. */
+private class MemoryAlertPreferences : AlertPreferences {
+    var writeGate: CompletableDeferred<Unit>? = null
+    private val switches = MutableStateFlow(emptyMap<Pair<String, String>, Boolean>())
+
+    override fun isEnabled(accountId: String, window: QuotaWindow): Flow<Boolean> = switches.map {
+        it[accountId to window.id] ?: ResetPolicy.alertsByDefault(window)
+    }
+
+    override suspend fun setEnabled(accountId: String, windowId: String, enabled: Boolean) {
+        writeGate?.await()
+        switches.update { it + ((accountId to windowId) to enabled) }
+    }
+}
+
+/** Runs [block] on the test scheduler and returns what it returned. */
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun <T> TestScope.runTestResult(block: suspend () -> T): T {
+    var result: T? = null
+    launch { result = block() }
+    runCurrent()
+    @Suppress("UNCHECKED_CAST")
+    return result as T
 }

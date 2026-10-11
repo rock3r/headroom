@@ -20,6 +20,7 @@ kotlin {
             implementation(libs.androidx.room.runtime)
             api(libs.androidx.datastore.preferences.core)
             api(libs.kotlinx.io.core)
+            implementation(libs.okio)
         }
         androidMain.dependencies { implementation(libs.androidx.datastore.preferences) }
         iosMain.dependencies { implementation(libs.androidx.sqlite.bundled) }

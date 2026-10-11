@@ -6,6 +6,11 @@ import androidx.lifecycle.viewModelScope
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetEventLog
+import dev.sebastiano.headroom.model.stats.ResetPeriod
+import dev.sebastiano.headroom.model.stats.Stats
+import dev.sebastiano.headroom.model.stats.StatsSource
+import dev.sebastiano.headroom.model.stats.resetUsage
+import dev.sebastiano.headroom.model.stats.stats
 import java.time.ZoneId
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineDispatcher
@@ -21,6 +26,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.datetime.toKotlinTimeZone
 
 /** What the Stats tab shows. */
 @Immutable
@@ -85,7 +91,7 @@ class StatsViewModel(
                     loading = false,
                     isDemo = demo,
                     stats =
-                        stats(sources, now, zone)
+                        stats(sources, now, zone.toKotlinTimeZone())
                             .copy(resetUsage = resetUsage(events, now, hasResets)),
                 )
             }

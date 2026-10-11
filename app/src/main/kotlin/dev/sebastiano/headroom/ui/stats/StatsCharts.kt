@@ -36,6 +36,10 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.providerColors
 import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.model.stats.BurnHeatmap
+import dev.sebastiano.headroom.model.stats.LIMIT
+import dev.sebastiano.headroom.model.stats.ProviderShare
+import dev.sebastiano.headroom.model.stats.Sparkline
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 

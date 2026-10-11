@@ -53,6 +53,7 @@ import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
 import dev.sebastiano.headroom.designsystem.WorkingShimmer
 import dev.sebastiano.headroom.designsystem.stale
+import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.WindowKind
@@ -73,7 +74,6 @@ import dev.sebastiano.headroom.ui.formatAmount
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.formatMoney
 import dev.sebastiano.headroom.ui.home.AccountSummary
-import dev.sebastiano.headroom.ui.home.ChartSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.WindowSummary
 import dev.sebastiano.headroom.ui.overview.AnimatedPercent
