@@ -16,12 +16,12 @@ struct CardMeters: View {
                     let isPrimary = window.id == account.primary?.id
                     MeterRow(label: window.label, window: window, providerId: account.providerId,
                              trailing: resetLabel(window, countdown: false), labelWidth: 96,
-                             wavy: isPrimary && account.needsAttention && !account.signInExpired)
+                             wavy: isPrimary && window.needsAttention)
                 }
             } else if let primary = account.primary {
                 MeterRow(label: kindLabel(primary.kind), window: primary, providerId: account.providerId,
                          trailing: resetLabel(primary, countdown: false),
-                         wavy: account.needsAttention && !account.signInExpired)
+                         wavy: primary.needsAttention)
             } else {
                 Text("No usage data yet.")
                     .font(.subheadline)
