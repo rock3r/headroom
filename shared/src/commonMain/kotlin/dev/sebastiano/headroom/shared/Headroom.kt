@@ -72,9 +72,12 @@ internal constructor(
         scope.launch { refreshNow(accountId) }
     }
 
-    /** Syncs every account and returns when it is done, for a background refresh. */
+    /**
+     * Syncs every account and returns when it is done, for a background refresh. Unlike [refresh],
+     * it leaves the demo accounts alone, as the Android app's background refresh does.
+     */
     public suspend fun refreshAll() {
-        refreshNow(accountId = null)
+        repository.refresh(accountId = null)
     }
 
     /** Signs the account out: its tokens and its history go. */

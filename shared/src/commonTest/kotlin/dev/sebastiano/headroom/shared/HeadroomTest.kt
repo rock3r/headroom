@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 
@@ -81,6 +82,26 @@ class HeadroomTest {
         repository.add(Account("a1", Provider.Claude, "sam@example.com"))
 
         headroom.refresh(accountId = null)
+        scope.runCurrent()
+
+        assertEquals(listOf<String?>(null), repository.refreshes)
+    }
+
+    @Test
+    fun `a background refresh leaves the demo accounts alone`() {
+        val before = latestOverview()
+
+        scope.launch { headroom.refreshAll() }
+        scope.runCurrent()
+
+        assertEquals(before, latestOverview())
+    }
+
+    @Test
+    fun `a background refresh syncs the real accounts`() {
+        repository.add(Account("a1", Provider.Claude, "sam@example.com"))
+
+        scope.launch { headroom.refreshAll() }
         scope.runCurrent()
 
         assertEquals(listOf<String?>(null), repository.refreshes)
