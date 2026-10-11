@@ -2,7 +2,7 @@ import Charts
 import HeadroomKit
 import SwiftUI
 
-/// Which provider burns the most quota.
+/// Which provider burns the most quota, as a donut.
 struct SharesCard: View {
     let shares: [ShareUi]
     @Environment(\.colorScheme) private var colorScheme
@@ -12,30 +12,39 @@ struct SharesCard: View {
             if let top = shares.first {
                 Text("\(top.providerName) does \(percent(top.fraction))% of the work")
                     .font(.headline)
-                Chart(shares, id: \.providerId) { share in
-                    BarMark(x: .value("Share", share.fraction), stacking: .normalized)
-                        .foregroundStyle(ProviderColors(providerId: share.providerId, colorScheme: colorScheme).accent)
-                }
-                .chartXAxis(.hidden)
-                .frame(height: 28)
-                .accessibilityHidden(true)
-                ForEach(shares, id: \.providerId) { share in
-                    HStack {
-                        Circle()
-                            .fill(ProviderColors(providerId: share.providerId, colorScheme: colorScheme).accent)
-                            .frame(width: 10, height: 10)
-                        Text(share.providerName)
-                        Spacer()
-                        Text("\(percent(share.fraction))%")
-                            .monospacedDigit()
+                HStack(spacing: 20) {
+                    Chart(shares, id: \.providerId) { share in
+                        SectorMark(angle: .value("Share", share.fraction), innerRadius: .ratio(0.6), angularInset: 1.5)
+                            .foregroundStyle(color(share))
                     }
-                    .accessibilityElement(children: .combine)
+                    .frame(width: 120, height: 120)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(shares, id: \.providerId) { share in
+                            HStack {
+                                Circle().fill(color(share)).frame(width: 10, height: 10)
+                                Text(share.providerName)
+                                Spacer()
+                                Text("\(percent(share.fraction))%")
+                                    .monospacedDigit()
+                            }
+                        }
+                    }
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Share of the quota burned: \(description)")
                 Text("Share of all the quota burned, in percentage points of each limit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var description: String {
+        shares.map { "\($0.providerName) \(percent($0.fraction))%" }.formatted(.list(type: .and))
+    }
+
+    private func color(_ share: ShareUi) -> Color {
+        ProviderColors(providerId: share.providerId, colorScheme: colorScheme).accent
     }
 
     private func percent(_ fraction: Double) -> Int {

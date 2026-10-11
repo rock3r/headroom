@@ -27,6 +27,12 @@ struct PaceChart: View {
             LineMark(x: .value("Time", end), y: .value("Even pace", shown(100)), series: .value("Line", "pace"))
                 .foregroundStyle(.secondary)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            if let limit = chart.projectedLimitAtEpochSeconds?.int64Value {
+                PointMark(x: .value("Time", Date(epochSeconds: limit)), y: .value("Limit", shown(100)))
+                    .symbol(.circle)
+                    .symbolSize(60)
+                    .foregroundStyle(.red)
+            }
             RuleMark(y: .value("Limit", shown(100)))
                 .foregroundStyle(.red.opacity(0.5))
                 .annotation(position: showsLeft ? .top : .bottom, alignment: .trailing) {
@@ -36,6 +42,26 @@ struct PaceChart: View {
                 }
         }
         .chartXScale(domain: start ... end)
+        .chartXAxis {
+            if isWeek {
+                AxisMarks(values: .stride(by: .day)) { value in
+                    AxisGridLine()
+                    AxisValueLabel(format: .dateTime.weekday(.narrow))
+                }
+            } else if isLong {
+                // Longer windows count their weeks: 1 to 4.
+                AxisMarks(values: weekStarts) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text("\(Int((date.timeIntervalSince(start) / (7 * 86_400)).rounded()) + 1)")
+                        }
+                    }
+                }
+            } else {
+                AxisMarks()
+            }
+        }
         .chartYScale(domain: 0 ... 100)
         .chartYAxis {
             AxisMarks(values: [0, 50, 100]) { value in
@@ -55,6 +81,22 @@ struct PaceChart: View {
 
     private var end: Date {
         Date(epochSeconds: chart.endEpochSeconds)
+    }
+
+    private var length: TimeInterval {
+        end.timeIntervalSince(start)
+    }
+
+    private var isWeek: Bool {
+        abs(length - 7 * 86_400) < 86_400
+    }
+
+    private var isLong: Bool {
+        length > 8 * 86_400
+    }
+
+    private var weekStarts: [Date] {
+        stride(from: 0.0, to: length, by: 7 * 86_400).map { start.addingTimeInterval($0) }
     }
 
     private var accent: Color {

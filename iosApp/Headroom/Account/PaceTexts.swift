@@ -33,7 +33,7 @@ enum PaceTexts {
                 ? "At this rate you run out in about \(until), \(before) before the reset."
                 : "At this rate you reach 100% in about \(until), \(before) before the reset."
         }
-        guard let end = chart.projectedEndPercent?.doubleValue, chart.usedPercent > 0 else {
+        guard chart.usedPercent > 0.5, let end = chart.projectedEndPercent?.doubleValue else {
             return "The window just reset. Nothing used yet."
         }
         let used = Int(end.rounded())

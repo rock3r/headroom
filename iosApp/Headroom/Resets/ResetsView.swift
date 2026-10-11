@@ -17,8 +17,8 @@ struct ResetsView: View {
                 }
             }
             .navigationTitle("Resets")
-            .navigationDestination(for: String.self) { accountId in
-                AccountDetailView(accountId: accountId)
+            .navigationDestination(for: AccountLink.self) { link in
+                AccountDetailView(accountId: link.accountId, showsResets: link.showsResets)
             }
         }
         .sheet(item: $redeeming) { account in

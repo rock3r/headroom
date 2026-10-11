@@ -5,6 +5,7 @@ import Foundation
 /// Screen and in the Dynamic Island. It is iOS's take on the Android reset island.
 struct ResetActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
+        let accountId: String
         let accountTitle: String
         let providerId: String
         let windowLabel: String

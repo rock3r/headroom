@@ -10,7 +10,7 @@ struct ZCodeSignInStep: View {
 
     var body: some View {
         content
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity)
             .onChange(of: pageOpening, initial: true) { _, opening in
                 if let opening, let url = URL(string: opening.url) { browser.open(url) } else { browser.close() }
             }

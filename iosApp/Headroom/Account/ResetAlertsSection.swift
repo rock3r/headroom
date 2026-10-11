@@ -13,20 +13,28 @@ struct ResetAlertsSection: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(alertable) { window in
-                Toggle("Alert when \(window.label) resets", isOn: binding(for: window))
+                Toggle(isOn: binding(for: window)) {
+                    Text("Alert when \(window.label) resets")
+                    Text(subtitle(window))
+                }
             }
         } header: {
             Text("Reset alerts")
         } footer: {
-            VStack(alignment: .leading) {
-                if alertable.contains(where: { $0.kind == "monthly" }) {
-                    Text("Monthly windows are off by default")
-                }
-                if account.windows.contains(where: { $0.kind == "session" }) {
-                    Text("Session limits never send alerts.")
-                }
+            if account.windows.contains(where: { $0.kind == "session" }) {
+                Text("Session limits never send alerts.")
             }
         }
+    }
+
+    /// "Alert at Tue 30 Sep, 07:00", a few seconds after the reset; "Off"; or, for a monthly
+    /// window still at its default, that monthly windows are off by default.
+    private func subtitle(_ window: WindowUi) -> String {
+        if window.alertOn, let resetsAt = window.resetsAtEpochSeconds?.int64Value {
+            return String(localized: "Alert at \(Formats.long(Date(epochSeconds: resetsAt + 10)))")
+        }
+        if window.kind == "monthly" { return String(localized: "Monthly windows are off by default") }
+        return String(localized: "Off")
     }
 
     private var alertable: [WindowUi] {

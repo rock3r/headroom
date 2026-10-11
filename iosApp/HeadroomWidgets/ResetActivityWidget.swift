@@ -8,6 +8,7 @@ struct ResetActivityWidget: Widget {
         ActivityConfiguration(for: ResetActivityAttributes.self) { context in
             ResetActivityView(state: context.state)
                 .padding()
+                .widgetURL(DeepLink.account(context.state.accountId))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -32,6 +33,7 @@ struct ResetActivityWidget: Widget {
             } minimal: {
                 Image(systemName: context.state.hasReset ? "checkmark" : "arrow.counterclockwise")
             }
+            .widgetURL(DeepLink.account(context.state.accountId))
         }
     }
 }

@@ -9,5 +9,5 @@ extension UpcomingResetUi: @retroactive Identifiable {
     public var id: String { "\(accountId)/\(windowId)" }
 }
 extension ResetHistoryUi: @retroactive Identifiable {
-    public var id: String { accountId }
+    public var id: String { "\(accountId)/\(windowId)" }
 }
