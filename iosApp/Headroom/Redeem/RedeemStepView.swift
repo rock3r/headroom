@@ -13,13 +13,14 @@ struct RedeemStepView: View {
         case let step as RedeemUiChoosePool:
             RedeemChoosePool(pools: step.pools, onChoose: choose)
         case let step as RedeemUiConfirm:
-            RedeemConfirm(step: step, onConfirm: redeem.confirm, onBack: redeem.back, onClose: onClose)
+            RedeemConfirm(step: step, providerName: account.providerName, onConfirm: redeem.confirm,
+                          onBack: redeem.back, onClose: onClose)
         case is RedeemUiResetting:
             RedeemBusy(text: "Resetting your usage…")
         case is RedeemUiChecking:
             RedeemBusy(text: "Checking again…")
         case let step as RedeemUiFinished:
-            RedeemFinished(step: step, providerName: account.providerName, onClose: onClose)
+            RedeemFinished(step: step, account: account, onClose: onClose)
         case is RedeemUiAsking:
             RedeemBusy(text: "Asking \(account.providerName) for a reset card…")
         case let step as RedeemUiAnswered:

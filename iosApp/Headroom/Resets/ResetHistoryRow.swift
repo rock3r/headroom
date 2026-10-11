@@ -10,7 +10,7 @@ struct ResetHistoryRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(history.accountTitle) · \(history.windowLabel)")
+            Text("\(ResetTitles.name(history.accountTitle, label: history.accountLabel)) · \(history.windowLabel)")
                 .font(.subheadline)
             if history.peaks.isEmpty {
                 Text("No past resets yet")

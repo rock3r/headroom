@@ -6,14 +6,17 @@ import SwiftUI
 struct SparklinesCard: View {
     let sparklines: [SparklineUi]
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         StatCard(title: "Last 7 days", empty: sparklines.isEmpty ? "No accounts to chart yet." : nil) {
             ForEach(sparklines, id: \.account.id) { line in
                 HStack(spacing: 12) {
+                    ProviderAvatar(provider: model.provider(id: line.account.providerId), size: 24)
                     Text(line.account.name)
-                        .frame(maxWidth: 110, alignment: .leading)
-                    if line.points.isEmpty {
+                        .frame(maxWidth: 100, alignment: .leading)
+                        .lineLimit(1)
+                    if line.points.count < 2 {
                         Text("No history in the last 7 days")
                             .font(.footnote)
                             .foregroundStyle(.secondary)

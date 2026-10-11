@@ -39,6 +39,7 @@ enum ResetLiveActivity {
     private static func end(_ activity: Activity<ResetActivityAttributes>, hasReset: Bool) async {
         let shown = activity.content.state
         let state = ResetActivityAttributes.ContentState(
+            accountId: shown.accountId,
             accountTitle: shown.accountTitle,
             providerId: shown.providerId,
             windowLabel: shown.windowLabel,

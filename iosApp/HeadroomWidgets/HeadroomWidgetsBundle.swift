@@ -1,13 +1,16 @@
 import SwiftUI
 import WidgetKit
 
-/// Headroom's widgets: the usage and countdown widgets for the Home Screen and the Lock Screen, the
-/// Control Center control, and the reset Live Activity.
+/// Headroom's widgets, as the Android ones: Rings, Bars, Shape and Countdown for the Home Screen,
+/// the Lock Screen widget, the Control Center control, and the reset Live Activity.
 @main
 struct HeadroomWidgetsBundle: WidgetBundle {
     var body: some Widget {
-        UsageWidget()
+        RingsWidget()
+        BarsWidget()
+        ShapeWidget()
         CountdownWidget()
+        LockScreenWidget()
         NextResetControl()
         ResetActivityWidget()
     }

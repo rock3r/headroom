@@ -34,6 +34,7 @@ final class AppServices {
     private static func activityState(_ overview: OverviewUi) -> ResetActivityAttributes.ContentState? {
         guard !overview.isDemo, let next = overview.nextReset else { return nil }
         return ResetActivityAttributes.ContentState(
+            accountId: next.accountId,
             accountTitle: next.accountTitle,
             providerId: overview.accounts.first { $0.id == next.accountId }?.providerId ?? "",
             windowLabel: next.windowLabel,

@@ -35,7 +35,11 @@ targets:
             export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
           fi
           cd "$SRCROOT/.."
-          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode :shared:exportLibraryDefinitions
+          # The licences of the libraries HeadroomKit is built with, for Settings > Open-source licences.
+          resources="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          mkdir -p "$resources"
+          cp shared/build/generated/aboutLibraries/aboutlibraries.json "$resources/licences.json"
     settings:
       base:
         PRODUCT_NAME: Headroom
