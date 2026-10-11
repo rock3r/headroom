@@ -12,7 +12,7 @@
 
 | Layer | Where | Runs on | Command |
 |---|---|---|---|
-| Unit tests | `src/test` in JVM modules | JVM, JUnit 5 | `./gradlew :core:quota:test` |
+| Unit tests | `src/jvmTest` in KMP modules, `src/test` in JVM modules | JVM, JUnit 5 | `./gradlew :core:quota:jvmTest` |
 | Multiplatform tests | `src/commonTest` in multiplatform modules | JVM, JUnit 5 | `./gradlew :core:model:jvmTest` |
 | Multiplatform tests | `src/commonTest` in multiplatform modules | iOS simulator (macOS only) | `./gradlew :core:model:iosSimulatorArm64Test` |
 | Android unit tests | `src/test` in Android modules | JVM with Robolectric, JUnit 4 | `./gradlew :core:data:testDebugUnitTest` |
@@ -30,8 +30,9 @@ CI runs them in a macOS job.
 
 ### Fixtures, not live services
 
-Provider parsing tests use recorded JSON fixtures in `src/test/resources`. HTTP behaviour is
-tested against OkHttp's `MockWebServer`. No test talks to a real provider.
+Provider parsing tests use recorded JSON fixtures in `src/test/resources` (`src/jvmTest/resources`
+in multiplatform modules). HTTP behaviour is tested against OkHttp's `MockWebServer`, which only
+runs on the JVM, so those tests live in `jvmTest`. No test talks to a real provider.
 
 ### End-to-end tests
 
