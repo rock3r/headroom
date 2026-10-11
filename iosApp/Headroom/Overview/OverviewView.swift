@@ -38,6 +38,9 @@ struct OverviewView: View {
         .onChange(of: model.route, initial: true) { _, route in
             follow(route)
         }
+        .onChange(of: model.overview) {
+            follow(model.route)
+        }
         .sheet(isPresented: $addingAccount) {
             SignInView(mode: .add)
         }
@@ -59,7 +62,10 @@ struct OverviewView: View {
         case let .account(id):
             path = [id]
         case let .signIn(accountId):
-            signingInAgain = model.account(id: accountId)
+            // A tap that launches the app gets here before its accounts load: the route waits for
+            // the account to show up in the overview.
+            guard let account = model.account(id: accountId) else { return }
+            signingInAgain = account
         case nil:
             return
         }
