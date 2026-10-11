@@ -14,7 +14,8 @@ struct WidgetSnapshotTests {
     private var snapshot: WidgetSnapshot {
         WidgetSnapshot(
             isDemo: false, showsLeft: false,
-            accounts: [account("a", used: 40, resetsIn: 3), account("b", used: 90, resetsIn: 1), account("c", used: 95, resetsIn: 2, expired: true)],
+            accounts: [account("a", used: 40, resetsIn: 3), account("b", used: 90, resetsIn: 1), account("c", used: 95, resetsIn: 2, expired: true),
+                       account("d", used: 20, resetsIn: 2.5)],
             nextReset: WidgetSnapshot.NextReset(accountId: "b", accountTitle: "b", providerId: "claude", windowLabel: "Weekly",
                                                 kind: "weekly", resetsAt: .now.addingTimeInterval(86_400)),
             nextResetTile: nil, tightestTile: nil
@@ -23,12 +24,17 @@ struct WidgetSnapshotTests {
 
     @Test func `a widget shows the accounts chosen for it, in that order`() {
         #expect(snapshot.selecting(["c", "a"]).accounts.map(\.id) == ["c", "a"])
-        #expect(snapshot.selecting(nil).accounts.map(\.id) == ["a", "b", "c"])
+        #expect(snapshot.selecting(nil).accounts.map(\.id) == ["a", "b", "c", "d"])
     }
 
     @Test func `the next reset is the soonest among the chosen accounts`() {
-        #expect(snapshot.selecting(["a", "c"]).nextReset?.accountId == "c")
+        #expect(snapshot.selecting(["a", "d"]).nextReset?.accountId == "d")
         #expect(snapshot.selecting(["a", "b"]).nextReset?.accountId == "b")
+    }
+
+    @Test func `the next reset leaves out an expired sign-in`() {
+        #expect(snapshot.selecting(["a", "c"]).nextReset?.accountId == "a")
+        #expect(snapshot.selecting(["c"]).nextReset == nil)
     }
 
     @Test func `the tightest account leaves out an expired sign-in`() {

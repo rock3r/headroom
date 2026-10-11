@@ -80,13 +80,14 @@ struct WidgetSnapshot: Codable, Equatable {
         accounts.filter { !$0.signInExpired }.max { $0.usedPercent < $1.usedPercent } ?? accounts.first
     }
 
-    /// The same snapshot with only `ids`, in that order, or every account when `ids` is nil.
+    /// The same snapshot with only `ids`, in that order, or every account when `ids` is nil. The next
+    /// reset skips expired sign-ins, whose reset times are stale, as the app's next reset does.
     func selecting(_ ids: [String]?) -> WidgetSnapshot {
         guard let ids, !ids.isEmpty else { return self }
         let byId = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
         let chosen = ids.compactMap { byId[$0] }
         let next = nextReset.flatMap { next in chosen.contains { $0.id == next.accountId } ? next : nil }
-            ?? chosen.compactMap { account in
+            ?? chosen.filter { !$0.signInExpired }.compactMap { account in
                 account.resetsAt.map { (account, $0) }
             }
             .filter { $0.1 > .now }
