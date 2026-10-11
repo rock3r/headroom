@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.io.IOException
 
 /**
  * Headroom for the iOS app: the accounts, sync and sign-in, wired as on Android. Everything the app
@@ -82,7 +83,13 @@ internal constructor(
 
     /** Signs the account out: its tokens and its history go. */
     public fun removeAccount(accountId: String) {
-        scope.launch { signInManager.signOut(accountId) }
+        scope.launch {
+            try {
+                signInManager.signOut(accountId)
+            } catch (ignored: IOException) {
+                // The keychain refused to forget the sign-in: the account stays, to remove again.
+            }
+        }
     }
 
     /** Names the account. A blank or null [nickname] removes the name. */
