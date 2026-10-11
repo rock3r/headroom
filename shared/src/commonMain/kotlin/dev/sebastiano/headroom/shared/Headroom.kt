@@ -107,7 +107,7 @@ internal constructor(
      * [TICK], so pace keeps moving between syncs.
      */
     private fun overview(): Flow<OverviewUi> =
-        combine(repository.accounts, demo.accounts, ticks()) { real, demoAccounts, now ->
+        combine(repository.loadedAccounts(), demo.accounts, ticks()) { real, demoAccounts, now ->
                 if (real.isEmpty()) UiMapping.overview(demoAccounts, isDemo = true, now)
                 else UiMapping.overview(real, isDemo = false, now)
             }

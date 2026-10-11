@@ -17,6 +17,7 @@ import dev.sebastiano.headroom.signin.SignInSteps
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -108,6 +109,23 @@ class HeadroomTest {
     }
 
     @Test
+    fun `stored accounts not read yet show no demo`() {
+        val stored = AccountState(Account("a1", Provider.Claude, "sam@example.com"), null)
+        repository.stored = listOf(stored)
+        var shown: OverviewUi? = null
+        val watch = headroom.watchOverview { shown = it }
+        scope.runCurrent()
+        val beforeLoad = shown
+
+        repository.accounts.value = listOf(stored)
+        scope.runCurrent()
+        watch.cancel()
+
+        assertNull(beforeLoad)
+        assertEquals(listOf("claude"), shown?.accounts?.map { it.providerId })
+    }
+
+    @Test
     fun `providers say how each one signs in`() {
         assertEquals(Provider.entries.map { it.id }, headroom.providers.map { it.id })
         assertTrue(headroom.providers.all { it.signIn == "apiKey" })
@@ -139,6 +157,11 @@ private object ApiKeySteps : SignInSteps {
 private class MemoryAccountsRepository : AccountsRepository {
     override val accounts = MutableStateFlow(emptyList<AccountState>())
     val refreshes = mutableListOf<String?>()
+
+    /** What storage holds when [accounts] has not published it yet, as Room does at first. */
+    var stored: List<AccountState>? = null
+
+    override suspend fun current(): List<AccountState> = stored ?: accounts.value
 
     fun add(account: Account) {
         accounts.update { it + AccountState(account, snapshot = null) }
