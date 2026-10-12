@@ -1,0 +1,9 @@
+{
+  "code": 0,
+  "msg": "success",
+  "data": {
+    "available_five_hour_resets": [],
+    "available_week_resets": [{ "expire_at": 1775995200000 }],
+    "has_unread_history": false
+  }
+}

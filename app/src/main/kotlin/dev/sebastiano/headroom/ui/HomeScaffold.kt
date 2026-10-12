@@ -149,6 +149,7 @@ internal fun HomeScaffold(
             resets,
             resetHandlers,
             onSignInAgain,
+            opener,
         )
     val suiteType = navigationSuiteType(width, spatial)
 
@@ -383,12 +384,7 @@ private fun OverviewPanes(
                 ) {
                     DetailPane(
                         detail,
-                        details.formatter,
-                        details.onAlertChange,
-                        details.onChartWindowChange,
-                        details.resets,
-                        details.resetHandlers,
-                        details.onSignInAgain,
+                        details,
                         Modifier.fillMaxSize()
                             .background(MaterialTheme.colorScheme.surfaceContainerLow),
                     )
@@ -457,14 +453,22 @@ private fun ResetsTab(
 }
 
 /** What the account detail needs, the same from every tab that opens it. */
-private class DetailActions(
+internal class DetailActions(
     val formatter: ResetFormatter,
     val onAlertChange: (String, String, Boolean) -> Unit,
     val onChartWindowChange: (String) -> Unit,
     val resets: AccountResets,
     val resetHandlers: ResetHandlers,
     val onSignInAgain: (accountId: String) -> Unit,
-)
+    private val opener: AccountOpener,
+) {
+    /** The account whose detail must bring its Resets card into view, or null. */
+    val revealResetsOf: String?
+        get() = opener.resetsFor
+
+    /** Called once the detail brought the Resets card into view. */
+    val onRevealResets: () -> Unit = { opener.resetsFor = null }
+}
 
 /**
  * A tab's list and the account detail, in a [NavigableListDetailPaneScaffold] driven by
@@ -527,12 +531,7 @@ private fun ListDetailPanes(
                     if (twoPanes) {
                         DetailPane(
                             current,
-                            details.formatter,
-                            details.onAlertChange,
-                            details.onChartWindowChange,
-                            details.resets,
-                            details.resetHandlers,
-                            details.onSignInAgain,
+                            details,
                             // A rounded panel beside the list.
                             modifier =
                                 Modifier.fillMaxSize()
@@ -554,6 +553,8 @@ private fun ListDetailPanes(
                             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
                             resets = details.resets,
                             resetHandlers = details.resetHandlers,
+                            revealResets = details.revealResetsOf == current.account.id,
+                            onRevealResets = details.onRevealResets,
                         )
                     }
                 }
@@ -569,30 +570,36 @@ private fun ListDetailPanes(
 @Composable
 private fun OpenAccountEffect(
     request: OpenAccountRequest?,
-    onOpen: suspend (String) -> Unit,
+    onOpen: suspend (OpenAccountRequest) -> Unit,
     onConsume: () -> Unit,
 ) {
     val open by rememberUpdatedState(onOpen)
     val consume by rememberUpdatedState(onConsume)
     LaunchedEffect(request) {
         val pending = request ?: return@LaunchedEffect
-        open(pending.accountId)
+        open(pending)
         consume()
     }
 }
 
 /**
- * The account whose detail opens next, from a widget tap, a sign-in warning, or the wide Resets
- * tab: [open] switches to the Overview tab, and [OpenDetailEffect] then shows the detail.
+ * The account whose detail opens next, from a widget tap, a sign-in warning, a reset reminder, or
+ * the wide Resets tab: [open] switches to the Overview tab, and [OpenDetailEffect] then shows the
+ * detail. With showResets, [resetsFor] holds the account until its detail has brought the Resets
+ * card into view.
  */
 @Stable
 internal class AccountOpener(private val onShowOverview: () -> Unit) {
     var pending: String? by mutableStateOf(null)
         private set
 
-    fun open(accountId: String) {
+    /** Cleared by the detail once the Resets card is in view. */
+    var resetsFor: String? by mutableStateOf(null)
+
+    fun open(accountId: String, showResets: Boolean = false) {
         onShowOverview()
         pending = accountId
+        resetsFor = accountId.takeIf { showResets }
     }
 
     fun consume() {
@@ -609,7 +616,7 @@ private fun rememberAccountOpener(
 ): AccountOpener {
     val showOverview by rememberUpdatedState(onShowOverview)
     val opener = remember { AccountOpener { showOverview() } }
-    OpenAccountEffect(request, { opener.open(it) }, onConsumeRequest)
+    OpenAccountEffect(request, { opener.open(it.accountId, it.showResets) }, onConsumeRequest)
     return opener
 }
 
@@ -676,7 +683,7 @@ internal fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit, inToolbar
     } else {
         FloatingActionButton(
             onClick = onClick,
-            modifier = modifier,
+            modifier = Modifier.padding(horizontal = RailItemHorizontalPadding).then(modifier),
             containerColor = container,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             content = content,
@@ -713,4 +720,8 @@ private const val TURN_MILLIS = 900
 
 private val CardShape = RoundedCornerShape(24.dp)
 private val ToolbarClearance = 96.dp
+
+/** Matches the horizontal padding of the rail items, so the refresh button centres over them. */
+private val RailItemHorizontalPadding = 20.dp
+
 private const val FADE_THROUGH_SCALE = 0.96f

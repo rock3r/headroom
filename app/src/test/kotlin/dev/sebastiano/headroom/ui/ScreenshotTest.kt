@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
@@ -57,7 +56,7 @@ import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.addWidgetTag
 import dev.sebastiano.headroom.ui.stats.STATS_TAG
 import dev.sebastiano.headroom.widgets.WidgetStyle
-import java.time.Duration
+import kotlin.time.Duration.Companion.days
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,7 +117,7 @@ class ScreenshotTest {
         // animation is drawn, so draw every step until transitions and sweeps have settled.
         repeat(SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
     }
 
@@ -388,7 +387,7 @@ class ScreenshotTest {
         // A finger moves over several frames; each frame brings a little more progress.
         repeat(BACK_STEPS) { step ->
             rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
             val progress = BACK_PROGRESS * (step + 1) / BACK_STEPS
             rule.runOnUiThread { dispatcher.dispatchOnBackProgressed(backEvent(progress)) }
         }
@@ -634,7 +633,7 @@ private fun creditWindows(): List<QuotaWindow> =
             usedAmount = 102.0,
             limitAmount = 250.0,
             amountUnit = "USD",
-            expiresAt = FIXED_NOW.plus(Duration.ofDays(39)),
+            expiresAt = FIXED_NOW.plus(39.days),
         ),
         QuotaWindow(
             id = "cinder_cove",
@@ -643,7 +642,7 @@ private fun creditWindows(): List<QuotaWindow> =
             usedPercent = 15.0,
             resetsAt = null,
             length = null,
-            expiresAt = FIXED_NOW.plus(Duration.ofDays(64)),
+            expiresAt = FIXED_NOW.plus(64.days),
         ),
     )
 

@@ -1,7 +1,6 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -56,7 +55,7 @@ class ExpiredSignInScreenshotTest {
     private fun settle() {
         repeat(SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
     }
 

@@ -1,0 +1,25 @@
+Headroom: your AI limits, at a glance.
+
+Headroom is a free, open source Android app that shows how much of your AI subscription limits you have left: Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go and JetBrains AI, all on one screen.
+
+• Pace, not just percent: a tick on every bar shows where an even pace would put you, and a bar turns wavy when you're burning through it too fast.
+• See it coming: the detail view tells you when you'll hit the limit at your current rate.
+• Use a reset in one tap: Codex and Grok resets refill your bars from a bottom sheet.
+• Know the moment it resets: an alert, or the reset island that grows out of the camera cutout.
+• Widgets for your home and lock screen: Rings, Bars, Shape and Countdown.
+• Make it yours: eight palettes or your wallpaper's colours, light or dark.
+
+Get it
+Google Play: [link]
+GitHub releases / Obtainium: https://github.com/rock3r/headroom
+Android 16 or later.
+
+Chapters
+0:00 Intro
+0:11 Every plan, one screen
+0:26 Details and forecast
+0:37 Use a reset
+0:48 Reset island and widgets
+1:00 Make it yours
+
+Headroom is not affiliated with any AI provider. Provider logos are trademarks of their owners. Apache License 2.0.

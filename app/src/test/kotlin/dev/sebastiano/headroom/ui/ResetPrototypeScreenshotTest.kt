@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -53,8 +52,9 @@ import dev.sebastiano.headroom.ui.resets.ResetsCard
 import dev.sebastiano.headroom.ui.resets.availableResetTag
 import dev.sebastiano.headroom.ui.resets.resetRowTag
 import dev.sebastiano.headroom.ui.settings.SETTINGS_LIST_TAG
-import java.time.Duration
 import java.time.ZoneOffset
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -104,7 +104,7 @@ class ResetPrototypeScreenshotTest {
     private fun capture(name: String) {
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onRoot().captureRoboImage(prototypeScreenshot(name))
     }
@@ -139,7 +139,7 @@ class ResetPrototypeScreenshotTest {
         }
         repeat(REFRESHING_FRAMES) {
             rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onNodeWithTag(CARD_TAG).captureRoboImage(prototypeScreenshot(name))
     }
@@ -162,7 +162,7 @@ class ResetPrototypeScreenshotTest {
         rule.onNodeWithContentDescription("Resets").clickNow()
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         fun frames(phase: String) {
             repeat(TRANSITION_FRAMES) { index ->
@@ -281,7 +281,7 @@ class ResetPrototypeScreenshotTest {
         }
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onNodeWithTag(CARD_TAG).captureRoboImage(prototypeScreenshot(name))
     }
@@ -351,9 +351,9 @@ class ResetPrototypeScreenshotTest {
                         pool.copy(
                             expiries =
                                 listOf(
-                                    FIXED_NOW.plus(Duration.ofDays(4)),
-                                    FIXED_NOW.plus(Duration.ofDays(9)),
-                                    FIXED_NOW.plus(Duration.ofDays(9)),
+                                    FIXED_NOW.plus(4.days),
+                                    FIXED_NOW.plus(9.days),
+                                    FIXED_NOW.plus(9.days),
                                 )
                         )
                     )

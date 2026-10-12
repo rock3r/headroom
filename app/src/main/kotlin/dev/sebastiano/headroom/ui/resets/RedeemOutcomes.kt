@@ -23,7 +23,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +45,7 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.AskOutcome
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.RedeemStep
 import dev.sebastiano.headroom.ui.ResetFormatter
@@ -286,15 +290,21 @@ internal fun Answered(
     actions: RedeemActions,
 ) {
     OutcomeBlock(answerLook(answer, provider, formatter)) {
-        if (answer is AskOutcome.Granted) {
-            CloseAnd(
-                R.string.redeem_use_now,
-                actions.onUseNow,
-                actions.onClose,
-                closeLabel = R.string.redeem_later,
-            )
-        } else {
-            DoneButton(actions.onClose, R.string.redeem_close)
+        when {
+            answer is AskOutcome.Granted ->
+                CloseAnd(
+                    R.string.redeem_use_now,
+                    actions.onUseNow,
+                    actions.onClose,
+                    closeLabel = R.string.redeem_later,
+                )
+            answer.needsSignIn ->
+                CloseAnd(
+                    R.string.redeem_sign_in_again_title,
+                    actions.onSignInAgain,
+                    actions.onClose,
+                )
+            else -> DoneButton(actions.onClose, R.string.redeem_close)
         }
     }
 }
@@ -338,24 +348,38 @@ private fun answerLook(
                 stringResource(R.string.redeem_throttled_body, provider),
             )
         is AskOutcome.Failed ->
-            OutcomeLook(
-                HeadroomIcons.Error,
-                colors.errorContainer,
-                colors.onErrorContainer,
-                stringResource(R.string.redeem_ask_failed_title),
-                stringResource(R.string.redeem_ask_failed_body, provider),
-            )
+            if (answer.needsSignIn) {
+                OutcomeLook(
+                    HeadroomIcons.Key,
+                    colors.errorContainer,
+                    colors.onErrorContainer,
+                    stringResource(R.string.redeem_sign_in_again_title),
+                    stringResource(R.string.redeem_ask_sign_in_again_body, provider),
+                )
+            } else {
+                OutcomeLook(
+                    HeadroomIcons.Error,
+                    colors.errorContainer,
+                    colors.onErrorContainer,
+                    stringResource(R.string.redeem_ask_failed_title),
+                    stringResource(R.string.redeem_ask_failed_body, provider),
+                )
+            }
         AskOutcome.Unsupported -> unsupportedLook()
     }
 }
 
+/** The provider no longer accepts the sign-in the ask used, as a refused reset. */
+private val AskOutcome.needsSignIn: Boolean
+    get() = this is AskOutcome.Failed && kind == QuotaErrorKind.Auth
+
 /**
- * The provider needs its own sign-in before resets can be seen or used, as Z.AI's ZCode. The
- * prototype's button only says that sign-in is not built yet.
+ * The provider needs its own sign-in before resets can be seen or used, as Z.AI's ZCode. The button
+ * starts it in the browser; [signInNote] says how it is going.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun SignIn(summary: AccountSummary, signInNote: Boolean, actions: RedeemActions) {
+internal fun SignIn(summary: AccountSummary, signInNote: String?, actions: RedeemActions) {
     val service = ResetCopy.signInService(summary.provider)
     val animate = animationsEnabled()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -378,7 +402,7 @@ internal fun SignIn(summary: AccountSummary, signInNote: Boolean, actions: Redee
         // The note opens its space, gap included, on the sheet's spring, so the sheet grows
         // smoothly instead of jumping by the note's height.
         AnimatedVisibility(
-            visible = signInNote,
+            visible = signInNote != null,
             enter =
                 if (animate) {
                     fadeIn(effects) + expandVertically(spatial, Alignment.Top, clip = false)
@@ -386,8 +410,11 @@ internal fun SignIn(summary: AccountSummary, signInNote: Boolean, actions: Redee
                     fadeIn(effects)
                 },
         ) {
+            // The last line stays while the note fades out.
+            val last = remember { mutableStateOf("") }
+            SideEffect { if (signInNote != null) last.value = signInNote }
             Text(
-                text = stringResource(R.string.redeem_sign_in_stub),
+                text = signInNote ?: last.value,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier =

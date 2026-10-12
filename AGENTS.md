@@ -9,6 +9,8 @@ screens, and a notification when a weekly limit resets.
 
 - Android 14 (API 34) and later. `compileSdk` and `targetSdk` are 37. The widgets need the
   widget player that Android 16 (API 36) ships, so they are off before it.
+- An iOS app (SwiftUI, iOS 18 and later) in `iosApp/` shares the Kotlin business logic through
+  Kotlin Multiplatform. See [iosApp/README.md](iosApp/README.md).
 - Kotlin, Jetpack Compose, Material 3 Expressive, Remote Compose. No Views, no Glance.
 - Plain constructor injection. There is no DI framework.
 

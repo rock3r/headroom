@@ -11,8 +11,6 @@ import androidx.compose.ui.Modifier
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.home.DetailUiState
-import dev.sebastiano.headroom.ui.resets.AccountResets
-import dev.sebastiano.headroom.ui.resets.ResetHandlers
 
 /**
  * The account detail beside the list, in the expanded window or in its own panel in Full Space. It
@@ -21,12 +19,7 @@ import dev.sebastiano.headroom.ui.resets.ResetHandlers
 @Composable
 internal fun DetailPane(
     detail: DetailUiState,
-    formatter: ResetFormatter,
-    onAlertChange: (String, String, Boolean) -> Unit,
-    onChartWindowChange: (String) -> Unit,
-    resets: AccountResets,
-    resetHandlers: ResetHandlers,
-    onSignInAgain: (accountId: String) -> Unit,
+    details: DetailActions,
     modifier: Modifier = Modifier,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -46,12 +39,14 @@ internal fun DetailPane(
     ) { shown ->
         DetailScreen(
             state = shown,
-            formatter = formatter,
-            onAlertChange = onAlertChange,
-            onChartWindowChange = onChartWindowChange,
-            resets = resets,
-            resetHandlers = resetHandlers,
-            onSignInAgain = onSignInAgain,
+            formatter = details.formatter,
+            onAlertChange = details.onAlertChange,
+            onChartWindowChange = details.onChartWindowChange,
+            resets = details.resets,
+            resetHandlers = details.resetHandlers,
+            onSignInAgain = details.onSignInAgain,
+            revealResets = details.revealResetsOf == shown.account.id,
+            onRevealResets = details.onRevealResets,
         )
     }
 }

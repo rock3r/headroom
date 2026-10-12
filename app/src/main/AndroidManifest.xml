@@ -57,6 +57,14 @@
                     android:host="signed-in"
                     android:scheme="headroom" />
             </intent-filter>
+            <!--
+                A long press on the Quick Settings tile. SystemUI opens the app's activity for this
+                action, and the app shows Settings at the tile's rows.
+            -->
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <!-- XR headsets open the app in Full Space, with its panels and orbiters. -->
             <property
                 android:name="android.window.PROPERTY_XR_ACTIVITY_START_MODE"

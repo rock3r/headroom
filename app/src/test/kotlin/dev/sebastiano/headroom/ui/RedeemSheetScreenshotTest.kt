@@ -4,7 +4,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,8 +25,9 @@ import dev.sebastiano.headroom.ui.delights.DelightsHost
 import dev.sebastiano.headroom.ui.home.toSummary
 import dev.sebastiano.headroom.ui.resets.RedeemActions
 import dev.sebastiano.headroom.ui.resets.RedeemSheetContent
-import java.time.Duration
 import java.time.ZoneOffset
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -103,13 +103,13 @@ class RedeemSheetMomentsScreenshotTest {
         }
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         state = account.afterReset(from.pool)
         refreshing = false
         repeat(REFILL_FRAMES) {
             rule.mainClock.advanceTimeBy(FRAME_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         rule.onNodeWithTag(SHEET_FRAME_TAG).captureRoboImage(prototypeScreenshot(name))
     }
@@ -149,7 +149,7 @@ class RedeemSheetMomentsScreenshotTest {
         }
         repeat(PROTOTYPE_SETTLE_STEPS) {
             rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-            rule.onRoot().captureToImage()
+            rule.onRoot().drawFrame()
         }
         state = account.afterReset(pool)
         refreshing = false
@@ -158,7 +158,7 @@ class RedeemSheetMomentsScreenshotTest {
             while (elapsed < GLOSS_FIRST_MILLIS + index * GLOSS_FRAME_MILLIS) {
                 rule.mainClock.advanceTimeBy(FRAME_MILLIS)
                 elapsed += FRAME_MILLIS
-                rule.onRoot().captureToImage()
+                rule.onRoot().drawFrame()
             }
             rule
                 .onNodeWithTag(SHEET_FRAME_TAG)
@@ -271,7 +271,7 @@ data class SheetShot(
     val display: QuotaDisplay = QuotaDisplay.Used,
     val palette: ThemePalette = ThemePalette.Wallpaper,
     val canAskForMore: Boolean = false,
-    val signInNote: Boolean = false,
+    val signInNote: String? = null,
     /** The usage is still being refreshed after a success. */
     val refreshing: Boolean = false,
     val reduceMotion: Boolean = false,
@@ -326,7 +326,7 @@ internal fun recordSheet(
     }
     repeat(PROTOTYPE_SETTLE_STEPS) {
         rule.mainClock.advanceTimeBy(PROTOTYPE_STEP_MILLIS)
-        rule.onRoot().captureToImage()
+        rule.onRoot().drawFrame()
     }
     val target = if (wholeScreen) rule.onRoot() else rule.onNodeWithTag(SHEET_FRAME_TAG)
     target.captureRoboImage(prototypeScreenshot(name))
@@ -347,6 +347,7 @@ internal fun sheetShots(): List<SheetShot> {
     val grant = ResetScenarios.claudeGrants(now).pools.first()
     val anyTime = ResetScenarios.claudeAnyTime(now).pools.single()
     val waiting = ResetScenarios.claudeWaiting(now).pools.single()
+    val notYet = ResetScenarios.claudeNotUsableYet(now).pools.single()
     return listOf(
         SheetShot("codex-confirm", codex, RedeemStep.Confirm(codexPool, false)),
         SheetShot("codex-resetting", codex, RedeemStep.Resetting(codexPool)),
@@ -393,11 +394,16 @@ internal fun sheetShots(): List<SheetShot> {
         SheetShot(
             "zai-ask-not-yet",
             zai,
-            RedeemStep.Answered(AskOutcome.NotYet(now.plus(Duration.ofHours(6)))),
+            RedeemStep.Answered(AskOutcome.NotYet(now.plus(6.hours))),
         ),
         SheetShot("zai-ask-throttled", zai, RedeemStep.Answered(AskOutcome.Throttled)),
         SheetShot("zai-sign-in", zai, RedeemStep.SignInRequired),
-        SheetShot("zai-sign-in-tapped", zai, RedeemStep.SignInRequired, signInNote = true),
+        SheetShot(
+            "zai-sign-in-tapped",
+            zai,
+            RedeemStep.SignInRequired,
+            signInNote = "Sign in to ZCode in your browser. Headroom carries on when you are done.",
+        ),
         SheetShot("claude-confirm", claude, RedeemStep.Confirm(grant, false)),
         SheetShot("claude-resetting", claude, RedeemStep.Resetting(grant)),
         SheetShot(
@@ -426,6 +432,11 @@ internal fun sheetShots(): List<SheetShot> {
         ),
         SheetShot("claude-cooldown", claude, RedeemStep.Finished(grant, RedeemOutcome.Cooldown)),
         SheetShot(
+            "claude-not-limited",
+            claude,
+            RedeemStep.Finished(grant, RedeemOutcome.NothingToReset),
+        ),
+        SheetShot(
             "claude-unconfirmed",
             claude,
             RedeemStep.Finished(grant, RedeemOutcome.Unconfirmed),
@@ -447,11 +458,16 @@ internal fun sheetShots(): List<SheetShot> {
             RedeemStep.Confirm(waiting, false),
         ),
         SheetShot(
+            "claude-not-usable-yet",
+            claude,
+            RedeemStep.Confirm(notYet, false),
+        ),
+        SheetShot(
             "claude-rate-limited",
             claude,
             RedeemStep.Finished(
                 grant,
-                RedeemOutcome.RateLimited(now.plus(Duration.ofMinutes(2))),
+                RedeemOutcome.RateLimited(now.plus(2.minutes)),
             ),
         ),
         SheetShot(

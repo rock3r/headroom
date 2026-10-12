@@ -23,7 +23,9 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +46,7 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.RedeemIntent
 import dev.sebastiano.headroom.model.RedeemOutcome
@@ -54,6 +57,8 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.signin.SignInError
+import dev.sebastiano.headroom.signin.ZCodeSignInState
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.delights.DelightsHost
 import dev.sebastiano.headroom.ui.delights.LocalDelights
@@ -106,6 +111,13 @@ fun RedeemSheet(
     onSignInAgain: () -> Unit = {},
     /** True while the account's usage is being refreshed after the reset. */
     refreshing: Boolean = false,
+    /**
+     * Starts the separate sign-in the provider's resets need (Z.AI's ZCode), or null where there is
+     * none, as for the demo accounts.
+     */
+    onSignIn: (() -> Unit)? = null,
+    /** How that sign-in is going, once it started from this sheet. */
+    signIn: ZCodeSignInState = ZCodeSignInState.Idle,
 ) {
     val session =
         remember(account.id, intent) {
@@ -128,7 +140,7 @@ fun RedeemSheet(
         )
     val scope = rememberCoroutineScope()
     LaunchedEffect(session) { session.start() }
-    var signInNote by remember { mutableStateOf(false) }
+    var stubNote by remember { mutableStateOf(false) }
     val actions =
         RedeemActions(
             onChoose = session::choose,
@@ -137,15 +149,24 @@ fun RedeemSheet(
             onTryAgain = { scope.launch { session.tryAgain() } },
             onAsk = { scope.launch { session.ask() } },
             onUseNow = { scope.launch { session.useNow() } },
-            onSignIn = { signInNote = true },
+            onSignIn = onSignIn ?: { stubNote = true },
             onCheckAgain = { scope.launch { session.checkAgain() } },
-            onSignInAgain = onSignInAgain,
+            // Z.AI's resets only use the ZCode sign-in, so that is the one to do again.
+            onSignInAgain = onSignIn?.takeIf { account.provider == Provider.ZAi } ?: onSignInAgain,
             onClose = {
                 scope
                     .launch { sheetState.hide() }
                     .invokeOnCompletion { if (!sheetState.isVisible) onDismiss() }
             },
         )
+    // Signed in: the account's resets are read again, and the sheet has done its job.
+    DisposableEffect(signIn) {
+        if (signIn is ZCodeSignInState.Done) actions.onClose()
+        onDispose {}
+    }
+    val signInNote =
+        if (stubNote) stringResource(R.string.redeem_sign_in_stub)
+        else signInLine(signIn, ResetCopy.signInService(account.provider))
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -171,6 +192,23 @@ fun RedeemSheet(
     }
 }
 
+/** The line that says how the sign-in to [service] is going, or null before it starts. */
+@Composable
+@ReadOnlyComposable
+private fun signInLine(state: ZCodeSignInState, service: String): String? =
+    when (state) {
+        ZCodeSignInState.Idle,
+        is ZCodeSignInState.Done -> null
+        is ZCodeSignInState.Starting,
+        is ZCodeSignInState.Waiting -> stringResource(R.string.redeem_sign_in_waiting, service)
+        is ZCodeSignInState.Failed ->
+            when (state.error) {
+                SignInError.Network -> stringResource(R.string.redeem_sign_in_network, service)
+                SignInError.Expired -> stringResource(R.string.redeem_sign_in_expired, service)
+                else -> stringResource(R.string.redeem_sign_in_failed, service)
+            }
+    }
+
 /** On a wide screen the sheet stays about as wide as a phone. */
 private val SheetMaxWidth = 560.dp
 
@@ -189,7 +227,8 @@ fun RedeemSheetContent(
     actions: RedeemActions,
     modifier: Modifier = Modifier,
     canAskForMore: Boolean = false,
-    signInNote: Boolean = false,
+    /** A line under the sign-in step: how the sign-in is going, or null. */
+    signInNote: String? = null,
     refreshing: Boolean = false,
 ) {
     val confetti = LocalDelights.current?.canBurst == true
@@ -365,7 +404,7 @@ private fun Steps(
     formatter: ResetFormatter,
     actions: RedeemActions,
     canAskForMore: Boolean,
-    signInNote: Boolean,
+    signInNote: String?,
     display: QuotaDisplay,
     refreshing: Boolean,
 ) {

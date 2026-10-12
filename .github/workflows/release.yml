@@ -1,7 +1,8 @@
 name: Release
 
-# Pushing a tag such as v1.0.0 builds a minified APK signed with the release key, and attaches it to
-# a GitHub release for that tag. See docs/RELEASING.md.
+# Pushing a tag such as v1.0.0 builds a minified APK signed with the release key, smoke-tests it on
+# an emulator, and attaches it to a GitHub release for that tag. Then it uploads the Play build to
+# Google Play. See docs/RELEASING.md.
 on:
   push:
     tags:
@@ -18,7 +19,7 @@ jobs:
   release:
     name: Build, sign and publish
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     env:
       # The SHA-256 of the release certificate. A build signed with any other key fails.
       RELEASE_CERT_SHA256: 815faa261d76b2b337e4abd0f3ba3184ad05fb8ebd65014243472269bcda5fc2
@@ -40,19 +41,22 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
+      # Google Play refuses release notes longer than 500 characters, and that would only show at
+      # the very end, after the GitHub release is out.
+      - name: Check the Play release notes
+        run: |
+          notes=app/src/main/play/release-notes/en-US/default.txt
+          length=$(wc -m < "$notes")
+          if [ "$length" -gt 500 ]; then
+            echo "::error::$notes has $length characters; Google Play allows 500"
+            exit 1
+          fi
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # The same setup as CI. It also exports ANDROID_HOME, which the emulator cache paths need.
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
         with:
-          packages: "platforms;android-37.0 build-tools;${{ env.BUILD_TOOLS }}"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v5
+          android-packages: "platforms;android-37.0 build-tools;${{ env.BUILD_TOOLS }}"
 
       - name: Write the release key
         env:
@@ -65,13 +69,13 @@ jobs:
           umask 077
           echo "$HEADROOM_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.p12"
 
-      - name: Check, then build the release APK
+      - name: Check, then build the release APK and the Play bundle
         env:
           HEADROOM_KEYSTORE_FILE: ${{ runner.temp }}/release.p12
           HEADROOM_KEYSTORE_PASSWORD: ${{ secrets.HEADROOM_KEYSTORE_PASSWORD }}
           HEADROOM_KEY_ALIAS: ${{ secrets.HEADROOM_KEY_ALIAS }}
           HEADROOM_KEY_PASSWORD: ${{ secrets.HEADROOM_KEY_PASSWORD }}
-        run: ./gradlew check :app:assembleRelease
+        run: ./gradlew check :app:assembleRelease :app:bundlePlay
 
       - name: Verify the signature
         id: apk
@@ -92,9 +96,74 @@ jobs:
           sha256sum "$name" > "$name.sha256"
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
+      - name: Verify the Play bundle's signature
+        run: |
+          bundle=app/build/outputs/bundle/play/app-play.aab
+          # keytool prints "SHA256: AB:CD:..."; compare it as lower-case hex without colons.
+          digest=$(keytool -printcert -jarfile "$bundle" \
+            | sed -nE 's/^[[:space:]]*SHA256: ([0-9A-F:]+)$/\1/p' | tr -d ':' | tr 'A-F' 'a-f' | sort -u)
+          if [ "$digest" != "$RELEASE_CERT_SHA256" ]; then
+            echo "::error::The Play bundle is signed with $digest, not the release certificate"
+            exit 1
+          fi
+
       - name: Remove the release key
         if: always()
         run: rm -f "$RUNNER_TEMP/release.p12"
+
+      # The smoke test runs the signed APK that is about to ship. A failure stops the job here, so
+      # the release is not published.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The cache that the CI end-to-end job saves on main. Tag builds can read it.
+      - name: Restore emulator and API 37 system image
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/emulator
+            ${{ env.ANDROID_HOME }}/system-images/android-37
+            ${{ env.ANDROID_HOME }}/system-images/android-37.0
+          key: gmd-api37-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('app/build.gradle.kts') }}
+          restore-keys: |
+            gmd-api37-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Start an API 37 emulator
+        env:
+          IMAGE: "system-images;android-37.0;google_apis;x86_64"
+        run: |
+          # Installs only what the cache did not restore.
+          sdkmanager --install emulator "$IMAGE" > /dev/null
+          echo no | avdmanager create avd --force --name smoke --package "$IMAGE" --device pixel_9
+          nohup "$ANDROID_HOME/emulator/emulator" -avd smoke -no-window -no-audio -no-boot-anim \
+            -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          timeout 300 adb wait-for-device
+          timeout 300 bash -c \
+            'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done'
+          # Animations off, so each screen settles before the script reads it.
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+
+      - name: Smoke-test the release APK
+        env:
+          APK: ${{ steps.apk.outputs.name }}
+          SMOKE_TEST_ARTIFACTS: ${{ runner.temp }}/smoke-test
+        run: scripts/release-smoke-test.sh "$APK"
+
+      - name: Upload smoke test screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-smoke-test
+          path: |
+            ${{ runner.temp }}/smoke-test/
+            ${{ runner.temp }}/emulator.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Publish the release
         env:
@@ -112,3 +181,18 @@ jobs:
             gh release create "$GITHUB_REF_NAME" "$APK" "$APK.sha256" \
               --verify-tag --title "Headroom $VERSION" --generate-notes
           fi
+
+      # The bundle built above, signed with the same key, goes to the track in the PLAY_TRACK
+      # repository variable, or to production. The service account needs the matching release
+      # permission in the Play Console. See docs/PLAY-STORE.md.
+      - name: Publish to Google Play
+        env:
+          ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_TRACK: ${{ vars.PLAY_TRACK || 'production' }}
+        run: |
+          if [ -z "$ANDROID_PUBLISHER_CREDENTIALS" ]; then
+            echo "::error::The PLAY_SERVICE_ACCOUNT_JSON secret is not set"
+            exit 1
+          fi
+          ./gradlew :app:publishPlayBundle --track "$PLAY_TRACK" \
+            --artifact-dir app/build/outputs/bundle/play

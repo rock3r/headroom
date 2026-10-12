@@ -8,6 +8,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SharedTransitionScope.SharedContentState
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
@@ -17,7 +18,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -72,20 +72,31 @@ class SettingsReveal(val transitionScope: SharedTransitionScope) {
  * reduced, and then nothing is shared or turned. [scrubbing] is true while the back gesture drives
  * the pages: the reveal then moves in step with the finger instead of on springs, which would run
  * far ahead of it.
+ *
+ * One page keeps the same object for as long as it shows. [revealing], [scrubbing] and [opening]
+ * read the pages' state when asked, so only what reads them updates when they change. A new object
+ * at the end of the reveal composed every row of Settings again in the reveal's last frame.
  */
 @Stable
 class PageReveal(
     val reveal: SettingsReveal,
     val visibility: AnimatedVisibilityScope,
-    val revealing: Boolean,
     val animate: Boolean,
-    val scrubbing: Boolean,
-    /** True while Settings opens, false while it closes. */
-    val opening: Boolean = true,
+    private val isRevealing: () -> Boolean,
+    private val isScrubbing: () -> Boolean,
+    private val isOpening: () -> Boolean = { true },
 ) {
+    val revealing: Boolean
+        get() = isRevealing()
+
+    val scrubbing: Boolean
+        get() = isScrubbing()
+
+    /** True while Settings opens, false while it closes. */
+    val opening: Boolean
+        get() = isOpening()
+
     /** The spec for the reveal's spatial parts: the radius, the shared bounds and the turn. */
-    @Composable
-    @ReadOnlyComposable
     fun <T> spatialSpec(): FiniteAnimationSpec<T> =
         when {
             scrubbing -> HeadroomMotion.scrubSpec()
@@ -94,8 +105,6 @@ class PageReveal(
         }
 
     /** The spec for the shared elements' fades. */
-    @Composable
-    @ReadOnlyComposable
     fun <T> effectsSpec(): FiniteAnimationSpec<T> =
         when {
             scrubbing -> HeadroomMotion.scrubSpec()
@@ -108,35 +117,56 @@ class PageReveal(
  * Settings' content arriving with the reveal: it fades in while moving down a little into place,
  * just behind the circle. Leaving, it only fades. Without the reveal (reduced motion, or another
  * page) nothing extra happens.
+ *
+ * The modifier stays the same when the reveal ends: only its layer reads [PageReveal.revealing].
+ * Returning a different modifier then would compose every row that uses it again.
  */
 @Composable
 internal fun Modifier.revealContentEntrance(page: PageReveal?): Modifier {
-    if (page == null || !page.animate || !page.revealing) return this
+    if (page == null || !page.animate) return this
     val offset = with(LocalDensity.current) { CONTENT_DROP.toPx() }
-    // The content waits a moment, so the circle leads and the content follows it in.
-    val delay = if (page.scrubbing) 0 else CONTENT_DELAY_MILLIS
-    val enterSpec = HeadroomMotion.pageOpenSpec<Float>(delayMillis = delay)
-    val exitSpec = page.effectsSpec<Float>()
+    // The content waits a moment, so the circle leads and the content follows it in. The specs
+    // are picked as each animation starts, as the modifier outlives one opening and closing. Away
+    // from the reveal the values snap, so they keep no page on screen for longer.
+    val enterSpec = {
+        if (!page.revealing) snap()
+        else
+            HeadroomMotion.pageOpenSpec<Float>(
+                delayMillis = if (page.scrubbing) 0 else CONTENT_DELAY_MILLIS
+            )
+    }
+    val exitSpec = { if (!page.revealing) snap() else page.effectsSpec<Float>() }
     // One pair of values, made here once and shared by every row that uses this modifier. A lazy
     // list composes a row when it scrolls into view; with animateEnterExit, each row composed
-    // during
-    // the reveal ran its own entrance, and stayed hidden until the reveal ended.
+    // during the reveal ran its own entrance, and stayed hidden until the reveal ended.
     val transition = page.visibility.transition
-    val alpha by
+    val alpha =
         transition.animateFloat(
-            transitionSpec = { if (targetState == EnterExitState.Visible) enterSpec else exitSpec },
+            transitionSpec = {
+                if (targetState == EnterExitState.Visible) enterSpec() else exitSpec()
+            },
             label = "content alpha",
         ) {
             if (it == EnterExitState.Visible) 1f else 0f
         }
-    val drop by
-        transition.animateFloat(transitionSpec = { enterSpec }, label = "content drop") {
+    val drop =
+        // Leaving, the drop snaps: even unmoving, it would keep the page until its spec ran out.
+        transition.animateFloat(
+            transitionSpec = { if (targetState == EnterExitState.Visible) enterSpec() else snap() },
+            label = "content drop",
+        ) {
             if (it == EnterExitState.PreEnter) -offset else 0f
         }
-    return graphicsLayer {
-        this.alpha = alpha
-        translationY = drop
-    }
+    val layer =
+        remember(page, alpha, drop) {
+            Modifier.graphicsLayer {
+                if (page.revealing) {
+                    this.alpha = alpha.value
+                    translationY = drop.value
+                }
+            }
+        }
+    return then(layer)
 }
 
 private val CONTENT_DROP = 32.dp

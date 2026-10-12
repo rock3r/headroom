@@ -40,6 +40,32 @@ Use them with a Perfetto system trace to find out what makes a frame late.
 3. Open the merged trace in [ui.perfetto.dev](https://ui.perfetto.dev), or query it with
    `trace_processor`.
 
+## Recording a screen as it opens
+
+`scripts/trace-steps.sh <adb serial> <output directory> <step>...` records the same two traces
+while it runs a list of steps: `tap:X,Y`, `wait:S`, `back`, `fling-up`, `fling-down`, and
+`mark:NAME`, which writes the device's boot time to `marks.txt` so you can find each step in the
+trace. Find the coordinates for `tap` first with `scripts/find-on-screen.sh <adb serial> <label>`,
+which looks an element up by its content description or text. Do not run it while recording: the
+accessibility dump makes the app do extra work.
+
+Use the two modes for different questions:
+
+- With the app's sections (the default), the trace shows which composables were slow. Compose
+  records about 20,000 sections for one screen opening, and that slows composition down.
+- With `APP_TRACE=0`, the app records nothing in process and the system trace leaves out every
+  process's track events. Use it to measure frame times.
+
+The system trace grows by about 3 MB a second on a phone, so keep a run under about 40 seconds or
+its 128 MB buffer drops the start. Check the size of `system.pftrace` after a run. A run once
+came back at 2 MB with no frames in it, and that run had to be recorded again.
+
+What the first traces on a Pixel 11 Pro found, in a debug build: two composables built shape
+morphs every time they were composed. They were the palette swatches in Settings, which then built
+one `Morph` each, and Material's pull-to-refresh `LoadingIndicator` on the overview, which builds
+its morphs even when it is hidden. Both cost about 10 ms or more a time, and both now do that work
+once or not at all.
+
 ## Useful queries
 
 Frames that missed their deadline, with the Settings rows composed around them:

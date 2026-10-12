@@ -53,6 +53,7 @@ internal fun HomeNavigationItems(
                 )
             },
             label = { Text(stringResource(item.label)) },
+            modifier = Modifier.testTag(navigationItemTag(item)),
             navigationSuiteType = suiteType,
         )
     }

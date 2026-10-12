@@ -41,10 +41,14 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.stale
+import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.canRedeemResets
+import dev.sebastiano.headroom.model.hasFooter
+import dev.sebastiano.headroom.model.holdsNone
+import dev.sebastiano.headroom.model.showsSummary
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ListCard
@@ -56,6 +60,8 @@ data class AccountResets(
     val byAccount: Map<String, ResetAvailability> = emptyMap(),
     /** The accounts whose usage is being refreshed after a reset. */
     val refreshing: Set<String> = emptySet(),
+    /** The user's settings, which decide whether Claude's resets can be used. */
+    val settings: AppSettings = AppSettings(),
 ) {
     fun of(accountId: String): ResetAvailability? = byAccount[accountId]
 
@@ -63,7 +69,7 @@ data class AccountResets(
     fun isRefreshing(accountId: String): Boolean = accountId in refreshing
 
     /** True when Headroom can use [provider]'s resets. Others are shown for information only. */
-    fun canRedeem(provider: Provider): Boolean = provider.canRedeemResets
+    fun canRedeem(provider: Provider): Boolean = provider.canRedeemResets(settings)
 }
 
 /** What the reset UI does: use a reset, or ask for one. */
@@ -96,6 +102,15 @@ fun ResetsCard(
     redeemEnabled: Boolean = true,
     stale: Boolean = false,
 ) {
+    // Resets Headroom cannot use are shown for information, with no action. A footer with nothing
+    // in it would show as an empty band, so the card then ends there.
+    val footer: @Composable () -> Unit = {
+        if (!stale && redeemEnabled && availability.hasFooter) {
+            CardFooter { ResetActions(availability, onUse, onAsk) }
+        } else {
+            Spacer(Modifier.height(4.dp))
+        }
+    }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionLabel(
             text = stringResource(R.string.resets_card_title),
@@ -119,6 +134,8 @@ fun ResetsCard(
                     if (!stale) SignInNotice(provider, onUse)
                 } else if (availability.holdsNone) {
                     NoResetsRow(provider)
+                    // Nothing to use, but the provider may give a reset card when asked.
+                    if (availability.canAskForMore) footer()
                 } else {
                     // The summary only when it adds to the rows: see showsSummary.
                     if (availability.showsSummary) {
@@ -129,14 +146,7 @@ fun ResetsCard(
                         if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surface)
                         PoolRow(provider, pool, formatter, first = index == 0)
                     }
-                    // Resets Headroom cannot use are shown for information, with no action. A
-                    // footer
-                    // with nothing in it would show as an empty band, so the card then ends here.
-                    if (!stale && redeemEnabled && availability.hasFooter) {
-                        CardFooter { ResetActions(availability, onUse, onAsk) }
-                    } else {
-                        Spacer(Modifier.height(4.dp))
-                    }
+                    footer()
                 }
             }
         }
@@ -335,24 +345,6 @@ private fun CardFooter(content: @Composable () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         content()
-    }
-}
-
-/** A note about the whole card, with an info mark. */
-@Composable
-private fun NoteLine(text: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(
-            painter = painterResource(HeadroomIcons.Error),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp).padding(top = 1.dp),
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

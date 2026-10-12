@@ -24,6 +24,7 @@ import androidx.xr.compose.subspace.layout.resizable
 import androidx.xr.compose.subspace.layout.width
 import androidx.xr.compose.subspace.semantics.testTag
 import dev.sebastiano.headroom.ui.LayoutWidth
+import dev.sebastiano.headroom.ui.navigationSuiteType
 
 /** The panel that shows the app's window in Full Space. */
 const val MAIN_PANEL_TAG: String = "main-panel"
@@ -57,8 +58,7 @@ fun navigationEdge(width: LayoutWidth): NavigationEdge =
  * floating toolbar takes its place) or in Full Space ([spatial]), where the orbiter carries it.
  */
 fun navigationSuiteType(width: LayoutWidth, spatial: Boolean): NavigationSuiteType =
-    if (width == LayoutWidth.Compact || spatial) NavigationSuiteType.None
-    else NavigationSuiteType.WideNavigationRailCollapsed
+    if (spatial) NavigationSuiteType.None else width.navigationSuiteType
 
 /**
  * How many columns of cards the overview shows for [width]. In 2D an expanded window shares its

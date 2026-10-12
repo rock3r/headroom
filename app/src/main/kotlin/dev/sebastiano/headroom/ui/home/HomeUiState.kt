@@ -2,14 +2,15 @@ package dev.sebastiano.headroom.ui.home
 
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.designsystem.PaceChipState
+import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
-import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Instant
+import kotlin.time.Instant
 
 /** Everything the overview, resets and detail screens show. */
 @Immutable
@@ -129,19 +130,4 @@ data class DetailUiState(
     val chartWindowId: String? = null,
     /** Whether percentages, rings and chart text show how much is used or how much is left. */
     val display: QuotaDisplay = QuotaDisplay.Used,
-)
-
-@Immutable
-data class ChartSummary(
-    val start: Instant,
-    val end: Instant,
-    val usedPercent: Double,
-    /** Where even pace is now. */
-    val expectedPercent: Double,
-    val kind: WindowKind,
-    val points: List<UsagePoint>,
-    /** When the window reaches 100% at the current rate, or null when that is after the reset. */
-    val projectedLimitAt: Instant?,
-    /** Where the window ends at the current rate, when it does not reach the limit. */
-    val projectedEndPercent: Double?,
 )

@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -57,11 +58,12 @@ import dev.sebastiano.headroom.ui.delights.NEXT_RESET_ANCHOR
 import dev.sebastiano.headroom.ui.delights.delightAnchor
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.resets.AccountResets
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Instant
 
 const val OVERVIEW_LIST_TAG: String = "overview-list"
 const val DEMO_BANNER_TAG: String = "demo-banner"
+
+const val PULL_REFRESH_INDICATOR_TAG: String = "pull-refresh-indicator"
 
 /**
  * The overview: title, demo banner, the next reset, and one card per account. Pull down to refresh;
@@ -101,7 +103,7 @@ fun OverviewScreen(
         state = pullState,
         modifier = modifier.fillMaxSize(),
         indicator = {
-            PullToRefreshDefaults.LoadingIndicator(
+            PullIndicator(
                 state = pullState,
                 isRefreshing = state.isRefreshing,
                 modifier =
@@ -255,7 +257,7 @@ private fun OverviewHeader(
 @ReadOnlyComposable
 private fun syncedText(lastSyncedAt: Instant?, now: Instant): String {
     if (lastSyncedAt == null) return stringResource(R.string.overview_never_synced)
-    val minutes = Duration.between(lastSyncedAt, now).toMinutes().coerceAtLeast(0)
+    val minutes = (now - lastSyncedAt).inWholeMinutes.coerceAtLeast(0)
     return when {
         minutes < 1 -> stringResource(R.string.overview_synced_just_now)
         minutes < MINUTES_PER_HOUR ->
@@ -300,4 +302,24 @@ private fun DemoBanner(onAddAccount: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * The pull-to-refresh indicator, composed only while it can show: while a refresh runs, or while a
+ * pull moves it. It builds its shape morphs when it is composed, and at rest it is hidden anyway,
+ * so this keeps that cost off every return to the overview (see docs/TRACING.md).
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PullIndicator(
+    state: PullToRefreshState,
+    isRefreshing: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (!isRefreshing && state.distanceFraction == 0f) return
+    PullToRefreshDefaults.LoadingIndicator(
+        state = state,
+        isRefreshing = isRefreshing,
+        modifier = modifier.testTag(PULL_REFRESH_INDICATOR_TAG),
+    )
 }

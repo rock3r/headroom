@@ -1,13 +1,14 @@
 package dev.sebastiano.headroom.designsystem
 
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 class PaceChartGeometryTest {
     private val start = Instant.parse("2026-09-23T07:00:00Z")
-    private val end = start.plus(Duration.ofDays(7))
+    private val end = start.plus(7.days)
     private val geometry =
         PaceChartGeometry(
             start = start,
@@ -26,7 +27,7 @@ class PaceChartGeometryTest {
 
     @Test
     fun `time maps linearly to x`() {
-        assertEquals(150f, geometry.x(start.plus(Duration.ofHours(84))), 0.01f)
+        assertEquals(150f, geometry.x(start.plus(84.hours)), 0.01f)
     }
 
     @Test
@@ -38,7 +39,7 @@ class PaceChartGeometryTest {
 
     @Test
     fun `values outside the window are clamped to the plot`() {
-        assertEquals(290f, geometry.x(end.plus(Duration.ofDays(1))), 0.01f)
+        assertEquals(290f, geometry.x(end.plus(1.days)), 0.01f)
         assertEquals(20f, geometry.y(130.0), 0.01f)
     }
 

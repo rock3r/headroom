@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
@@ -51,6 +53,7 @@ import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
 import dev.sebastiano.headroom.designsystem.WorkingShimmer
 import dev.sebastiano.headroom.designsystem.stale
+import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.WindowKind
@@ -71,17 +74,16 @@ import dev.sebastiano.headroom.ui.formatAmount
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.formatMoney
 import dev.sebastiano.headroom.ui.home.AccountSummary
-import dev.sebastiano.headroom.ui.home.ChartSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.WindowSummary
 import dev.sebastiano.headroom.ui.overview.AnimatedPercent
 import dev.sebastiano.headroom.ui.resets.AccountResets
 import dev.sebastiano.headroom.ui.resets.ResetHandlers
 import dev.sebastiano.headroom.ui.resets.ResetsCard
-import java.time.Duration
-import java.time.Instant
 import java.time.format.TextStyle
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 const val DETAIL_TAG: String = "detail"
 
@@ -93,7 +95,8 @@ fun chartWindowTag(windowId: String): String = "chart-window-$windowId"
  * One account in depth: the hero ring (weekly outside, session inside), every window, the pace
  * chart drawn to scale, and the per-window reset alert switches. The ring, the numbers and the
  * chart text show how much is used or how much is left, as the state's display says; the chart
- * itself always plots usage against even pace.
+ * itself always plots usage against even pace. With [revealResets], it scrolls the Resets card into
+ * view once the card shows, then calls [onRevealResets].
  */
 @Composable
 fun DetailScreen(
@@ -107,6 +110,8 @@ fun DetailScreen(
     resets: AccountResets = AccountResets(),
     resetHandlers: ResetHandlers = ResetHandlers(),
     onSignInAgain: (accountId: String) -> Unit = {},
+    revealResets: Boolean = false,
+    onRevealResets: () -> Unit = {},
 ) {
     val account = state.account
     val container =
@@ -121,6 +126,7 @@ fun DetailScreen(
         // Not saved: the detail pane restores saved state from whichever account it showed last,
         // so a saved scroll would open the next account part way down. Details open at the top.
         val scrollState = remember(account.id) { ScrollState(initial = 0) }
+        val resetsRequester = remember { BringIntoViewRequester() }
         StatusBarBlurBox(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier =
@@ -194,6 +200,7 @@ fun DetailScreen(
                 // A stale account's resets are as old as its usage: faded with it, and with no
                 // action until the user signs in again.
                 resets.of(account.id)?.let { availability ->
+                    RevealResetsEffect(revealResets, resetsRequester, onRevealResets)
                     ResetsCard(
                         provider = account.provider,
                         availability = availability,
@@ -202,7 +209,7 @@ fun DetailScreen(
                         onAsk = { resetHandlers.onAsk(account.id) },
                         redeemEnabled = resets.canRedeem(account.provider),
                         stale = stale,
-                        modifier = content,
+                        modifier = content.bringIntoViewRequester(resetsRequester),
                     )
                 }
                 AlertSection(account, formatter, onAlertChange, content)
@@ -283,9 +290,13 @@ private fun HeroRing(
                 modifier = Modifier.padding(top = 4.dp),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val large = MaterialTheme.typography.displayMedium
                     AnimatedPercent(
                         percent = display.percent(primary.usedPercent),
-                        style = MaterialTheme.typography.displayMedium,
+                        style = large,
+                        // "100%" in the large style is wider than the inner ring: while it shows
+                        // three digits, also as it counts, the number is as wide as two digits.
+                        threeDigitStyle = large.copy(fontSize = large.fontSize * THREE_DIGIT_SCALE),
                         display = display,
                         modifier =
                             sharedElements?.run {
@@ -310,6 +321,9 @@ private fun HeroRing(
         }
     }
 }
+
+/** How much smaller the hero ring's number is with three digits. */
+private const val THREE_DIGIT_SCALE = 0.72f
 
 @Composable
 private fun LegendItem(label: String, color: Color) {
@@ -358,7 +372,7 @@ private fun WindowList(
                                 expiresAt?.let {
                                     stringResource(R.string.detail_expires_at, formatter.date(it))
                                 }
-                            resetsAt != null && account.signInExpired && !resetsAt.isAfter(now) ->
+                            resetsAt != null && account.signInExpired && resetsAt <= now ->
                                 stringResource(R.string.stale_window_reset_long)
                             resetsAt != null -> resetLine(window, resetsAt, now, formatter)
                             else -> null
@@ -445,7 +459,7 @@ private fun resetLine(window: WindowSummary, at: Instant, now: Instant, formatte
     when {
         window.kind == WindowKind.Session || window.kind == WindowKind.Daily ->
             stringResource(R.string.detail_resets_in_no_alert, formatter.countdown(now, at))
-        Duration.between(now, at) < Duration.ofDays(1) ->
+        (at - now) < 1.days ->
             stringResource(R.string.detail_resets_in, formatter.countdown(now, at))
         else -> stringResource(R.string.detail_resets_at, formatter.long(at))
     }

@@ -7,7 +7,7 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.ui.ResetFormatter
-import java.time.Instant
+import kotlin.time.Instant
 
 /**
  * Tools for trying the 1.1 prototypes on a device without real accounts. Debug builds have them;

@@ -12,16 +12,28 @@
 
 | Layer | Where | Runs on | Command |
 |---|---|---|---|
-| Unit tests | `src/test` in JVM modules | JVM, JUnit 5 | `./gradlew :core:quota:test` |
+| Unit tests | `src/jvmTest` in KMP modules, `src/test` in JVM modules | JVM, JUnit 5 | `./gradlew :core:quota:jvmTest` |
+| Multiplatform tests | `src/commonTest` in multiplatform modules | JVM, JUnit 5 | `./gradlew :core:model:jvmTest` |
+| Multiplatform tests | `src/commonTest` in multiplatform modules | iOS simulator (macOS only) | `./gradlew :core:model:iosSimulatorArm64Test` |
+| iOS app tests | `iosApp/HeadroomTests`, `iosApp/HeadroomUITests` | iOS simulator (macOS only) | `iosApp/scripts/test.sh` |
 | Android unit tests | `src/test` in Android modules | JVM with Robolectric, JUnit 4 | `./gradlew :core:data:testDebugUnitTest` |
 | Compose UI tests | `src/test` in `:app` and `:core:designsystem` | Robolectric | `./gradlew :app:testDebugUnitTest` |
 | Screenshots | `src/test`, Roborazzi | Robolectric | `./gradlew :app:recordRoborazziDebug` |
 | End-to-end tests | `src/androidTest` in `:app` | Emulator, fake data | `./gradlew :app:pixel9api37DebugAndroidTest` |
+| Release smoke test | `scripts/release-smoke-test.sh` | Emulator, demo data, minified APK | See [RELEASING.md](RELEASING.md#the-smoke-test) |
+
+### Multiplatform tests
+
+`commonTest` code runs on every target, so it uses `kotlin.test` only: no JUnit imports and no
+`java.*` APIs. Kotlin/Native does not allow commas in function names, so backticked test names
+leave them out. `./gradlew check` runs the iOS simulator tests on macOS and skips them elsewhere;
+CI runs them in a macOS job.
 
 ### Fixtures, not live services
 
-Provider parsing tests use recorded JSON fixtures in `src/test/resources`. HTTP behaviour is
-tested against OkHttp's `MockWebServer`. No test talks to a real provider.
+Provider parsing tests use recorded JSON fixtures in `src/test/resources` (`src/jvmTest/resources`
+in multiplatform modules). HTTP behaviour is tested against OkHttp's `MockWebServer`, which only
+runs on the JVM, so those tests live in `jvmTest`. No test talks to a real provider.
 
 ### End-to-end tests
 
@@ -50,6 +62,11 @@ Roborazzi records screenshots of the main screens from Robolectric with
 `./gradlew :app:recordRoborazziDebug`. `./gradlew :widget:recordWidgetGallery` plays each widget
 in the Android 16 widget player and saves it. Both are used for the README. They are not compared
 in CI, because font rendering differs between machines.
+
+Robolectric draws only when a test asks. A test that draws frames just to move animations along
+calls `drawFrame()` on a node rather than dropping the result of `captureToImage()`. Under native
+graphics a picture's pixels live outside the Java heap and the garbage collector does not count
+them, so dropped pictures pile up: thousands of them ran CI runners out of memory (issue #6).
 
 ### Widgets
 

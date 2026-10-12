@@ -7,9 +7,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.sebastiano.headroom.appdata.DemoAwareResetEvents
 import dev.sebastiano.headroom.appdata.DemoAwareResetHistory
 import dev.sebastiano.headroom.appdata.DemoAwareUsageHistory
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
+import dev.sebastiano.headroom.appdata.DemoResetEvents
 import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.HistoryResetHistory
@@ -20,6 +22,7 @@ import dev.sebastiano.headroom.appdata.ResetCenter
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
+import dev.sebastiano.headroom.data.reset.AndroidResetLog
 import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
@@ -28,6 +31,7 @@ import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetAttemptMemory
 import dev.sebastiano.headroom.model.ResetAttemptStore
+import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.prototype.PrototypeTools
@@ -36,6 +40,7 @@ import dev.sebastiano.headroom.signin.AuthSignInSteps
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
+import dev.sebastiano.headroom.signin.ZCodeSignIn
 import dev.sebastiano.headroom.tile.StatusBarTileAdder
 import dev.sebastiano.headroom.tile.TileAdder
 import dev.sebastiano.headroom.tile.TileSettings
@@ -47,9 +52,12 @@ import dev.sebastiano.headroom.widget.HeadroomWidgetProvider
 import dev.sebastiano.headroom.widgets.AppWidgetManagerPinner
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +78,7 @@ import kotlinx.coroutines.flow.map
  * - [widgetPinner]: the widget module supplies the `AppWidgetProvider` for each style.
  * - [resetHistory]: the data layer answers it from the Room history.
  * - [usageHistory]: the Room history of each window, or demo history in demo mode, for the stats.
+ * - [resetEvents]: the resets used and expired, from Room, or demo events in demo mode.
  * - [settings]: the data layer's DataStore settings, or settings in memory without it.
  * - [resetIsland]: whether the reset island's accessibility service is ready, and a way to show it.
  * - [resetProvider]: reads and redeems usage limit resets. Prototype: fake data in debug builds,
@@ -94,7 +103,7 @@ class AppGraph(
     /** Stores the order the user put the accounts in. Does nothing without the data layer. */
     val reorderAccounts: suspend (orderedIds: List<String>) -> Unit = {},
     /** How often countdowns re-read the clock. Null turns it off, for tests with a fixed clock. */
-    val tickInterval: Duration? = Duration.ofMinutes(1),
+    val tickInterval: Duration? = 1.minutes,
     /** Used or left, how often to sync in the background, and how the overview sorts accounts. */
     val settings: SettingsRepository = InMemorySettingsRepository(),
     /** The version name the settings screen shows. */
@@ -117,6 +126,10 @@ class AppGraph(
     val prototypes: PrototypeTools? = null,
     /** The demo accounts, so debug tools can show a scenario such as an expired sign-in. */
     val demoAccounts: FakeQuotaRepository? = null,
+    /** The ZCode sign-in that Z.AI resets need; null without the data layer. */
+    val zCodeSignIn: ZCodeSignIn? = null,
+    /** The resets used and expired, for the Stats tab; redeems in Headroom are recorded here. */
+    val resetEvents: ResetEventLog = ResetEventLog.None,
 ) {
     /** The resets of every account, read through the reset provider. */
     val resets: ResetCenter =
@@ -125,6 +138,7 @@ class AppGraph(
             accounts = quotaRepository.accounts,
             scope = resetScope,
             refreshUsage = { accountId -> quotaRepository.refresh(accountId) },
+            recordRedeem = resetEvents::redeemed,
         )
 
     /** The keys of unsettled redeem attempts, so a retry never uses a second reset. */
@@ -157,6 +171,7 @@ class AppGraph(
                 clock = clock,
                 zone = zone,
                 computeDispatcher = statsDispatcher,
+                resetEvents = resetEvents,
             )
         }
     }
@@ -184,13 +199,25 @@ class AppGraph(
          * layer, and demo data only while there are none. Without one (instrumented tests,
          * previews) it runs on fakes.
          */
+        /** The recorded reset history, or demo events while the demo accounts show. */
+        private fun resetEvents(
+            isDemo: StateFlow<Boolean>,
+            data: DataGraph?,
+            clock: () -> Instant,
+        ): ResetEventLog =
+            DemoAwareResetEvents(
+                isDemo = isDemo,
+                real = data?.resetEvents ?: ResetEventLog.None,
+                demo = DemoResetEvents(clock),
+            )
+
         fun create(
             context: Context,
-            clock: () -> Instant = Instant::now,
+            clock: () -> Instant = Clock.System::now,
             zone: ZoneId = ZoneId.systemDefault(),
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            demoLatency: Duration = Duration.ofMillis(DEMO_LATENCY_MILLIS),
-            tickInterval: Duration? = Duration.ofMinutes(1),
+            demoLatency: Duration = DEMO_LATENCY_MILLIS.milliseconds,
+            tickInterval: Duration? = 1.minutes,
             data: DataGraph? = null,
             resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
             tileSettings: TileSettings? = null,
@@ -205,19 +232,21 @@ class AppGraph(
                     scope = scope,
                     simulatedLatency = demoLatency,
                 )
+            // The app's task is under the browser tab, so this start is allowed; MainActivity is
+            // singleTask, so it clears the tab above it.
+            val bringAppToFront = {
+                context.startActivity(
+                    Intent(context, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+            val steps = data?.let {
+                AuthSignInSteps(it.authMethods, bringAppToFront = bringAppToFront)
+            }
             val signInController =
-                if (data == null) {
+                if (data == null || steps == null) {
                     FakeSignInController()
                 } else {
-                    val steps =
-                        AuthSignInSteps(data.authMethods) {
-                            // The app's task is under the browser tab, so this start is allowed;
-                            // MainActivity is singleTask, so it clears the tab above it.
-                            context.startActivity(
-                                Intent(context, MainActivity::class.java)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }
                     RealSignInController(
                         steps,
                         scope,
@@ -279,6 +308,17 @@ class AppGraph(
                 tileSettings = tileSettings,
                 prototypes = prototypeTools,
                 demoAccounts = demoAccounts,
+                resetEvents = resetEvents(repository.isDemo, data, clock),
+                zCodeSignIn =
+                    if (data == null || steps == null) null
+                    else
+                        ZCodeSignIn(
+                            start = steps::startZCode,
+                            save = data.signInManager::signInToZCode,
+                            scope = scope,
+                            returnToApp = bringAppToFront,
+                            log = AndroidResetLog::debug,
+                        ),
             )
         }
 

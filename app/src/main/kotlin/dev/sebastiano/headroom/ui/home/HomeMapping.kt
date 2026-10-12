@@ -6,11 +6,8 @@ import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.Pace
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetPolicy
-import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+import kotlin.time.Instant
 
 /** Alert switches keyed by account id and window id. */
 internal typealias AlertSwitches = Map<Pair<String, String>, Boolean>
@@ -138,33 +135,3 @@ private fun QuotaWindow.toSummary(
 private fun AlertSwitches.isOn(accountId: String, window: QuotaWindow) =
     ResetPolicy.canAlert(window) &&
         (this[accountId to window.id] ?: ResetPolicy.alertsByDefault(window))
-
-internal fun chartSummary(
-    window: QuotaWindow,
-    points: List<UsagePoint>,
-    now: Instant,
-): ChartSummary? {
-    val resetsAt = window.resetsAt ?: return null
-    val length = window.length ?: return null
-    val start = resetsAt.minus(length)
-    // A projection is an estimate; whole minutes keep "in 1d 17h, 1d 1h before" consistent.
-    val hit = Pace.projectedLimitAt(window, now)?.truncatedTo(ChronoUnit.MINUTES)
-    val elapsed = Duration.between(start, now).toMillis()
-    val projectedEnd =
-        if (hit == null && elapsed > 0) {
-            window.usedPercent / elapsed * length.toMillis()
-        } else {
-            null
-        }
-    return ChartSummary(
-        start = start,
-        end = resetsAt,
-        usedPercent = window.usedPercent,
-        expectedPercent = Pace.expectedPercent(window, now) ?: 0.0,
-        kind = window.kind,
-        // History keeps earlier windows too. Their samples would pile up on the left edge.
-        points = points.filter { !it.at.isBefore(start) && !it.at.isAfter(now) },
-        projectedLimitAt = hit,
-        projectedEndPercent = projectedEnd,
-    )
-}

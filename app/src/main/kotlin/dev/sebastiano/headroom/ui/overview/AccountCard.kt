@@ -49,8 +49,8 @@ import dev.sebastiano.headroom.ui.components.windowKindLabel
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
-import java.time.Instant
 import kotlin.math.roundToInt
+import kotlin.time.Instant
 
 /**
  * One account on the overview: the big number, the primary window's bar with its pace tick, the
@@ -203,7 +203,7 @@ private fun resetLabel(
     format: (Instant) -> String,
 ): String? {
     val resetsAt = window.resetsAt ?: return null
-    return if (stale && !resetsAt.isAfter(now)) stringResource(R.string.stale_window_reset)
+    return if (stale && resetsAt <= now) stringResource(R.string.stale_window_reset)
     else format(resetsAt)
 }
 
@@ -317,14 +317,20 @@ fun AnimatedPercent(
     display: QuotaDisplay = QuotaDisplay.Used,
     seen: SeenValues? = null,
     seenKey: String = "percent",
+    /** The style while the number shows three digits, as it does at 100%. */
+    threeDigitStyle: androidx.compose.ui.text.TextStyle = style,
 ) {
     val animated = animatedValue(percent.toFloat(), draining, display, seen, seenKey)
+    val shown = animated.roundToInt()
     Text(
-        text = stringResource(R.string.percent, animated.roundToInt()),
-        style = style,
+        text = stringResource(R.string.percent, shown),
+        style = if (shown >= THREE_DIGITS) threeDigitStyle else style,
         modifier = modifier,
     )
 }
+
+/** A percentage has three digits from here. */
+private const val THREE_DIGITS = 100
 
 @Composable
 private fun MeterRow(

@@ -115,6 +115,32 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun `redeeming Claude resets is off until the user turns it on, and then it is stored`() =
+        runTest(main.dispatcher) {
+            observe()
+            assertFalse(viewModel.state.value.redeemClaudeResets)
+
+            viewModel.setRedeemClaudeResets(true)
+            runCurrent()
+
+            assertTrue(repository.settings.value.redeemClaudeResets)
+            assertTrue(viewModel.state.value.redeemClaudeResets)
+        }
+
+    @Test
+    fun `reset reminders are on until the user turns them off, and then it is stored`() =
+        runTest(main.dispatcher) {
+            observe()
+            assertTrue(viewModel.state.value.resetExpiryReminders)
+
+            viewModel.setResetExpiryReminders(false)
+            runCurrent()
+
+            assertFalse(repository.settings.value.resetExpiryReminders)
+            assertFalse(viewModel.state.value.resetExpiryReminders)
+        }
+
+    @Test
     fun `choosing a frequency stores it`() =
         runTest(main.dispatcher) {
             observe()

@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,14 +43,36 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.model.stats.coverage
+import dev.sebastiano.headroom.model.stats.heatmap
+import dev.sebastiano.headroom.model.stats.leftOver
+import dev.sebastiano.headroom.model.stats.resetUsage
+import dev.sebastiano.headroom.model.stats.shares
+import dev.sebastiano.headroom.model.stats.sparklines
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
+import kotlinx.coroutines.flow.StateFlow
 
 const val STATS_TAG: String = "stats"
+
+/**
+ * The Stats tab of the home. It collects [state] only while the tab shows, so no stats work runs
+ * off screen.
+ */
+@Composable
+internal fun StatsTab(
+    state: StateFlow<StatsUiState>,
+    formatter: ResetFormatter,
+    bottomPadding: Dp,
+) {
+    val stats by state.collectAsStateWithLifecycle()
+    StatsScreen(stats, formatter, bottomPadding = bottomPadding)
+}
 
 /**
  * General stats and a few playful charts, from the usage history stored on the device. One column
@@ -96,6 +119,7 @@ fun StatsScreen(
                 return@LazyVerticalStaggeredGrid
             }
             item { ResetsCard(stats.resets) }
+            stats.resetUsage?.let { usage -> item { ResetUsageCard(usage) } }
             item { SharesCard(stats.shares) }
             item { HeatmapCard(stats.heatmap, stats.coverage, formatter) }
             item { HighlightsRow(stats, formatter) }

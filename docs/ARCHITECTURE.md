@@ -4,18 +4,53 @@
 
 | Module | Kind | Contents |
 |---|---|---|
-| `:core:model` | Kotlin/JVM | Quota types, pace maths, reset alert policy, countdown formatting, repository contracts, demo data |
-| `:core:quota` | Kotlin/JVM | One fetcher per provider: calls the provider's usage endpoint and parses it into the model |
-| `:core:auth` | Kotlin/JVM | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
-| `:core:data` | Android library | Room history, DataStore settings, encrypted token store, sync, reset alarms, notifications |
+| `:core:model` | Kotlin Multiplatform (JVM, iOS) | Quota types, pace maths, reset alert policy, countdown formatting, repository contracts, demo data |
+| `:core:quota` | Kotlin Multiplatform (JVM, iOS) | One fetcher per provider: calls the provider's usage endpoint and parses it into the model |
+| `:core:auth` | Kotlin Multiplatform (JVM, iOS) | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
+| `:core:storage` | Kotlin Multiplatform (Android, JVM, iOS) | Room database (accounts, snapshots, history, reset events), DataStore settings, account fetching and sign-in bookkeeping |
+| `:core:data` | Android library | Encrypted token store, sync worker, reset alarms, notifications, the Android wiring (`DataGraph`) |
+| `:shared` | Kotlin Multiplatform (JVM, iOS) | The `HeadroomKit` framework for the iOS app: wiring, Keychain-backed token store, Swift-friendly view models |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
 | `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen, from Android 16 |
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
 
 Dependencies point down: `:app` → `:widget`, `:core:designsystem`, `:core:data` →
-`:core:quota`, `:core:auth` → `:core:model`. `:widget` also uses `:core:designsystem`, for the
+`:core:storage` → `:core:quota`, `:core:auth` → `:core:model`. `:widget` also uses `:core:designsystem`, for the
 colour palettes it shares with the app. The JVM modules have no Android dependencies, so their
 tests run fast on the JVM.
+
+### Kotlin Multiplatform
+
+The business logic is moving into Kotlin Multiplatform modules, so a SwiftUI iOS app can share it.
+A multiplatform module (`headroom.kmp.library`) has JVM, `iosArm64` and `iosSimulatorArm64`
+targets, its code in `src/commonMain` and its tests in `src/commonTest`. The Android modules use the
+JVM target. Common code uses `kotlin.time`, `kotlinx-datetime` and `kotlinx-atomicfu` locks in place
+of `java.time` and `synchronized`, and Okio for hashing. HTTP goes through Ktor
+(`KtorQuotaHttpClient`), with the OkHttp engine on the JVM and Android and the Darwin engine on
+iOS. `:core:model`, `:core:quota`, `:core:auth` and `:core:storage` are multiplatform.
+
+`:core:storage` uses `headroom.kmp.android.library`, which adds an Android target: Room and DataStore
+ship separate Android builds, and the Android app keeps Android's own SQLite and the same file names
+(`headroom.db`, `files/datastore/settings.preferences_pb`). iOS opens the same database with the
+SQLite that ships with Room. The JVM target only runs `commonTest` on the host, with that bundled
+SQLite. `HeadroomStorage` is the one public entry point; each platform opens it with its own
+`openHeadroomStorage`. The sign-in state machine (`RealSignInController`, `AuthSignInSteps`) lives
+in `:core:storage` too, so both apps run the same sign-in steps.
+
+`:shared` builds the static `HeadroomKit` framework the iOS app links. `openHeadroom(directory:secrets:)`
+wires storage, sync and sign-in as `DataGraph` and `AppGraph` do on Android. The app implements
+`SecureValueStore` with the Keychain, and `SecureTokenStore` keeps the same compare-and-swap
+revisions as the Android token store. Swift observes `OverviewUi` and `SignInUi` through callbacks
+on the main thread. These carry plain values and stable ids (`"network"`, `"over"`), and the app's
+String Catalog holds the text.
+
+The SwiftUI app lives in `iosApp/`; its [README](../iosApp/README.md) covers building, testing and
+how it fits together. Its Xcode project is generated from `iosApp/project.yml` with XcodeGen.
+
+The OAuth loopback listener (`LoopbackServer`) keeps its HTTP handling in common code, over a small
+socket interface: `ServerSocket` on the JVM and POSIX sockets on iOS, always bound to the loopback
+address. On iOS the sign-in page must open in `ASWebAuthenticationSession`, never in Safari: Safari
+puts Headroom in the background, iOS suspends it, and the listener stops answering.
 
 ## Data flow
 
@@ -84,8 +119,11 @@ it.
 - The app and the widgets draw its numbers faded and pulled towards grey (`Modifier.stale` and
   `StaleStyle` in `:core:designsystem`). They are never wavy, and pace is worked out at the time
   of the last good sync. "Last updated 2 hours ago" rounds to the nearest unit (`Age`).
-- The card, the detail and every widget layout show a "Sign in" action that is never faded. A
-  widget tap on such an account opens its sign-in.
+- The card and the detail show a "Sign in" action that is never faded. Every widget layout marks
+  the account too, never faded: Bars and the single ring and shape show a "Sign in" label, and the
+  ring grid, the lock screen and the Shape grid show a red "!" badge where the number would be,
+  because only the account name goes under a ring. The content description still says that the
+  sign-in expired, with the last numbers. A widget tap on such an account opens its sign-in.
 - It never leads the next reset, gets no reset alarms, and its resets are not listed as upcoming.
 - `SignInAlertingRepository` in `:core:data` runs `SignInAlertPolicy` after every refresh. The
   first time an account expires, it posts a warning on the "Sign-in problems" channel. Tapping it
@@ -102,10 +140,15 @@ it.
 
 ## Usage-limit resets
 
-Each sync reads the resets of Codex, Grok and Claude accounts next to the usage, and Room stores
-them with the snapshot. Codex and Grok resets can be used; Claude's are shown only. The reset
-clients live in `:core:quota`, the sync and storage in `:core:data`, and the screens in `:app`. See
-[RESETS.md](RESETS.md), which also says how to read their logs.
+Each sync reads the resets of Codex, Grok, Claude and Z.AI accounts next to the usage, and Room
+stores them with the snapshot. Codex, Grok and Z.AI resets can be used. Claude's can be used only
+when the user turns on the experimental setting; otherwise they are shown only. Z.AI resets need a
+second sign-in, to ZCode,
+which `:core:auth` runs and stores next to the account's API key. About a day before a reset the
+user can use expires, a notification reminds them. Each sync also records the resets that were
+used or expired, for the Stats tab. The reset clients live in `:core:quota`, the sync and storage
+in `:core:data`, and the screens in `:app`. See [RESETS.md](RESETS.md), which also describes that
+history and says how to read the logs.
 
 ## Demo mode
 

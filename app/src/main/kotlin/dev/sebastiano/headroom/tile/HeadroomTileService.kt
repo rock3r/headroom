@@ -10,7 +10,8 @@ import dev.sebastiano.headroom.HeadroomApplication
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.model.QuotaDisplay
-import java.time.Instant
+import dev.sebastiano.headroom.model.TileSubtitle
+import kotlin.time.Clock
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -33,7 +34,7 @@ class HeadroomTileService : TileService() {
                 TileSubtitle.of(
                     mode = app.tileSettings.subtitle.value,
                     accounts = app.graph.quotaRepository.accounts.value,
-                    now = Instant.now(),
+                    now = Clock.System.now(),
                     display = display,
                 )
             val tile = qsTile ?: return@launch
@@ -54,8 +55,10 @@ class HeadroomTileService : TileService() {
                 PendingIntent.FLAG_IMMUTABLE,
             )
         // The Intent overload throws on Android 14 and later; the PendingIntent one is required.
-        if (isLocked) unlockAndRun { startActivityAndCollapse(open) }
-        else startActivityAndCollapse(open)
+        // Do not wrap this in unlockAndRun when the device is locked: an active tile is unbound
+        // while the user unlocks, and the pending action is lost with it. SystemUI holds on to the
+        // PendingIntent instead, asks for the unlock and starts it afterwards.
+        startActivityAndCollapse(open)
     }
 
     override fun onDestroy() {

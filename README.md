@@ -89,6 +89,9 @@ later, the first version with a widget player. The pictures below come from that
   the account again and notifies you only if the reset really happened. The notification pops up
   as a heads-up. Session and daily limits never alert; monthly ones can be turned on, and each
   alert has a bell you can switch in the Resets tab.
+- **Reset reminders.** About a day before a reset you can use expires, a notification says so, for
+  example "Your ChatGPT Codex reset expires tomorrow at 06:18". You get at most one a day. Tapping
+  it opens the account with its resets in view. Settings can turn it off.
 - **Widgets for the home screen and the lock screen.** There are four styles (Rings, Bars, Shape
   and Countdown), and each widget remembers its own accounts, window and colours. Settings can
   add any style to the home screen.
@@ -129,6 +132,26 @@ Download the APK from the [latest release](https://github.com/rock3r/headroom/re
 open it on your phone. Headroom needs Android 14 or later, and its widgets Android 16 or later.
 Releases are signed with the same key every time, so later releases install over earlier ones. [docs/RELEASING.md](docs/RELEASING.md)
 explains how a release is made.
+
+### With Obtainium
+
+[Obtainium](https://obtainium.imranr.dev/) installs Headroom from the GitHub releases and tells you
+when a new one is out.
+
+[<img src="docs/media/badge_obtainium.png" alt="Get it on Obtainium" width="161">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.sebastiano.headroom%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Frock3r%2Fheadroom%22%2C%22author%22%3A%22rock3r%22%2C%22name%22%3A%22Headroom%22%7D)
+
+The badge goes through apps.obtainium.imranr.dev, which shows a "get Obtainium" page when the app
+is missing. If you already have Obtainium, you can instead add an app in it with this URL:
+
+```
+https://github.com/rock3r/headroom
+```
+
+To check an APK yourself, its signing certificate has this SHA-256:
+
+```
+81:5F:AA:26:1D:76:B2:B3:37:E4:AB:D0:F3:BA:31:84:AD:05:FB:8E:BD:65:01:42:43:47:22:69:BC:DA:5F:C2
+```
 
 ## Building
 

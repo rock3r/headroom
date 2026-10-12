@@ -32,7 +32,7 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.model.Age
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
+import kotlin.time.Instant
 
 fun signInExpiredRowTag(accountId: String): String = "sign-in-expired-$accountId"
 

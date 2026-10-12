@@ -5,10 +5,12 @@ import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,7 +74,7 @@ class ResetCheckerTest {
     }
 
     private class MemoryLedger : ResetLedger {
-        val notified = mutableSetOf<Pair<Int, java.time.Instant>>()
+        val notified = mutableSetOf<Pair<Int, Instant>>()
 
         override fun wasNotified(alarm: ResetAlarm) =
             (alarm.requestCode to alarm.expectedResetAt) in notified
@@ -101,7 +103,7 @@ class ResetCheckerTest {
                             snapshot.windows.map {
                                 it.copy(
                                     usedPercent = 0.0,
-                                    resetsAt = it.resetsAt!!.plus(Duration.ofDays(7)),
+                                    resetsAt = it.resetsAt!!.plus(7.days),
                                 )
                             }
                     )
@@ -138,11 +140,11 @@ class ResetCheckerTest {
         val repo = ScriptedRepository(before) { before }
         val notifier = RecordingNotifier()
         assertEquals(
-            ResetCheckOutcome.Retry(Duration.ofSeconds(30)),
+            ResetCheckOutcome.Retry(30.seconds),
             checker(repo, notifier).check(alarm, 1),
         )
         assertEquals(
-            ResetCheckOutcome.Retry(Duration.ofMinutes(60)),
+            ResetCheckOutcome.Retry(60.minutes),
             checker(repo, notifier).check(alarm, 5),
         )
         assertEquals(ResetCheckOutcome.GaveUp, checker(repo, notifier).check(alarm, 6))

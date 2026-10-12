@@ -74,6 +74,7 @@ internal object ResetCopy {
             ResetPoolStatus.WaitingForLimit -> R.string.resets_pool_waiting
             ResetPoolStatus.Queued -> R.string.resets_pool_queued
             ResetPoolStatus.Paused -> R.string.resets_pool_paused
+            ResetPoolStatus.NotUsableYet -> R.string.resets_pool_not_yet
         }
 
     /** The service a provider's resets need a separate sign-in to, such as Z.AI's ZCode. */

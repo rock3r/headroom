@@ -13,6 +13,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
 
             extensions.configure<ApplicationExtension> {
                 configureAndroidCommon(this)
+                configureAppUnitTestShards(this)
                 defaultConfig {
                     targetSdk = HeadroomSdk.TARGET
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -15,3 +15,6 @@ enum class HomeTab(
     Resets(R.string.tab_resets, HeadroomIcons.Monitoring, HeadroomIcons.MonitoringFilled),
     Stats(R.string.tab_stats, HeadroomIcons.PieChart, HeadroomIcons.PieChartFilled),
 }
+
+/** The stable test tag for a navigation destination, e.g. "nav-item-overview". */
+internal fun navigationItemTag(item: HomeTab): String = "nav-item-${item.name.lowercase()}"

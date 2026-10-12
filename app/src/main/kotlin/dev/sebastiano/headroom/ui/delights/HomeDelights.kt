@@ -10,10 +10,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
 import dev.sebastiano.headroom.designsystem.providerColors
+import dev.sebastiano.headroom.model.FreshDataTrigger
 import dev.sebastiano.headroom.model.Provider
-import dev.sebastiano.headroom.ui.home.FreshDataTrigger
+import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.ui.home.HomeUiState
-import dev.sebastiano.headroom.ui.home.ResetBurst
 
 /**
  * Plays the delights that [home] asks for, through the enclosing [DelightsHost]: the shimmer when a
