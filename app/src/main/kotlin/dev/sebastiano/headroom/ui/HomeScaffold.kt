@@ -30,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
@@ -41,8 +42,10 @@ import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneSca
 import androidx.compose.material3.adaptive.navigation.ThreePaneScaffoldNavigator
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -372,17 +375,24 @@ private fun OverviewPanes(
         list(null, true)
         if (detail != null) {
             DetailPanelContent(detailPanel) {
-                DetailPane(
-                    detail,
-                    details.formatter,
-                    details.onAlertChange,
-                    details.onChartWindowChange,
-                    details.resets,
-                    details.resetHandlers,
-                    details.onSignInAgain,
-                    Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                )
+                // The panel is outside the window's scaffold, which gives the window's text its
+                // colour. It takes the same one: without it, text with no colour of its own,
+                // like the account's name, would be black.
+                CompositionLocalProvider(
+                    LocalContentColor provides NavigationSuiteScaffoldDefaults.contentColor
+                ) {
+                    DetailPane(
+                        detail,
+                        details.formatter,
+                        details.onAlertChange,
+                        details.onChartWindowChange,
+                        details.resets,
+                        details.resetHandlers,
+                        details.onSignInAgain,
+                        Modifier.fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                    )
+                }
             }
         }
     } else {

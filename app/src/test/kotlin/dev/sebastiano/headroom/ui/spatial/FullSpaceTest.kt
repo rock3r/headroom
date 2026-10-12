@@ -1,16 +1,24 @@
 package dev.sebastiano.headroom.ui.spatial
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import androidx.xr.compose.platform.requestHomeSpace
 import androidx.xr.compose.testing.getPositionInRoot
@@ -29,6 +37,7 @@ import dev.sebastiano.headroom.ui.resets.resetRowTag
 import dev.sebastiano.headroom.ui.settings.SETTINGS_TAG
 import dev.sebastiano.headroom.ui.stats.STATS_TAG
 import dev.sebastiano.headroom.ui.testGraph
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.launch
 import org.junit.Before
@@ -90,6 +99,41 @@ class FullSpaceTest {
         rule.onNode(hasTestTag(DETAIL_TAG) and outsideTheWindow).assertExists()
         rule.onNode(hasText("Max 20x · sam@example.com") and inTheDetail).assertExists()
         rule.onAllNodes(hasTestTag(DETAIL_TAG) and insideTheWindow).assertCountEquals(0)
+    }
+
+    @Test
+    fun `the detail panel's title and percentage have the colour of the app's title`() {
+        launch()
+
+        val appTitle =
+            rule.onNode(
+                hasText("Headroom") and isHeading() and insideTheWindow,
+                useUnmergedTree = true,
+            )
+        val title =
+            rule.onNode(hasText("Claude") and isHeading() and inTheDetail, useUnmergedTree = true)
+        // The hero ring's percentage, above its label. The window list repeats the number.
+        val percent =
+            rule.onNode(
+                hasText("71%") and hasAnySibling(hasText("weekly used")) and inTheDetail,
+                useUnmergedTree = true,
+            )
+        assertEquals(appTitle.textColor(), title.textColor(), "The detail's title")
+        assertEquals(appTitle.textColor(), percent.textColor(), "The hero ring's percentage")
+    }
+
+    @Test
+    fun `the account's name sits 12 dp below the top of the detail panel`() {
+        launch()
+
+        val detail =
+            rule.onNode(hasTestTag(DETAIL_TAG) and outsideTheWindow).getUnclippedBoundsInRoot()
+        val name =
+            rule
+                .onNode(hasText("Claude") and isHeading() and inTheDetail, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        // The detail's own 4 dp, and 8 dp more above the row with the avatar and the name.
+        assertEquals(12.dp, name.top - detail.top)
     }
 
     @Test
@@ -216,3 +260,10 @@ class FullSpaceTest {
 
 /** The system feature of devices that run spatial apps, such as XR headsets. */
 private const val XR_SPATIAL_FEATURE = "android.software.xr.api.spatial"
+
+/** The colour a text node draws its text in. */
+private fun SemanticsNodeInteraction.textColor(): Color {
+    val layouts = mutableListOf<TextLayoutResult>()
+    fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+    return layouts.single().layoutInput.style.color
+}

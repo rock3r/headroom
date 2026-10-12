@@ -48,6 +48,6 @@ public class Pkce(public val verifier: String, public val challenge: String) {
 
 /**
  * The one place this module creates a [SecureRandom]. Lint's TrulyRandom check is about a PRNG
- * seeding bug on Android 4.3 and older; Headroom runs on Android 16 and later only.
+ * seeding bug on Android 4.3 and older; Headroom runs on Android 14 and later.
  */
 @Suppress("TrulyRandom") internal fun secureRandom(): SecureRandom = SecureRandom()

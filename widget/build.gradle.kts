@@ -11,6 +11,9 @@ dependencies {
     implementation(libs.remote.creation.compose)
     implementation(libs.remote.creation.core)
     implementation(libs.remote.core)
+
+    // @SdkSuppress, for the tests that play widgets in the Android 16 widget player.
+    testImplementation(libs.androidx.test.runner)
 }
 
 // Records the widget pictures used in the README into docs/screenshots/widgets.

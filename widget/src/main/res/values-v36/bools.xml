@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 16 has the widget player: see values/bools.xml. -->
+    <bool name="widgets_available">true</bool>
+</resources>

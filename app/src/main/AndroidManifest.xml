@@ -20,10 +20,15 @@
     -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!--
+        enableOnBackInvokedCallback: Android 16 shows the predictive back gesture to every app that
+        targets it, but Android 14 and 15 show it only to apps that ask for it here.
+    -->
     <application
         android:name=".HeadroomApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"

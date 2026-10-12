@@ -9,7 +9,7 @@
 | `:core:auth` | Kotlin/JVM | OAuth (PKCE, loopback redirect, device code), API keys, token refresh, token store contract |
 | `:core:data` | Android library | Room history, DataStore settings, encrypted token store, sync, reset alarms, notifications |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
-| `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
+| `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen, from Android 16 |
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
 
 Dependencies point down: `:app` → `:widget`, `:core:designsystem`, `:core:data` →
@@ -163,8 +163,7 @@ from the `ui.spatial` package. Everywhere else, including a headset's Home Space
   on the same edge of the main panel: the bottom when compact, the start otherwise
   (`navigationEdge()`).
 
-Headsets run Android 14 and the app needs Android 16, so this is tested only with Robolectric
-and the fake XR runtime (`FullSpaceTest`). Two quirks of that setup:
+The tests use Robolectric and the fake XR runtime (`FullSpaceTest`). Two quirks of that setup:
 
 - An orbiter or a panel that leaves the composition keeps its semantics under Robolectric, so
   tests check what is inside or outside the window (`APP_TAG`), or the subspace nodes, rather than

@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.os.Build
 import android.widget.RemoteViews
+import androidx.annotation.RequiresApi
 import androidx.compose.remote.creation.compose.capture.captureSingleRemoteDocument
 import androidx.compose.remote.creation.compose.capture.createCreationDisplayInfo
 import androidx.compose.remote.creation.compose.capture.createProfile
@@ -88,7 +89,10 @@ public object WidgetRenderer {
      * Wraps [document] in [RemoteViews] draw instructions. The platform player reports a tap as the
      * id of the host action that was tapped, and `RemoteViews` sends the pending intent registered
      * under that id, so each tap id gets its own click pending intent.
+     *
+     * Only Android 16 and later have a widget player that draws them.
      */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     public fun remoteViews(document: WidgetDocument): RemoteViews {
         val instructions = RemoteViews.DrawInstructions.Builder(listOf(document.bytes)).build()
         val views = RemoteViews(instructions)

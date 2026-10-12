@@ -191,6 +191,19 @@ class WidgetUpdaterTest {
     }
 
     @Test
+    @Config(sdk = [34])
+    fun `before Android 16, which has no widget player, nothing is drawn`() = runTest {
+        gateway.ids[RingsWidgetProvider::class.java] = intArrayOf(1)
+
+        updater.updateAll(context, accounts, now)
+        updater.publishPreviews(context, now)
+
+        assertTrue(rendered.isEmpty())
+        assertTrue(gateway.updated.isEmpty())
+        assertTrue(gateway.previews.isEmpty())
+    }
+
+    @Test
     fun `one layout is sent as is and several become one sized view`() {
         val small = RemoteViews(context.packageName, android.R.layout.simple_list_item_1)
         val large = RemoteViews(context.packageName, android.R.layout.simple_list_item_2)

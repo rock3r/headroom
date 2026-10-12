@@ -218,7 +218,7 @@ private fun DetailTopBar(
     sharedElements: SharedElements?,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (onBack != null) {
             IconButton(onClick = onBack) {
                 Icon(
