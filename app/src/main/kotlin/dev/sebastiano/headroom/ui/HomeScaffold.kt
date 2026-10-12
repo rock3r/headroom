@@ -19,6 +19,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -28,12 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingToolbarDefaults
-import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
@@ -43,10 +41,11 @@ import androidx.compose.material3.adaptive.layout.calculateDefaultExitTransition
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.ThreePaneScaffoldNavigator
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -66,7 +65,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
@@ -82,6 +80,11 @@ import dev.sebastiano.headroom.ui.overview.SeenValues
 import dev.sebastiano.headroom.ui.resets.AccountResets
 import dev.sebastiano.headroom.ui.resets.ResetHandlers
 import dev.sebastiano.headroom.ui.resets.ResetsScreen
+import dev.sebastiano.headroom.ui.spatial.DetailPanelContent
+import dev.sebastiano.headroom.ui.spatial.DetailPanelSlot
+import dev.sebastiano.headroom.ui.spatial.isSpatialUiEnabled
+import dev.sebastiano.headroom.ui.spatial.navigationSuiteType
+import dev.sebastiano.headroom.ui.spatial.overviewColumns
 import kotlin.math.floor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -97,6 +100,10 @@ const val REFRESH_TAG: String = "refresh"
  *
  * The Overview and Resets tabs each have their own list and detail: an account opened from the
  * Resets tab opens there, so back returns to the Resets tab.
+ *
+ * In Full Space the toolbar or the rail moves to an orbiter on the main panel (see
+ * [HomeNavigationOrbiter]), and the account detail shows in a panel of its own beside it
+ * ([detailPanel]).
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
@@ -111,6 +118,7 @@ internal fun HomeScaffold(
     onSortChange: (OverviewSort) -> Unit,
     onOpenAccounts: () -> Unit,
     onOpenSettings: () -> Unit,
+    detailPanel: DetailPanelSlot,
     /** The Stats tab, given the space to leave at the bottom for the floating toolbar. */
     stats: @Composable (bottomPadding: androidx.compose.ui.unit.Dp) -> Unit,
     modifier: Modifier = Modifier,
@@ -124,6 +132,7 @@ internal fun HomeScaffold(
     onSignInAgain: (accountId: String) -> Unit = {},
 ) {
     val width = layoutWidth()
+    val spatial = isSpatialUiEnabled()
     var tab by rememberSaveable { mutableStateOf(HomeTab.Overview) }
     val tabs = rememberTabNavigators()
     val selectTab: (HomeTab) -> Unit = { next ->
@@ -142,13 +151,13 @@ internal fun HomeScaffold(
             onSignInAgain,
             opener,
         )
-    val suiteType = width.navigationSuiteType
+    val suiteType = navigationSuiteType(width, spatial)
 
     NavigationSuiteScaffold(
         navigationItems = { HomeNavigationItems(tab, suiteType, selectTab) },
         navigationSuiteType = suiteType,
         primaryActionContent = {
-            if (width != LayoutWidth.Compact) {
+            if (suiteType != NavigationSuiteType.None) {
                 RefreshButton(
                     refreshing = home.isRefreshing,
                     onRefresh = onRefresh,
@@ -159,8 +168,8 @@ internal fun HomeScaffold(
         modifier = modifier,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            val compact = width == LayoutWidth.Compact
-            val bottomPadding = if (compact) ToolbarClearance else 0.dp
+            val toolbar = width == LayoutWidth.Compact && !spatial
+            val bottomPadding = if (toolbar) ToolbarClearance else 0.dp
             val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
             val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
             // With motion reduced, tabs and the toolbar only fade.
@@ -181,6 +190,7 @@ internal fun HomeScaffold(
                         OverviewPanes(
                             navigator = tabs.overview,
                             width = width,
+                            detailPanel = detailPanel,
                             home = home,
                             detail = detail,
                             details = details,
@@ -210,16 +220,10 @@ internal fun HomeScaffold(
                     HomeTab.Stats -> stats(bottomPadding)
                 }
             }
-            ToolbarSlot(
-                visible = compact && !tabs.showsDetailOnly(tab),
-                animate = animate,
-                modifier =
-                    Modifier.align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 16.dp),
-            ) {
+            ToolbarSlot(visible = toolbar && !tabs.showsDetailOnly(tab), animate = animate) {
                 HomeToolbar(tab, selectTab, home.isRefreshing, onRefresh)
             }
+            if (spatial) HomeNavigationOrbiter(width, tab, selectTab, home.isRefreshing, onRefresh)
         }
     }
 }
@@ -259,12 +263,14 @@ private fun rememberTabNavigators(): TabNavigators {
     return remember(overview, resets, scope) { TabNavigators(overview, resets, scope) }
 }
 
-/** The floating toolbar slides up into view, or only fades when motion is reduced. */
+/**
+ * The floating toolbar, at the bottom of the home: it slides up into view, or only fades when
+ * motion is reduced.
+ */
 @Composable
-private fun ToolbarSlot(
+private fun BoxScope.ToolbarSlot(
     visible: Boolean,
     animate: Boolean,
-    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -275,7 +281,8 @@ private fun ToolbarSlot(
         visible = visible,
         enter = if (animate) slideInVertically(spatial) { it } + fadeIn(effects) else fadeIn(fast),
         exit = if (animate) slideOutVertically(spatial) { it } + fadeOut(fast) else fadeOut(fast),
-        modifier = modifier,
+        modifier =
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp),
     ) {
         content()
     }
@@ -305,11 +312,16 @@ private fun rememberSharedElements(
     }
 }
 
+/**
+ * The Overview tab: the list of accounts and their detail. In Full Space the detail goes to
+ * [detailPanel], beside the main panel, so the list fills the main panel and only selects accounts.
+ */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 private fun OverviewPanes(
     navigator: ThreePaneScaffoldNavigator<String>,
     width: LayoutWidth,
+    detailPanel: DetailPanelSlot,
     home: HomeUiState,
     detail: DetailUiState?,
     details: DetailActions,
@@ -325,20 +337,21 @@ private fun OverviewPanes(
     onEntranceStart: () -> Unit,
     opener: AccountOpener,
 ) {
-    OpenDetailEffect(navigator, opener, onSelectAccount)
+    val spatial = isSpatialUiEnabled()
+    OpenDetailEffect(navigator.takeUnless { spatial }, opener, onSelectAccount)
     val scope = rememberCoroutineScope()
     // Outlives the cards, which leave while the detail is full screen: see SeenValues.
     val seen = remember { SeenValues() }
-    ListDetailPanes(navigator = navigator, width = width, detail = detail, details = details) {
-        shared,
-        twoPanes ->
+    val list: @Composable (SharedElements?, Boolean) -> Unit = { shared, twoPanes ->
         OverviewScreen(
             state = home,
             formatter = details.formatter,
             onRefresh = onRefresh,
             onOpenAccount = { id ->
                 onSelectAccount(id)
-                scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, id) }
+                if (!spatial) {
+                    scope.launch { navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, id) }
+                }
             },
             onNextResetAlertChange = { enabled ->
                 home.nextReset?.let { details.onAlertChange(it.accountId, it.windowId, enabled) }
@@ -348,7 +361,7 @@ private fun OverviewPanes(
             onOpenSettings = onOpenSettings,
             onSortChange = onSortChange,
             settingsReveal = settingsReveal,
-            columns = if (width == LayoutWidth.Medium) 2 else 1,
+            columns = overviewColumns(width, spatial),
             selectedAccountId = if (twoPanes) detail?.account?.id else null,
             bottomPadding = bottomPadding,
             sharedElements = shared,
@@ -359,12 +372,34 @@ private fun OverviewPanes(
             onSignInAgain = details.onSignInAgain,
         )
     }
+    if (spatial) {
+        list(null, true)
+        if (detail != null) {
+            DetailPanelContent(detailPanel) {
+                // The panel is outside the window's scaffold, which gives the window's text its
+                // colour. It takes the same one: without it, text with no colour of its own,
+                // like the account's name, would be black.
+                CompositionLocalProvider(
+                    LocalContentColor provides NavigationSuiteScaffoldDefaults.contentColor
+                ) {
+                    DetailPane(
+                        detail,
+                        details,
+                        Modifier.fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                    )
+                }
+            }
+        }
+    } else {
+        ListDetailPanes(navigator, width, detail, details, list = list)
+    }
 }
 
 /**
- * The Resets tab. Two panes show the detail beside the Overview's list with no back step, so a wide
- * Resets tab opens accounts there. One pane opens them in this tab, so back returns here, and the
- * detail grows out of the row it was opened from.
+ * The Resets tab. Two panes, and Full Space, show the detail beside the Overview's list with no
+ * back step, so there the Resets tab opens accounts in the Overview. One pane opens them in this
+ * tab, so back returns here, and the detail grows out of the row it was opened from.
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
@@ -378,7 +413,7 @@ private fun ResetsTab(
     opener: AccountOpener,
     bottomPadding: androidx.compose.ui.unit.Dp,
 ) {
-    if (width == LayoutWidth.Expanded) {
+    if (width == LayoutWidth.Expanded || isSpatialUiEnabled()) {
         ResetsScreen(
             state = home,
             formatter = details.formatter,
@@ -418,7 +453,7 @@ private fun ResetsTab(
 }
 
 /** What the account detail needs, the same from every tab that opens it. */
-private class DetailActions(
+internal class DetailActions(
     val formatter: ResetFormatter,
     val onAlertChange: (String, String, Boolean) -> Unit,
     val onChartWindowChange: (String) -> Unit,
@@ -494,7 +529,17 @@ private fun ListDetailPanes(
                 ) {
                     val current = detail ?: return@AnimatedPane
                     if (twoPanes) {
-                        DetailPane(current, details)
+                        DetailPane(
+                            current,
+                            details,
+                            // A rounded panel beside the list.
+                            modifier =
+                                Modifier.fillMaxSize()
+                                    .statusBarsPadding()
+                                    .padding(top = 8.dp, end = 12.dp, bottom = 12.dp)
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                        )
                     } else {
                         val shared = rememberSharedElements(transitionScope, this, animate)
                         DetailScreen(
@@ -514,29 +559,6 @@ private fun ListDetailPanes(
                     }
                 }
             },
-        )
-    }
-}
-
-@Composable
-private fun HomeNavigationItems(
-    tab: HomeTab,
-    suiteType: NavigationSuiteType,
-    onSelect: (HomeTab) -> Unit,
-) {
-    HomeTab.entries.forEach { item ->
-        NavigationSuiteItem(
-            selected = item == tab,
-            onClick = { onSelect(item) },
-            icon = {
-                Icon(
-                    painter = painterResource(if (item == tab) item.selectedIcon else item.icon),
-                    contentDescription = null,
-                )
-            },
-            label = { Text(stringResource(item.label)) },
-            modifier = Modifier.testTag(navigationItemTag(item)),
-            navigationSuiteType = suiteType,
         )
     }
 }
@@ -601,12 +623,13 @@ private fun rememberAccountOpener(
 /**
  * Selects the account [opener] holds and shows its detail. It must be composed with the list-detail
  * scaffold: a navigator whose scaffold is not on screen, for example while the Resets tab shows,
- * ignores the request.
+ * ignores the request. Without a [navigator], in Full Space, it only selects the account: the
+ * detail panel shows the selection.
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 private fun OpenDetailEffect(
-    navigator: ThreePaneScaffoldNavigator<String>,
+    navigator: ThreePaneScaffoldNavigator<String>?,
     opener: AccountOpener,
     onSelect: (String) -> Unit,
 ) {
@@ -615,89 +638,8 @@ private fun OpenDetailEffect(
     LaunchedEffect(accountId) {
         val pending = accountId ?: return@LaunchedEffect
         select(pending)
-        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pending)
+        navigator?.navigateTo(ListDetailPaneScaffoldRole.Detail, pending)
         opener.consume()
-    }
-}
-
-/** The expanded detail pane: a rounded panel that fades through to a newly selected account. */
-@Composable
-private fun DetailPane(
-    detail: DetailUiState,
-    details: DetailActions,
-) {
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fast = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val animate = animationsEnabled()
-    AnimatedContent(
-        targetState = detail,
-        contentKey = { it.account.id },
-        transitionSpec = {
-            if (!animate) fadeIn(fast) togetherWith fadeOut(fast)
-            else
-                (fadeIn(effects) + scaleIn(effects, initialScale = PANE_SCALE)) togetherWith
-                    fadeOut(fast)
-        },
-        modifier =
-            Modifier.fillMaxSize()
-                .statusBarsPadding()
-                .padding(top = 8.dp, end = 12.dp, bottom = 12.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow),
-        label = "detail pane",
-    ) { shown ->
-        DetailScreen(
-            state = shown,
-            formatter = details.formatter,
-            onAlertChange = details.onAlertChange,
-            onChartWindowChange = details.onChartWindowChange,
-            resets = details.resets,
-            resetHandlers = details.resetHandlers,
-            onSignInAgain = details.onSignInAgain,
-            revealResets = details.revealResetsOf == shown.account.id,
-            onRevealResets = details.onRevealResets,
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun HomeToolbar(
-    tab: HomeTab,
-    onSelect: (HomeTab) -> Unit,
-    refreshing: Boolean,
-    onRefresh: () -> Unit,
-) {
-    HorizontalFloatingToolbar(
-        expanded = true,
-        floatingActionButton = {
-            RefreshButton(refreshing = refreshing, onRefresh = onRefresh, inToolbar = true)
-        },
-        modifier = Modifier.testTag(TOOLBAR_TAG),
-    ) {
-        HomeTab.entries.forEach { item ->
-            val selected = item == tab
-            val label = stringResource(item.label)
-            IconButton(
-                onClick = { onSelect(item) },
-                colors =
-                    if (selected) {
-                        IconButtonDefaults.filledIconButtonColors()
-                    } else {
-                        IconButtonDefaults.iconButtonColors()
-                    },
-                modifier =
-                    Modifier.width(56.dp).semantics {
-                        contentDescription = label
-                        this.selected = selected
-                    },
-            ) {
-                Icon(
-                    painter = painterResource(if (selected) item.selectedIcon else item.icon),
-                    contentDescription = null,
-                )
-            }
-        }
     }
 }
 
@@ -783,4 +725,3 @@ private val ToolbarClearance = 96.dp
 private val RailItemHorizontalPadding = 20.dp
 
 private const val FADE_THROUGH_SCALE = 0.96f
-private const val PANE_SCALE = 0.98f

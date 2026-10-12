@@ -18,6 +18,13 @@ composeRuntimeAnnotation = "1.13.0-alpha01"
 material3 = "1.5.0-alpha29"
 material3Adaptive = "1.3.0"
 remoteCompose = "1.0.0-alpha20"
+# Jetpack Compose for XR: spatial panels and orbiters in Full Space on XR devices.
+xrCompose = "1.0.0-beta01"
+# The XR runtime and SceneCore versions Compose for XR is built against.
+xrRuntime = "1.0.0-beta01"
+xrSceneCore = "1.0.0-beta01"
+# The headset's XR extensions. compileOnly: the device provides them; R8 needs them to minify.
+xrExtensions = "1.3.0"
 graphicsShapes = "1.1.0"
 activity = "1.14.0-alpha03"
 lifecycle = "2.12.0-alpha04"
@@ -86,6 +93,11 @@ remote-creation-core = { module = "androidx.compose.remote:remote-creation-core"
 remote-core = { module = "androidx.compose.remote:remote-core", version.ref = "remoteCompose" }
 remote-player-view = { module = "androidx.compose.remote:remote-player-view", version.ref = "remoteCompose" }
 remote-tooling-preview = { module = "androidx.compose.remote:remote-tooling-preview", version.ref = "remoteCompose" }
+xr-compose = { module = "androidx.xr.compose:compose", version.ref = "xrCompose" }
+xr-compose-testing = { module = "androidx.xr.compose:compose-testing", version.ref = "xrCompose" }
+xr-runtime-testing = { module = "androidx.xr.runtime:runtime-testing", version.ref = "xrRuntime" }
+xr-scenecore-testing = { module = "androidx.xr.scenecore:scenecore-testing", version.ref = "xrSceneCore" }
+xr-extensions = { module = "com.android.extensions.xr:extensions-xr", version.ref = "xrExtensions" }
 
 # AndroidX
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }

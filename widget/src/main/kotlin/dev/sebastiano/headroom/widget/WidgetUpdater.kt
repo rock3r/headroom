@@ -4,9 +4,12 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.util.SizeF
 import android.widget.RemoteViews
+import androidx.annotation.ChecksSdkIntAtLeast
+import androidx.annotation.RequiresApi
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaDisplay
@@ -17,15 +20,23 @@ import kotlin.time.Instant
 /**
  * Redraws the widgets. The app calls [updateAll] after every sync and whenever [HeadroomWidgetHost]
  * asks for fresh content; widgets never read data on their own.
+ *
+ * Before Android 16 there is no widget player to draw the widgets, and their providers are off, so
+ * the updater draws nothing.
  */
 public class WidgetUpdater
 internal constructor(
     private val configStore: WidgetConfigStore,
     private val gateway: (Context) -> AppWidgetGateway = ::SystemAppWidgetGateway,
     private val render: WidgetRender = { context, state, appWidgetId, size, palette ->
-        WidgetRenderer.remoteViews(
-            WidgetRenderer.capture(context, state, appWidgetId, size, palette)
-        )
+        // updateAll and publishPreviews never get here without a widget player.
+        if (hasWidgetPlayer()) {
+            WidgetRenderer.remoteViews(
+                WidgetRenderer.capture(context, state, appWidgetId, size, palette)
+            )
+        } else {
+            error("There is no widget player before Android 16")
+        }
     },
 ) {
     public constructor(configStore: WidgetConfigStore) : this(configStore, ::SystemAppWidgetGateway)
@@ -41,6 +52,7 @@ internal constructor(
         display: QuotaDisplay = QuotaDisplay.Used,
         palette: ThemePalette = ThemePalette.Wallpaper,
     ) {
+        if (!hasWidgetPlayer()) return
         val widgets = gateway(context)
         WidgetStyle.entries.forEach { style ->
             widgets.appWidgetIds(HeadroomWidgetProvider.classFor(style)).forEach { appWidgetId ->
@@ -72,6 +84,7 @@ internal constructor(
      * this works, so call it rarely, for example once after an app update.
      */
     public suspend fun publishPreviews(context: Context, now: Instant) {
+        if (!hasWidgetPlayer()) return
         val widgets = gateway(context)
         val accounts = DemoData.accounts(now)
         WidgetStyle.entries.forEach { style ->
@@ -96,6 +109,10 @@ internal constructor(
     }
 }
 
+/** Android 16 ships the first widget player, which the widgets need: see [WidgetRenderer]. */
+@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.BAKLAVA)
+private fun hasWidgetPlayer(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
+
 internal typealias WidgetRender =
     suspend (Context, WidgetUiState, Int, WidgetSize, ThemePalette) -> RemoteViews
 
@@ -108,6 +125,8 @@ internal interface AppWidgetGateway {
     /** Shows [layouts], one per size the launcher lists for the widget. */
     fun update(appWidgetId: Int, layouts: Map<WidgetSize, RemoteViews>)
 
+    /** Publishes [views] as the picker preview of [provider]. Only widget players show it. */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     fun setPreview(provider: Class<out HeadroomWidgetProvider>, views: RemoteViews)
 }
 
@@ -123,6 +142,7 @@ internal class SystemAppWidgetGateway(private val context: Context) : AppWidgetG
         manager.updateAppWidget(appWidgetId, layouts.toRemoteViews())
     }
 
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     override fun setPreview(provider: Class<out HeadroomWidgetProvider>, views: RemoteViews) {
         manager.setWidgetPreview(
             ComponentName(context, provider),

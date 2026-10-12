@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The widgets are Remote Compose documents, and Android 16 ships the first widget player that
+        draws them. Before it the widget providers are off, so launchers do not list the widgets,
+        and the app's settings do not offer them. values-v36 turns them on.
+    -->
+    <bool name="widgets_available">false</bool>
+</resources>

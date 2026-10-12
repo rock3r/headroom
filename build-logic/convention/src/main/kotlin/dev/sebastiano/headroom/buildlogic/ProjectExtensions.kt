@@ -13,6 +13,6 @@ internal fun VersionCatalog.library(alias: String) = findLibrary(alias).get()
 internal object HeadroomSdk {
     const val COMPILE = 37
     const val TARGET = 37
-    const val MIN = 36
+    const val MIN = 34
     const val JVM_TOOLCHAIN = 21
 }

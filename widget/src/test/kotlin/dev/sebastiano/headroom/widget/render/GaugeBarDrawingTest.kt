@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.widget.render
 
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
+import android.os.Build
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.RemoteViews
@@ -15,6 +16,7 @@ import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.createBitmap
+import androidx.test.filters.SdkSuppress
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -27,6 +29,8 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+// The widget player these tests play the widgets in is Android 16 and later only.
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GaugeBarDrawingTest {
     private val context = RuntimeEnvironment.getApplication()

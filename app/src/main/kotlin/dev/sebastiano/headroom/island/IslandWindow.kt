@@ -1,8 +1,10 @@
 package dev.sebastiano.headroom.island
 
 import android.content.Context
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.RectF
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -34,13 +36,26 @@ internal fun WindowManager.measureIsland(density: Float): IslandGeometry {
     // The outline of the top cutout: the path covers every cutout, so keep the part in the rect.
     val outline =
         cutout?.cutoutPath?.let { path ->
-            val box = RectF().also { path.computeBounds(it) }
+            val box = path.bounds()
             PxRect(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
                 .takeIf { box -> rect != null && !box.isEmpty && rect.contains(box) }
         }
     val hole = cameraHole(outline, rect)
     return islandGeometry(hole, bounds.width(), bounds.height(), density)
 }
+
+/**
+ * The bounds of this path. Android 16 added the one-argument `computeBounds`; the older form
+ * ignores its `exact` argument and gives the same bounds.
+ */
+internal fun Path.bounds(): RectF =
+    RectF().also { box ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            computeBounds(box)
+        } else {
+            @Suppress("DEPRECATION") computeBounds(box, true)
+        }
+    }
 
 /** The two kinds of window the island can be drawn in. */
 internal enum class IslandWindowKind {

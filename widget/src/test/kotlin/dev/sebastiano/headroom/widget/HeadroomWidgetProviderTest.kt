@@ -8,8 +8,10 @@ import android.os.Bundle
 import android.os.Looper
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -83,6 +85,26 @@ class HeadroomWidgetProviderTest {
             assertEquals(xml, info.metaData.getInt(AppWidgetManager.META_DATA_APPWIDGET_PROVIDER))
         }
     }
+
+    @Test
+    fun `the widgets are on from Android 16`() {
+        WidgetStyle.entries.forEach { style -> assertTrue(isEnabled(style), "$style is off") }
+    }
+
+    @Test
+    @Config(sdk = [34])
+    fun `the widgets are off before Android 16, which has no widget player`() {
+        WidgetStyle.entries.forEach { style -> assertFalse(isEnabled(style), "$style is on") }
+    }
+
+    /** Whether the receiver of [style] is on, so launchers list its widget. */
+    private fun isEnabled(style: WidgetStyle): Boolean =
+        app.packageManager
+            .getReceiverInfo(
+                ComponentName(app, HeadroomWidgetProvider.classFor(style)),
+                PackageManager.MATCH_DISABLED_COMPONENTS,
+            )
+            .isEnabled
 
     @Test
     fun `provider infos allow home and lock screens and set target cells`() {
