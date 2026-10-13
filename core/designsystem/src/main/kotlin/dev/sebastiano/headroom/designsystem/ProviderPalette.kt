@@ -34,6 +34,7 @@ object ProviderPalette {
             Provider.Kimi -> 270f
             Provider.Copilot -> 305f
             Provider.JetBrains -> 350f
+            Provider.Muse -> 215f
         }
 
     fun colors(provider: Provider, primary: Color, dark: Boolean): ProviderColors {

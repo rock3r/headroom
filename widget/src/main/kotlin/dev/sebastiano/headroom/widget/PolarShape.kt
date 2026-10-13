@@ -11,6 +11,7 @@ import kotlin.math.sin
  */
 internal enum class PolarShape(val lobes: Int, val depth: Float) {
     Cookie4(lobes = 4, depth = 0.09f),
+    Cookie6(lobes = 6, depth = 0.08f),
     Cookie9(lobes = 9, depth = 0.075f),
     Cookie12(lobes = 12, depth = 0.06f),
     Clover4(lobes = 4, depth = 0.2f),

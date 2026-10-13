@@ -24,6 +24,7 @@ internal val Provider.style: ProviderStyle
             Provider.ZAi -> ProviderStyle("Z.AI", HUE_ZAI, PolarShape.Pentagon)
             Provider.OpenCodeGo -> ProviderStyle("OpenCode", HUE_OPENCODE, PolarShape.Cookie4)
             Provider.JetBrains -> ProviderStyle("JetBrains", HUE_JETBRAINS, PolarShape.Cookie9)
+            Provider.Muse -> ProviderStyle("Muse", HUE_MUSE, PolarShape.Cookie6)
         }
 
 private const val HUE_CLAUDE = 45f
@@ -34,3 +35,4 @@ private const val HUE_KIMI = 270f
 private const val HUE_ZAI = 195f
 private const val HUE_OPENCODE = 100f
 private const val HUE_JETBRAINS = 340f
+private const val HUE_MUSE = 215f

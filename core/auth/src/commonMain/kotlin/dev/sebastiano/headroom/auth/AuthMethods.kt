@@ -68,11 +68,14 @@ public class AuthMethods(
     private val codex = CodexOAuth(http, clock)
     private val copilot = CopilotDeviceAuth(http)
     private val kimi = KimiDeviceAuth(http, clock)
+    private val muse = MuseDeviceAuth(http)
     private val zCode = ZCodeAuth(http, clock)
 
     /**
-     * The refreshers of every OAuth provider. API key providers have none, so the Z.AI refresher
-     * only ever refreshes a ZCode sign-in: the API key never expires.
+     * The refreshers of every provider that can refresh. API key providers have none, and neither
+     * does Muse: Meta issues no refresh token, so its sign-in never expires on a timer and this map
+     * has no entry for it. The Z.AI refresher only ever refreshes a ZCode sign-in: the API key
+     * never expires.
      */
     public val refreshers: Map<Provider, TokenRefresher> =
         mapOf(
@@ -101,6 +104,7 @@ public class AuthMethods(
             Provider.Codex -> AuthMethod.Browser(browser(codex), offersCodePage = false)
             Provider.Copilot -> AuthMethod.DeviceCode(DeviceCodeFlow(copilot, clock))
             Provider.Kimi -> AuthMethod.DeviceCode(DeviceCodeFlow(kimi, clock))
+            Provider.Muse -> AuthMethod.DeviceCode(DeviceCodeFlow(muse, clock))
             Provider.ZAi,
             Provider.OpenCodeGo -> AuthMethod.ApiKey(provider)
         }

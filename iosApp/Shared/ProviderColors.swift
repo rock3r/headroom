@@ -25,5 +25,6 @@ struct ProviderColors {
         "kimi": 270,
         "copilot": 305,
         "jetbrains": 350,
+        "muse": 215,
     ]
 }

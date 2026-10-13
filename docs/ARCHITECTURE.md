@@ -109,6 +109,17 @@ next reset, the widgets never show them.
   `scope.model` or `scope.surface`. Rows are classified by `kind`, never by label. A row is left
   out when a flat `seven_day_<name>` key reports the same model, so nothing shows twice.
 
+### Muse usage
+
+`MuseQuotaFetcher` reads Muse subscription limits from `POST /muse-code/key` on
+`api.meta.ai`, the call the Muse CLI makes at startup. The sign-in is that CLI's device-code
+flow (`MuseDeviceAuth` in `:core:auth`): Meta issues a device client access (DCA) token and no
+refresh token, so the stored credential holds the DCA token and never expires on a timer. The
+response's `subs_usage` maps to a session window (`window`, usually five hours) and a weekly
+window (`weekly`). An account with no active subscription returns no `subs_usage` and is reported
+as `QuotaErrorKind.Access`, never as zero usage. Meta offers no banked usage-limit resets for Muse
+Code, so there is no Muse reset client; the windows' reset times drive the usual reset alerts.
+
 ## Expired sign-in
 
 An account whose sync failed with `QuotaErrorKind.Auth` has an expired sign-in
