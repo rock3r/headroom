@@ -100,6 +100,13 @@ public object DemoData {
                         length = MONTH,
                     ),
                 ),
+                state(
+                    Account("demo-muse", Provider.Muse, "sam@example.com"),
+                    "Muse Code Power Usage",
+                    now,
+                    weekly("weekly", "Weekly", 41.0, now.plus(4968.minutes)),
+                    session("five_hour", 57.0, now.plus(96.minutes)),
+                ),
             )
 
     /**

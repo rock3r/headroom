@@ -11,6 +11,7 @@ resets (experimental)" in Settings. Until then, Claude's resets are shown for in
 | Grok | Yes | Yes | |
 | Claude | Yes | Experimental, off by default | The user turns it on in Settings. Never tried with a real account. |
 | Z.AI | After a ZCode sign-in | Yes | Z.AI resets need a separate ZCode sign-in. |
+| Muse | No | No | Meta gives Muse subscriptions no banked resets to list or use. Its limits refill at their `resets_at` times, which the reset alerts already cover. |
 
 `Provider.canRedeemResets(settings)` in `:core:model` is the one place that says which providers can
 use resets. The UI and `SyncedResetProvider` both read it, with the user's current settings.

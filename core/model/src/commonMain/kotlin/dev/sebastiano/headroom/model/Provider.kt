@@ -9,7 +9,8 @@ public enum class Provider(public val id: String, public val displayName: String
     Kimi("kimi", "Kimi Code"),
     ZAi("zai", "Z.AI"),
     OpenCodeGo("opencode-go", "OpenCode Go"),
-    JetBrains("jetbrains", "JetBrains AI");
+    JetBrains("jetbrains", "JetBrains AI"),
+    Muse("muse", "Muse");
 
     /**
      * True when each window is its own allowance, like JetBrains licences and workspace seats,

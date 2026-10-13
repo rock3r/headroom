@@ -220,7 +220,10 @@ public class AuthSignInSteps(
     private val methods: AuthMethods,
     /** Where the success page's "Return to Headroom" link points. */
     private val returnUrl: String = RETURN_URL,
-    /** Brings the app back in front of the browser when a redirect cannot. */
+    /**
+     * Brings the app back in front of the browser when a redirect cannot, and when a device-code
+     * sign-in is authorized.
+     */
     private val bringAppToFront: () -> Unit = {},
 ) : SignInSteps {
     override fun kindOf(provider: Provider): SignInKind =
@@ -238,7 +241,9 @@ public class AuthSignInSteps(
     override suspend fun startDeviceCode(provider: Provider): DeviceSession {
         val method = methods.forProvider(provider) as AuthMethod.DeviceCode
         val prompt = method.flow.start()
-        return DeviceAdapter(prompt) { method.flow.awaitTokens(prompt) }
+        return DeviceAdapter(prompt, onAuthorized = bringAppToFront) {
+            method.flow.awaitTokens(prompt)
+        }
     }
 
     override fun apiKeyTokens(provider: Provider, key: String): TokenSet =
@@ -248,6 +253,7 @@ public class AuthSignInSteps(
     public suspend fun startZCode(): DeviceSession {
         val flow = methods.zCodeSignIn
         val prompt = flow.start()
+        // No onAuthorized: the ZCode caller brings the app forward itself, after it saves.
         return DeviceAdapter(prompt) { flow.awaitTokens(prompt) }
     }
 
@@ -262,15 +268,26 @@ public class AuthSignInSteps(
         override fun close() = signIn.close()
     }
 
+    /**
+     * A device-code session. The provider's page has no redirect back to the app, so once the poll
+     * is authorized [onAuthorized] brings the app in front of the browser tab, as the browser
+     * sign-in's return link and redirect do. A denied or expired code does not: the failure is
+     * shown when the user comes back.
+     */
     private class DeviceAdapter(
         prompt: DeviceCodePrompt,
+        private val onAuthorized: () -> Unit = {},
         private val await: suspend () -> TokenSet,
     ) : DeviceSession {
         override val userCode: String = prompt.userCode
         override val verificationUrl: String =
             prompt.verificationUriComplete ?: prompt.verificationUri
 
-        override suspend fun awaitTokens(): TokenSet = await()
+        override suspend fun awaitTokens(): TokenSet {
+            val tokens = await()
+            onAuthorized()
+            return tokens
+        }
     }
 
     public companion object {
