@@ -15,9 +15,11 @@ import kotlinx.serialization.json.JsonObject
  *    the browser.
  * 2. `POST /oidc/device/token/` polls with the RFC 8628 device-code grant until Meta issues a
  *    device client access (DCA) token.
- * 3. `POST https://api.meta.ai/muse-code/key` with that token names the signed-in account. It is
- *    best effort at sign-in: the quota fetcher makes the same call on every sync, so a failure here
- *    only loses the account label, never the sign-in.
+ * 3. `POST https://api.meta.ai/muse-code/key` with `{"onboard":true}` onboards the account and
+ *    names it. The onboarding body matters: it creates or attaches the subscription key, which an
+ *    account that no Muse client has signed in before does not have yet. It is still best effort at
+ *    sign-in, because the credential itself is the DCA token; the quota fetcher repeats the call
+ *    (without onboarding) on every sync.
  *
  * Meta issues no refresh token. Its token answer usually names no expiry either, and then the
  * credential never expires on a timer. When it does name one (`expires_in` or `expires_at`), it is
@@ -145,7 +147,7 @@ internal class MuseDeviceAuth(
                                     "User-Agent" to USER_AGENT,
                                     "x-api-version" to API_VERSION,
                                 ),
-                            body = EMPTY_JSON_BODY,
+                            body = ONBOARD_BODY,
                             contentType = JSON,
                         )
                     )
@@ -188,6 +190,6 @@ internal class MuseDeviceAuth(
         /** Credentials stop a little before Meta's stated end, as the OAuth sign-ins do. */
         val EXPIRY_MARGIN: Duration = 5.minutes
         private const val AUTH_HOST_NAME = "auth.meta.com"
-        private const val EMPTY_JSON_BODY = "{}"
+        private const val ONBOARD_BODY = """{"onboard":true}"""
     }
 }

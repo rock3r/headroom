@@ -52,7 +52,7 @@ class MuseQuotaFetcherTest {
         assertEquals("/muse-code/key", request.target)
         assertEquals("Bearer " + credentials().accessToken, request.headers["Authorization"])
         assertEquals("1.0.0", request.headers["x-api-version"])
-        assertEquals("{}", request.body?.utf8()?.trim())
+        assertEquals("""{"onboard":false}""", request.body?.utf8()?.trim())
         assertEquals(Provider.Muse, snapshot.provider)
         assertEquals("Muse Code Power Usage", snapshot.planLabel)
         assertEquals(listOf("five_hour", "weekly"), snapshot.windows.map { it.id })

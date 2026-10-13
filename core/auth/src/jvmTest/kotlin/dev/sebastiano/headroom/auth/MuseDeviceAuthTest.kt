@@ -145,7 +145,8 @@ class MuseDeviceAuthTest {
         assertEquals("/muse-code/key", mint.url.encodedPath)
         assertEquals("Bearer dca:token", mint.headers["Authorization"])
         assertEquals("1.0.0", mint.headers["x-api-version"])
-        assertEquals("{}", mint.body?.utf8()?.trim())
+        // The first exchange onboards the account; quota reads afterwards do not.
+        assertEquals("""{"onboard":true}""", mint.body?.utf8()?.trim())
         assertEquals(Provider.Muse, tokens.provider)
         assertEquals(CredentialKind.OAuth, tokens.kind)
         assertEquals("dca:token", tokens.accessToken)

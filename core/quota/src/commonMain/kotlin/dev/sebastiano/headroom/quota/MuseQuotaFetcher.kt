@@ -21,6 +21,9 @@ import kotlinx.serialization.json.longOrNull
  * Reads Muse subscription limits from the Muse key endpoint, the same call the Muse CLI makes at
  * startup and for its usage view.
  *
+ * The read sends `{"onboard":false}`, as the CLI's startup read does; onboarding happens once, in
+ * the sign-in's own key exchange.
+ *
  * Credentials: the device-code (DCA) token of the sign-in, sent as `Authorization: Bearer`. The
  * Muse API key the response also carries cannot read this endpoint and is never used. The answer
  * holds `subs_usage`: a rolling window (usually five hours) and a weekly window, each with the
@@ -51,7 +54,7 @@ public class MuseQuotaFetcher(
                         "User-Agent" to USER_AGENT,
                         "x-api-version" to API_VERSION,
                     ),
-                body = EMPTY_JSON_BODY,
+                body = ONBOARD_BODY,
             )
         val response =
             try {
@@ -169,7 +172,7 @@ public class MuseQuotaFetcher(
         const val WEEKLY_ID = "weekly"
         const val SESSION_LABEL = "Session"
         const val WEEKLY_LABEL = "Weekly"
-        const val EMPTY_JSON_BODY = "{}"
+        const val ONBOARD_BODY = """{"onboard":false}"""
         const val MINUTES_PER_HOUR = 60L
     }
 }
