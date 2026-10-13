@@ -17,9 +17,9 @@ import kotlinx.serialization.json.JsonObject
  *    device client access (DCA) token.
  * 3. `POST https://api.meta.ai/muse-code/key` with `{"onboard":true}` onboards the account and
  *    names it. The onboarding body matters: it creates or attaches the subscription key, which an
- *    account that no Muse client has signed in before does not have yet. It is still best effort at
- *    sign-in, because the credential itself is the DCA token; the quota fetcher repeats the call
- *    (without onboarding) on every sync.
+ *    account that no Muse client has signed in before does not have yet. If it fails, the sign-in
+ *    fails, because such an account could never be read; signing in again retries it. The quota
+ *    fetcher repeats the call (without onboarding) on every sync.
  *
  * Meta issues no refresh token. Its token answer usually names no expiry either, and then the
  * credential never expires on a timer. When it does name one (`expires_in` or `expires_at`), it is
@@ -126,41 +126,38 @@ internal class MuseDeviceAuth(
     }
 
     /**
-     * The signed-in account's label and stable id from the key call. The label is its email (under
-     * any of the field names its clients use), else its full name. The id is the stable `user_id`
-     * when Meta names one, else the email: a display name is not an identity, because two accounts
-     * can share one and one account's email can change. Both are null when the call fails. The call
-     * mints a Muse API key as a side effect; Headroom keeps nothing of it.
+     * Onboards the account with the key call and reads its label and stable id from the answer. The
+     * label is its email (under any of the field names its clients use), else its full name. The id
+     * is the stable `user_id` when Meta names one, else the email: a display name is not an
+     * identity, because two accounts can share one and one account's email can change. A failure
+     * fails the sign-in: without onboarding, an account that is new to Muse can never be read, so
+     * saving the sign-in would leave a broken account. Signing in again retries the onboarding. The
+     * call mints a Muse API key as a side effect; Headroom keeps nothing of it.
      */
-    private suspend fun accountIdentity(dcaToken: String): Pair<String?, String?> =
-        try {
-            val json =
-                http
-                    .execute(
-                        AuthHttpRequest(
-                            method = "POST",
-                            url = keyUrl,
-                            headers =
-                                mapOf(
-                                    "Accept" to JSON,
-                                    "Authorization" to "Bearer $dcaToken",
-                                    "User-Agent" to USER_AGENT,
-                                    "x-api-version" to API_VERSION,
-                                ),
-                            body = ONBOARD_BODY,
-                            contentType = JSON,
-                        )
+    private suspend fun accountIdentity(dcaToken: String): Pair<String?, String?> {
+        val json =
+            http
+                .execute(
+                    AuthHttpRequest(
+                        method = "POST",
+                        url = keyUrl,
+                        headers =
+                            mapOf(
+                                "Accept" to JSON,
+                                "Authorization" to "Bearer $dcaToken",
+                                "User-Agent" to USER_AGENT,
+                                "x-api-version" to API_VERSION,
+                            ),
+                        body = ONBOARD_BODY,
+                        contentType = JSON,
                     )
-                    .successJson("Muse account lookup")
-            val email =
-                json.string("user_email")
-                    ?: json.string("user_email_address")
-                    ?: json.string("email")
-            val label = email ?: json.string("user_full_name") ?: json.string("name")
-            label to (json.string("user_id") ?: email)
-        } catch (_: AuthException) {
-            null to null
-        }
+                )
+                .successJson("Muse account onboarding")
+        val email =
+            json.string("user_email") ?: json.string("user_email_address") ?: json.string("email")
+        val label = email ?: json.string("user_full_name") ?: json.string("name")
+        return label to (json.string("user_id") ?: email)
+    }
 
     /** The page the user approves the code on: https on `auth.meta.com`, as the CLI opens it. */
     private fun trustedVerificationUri(value: String): String {

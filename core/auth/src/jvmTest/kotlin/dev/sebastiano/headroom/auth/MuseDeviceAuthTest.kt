@@ -202,14 +202,11 @@ class MuseDeviceAuthTest {
     }
 
     @Test
-    fun `approval still works when the key call fails`() = runTest {
+    fun `a failed onboarding fails the sign-in instead of saving an unusable account`() = runTest {
         server.enqueue(MockResponse(code = 200, body = """{"access_token":"dca:token"}"""))
         server.enqueue(MockResponse(code = 500, body = """{"error":"boom"}"""))
 
-        val tokens = (muse.poll(grant()) as DevicePoll.Authorized).tokens
-
-        assertEquals("dca:token", tokens.accessToken)
-        assertNull(tokens.label)
-        assertNull(tokens.providerAccountId)
+        // Without onboarding, an account that is new to Muse could never be read.
+        assertFailsWith<AuthException> { muse.poll(grant()) }
     }
 }
