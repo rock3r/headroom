@@ -9,6 +9,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -17,12 +18,17 @@ class MuseDeviceAuthTest {
     private val server = MockWebServer()
     private lateinit var muse: MuseDeviceAuth
 
+    companion object {
+        val NOW: Instant = Instant.parse("2026-09-18T12:00:00Z")
+    }
+
     @BeforeTest
     fun setUp() {
         server.start()
         muse =
             MuseDeviceAuth(
                 http = KtorAuthHttpClient(),
+                clock = fixedClock(NOW),
                 authHost = server.url("/").toString().trimEnd('/'),
                 apiBaseUrl = server.url("/").toString().trimEnd('/'),
             )
@@ -159,7 +165,39 @@ class MuseDeviceAuthTest {
         val tokens = (muse.poll(grant()) as DevicePoll.Authorized).tokens
 
         assertEquals("Sam Meta", tokens.label)
-        assertEquals("Sam Meta", tokens.providerAccountId)
+        // A display name is not an identity: two accounts can share one.
+        assertNull(tokens.providerAccountId)
+    }
+
+    @Test
+    fun `approval prefers the stable user id for the account identity`() = runTest {
+        server.enqueue(MockResponse(code = 200, body = """{"access_token":"dca:token"}"""))
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = """{"user_id":"u-42","user_email":"sam@example.com"}""",
+            )
+        )
+
+        val tokens = (muse.poll(grant()) as DevicePoll.Authorized).tokens
+
+        assertEquals("sam@example.com", tokens.label)
+        assertEquals("u-42", tokens.providerAccountId)
+    }
+
+    @Test
+    fun `approval keeps the expiry Meta reports for the token`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body = """{"access_token":"dca:token","expires_in":3600}""",
+            )
+        )
+        server.enqueue(MockResponse(code = 200, body = """{"user_email":"sam@example.com"}"""))
+
+        val tokens = (muse.poll(grant()) as DevicePoll.Authorized).tokens
+
+        assertEquals(NOW + 3300.seconds, tokens.expiresAt)
     }
 
     @Test

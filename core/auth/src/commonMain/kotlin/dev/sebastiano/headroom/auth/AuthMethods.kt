@@ -68,7 +68,7 @@ public class AuthMethods(
     private val codex = CodexOAuth(http, clock)
     private val copilot = CopilotDeviceAuth(http)
     private val kimi = KimiDeviceAuth(http, clock)
-    private val muse = MuseDeviceAuth(http)
+    private val muse = MuseDeviceAuth(http, clock)
     private val zCode = ZCodeAuth(http, clock)
 
     /**

@@ -114,7 +114,8 @@ next reset, the widgets never show them.
 `MuseQuotaFetcher` reads Muse subscription limits from `POST /muse-code/key` on
 `api.meta.ai`, the call the Muse CLI makes at startup. The sign-in is that CLI's device-code
 flow (`MuseDeviceAuth` in `:core:auth`): Meta issues a device client access (DCA) token and no
-refresh token, so the stored credential holds the DCA token and never expires on a timer. The
+refresh token, so the stored credential holds the DCA token. It never expires on a timer unless
+Meta's token answer names an expiry, in which case the credential ends then. The
 response's `subs_usage` maps to a session window (`window`, usually five hours) and a weekly
 window (`weekly`). An account with no active subscription returns no `subs_usage` and is reported
 as `QuotaErrorKind.Access`, never as zero usage. Meta offers no banked usage-limit resets for Muse

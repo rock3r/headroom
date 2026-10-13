@@ -1,7 +1,12 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Muse sign-in: the Muse CLI's device-code flow against `auth.meta.com`, as Muse Code itself does
@@ -14,14 +19,17 @@ import kotlin.time.Duration.Companion.seconds
  *    best effort at sign-in: the quota fetcher makes the same call on every sync, so a failure here
  *    only loses the account label, never the sign-in.
  *
- * Meta issues no refresh token and does not name an expiry, so the credential never expires on a
- * timer. The stored access token is the DCA token itself: it is the only credential the quota
+ * Meta issues no refresh token. Its token answer usually names no expiry either, and then the
+ * credential never expires on a timer. When it does name one (`expires_in` or `expires_at`), it is
+ * stored, so an expired sign-in is reported as expired at once instead of failing syncs until Meta
+ * answers 401. The stored access token is the DCA token itself: it is the only credential the quota
  * endpoint accepts. The Muse API key the key call also returns is not stored, because Headroom
  * never makes model requests. When Meta revokes the DCA token the quota fetch answers 401 and the
  * account is shown as an expired sign-in.
  */
 internal class MuseDeviceAuth(
     private val http: AuthHttpClient,
+    private val clock: Clock = Clock.System,
     authHost: String = AUTH_HOST,
     apiBaseUrl: String = API_BASE_URL,
 ) : DeviceCodeSpec {
@@ -80,28 +88,47 @@ internal class MuseDeviceAuth(
             error == "access_denied" -> DevicePoll.Denied("Muse sign-in was denied")
             error != null -> throw response.rejected(context)
             !response.isSuccessful -> throw response.rejected(context)
-            else -> DevicePoll.Authorized(tokens(json.requireString("access_token", context)))
+            else ->
+                DevicePoll.Authorized(
+                    tokens(json.requireString("access_token", context), tokenExpiry(json))
+                )
         }
     }
 
+    /**
+     * When the DCA token stops working, as Meta reports it, shortened a little. Null when unstated.
+     */
+    private fun tokenExpiry(json: JsonObject): Instant? {
+        val now = clock.now()
+        json
+            .long("expires_in")
+            ?.takeIf { it > 0 }
+            ?.let {
+                return expiryWithSkew(now, it, EXPIRY_MARGIN)
+            }
+        return json.long("expires_at")?.let { Instant.fromEpochSeconds(it) - EXPIRY_MARGIN }
+    }
+
     /** The sign-in's tokens, labelled from one key call when Meta answers it. */
-    private suspend fun tokens(dcaToken: String): TokenSet {
+    private suspend fun tokens(dcaToken: String, expiresAt: Instant?): TokenSet {
         val (label, accountId) = accountIdentity(dcaToken)
         return TokenSet(
             provider = provider,
             kind = CredentialKind.OAuth,
             accessToken = dcaToken,
             refreshToken = null,
-            expiresAt = null,
+            expiresAt = expiresAt,
             providerAccountId = accountId,
             label = label,
         )
     }
 
     /**
-     * The signed-in account's label and stable id from the key call: its email when Meta names one
-     * (under any of the field names its clients use), else its full name. Both are null when the
-     * call fails. The call mints a Muse API key as a side effect; Headroom keeps nothing of it.
+     * The signed-in account's label and stable id from the key call. The label is its email (under
+     * any of the field names its clients use), else its full name. The id is the stable `user_id`
+     * when Meta names one, else the email: a display name is not an identity, because two accounts
+     * can share one and one account's email can change. Both are null when the call fails. The call
+     * mints a Muse API key as a side effect; Headroom keeps nothing of it.
      */
     private suspend fun accountIdentity(dcaToken: String): Pair<String?, String?> =
         try {
@@ -128,7 +155,7 @@ internal class MuseDeviceAuth(
                     ?: json.string("user_email_address")
                     ?: json.string("email")
             val label = email ?: json.string("user_full_name") ?: json.string("name")
-            label to (email ?: label)
+            label to (json.string("user_id") ?: email)
         } catch (_: AuthException) {
             null to null
         }
@@ -157,6 +184,9 @@ internal class MuseDeviceAuth(
         const val USER_AGENT = "muse-code/1.0.2"
         const val API_VERSION = "1.0.0"
         const val DEFAULT_INTERVAL = 5L
+
+        /** Credentials stop a little before Meta's stated end, as the OAuth sign-ins do. */
+        val EXPIRY_MARGIN: Duration = 5.minutes
         private const val AUTH_HOST_NAME = "auth.meta.com"
         private const val EMPTY_JSON_BODY = "{}"
     }
