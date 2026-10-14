@@ -39,6 +39,7 @@ public class QuotaFetchers(fetchers: List<QuotaFetcher>) {
                     ZAiQuotaFetcher(httpClient, clock),
                     OpenCodeGoQuotaFetcher(httpClient, clock),
                     JetBrainsQuotaFetcher(httpClient, clock, jetBrainsLog),
+                    MuseQuotaFetcher(httpClient, clock),
                 )
             )
     }

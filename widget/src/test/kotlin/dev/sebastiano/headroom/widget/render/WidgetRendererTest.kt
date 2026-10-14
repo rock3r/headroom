@@ -177,7 +177,7 @@ class WidgetRendererTest {
         val size = WidgetSize(280f, 110f)
         val doc = captureManyBars(size)
 
-        doc.assertText("Claude", "Codex", "+6 more", "6 more accounts. Open Headroom.")
+        doc.assertText("Claude", "Codex", "+7 more", "7 more accounts. Open Headroom.")
         doc.assertNoText("Grok")
         assertFalse(documentOperations(doc.bytes).contains(SCROLL_OPERATION))
         assertEquals(
@@ -207,6 +207,7 @@ class WidgetRendererTest {
             "Z.AI",
             "OpenCode",
             "JetBrains",
+            "Muse",
         )
         doc.assertNoText("more")
         assertContains(documentOperations(doc.bytes), SCROLL_OPERATION)
@@ -217,8 +218,8 @@ class WidgetRendererTest {
     }
 
     @Test
-    fun `sixteen bars stay within the variables the Android 16 player can hold`() = runTest {
-        // Tall enough for every row, so the document holds all sixteen.
+    fun `eighteen bars stay within the variables the Android 16 player can hold`() = runTest {
+        // Tall enough for every row, so the document holds all eighteen.
         val size = WidgetSize(280f, 600f)
         val accounts =
             DemoData.manyAccounts(now) +
@@ -236,7 +237,7 @@ class WidgetRendererTest {
         val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
 
         val operations = documentOperations(doc.bytes)
-        assertEquals(16, hostActionIds(operations).size - 1, "A tap per account and the refresh")
+        assertEquals(18, hostActionIds(operations).size - 1, "A tap per account and the refresh")
         val maxId = maxVariableId(operations)
         assertTrue(maxId < PLAYER_MAX_VARIABLES, "The document uses variable $maxId")
         WidgetRenderer.remoteViews(doc).playAt(size)
@@ -595,10 +596,10 @@ class WidgetRendererTest {
         widget.drag(xDp = 60f, fromYDp = 100f, toYDp = -100f)
         assertNull(shadowOf(app).nextStartedActivity, "A drag should not open an account")
 
-        // At the end of the list, the bottom row is JetBrains, the last account.
+        // At the end of the list, the bottom row is Muse, the last account.
         widget.tap(xDp = 60f, yDp = 86f)
         assertEquals(
-            "demo-jetbrains",
+            "demo-muse",
             shadowOf(app).nextStartedActivity?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID),
         )
 

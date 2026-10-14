@@ -25,6 +25,7 @@ class AuthMethodsTest {
                 Provider.ZAi to AuthMethod.ApiKey::class,
                 Provider.OpenCodeGo to AuthMethod.ApiKey::class,
                 Provider.JetBrains to AuthMethod.Browser::class,
+                Provider.Muse to AuthMethod.DeviceCode::class,
             ),
             kinds,
         )
@@ -55,6 +56,15 @@ class AuthMethodsTest {
             Provider.Kimi,
             assertIs<AuthMethod.DeviceCode>(methods.forProvider(Provider.Kimi)).flow.provider,
         )
+    }
+
+    @Test
+    fun `Muse signs in with a device code and cannot refresh`() {
+        assertEquals(
+            Provider.Muse,
+            assertIs<AuthMethod.DeviceCode>(methods.forProvider(Provider.Muse)).flow.provider,
+        )
+        assertFalse(Provider.Muse in methods.refreshers)
     }
 
     @Test

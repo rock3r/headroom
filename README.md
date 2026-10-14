@@ -1,7 +1,7 @@
 # Headroom
 
 Headroom is an Android app that shows how much of your AI subscription limits you have left. It
-covers Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go and JetBrains AI.
+covers Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go, JetBrains AI and Muse.
 It has home screen and lock screen widgets, and it tells you when a weekly limit resets.
 
 Headroom is free software under the [Apache License 2.0](LICENSE).
@@ -123,7 +123,7 @@ Keystore and are never backed up.
 |---|---|
 | Claude | Browser sign-in. The page returns to the app; if it cannot, paste the code the page shows. |
 | ChatGPT Codex, Grok, JetBrains AI | Browser sign-in, returning to the app. |
-| GitHub Copilot, Kimi Code | Device code: enter a short code on the provider's page. |
+| GitHub Copilot, Kimi Code, Muse | Device code: enter a short code on the provider's page. |
 | Z.AI, OpenCode Go | API key. |
 
 ## Installing
