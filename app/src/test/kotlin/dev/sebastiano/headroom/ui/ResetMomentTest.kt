@@ -10,7 +10,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
-import java.time.Duration
+import kotlin.time.Duration.Companion.days
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,7 +45,7 @@ class ResetMomentTest {
                                 snapshot.windows.map {
                                     it.copy(
                                         usedPercent = 0.0,
-                                        resetsAt = it.resetsAt?.plus(Duration.ofDays(7)),
+                                        resetsAt = it.resetsAt?.plus(7.days),
                                     )
                                 }
                         )

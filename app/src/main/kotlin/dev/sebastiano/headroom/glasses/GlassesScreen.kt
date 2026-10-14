@@ -37,8 +37,8 @@ import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.NextResetSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
-import java.time.Instant
 import kotlin.math.roundToInt
+import kotlin.time.Instant
 
 /**
  * What the glasses show: one card at a time on a black background, which the additive display draws
@@ -228,7 +228,7 @@ private fun windowLine(
     val resetsAt = window.resetsAt
     return when {
         resetsAt == null -> stringResource(R.string.glasses_window_line_no_reset, label, amount)
-        account.signInExpired && !resetsAt.isAfter(now) ->
+        account.signInExpired && resetsAt <= now ->
             stringResource(
                 R.string.glasses_window_line,
                 label,

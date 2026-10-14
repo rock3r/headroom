@@ -5,7 +5,10 @@
 - Package root: `dev.sebastiano.headroom`, then the module name.
 - JVM modules use explicit API mode: every public declaration states its visibility.
 - Keep Android types out of `:core:model`, `:core:quota` and `:core:auth`.
-- Use `java.time` for instants and durations.
+- Use `kotlin.time` (`Instant`, `Duration`, `Clock`) for instants and durations, and
+  `kotlinx-datetime` for calendar dates, times of day and time zones, so the shared code can
+  move to Kotlin Multiplatform. Android-only code that formats dates for display can convert
+  with `toJavaInstant()` at the formatter.
 - Constructor injection only. `:app` wires the object graph in `AppGraph`.
 
 ## Compose

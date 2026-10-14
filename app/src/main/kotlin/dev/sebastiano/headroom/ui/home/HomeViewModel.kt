@@ -11,10 +11,14 @@ import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.ResetPolicy
+import dev.sebastiano.headroom.model.ResetTracker
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import dev.sebastiano.headroom.model.chartSummary
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -47,7 +51,7 @@ class HomeViewModel(
     /** True once the stored accounts have been read; see [DemoModeQuotaRepository.isLoaded]. */
     private val accountsLoaded: StateFlow<Boolean>,
     resetHistory: ResetHistory,
-    tickInterval: Duration? = Duration.ofMinutes(1),
+    tickInterval: Duration? = 1.minutes,
     private val savedStateHandle: SavedStateHandle,
     /** Whether the screens show how much of each limit is used or how much is left. */
     quotaDisplay: Flow<QuotaDisplay> = flowOf(QuotaDisplay.Used),
@@ -67,7 +71,7 @@ class HomeViewModel(
             flow {
                 while (true) {
                     emit(clock())
-                    delay(tickInterval.toMillis())
+                    delay(tickInterval.inWholeMilliseconds)
                 }
             }
         }

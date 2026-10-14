@@ -3,18 +3,20 @@ package dev.sebastiano.headroom.appdata
 import app.cash.turbine.test
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
 class InMemoryAlertPreferencesTest {
-    private val weekly = window("seven_day", WindowKind.Weekly, Duration.ofDays(7))
-    private val monthly = window("premium", WindowKind.Monthly, Duration.ofDays(30))
-    private val session = window("five_hour", WindowKind.Session, Duration.ofHours(5))
+    private val weekly = window("seven_day", WindowKind.Weekly, 7.days)
+    private val monthly = window("premium", WindowKind.Monthly, 30.days)
+    private val session = window("five_hour", WindowKind.Session, 5.hours)
 
     @Test
     fun `weekly windows alert by default and monthly ones do not`() = runTest {

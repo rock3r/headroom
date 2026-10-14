@@ -3,7 +3,8 @@ package dev.sebastiano.headroom.appdata
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.Duration
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +27,7 @@ class DemoModeQuotaRepository(
     private val real: QuotaRepository,
     private val demo: QuotaRepository,
     scope: CoroutineScope,
-    private val simulatedLatency: Duration = Duration.ofMillis(DEFAULT_LATENCY_MILLIS),
+    private val simulatedLatency: Duration = DEFAULT_LATENCY_MILLIS.milliseconds,
 ) : QuotaRepository {
     val isDemo: StateFlow<Boolean> =
         real.accounts
@@ -57,7 +58,7 @@ class DemoModeQuotaRepository(
 
     override suspend fun refresh(accountId: String?) {
         if (real.accounts.value.isEmpty()) {
-            delay(simulatedLatency.toMillis())
+            delay(simulatedLatency.inWholeMilliseconds)
             demo.refresh(accountId)
         } else {
             real.refresh(accountId)

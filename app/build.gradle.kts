@@ -6,14 +6,16 @@ plugins {
     alias(libs.plugins.roborazzi)
     // Collects the licence of every dependency at build time into res/raw/aboutlibraries.json.
     alias(libs.plugins.aboutlibraries.android)
+    // Uploads the Play build and its store listing to Google Play. See docs/PLAY-STORE.md.
+    alias(libs.plugins.play.publisher)
 }
 
 android {
     namespace = "dev.sebastiano.headroom"
     defaultConfig {
         applicationId = "dev.sebastiano.headroom"
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
         // Starts the app in demo mode with a fixed clock for the end-to-end tests.
         testInstrumentationRunner = "dev.sebastiano.headroom.HeadroomTestRunner"
     }
@@ -41,7 +43,18 @@ android {
             )
             signingConfig = signingConfigs.findByName("release")
         }
+        // The Google Play build: the release build without what Play policy refuses. Its manifest
+        // in src/play drops USE_EXACT_ALARM and the reset island's accessibility service. See
+        // docs/PLAY-STORE.md.
+        create("play") {
+            initWith(getByName("release"))
+            matchingFallbacks += "release"
+        }
     }
+    // The Play build ships the release code, including what only release builds have.
+    sourceSets.getByName("play").kotlin.srcDir("src/release/kotlin")
+    // Only the Play build goes to Google Play.
+    playConfigs { register("play") { enabled.set(true) } }
     testOptions {
         managedDevices {
             localDevices {
@@ -58,6 +71,14 @@ android {
             }
         }
     }
+}
+
+// The service account key comes from the ANDROID_PUBLISHER_CREDENTIALS environment variable, so it
+// never lives in the repository. The release workflow passes the track, for example
+// `--track production`; without it the bundle goes to internal testing.
+play {
+    enabled.set(false)
+    defaultToAppBundles.set(true)
 }
 
 // Screenshots of the main screens, for the README. They are recorded, never compared in CI.

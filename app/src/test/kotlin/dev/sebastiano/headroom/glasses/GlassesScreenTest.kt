@@ -14,10 +14,11 @@ import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.NextResetSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,7 +70,7 @@ class GlassesScreenTest {
                 provider = Provider.Claude,
                 windowId = "weekly",
                 kind = WindowKind.Weekly,
-                resetsAt = now.plusSeconds(2 * 3_600),
+                resetsAt = now.plus(2.hours),
                 alertEnabled = true,
             )
     ) =
@@ -95,7 +96,7 @@ class GlassesScreenTest {
                     kind = WindowKind.Weekly,
                     usedPercent = 71.0,
                     expectedPercent = null,
-                    resetsAt = now.plusSeconds(2 * 3_600),
+                    resetsAt = now.plus(2.hours),
                     canAlert = true,
                     alertEnabled = true,
                 ),

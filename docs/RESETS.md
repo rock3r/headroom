@@ -11,6 +11,7 @@ resets (experimental)" in Settings. Until then, Claude's resets are shown for in
 | Grok | Yes | Yes | |
 | Claude | Yes | Experimental, off by default | The user turns it on in Settings. Never tried with a real account. |
 | Z.AI | After a ZCode sign-in | Yes | Z.AI resets need a separate ZCode sign-in. |
+| Muse | No | No | Meta gives Muse subscriptions no banked resets to list or use. Its limits refill at their `resets_at` times, which the reset alerts already cover. |
 
 `Provider.canRedeemResets(settings)` in `:core:model` is the one place that says which providers can
 use resets. The UI and `SyncedResetProvider` both read it, with the user's current settings.
@@ -24,12 +25,26 @@ Each sync reads an account's resets together with its usage, with the same crede
 adds the result to the snapshot (`QuotaSnapshot.resets`).
 
 - A reset read that fails never fails the sync. The snapshot sets `resetsReadFailed`, and Room
-  keeps the resets it stored last.
+  keeps the resets it stored last. Room also keeps the flag (`accounts.resetsReadFailed`, database
+  version 8), so the stored snapshot shows that its resets are older than its usage. The next sync
+  that works sets the flag again. A sync that fails leaves it as it was.
 - Room stores the resets as JSON on the account row (`accounts.resetsJson`, database version 6).
 - The screens read the resets from the stored snapshot. Opening a screen makes no network call.
 - A demo account never reaches a provider. Debug builds give the demo accounts fake resets
   (`FakeResetProvider`); release builds give them none. `RealOrDemoResetProvider` in `:app` sends
   each account to the right side.
+
+## Widgets
+
+The Bars and Rings widgets, on the home screen and the lock screen, show a small counter on an
+account that has resets it can use now. It is just the number, or "9+" above nine, in a disc in the
+colour of the account's ring or bar. Rings carry it just outside the ring, at its bottom-right, so it
+does not look like the end of the arc. Bars carry it on the bottom-right of the avatar. The Shape
+widgets show no counter.
+
+The count is `ResetAvailability.availableNow`, the same number the app shows. The counter is hidden
+when the count is zero and when the account's sign-in expired. Screen readers hear "2 resets
+available now." The widget pictures are in `docs/screenshots/widgets/widget-resets-*.png`.
 
 ## Endpoints
 
@@ -231,6 +246,109 @@ refreshed so its resets show.
 - After a reset works, `ResetCenter` waits 2 seconds (`ResetRefresh.DELAY`), then refreshes the
   account. The refill animation plays from the new usage.
 - An account whose sign-in expired shows its resets faded, with no action.
+
+## Reminders before a reset expires
+
+About a day before a reset expires unused, Headroom posts a notification on the "Reset reminders"
+channel, for example "Your ChatGPT Codex reset expires tomorrow at 06:18". The user can turn it off
+in Settings ("Remind me before a reset expires"). It is on by default.
+
+`ResetReminderPolicy` in `:core:model` makes every decision:
+
+- It reminds about the resets the user can act on: the account's sign-in works,
+  `Provider.canRedeemResets(settings)` is true, and the pool is `Ready` or `WaitingForLimit`. Each
+  expiry in `ResetPool.expiries` is one reset. Pools with no expiry dates never remind.
+- A reset is due `LEAD` (one day) before it expires, and is reminded about once.
+- The user gets at most one reminder per day. When it goes out, it lists every reset whose reminder
+  falls on that day, soonest first. A reset whose reminder falls on a day that already had one
+  moves to 09:00 the next day (`DEFERRED_TIME`), and is skipped if it expires before then.
+
+`ResetReminders` in `:core:data` runs it. After every sync and every settings change it sets one
+inexact alarm for the next check (`ResetReminderAlarm`); a reboot, an app update or a time zone change sets it again.
+The alarm starts `ResetReminderWorker`, which refreshes the accounts with due resets first, so a
+reset used on another device is left out.
+
+The worker has no network constraint, because an offline phone must still get the reminder. The
+stored resets may be stale after the refresh of an account with a due reset in two cases:
+
+- The refresh fails with `QuotaErrorKind.Network`.
+- The refresh works but cannot read the resets (`QuotaSnapshot.resetsReadFailed`). An example is a
+  Z.AI account whose usage works while the ZCode sign-in endpoint does not answer.
+
+In both cases the worker posts nothing and runs again later (`ResetReminderRetryPolicy`). It
+waits 5, 15, 30 and 60 minutes. When the retries run out, it posts from the stored resets. It also
+posts from the stored resets when the next wait would end less than 12 hours (`MIN_NOTICE`) before
+the soonest due reset of an account with stale resets expires. The resets of the other accounts
+do not count, because their refresh read them fresh. A retry does not count as a reminder, so the rule of one reminder
+per day still holds.
+
+`SharedPreferencesResetReminderLedger` stores which
+resets were reminded about and the day of the last reminder. It stores keys made of the account
+id, the pool id and the expiry time, and no token.
+
+Tapping the notification opens the detail of the soonest reset's account and scrolls its Resets
+card into view (`ResetReminderIntents`, `OpenAccountRequest.showResets`).
+
+## Reset history
+
+Headroom keeps a history of the resets that were used or expired, for the "Usage limit resets"
+card of the Stats tab.
+
+### Where it is stored
+
+- Room stores it in the `reset_events` table of `headroom.db` (database version 7), next to the
+  usage history. Like every app file, it is excluded from backup and device transfer.
+- A row holds the account id, the provider, the pool id and label, "used" or "expired", the time
+  Headroom saw it, the reset's expiry date, where a used reset was used, what it gave back, and
+  the attempt key of a redeem in Headroom. It holds no token.
+- Rows are kept for 365 days: each sync deletes older ones. Removing an account deletes its rows,
+  as it deletes its usage history.
+
+### How a reset is recorded
+
+`ResetEventDetector` in `:core:model` compares the resets a sync read with the ones stored before,
+pool by pool. Every provider lists one expiry date per reset, so a reset is matched by its date.
+
+- A reset that is gone after its expiry date counts as expired.
+- A reset that is gone before its expiry date counts as used. When the provider gives no expiry
+  date, a lower count counts as a use.
+- `ResetCenter` records a redeem that works in Headroom straight away, before it refreshes the
+  usage (`RoomResetEventLog.redeemed`). The attempt key is unique, so a retry, an `already_used`
+  answer or a "Check again" records it once. A later sync then finds its reset gone and settles the
+  redeem instead of adding a second use. The redeem settles the gone reset that expires first after
+  the redeem, because the providers use the soonest reset first.
+- A sync can store between the provider using a reset and Headroom recording the redeem. It then
+  records that reset as used elsewhere. The redeem record runs in one transaction with the syncs,
+  and takes over a use elsewhere of the same pool recorded in the last 5 minutes, so the reset
+  counts once. It keeps that row's expiry and its estimate of the usage before the reset. The
+  takeover matches by pool, not by reset, because the stored resets no longer show which reset the
+  redeem used. When a use elsewhere and a redeem in Headroom of the same pool fall within those 5
+  minutes, both still count, but their "in Headroom" and "elsewhere" labels can swap.
+- A redeem stays pending until a sync settles it, however long that takes. A first sync after days
+  offline still counts its reset once.
+- Any other use counts as a use "elsewhere", for example in Claude Code or on chatgpt.com.
+- Nothing is recorded when the resets could not be read, when Z.AI needs its ZCode sign-in, when
+  the account is outside the provider's program, or on the first read of an account.
+
+A use elsewhere in the minutes before its expiry date looks like an expiry: Headroom cannot tell
+them apart.
+
+### What a reset gave back
+
+"Gave back" is the used percent of each limit that a reset cleared, added up per kind of limit
+(`ResetGivenBack`). When a reset covers several limits of one kind, such as Claude's weekly ones,
+the highest counts. A limit that reset on its own since the usage was read counts nothing.
+
+| Reset | Measured from | Marked "about" |
+|---|---|---|
+| Used in Headroom | The usage stored at the moment of the redeem | When that usage is more than 30 minutes old |
+| Used elsewhere | The usage of the last sync before the reset was found gone | Always |
+
+The estimate for a use elsewhere can be wrong in both directions: usage may have grown after the
+last sync, and some of the limit may have been used again after the reset. When one sync finds
+several uses of one pool, only the first one gets an estimate, because the usage was close to
+zero after it. All of this was checked with unit tests and demo data only, not with real
+accounts.
 
 ## Logs
 

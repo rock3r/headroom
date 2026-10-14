@@ -25,7 +25,7 @@ import dev.sebastiano.headroom.widget.HeadroomWidgetHost
 import dev.sebastiano.headroom.widget.WidgetConfigStore
 import dev.sebastiano.headroom.widget.WidgetUpdater
 import dev.sebastiano.headroom.widgets.DataStoreWidgetConfigStore
-import java.time.Instant
+import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -170,7 +170,7 @@ open class HeadroomApplication :
      */
     internal fun drawWidgetsWithDemoData() {
         appScope.launch {
-            val now = Instant.now()
+            val now = Clock.System.now()
             widgetUpdater.updateAll(this@HeadroomApplication, DemoData.accounts(now), now)
         }
     }
@@ -182,7 +182,7 @@ open class HeadroomApplication :
      * warning goes away.
      */
     internal fun previewExpiredSignIn(clear: Boolean) {
-        val now = Instant.now()
+        val now = Clock.System.now()
         val accounts =
             if (clear) DemoData.accounts(now) else DemoData.accountsWithExpiredSignIn(now)
         graph.demoAccounts?.set(accounts)
@@ -197,7 +197,7 @@ open class HeadroomApplication :
     }
 
     private suspend fun updateWidgets(accounts: List<AccountState>, look: WidgetLook) {
-        widgetUpdater.updateAll(this, accounts, Instant.now(), look.display, look.palette)
+        widgetUpdater.updateAll(this, accounts, Clock.System.now(), look.display, look.palette)
     }
 
     private data class WidgetLook(val display: QuotaDisplay, val palette: ThemePalette)

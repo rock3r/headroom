@@ -6,7 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import dev.sebastiano.headroom.data.DataGraphOwner
-import java.time.Instant
+import kotlin.time.Instant
 
 /** Fires at a planned reset time and hands the check to [ResetCheckWorker]. */
 internal class ResetAlarmReceiver : BroadcastReceiver() {
@@ -27,8 +27,8 @@ internal class ResetAlarmReceiver : BroadcastReceiver() {
             Intent(context, ResetAlarmReceiver::class.java)
                 .putExtra(EXTRA_ACCOUNT, alarm.accountId)
                 .putExtra(EXTRA_WINDOW, alarm.windowId)
-                .putExtra(EXTRA_TRIGGER, alarm.triggerAt.toEpochMilli())
-                .putExtra(EXTRA_EXPECTED, alarm.expectedResetAt.toEpochMilli())
+                .putExtra(EXTRA_TRIGGER, alarm.triggerAt.toEpochMilliseconds())
+                .putExtra(EXTRA_EXPECTED, alarm.expectedResetAt.toEpochMilliseconds())
                 .putExtra(EXTRA_USED, alarm.usedBefore)
 
         fun alarmFrom(intent: Intent): ResetAlarm? {
@@ -37,8 +37,9 @@ internal class ResetAlarmReceiver : BroadcastReceiver() {
             return ResetAlarm(
                 accountId = account,
                 windowId = window,
-                triggerAt = Instant.ofEpochMilli(intent.getLongExtra(EXTRA_TRIGGER, 0)),
-                expectedResetAt = Instant.ofEpochMilli(intent.getLongExtra(EXTRA_EXPECTED, 0)),
+                triggerAt = Instant.fromEpochMilliseconds(intent.getLongExtra(EXTRA_TRIGGER, 0)),
+                expectedResetAt =
+                    Instant.fromEpochMilliseconds(intent.getLongExtra(EXTRA_EXPECTED, 0)),
                 usedBefore = intent.getDoubleExtra(EXTRA_USED, 0.0),
             )
         }
@@ -88,23 +89,31 @@ internal class MuteAlertReceiver : BroadcastReceiver() {
     }
 }
 
-/** Alarms do not survive a reboot or an app update; plan them again. */
+/**
+ * Alarms do not survive a reboot or an app update; plan them again. A time zone change plans them
+ * again too, because a reset reminder moved to the next morning is due at a local time.
+ */
 internal class RescheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (
-            intent.action != Intent.ACTION_BOOT_COMPLETED &&
-                intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
-        ) {
-            return
-        }
+        if (intent.action !in ACTIONS) return
         val graph = (context.applicationContext as? DataGraphOwner)?.dataGraph ?: return
         val pending = goAsync()
         graph.launchInBackground {
             try {
                 graph.rescheduleResetAlarms()
+                graph.rescheduleResetReminders()
             } finally {
                 pending.finish()
             }
         }
+    }
+
+    private companion object {
+        val ACTIONS =
+            setOf(
+                Intent.ACTION_BOOT_COMPLETED,
+                Intent.ACTION_MY_PACKAGE_REPLACED,
+                Intent.ACTION_TIMEZONE_CHANGED,
+            )
     }
 }

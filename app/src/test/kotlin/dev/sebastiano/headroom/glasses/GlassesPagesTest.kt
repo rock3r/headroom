@@ -5,9 +5,10 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.NextResetSummary
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 class GlassesPagesTest {
     private val now = Instant.parse("2026-10-10T12:00:00Z")
@@ -20,7 +21,7 @@ class GlassesPagesTest {
                 provider = Provider.Grok,
                 windowId = "weekly",
                 kind = WindowKind.Weekly,
-                resetsAt = now.plusSeconds(3_600),
+                resetsAt = now.plus(1.hours),
                 alertEnabled = true,
             )
         val grok = account("grok", Provider.Grok)

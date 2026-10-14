@@ -238,6 +238,44 @@
     <string name="stats_sparkline_description">%1$s over the last 7 days: lowest %2$d%%, highest %3$d%%, %4$d%% now</string>
     <string name="stats_sparkline_empty">No history in the last 7 days</string>
     <string name="stats_sparklines_empty">No accounts to chart yet.</string>
+    <string name="stats_reset_usage_title">Usage limit resets</string>
+    <string name="stats_reset_usage_four_weeks">4 weeks</string>
+    <string name="stats_reset_usage_three_months">3 months</string>
+    <string name="stats_reset_usage_twelve_months">12 months</string>
+    <string name="stats_reset_usage_used">used</string>
+    <string name="stats_reset_usage_expired">expired unused</string>
+    <string name="stats_reset_usage_sources">%1$s, %2$s.</string>
+    <plurals name="stats_reset_usage_in_headroom">
+        <item quantity="one">%d in Headroom</item>
+        <item quantity="other">%d in Headroom</item>
+    </plurals>
+    <plurals name="stats_reset_usage_elsewhere">
+        <item quantity="one">%d elsewhere</item>
+        <item quantity="other">%d elsewhere</item>
+    </plurals>
+    <string name="stats_reset_usage_given_back">Gave back %1$s.</string>
+    <string name="stats_reset_usage_given_back_estimated">Gave back about %1$s.</string>
+    <string name="stats_reset_usage_and">" and "</string>
+    <string name="stats_reset_usage_limit_session">%1$s times the session limit</string>
+    <string name="stats_reset_usage_limit_daily">%1$s times the daily limit</string>
+    <string name="stats_reset_usage_limit_weekly">%1$s times the weekly limit</string>
+    <string name="stats_reset_usage_limit_monthly">%1$s times the monthly limit</string>
+    <string name="stats_reset_usage_provider">%1$s, %2$s</string>
+    <plurals name="stats_reset_usage_used_count">
+        <item quantity="one">%d used</item>
+        <item quantity="other">%d used</item>
+    </plurals>
+    <plurals name="stats_reset_usage_expired_count">
+        <item quantity="one">%d expired</item>
+        <item quantity="other">%d expired</item>
+    </plurals>
+    <plurals name="stats_reset_usage_expired_unused_count">
+        <item quantity="one">%d expired unused</item>
+        <item quantity="other">%d expired unused</item>
+    </plurals>
+    <string name="stats_reset_usage_description">Usage limit resets in the last %1$s: %2$s, %3$s.</string>
+    <string name="stats_reset_usage_empty">No resets were used or expired in this period.</string>
+    <string name="stats_reset_usage_note">A reset counts as used when it is gone before its expiry date. \"Gave back\" adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.</string>
 
     <!-- Widgets -->
     <string name="widget_rings_title">Rings · 2×2</string>
@@ -289,6 +327,8 @@
     <string name="settings_reset_island">Reset island (experimental)</string>
     <string name="settings_reset_island_body">A small black pill grows out of your camera cutout when a limit resets while Headroom is in the background.</string>
     <string name="settings_resets">Resets</string>
+    <string name="settings_reset_expiry_reminders">Remind me before a reset expires</string>
+    <string name="settings_reset_expiry_reminders_body">A notification about a day before a reset you can use expires. At most one a day, for every reset that expires soon.</string>
     <string name="settings_redeem_claude_resets">Redeem Claude resets (experimental)</string>
     <string name="settings_redeem_claude_resets_body">Use Claude\'s saved resets from Headroom. Claude has not published this API, so it may fail or stop working.</string>
     <string name="settings_reset_island_off">Off</string>
@@ -320,6 +360,9 @@
     <string name="island_setup_overlay_limit_place">The status bar icons can show on top of the pill where they meet it.</string>
     <string name="island_setup_overlay_limit_lock">It does not show on the lock screen. A reset that arrives while the phone is locked uses a normal pop-up notification.</string>
     <string name="island_setup_overlay_limit_tap">You can tap it to open Headroom, or swipe it up to hide it.</string>
+    <string name="island_setup_overlay_only_why_title">Why it needs a permission</string>
+    <string name="island_setup_overlay_only_why_body">Headroom draws the pill with the Display over other apps permission, and uses it for nothing else.</string>
+    <string name="island_setup_overlay_only_not_body">It does not read your screen. It does not read other apps. It only draws the pill when a limit resets.</string>
     <string name="island_setup_overlay_button">Allow display over other apps</string>
     <string name="island_setup_done_body">It will show up when a limit resets and Headroom is in the background. You can turn the service off in accessibility settings at any time.</string>
     <string name="island_setup_done_body_overlay">It grows out of the camera when a limit resets and Headroom is in the background. It does not show on the lock screen. You can take the permission away in Settings at any time.</string>

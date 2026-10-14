@@ -18,12 +18,14 @@ import androidx.compose.remote.creation.compose.modifier.height
 import androidx.compose.remote.creation.compose.modifier.padding
 import androidx.compose.remote.creation.compose.modifier.semantics
 import androidx.compose.remote.creation.compose.modifier.width
+import androidx.compose.remote.creation.compose.state.RemoteString
 import androidx.compose.remote.creation.compose.state.RemoteTextUnit
 import androidx.compose.remote.creation.compose.state.rc
 import androidx.compose.remote.creation.compose.state.rememberMutableRemoteBoolean
 import androidx.compose.remote.creation.compose.state.rf
 import androidx.compose.remote.creation.compose.state.rs
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import dev.sebastiano.headroom.widget.Gauge
 import dev.sebastiano.headroom.widget.WidgetUiState
@@ -89,6 +91,9 @@ internal fun SingleRingWidget(
             RemoteModifier.fillMaxSize()
         }
 
+    val counter =
+        render.counterStyle(gauge, render.pxValue(HERO_COUNTER), render.pxValue(HERO_COUNTER_TEXT))
+
     WidgetCard(render, modifier) {
         RemoteBox(
             modifier = ringModifier.semantics { contentDescription = description.rs },
@@ -110,6 +115,9 @@ internal fun SingleRingWidget(
                         track = colors.track.rc,
                     )
                 }
+                if (gauge.resetsAvailable > 0) {
+                    drawRingCounter(gauge.resetsAvailable, HeroOuter, counter)
+                }
             }
             RemoteColumn(horizontalAlignment = RemoteAlignment.CenterHorizontally) {
                 WidgetText(
@@ -121,29 +129,47 @@ internal fun SingleRingWidget(
                             contentDescription = strings.openAction(gauge.name, gauge.stale).rs
                         },
                 )
-                val bigPx = render.textPx(BIG)
-                val labelPx = render.textPx(LABEL)
-                RemoteBox(
-                    RemoteModifier.width(render.px(NUMBER_BOX_WIDTH))
-                        .height((bigPx * NUMBER_LINE + labelPx * LABEL_LINE).rf)
-                ) {
-                    RemoteCanvas(RemoteModifier.fillMaxSize()) {
-                        with(RestrictedRemoteApis) {
-                            drawCentredText(
-                                number,
-                                width / 2f.rf,
-                                (bigPx * NUMBER_LINE / 2f).rf,
-                                textPaint(colors.onSurface, bigPx, bold = true),
-                            )
-                            drawCentredText(
-                                word,
-                                width / 2f.rf,
-                                (bigPx * NUMBER_LINE + labelPx * LABEL_LINE / 2f).rf,
-                                textPaint(wordColor, labelPx, bold = true),
-                            )
-                        }
-                    }
-                }
+                RingNumber(number, word, colors.onSurface, wordColor, render)
+            }
+        }
+    }
+}
+
+/**
+ * The big number and the word under it, drawn on a canvas because they change when the ring flips,
+ * see [RestrictedRemoteApis].
+ */
+@RemoteComposable
+@Composable
+private fun RingNumber(
+    number: RemoteString,
+    word: RemoteString,
+    numberColor: Color,
+    wordColor: Color,
+    render: RenderContext,
+    modifier: RemoteModifier = RemoteModifier,
+) {
+    val bigPx = render.textPx(BIG)
+    val labelPx = render.textPx(LABEL)
+    RemoteBox(
+        modifier
+            .width(render.px(NUMBER_BOX_WIDTH))
+            .height((bigPx * NUMBER_LINE + labelPx * LABEL_LINE).rf)
+    ) {
+        RemoteCanvas(RemoteModifier.fillMaxSize()) {
+            with(RestrictedRemoteApis) {
+                drawCentredText(
+                    number,
+                    width / 2f.rf,
+                    (bigPx * NUMBER_LINE / 2f).rf,
+                    textPaint(numberColor, bigPx, bold = true),
+                )
+                drawCentredText(
+                    word,
+                    width / 2f.rf,
+                    (bigPx * NUMBER_LINE + labelPx * LABEL_LINE / 2f).rf,
+                    textPaint(wordColor, labelPx, bold = true),
+                )
             }
         }
     }
@@ -215,8 +241,17 @@ private fun SmallRing(
     modifier: RemoteModifier = RemoteModifier,
 ) {
     val colors = render.colorsFor(gauge)
+    val counter =
+        render.counterStyle(
+            gauge,
+            render.pxValue(SMALL_COUNTER),
+            render.pxValue(SMALL_COUNTER_TEXT),
+        )
+    val signIn =
+        render.signInBadgeStyle(render.pxValue(SIGN_IN_BADGE), render.pxValue(SIGN_IN_BADGE_TEXT))
+    // Inside the cell's tap area, so the gap between rows still opens the account.
     RemoteColumn(
-        modifier = modifier,
+        modifier = modifier.padding(vertical = render.px(SMALL_CELL_GAP / 2f)),
         verticalArrangement = RemoteArrangement.Center,
         horizontalAlignment = RemoteAlignment.CenterHorizontally,
     ) {
@@ -231,21 +266,42 @@ private fun SmallRing(
                     active = colors.accent(gauge.provider).rc,
                     track = colors.track.rc,
                 )
+                if (gauge.resetsAvailable > 0) {
+                    drawRingCounter(gauge.resetsAvailable, SmallRing, counter)
+                }
+                if (gauge.stale) drawSignInBadge(signIn)
             }
-            WidgetText(
-                text = gauge.shownPercent.toString(),
-                color = colors.onSurface,
-                fontSize = render.sp(SMALL_NUMBER),
-                fontWeight = FontWeight.ExtraBold,
-            )
+            // A stale ring shows a "!" badge where its number would be: only the name goes under
+            // a ring. Its faded arc still shows the last usage.
+            if (!gauge.stale) {
+                WidgetText(
+                    text = gauge.shownPercent.toString(),
+                    color = colors.onSurface,
+                    fontSize = render.sp(SMALL_NUMBER),
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
         }
         WidgetText(
             gauge.name,
             colors.onSurfaceVariant,
             render.sp(SMALL_NAME),
+            modifier = RemoteModifier.padding(top = render.px(NAME_GAP)),
             fontWeight = FontWeight.SemiBold,
         )
-        if (gauge.stale) SignInLabel(render, render.sp(SMALL_NAME))
+    }
+}
+
+/**
+ * The "!" badge of a gauge whose sign-in expired, on its own, for a layout that is not a canvas.
+ */
+@RemoteComposable
+@Composable
+internal fun SignInBadge(render: RenderContext, modifier: RemoteModifier = RemoteModifier) {
+    val radius = render.pxValue(SIGN_IN_BADGE)
+    val style = render.signInBadgeStyle(radius, render.pxValue(SIGN_IN_BADGE_TEXT))
+    RemoteBox(modifier.width((radius * 2f).rf).height((radius * 2f).rf)) {
+        RemoteCanvas(RemoteModifier.fillMaxSize()) { drawSignInBadge(style) }
     }
 }
 
@@ -267,3 +323,13 @@ private const val SMALL_NAME = 9.5f
 private const val NUMBER_BOX_WIDTH = 110f
 private const val NUMBER_LINE = 1.15f
 private const val LABEL_LINE = 1.4f
+private const val HERO_COUNTER = 10f
+private const val HERO_COUNTER_TEXT = 12f
+private const val SMALL_COUNTER = 7f
+/** Space between a small ring and the name under it. */
+internal const val NAME_GAP = 4f
+internal const val SIGN_IN_BADGE = 9f
+internal const val SIGN_IN_BADGE_TEXT = 13f
+/** Space between the rows of the ring grid. */
+private const val SMALL_CELL_GAP = 8f
+private const val SMALL_COUNTER_TEXT = 9f

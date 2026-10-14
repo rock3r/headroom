@@ -7,9 +7,9 @@ import dev.sebastiano.headroom.prototype.ScenarioAccounts
 import dev.sebastiano.headroom.ui.home.toSummary
 import dev.sebastiano.headroom.ui.resets.affectedWindows
 import dev.sebastiano.headroom.ui.resets.sheetWindows
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Instant
 
 class AffectedWindowsTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")

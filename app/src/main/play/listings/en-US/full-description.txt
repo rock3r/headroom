@@ -1,0 +1,39 @@
+Headroom shows how much of your AI subscription limits you have left, for every plan you pay for, in one place. Stop guessing whether you can finish the task before the weekly limit runs out.
+
+Headroom works with Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go and JetBrains AI.
+
+<b>One overview for every subscription</b>
+Each account shows its weekly or monthly usage, its session usage, and when each limit resets. A big countdown at the top tells you which limit resets next.
+
+<b>Pace, not just percent</b>
+A tick on each bar shows where you would be if you spread the limit evenly over the week. Headroom tells you how many points you are over or under that pace, draws the week to scale, and says when you would reach 100% at your current rate. Bars turn wavy only when an account needs your attention.
+
+<b>Reset alerts and reminders</b>
+Get a notification when a weekly limit really resets, so you know when you can get back to work. Headroom also reminds you about a day before a usage-limit reset you can redeem expires, so none go to waste.
+
+<b>Usage limit resets</b>
+Some providers hand out resets that refill a limit early. Headroom lists the ones each account has, with when they expire, and lets you use Codex, Grok and Z.AI resets from the app.
+
+<b>Widgets for the home and lock screen</b>
+Four widget styles, Rings, Bars, Shape and Countdown, each with its own accounts, window and colours. A Quick Settings tile shows the next reset or the quota closest to its limit.
+
+<b>Stats from your own history</b>
+See how many resets came without hitting the limit, which service does most of your work, the hours you burn the most quota, and a 7-day line for each account.
+
+<b>Made for Android 16</b>
+Material 3 Expressive design, colours from your wallpaper or one of eight palettes, light and dark themes, reduced motion, and adaptive layouts that put the list and the detail side by side on tablets and foldables.
+
+<b>Private by design</b>
+• No ads, no analytics, no tracking.
+• Headroom talks only to the services you sign in to. There is no Headroom server.
+• Sign-in tokens are encrypted with the Android Keystore and never leave your device or get backed up.
+• Usage history stays on your phone.
+• Free and open source under the Apache License 2.0.
+
+<b>Try it without an account</b>
+Headroom opens with clearly labelled demo data, so you can explore every screen before you sign in.
+
+<b>Signing in</b>
+Each service signs in the same way its own tools do: a browser sign-in, a short device code, or an API key, depending on the service.
+
+Headroom is an independent app. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, GitHub, Microsoft, xAI, Zhipu AI, Moonshot AI, SST or JetBrains. All product names and logos are trademarks of their owners and are used only to show which service an account belongs to. Headroom reads usage information that the services do not officially document, so a service can change it at any time.

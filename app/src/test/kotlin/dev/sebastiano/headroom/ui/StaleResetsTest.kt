@@ -10,7 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.DemoData
-import java.time.Duration
+import kotlin.time.Duration.Companion.hours
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,7 +25,7 @@ class StaleResetsTest {
     @Test
     fun `a reset that has already passed is not listed as upcoming`() {
         // A snapshot from 16 hours ago: Grok's weekly reset (15h 28m after it) has passed.
-        val stale = DemoData.accounts(FIXED_NOW.minus(Duration.ofHours(16)))
+        val stale = DemoData.accounts(FIXED_NOW.minus(16.hours))
         rule.setContent {
             HeadroomTheme(dynamicColor = false) {
                 HeadroomApp(graph = testGraph(rule.activity, realAccounts = stale))

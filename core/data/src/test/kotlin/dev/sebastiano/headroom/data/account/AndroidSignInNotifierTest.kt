@@ -8,12 +8,12 @@ import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.data.SignInIntents
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaErrorKind
-import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf

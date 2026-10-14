@@ -6,6 +6,6 @@
         it. It is ignored for the one file that creates the SecureRandom, and nowhere else.
     -->
     <issue id="TrulyRandom">
-        <ignore path="src/main/kotlin/dev/sebastiano/headroom/auth/Pkce.kt" />
+        <ignore path="src/jvmMain/kotlin/dev/sebastiano/headroom/auth/SecureRandom.jvm.kt" />
     </issue>
 </lint>

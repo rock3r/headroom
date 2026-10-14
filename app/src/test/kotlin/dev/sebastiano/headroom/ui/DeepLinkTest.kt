@@ -14,6 +14,7 @@ import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.MainActivity
 import dev.sebastiano.headroom.TestHeadroomApplication
+import dev.sebastiano.headroom.data.ResetReminderIntents
 import dev.sebastiano.headroom.data.SignInIntents
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
@@ -56,6 +57,16 @@ class DeepLinkTest {
         )
         rule.onNodeWithTag(ACCOUNTS_TAG).assertIsDisplayed()
         rule.onNodeWithText("Sign in to Claude again").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a reset reminder opens that account's detail`() {
+        launch(
+            Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+                .putExtra(ResetReminderIntents.EXTRA_ACCOUNT_ID, "demo-codex")
+        )
+        rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
+        rule.onNodeWithText("Pro · sam@example.com").assertIsDisplayed()
     }
 
     @Test

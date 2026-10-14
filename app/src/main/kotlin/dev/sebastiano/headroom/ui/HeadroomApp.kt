@@ -46,10 +46,10 @@ import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.island.ResetIslandAccess
+import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.tile.TileAddResult
-import dev.sebastiano.headroom.tile.TileSubtitleMode
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
 import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
@@ -65,7 +65,7 @@ import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
 import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
-import dev.sebastiano.headroom.ui.stats.StatsScreen
+import dev.sebastiano.headroom.ui.stats.StatsTab
 import dev.sebastiano.headroom.ui.stats.StatsViewModel
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
@@ -83,6 +83,8 @@ fun HeadroomApp(
     modifier: Modifier = Modifier,
     openAccountRequest: OpenAccountRequest? = null,
     onConsumeOpenAccount: () -> Unit = {},
+    openTileSettingsRequest: Long? = null,
+    onConsumeOpenTileSettings: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(factory = graph.homeViewModelFactory),
     accountsViewModel: AccountsViewModel = viewModel(factory = graph.accountsViewModelFactory),
     settingsViewModel: SettingsViewModel = viewModel(factory = graph.settingsViewModelFactory),
@@ -121,6 +123,8 @@ fun HeadroomApp(
         if (next == Page.Accounts) accountsFromSettings = true
         page = next
     }
+    val tileScroll =
+        rememberTileScroll(openTileSettingsRequest, onConsumeOpenTileSettings, requests, openPage)
     // Made once: this composable recomposes whenever the pages settle, for example as Settings'
     // reveal ends. New callbacks then would compose every row of Settings again.
     val settingsActions =
@@ -145,7 +149,8 @@ fun HeadroomApp(
         ) { current, reveal ->
             when (current) {
                 Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
-                Page.Settings -> SettingsPage(graph, settings, home, settingsActions, reveal)
+                Page.Settings ->
+                    SettingsPage(graph, settings, home, settingsActions, reveal, tileScroll)
                 Page.Prototypes ->
                     PrototypesPage(graph, home, formatter, onBack = { page = Page.Settings })
                 Page.Licences -> LicencesScreen(onBack = { page = Page.Settings })
@@ -180,11 +185,7 @@ fun HeadroomApp(
                         },
                         resets = resets,
                         resetHandlers = sheet.handlers(),
-                        stats = { bottomPadding ->
-                            // Collected only while the tab shows: no stats work off screen.
-                            val stats by statsViewModel.state.collectAsStateWithLifecycle()
-                            StatsScreen(stats, formatter, bottomPadding = bottomPadding)
-                        },
+                        stats = { StatsTab(statsViewModel.state, formatter, bottomPadding = it) },
                     )
             }
         }
@@ -205,6 +206,7 @@ private fun SettingsPage(
     home: HomeUiState,
     actions: SettingsActions,
     reveal: PageReveal,
+    tileScroll: TileScroll,
 ) {
     var tileStatus by rememberSaveable { mutableStateOf<TileAddResult?>(null) }
     val tileSubtitle = graph.tileSettings?.subtitle?.collectAsStateWithLifecycle()?.value
@@ -227,7 +229,41 @@ private fun SettingsPage(
         tileStatus = tileStatus,
         tileSubtitle = tileSubtitle ?: TileSubtitleMode.NextReset,
         debugEntry = debugEntry,
+        scrollToTile = tileScroll.pending,
+        onScrollToTileFinish = { tileScroll.pending = false },
     )
+}
+
+/** Whether Settings still has to scroll to the Quick Settings tile's rows. */
+@Stable
+private class TileScroll {
+    var pending by mutableStateOf(false)
+}
+
+/**
+ * Handles a long press on the Quick Settings tile, by [request] serial: [onOpenPage] shows
+ * Settings, the returned [TileScroll] asks it to scroll to the tile's rows, and [onConsume] tells
+ * the host to clear the request. The long press wins over an earlier widget tap in [pending], like
+ * the user's own taps.
+ */
+@Composable
+private fun rememberTileScroll(
+    request: Long?,
+    onConsume: () -> Unit,
+    pending: PendingRequest,
+    onOpenPage: (Page) -> Unit,
+): TileScroll {
+    val scroll = remember { TileScroll() }
+    var handled by remember { mutableStateOf<Long?>(null) }
+    SideEffect {
+        if (request == null || request == handled) return@SideEffect
+        handled = request
+        pending.drop()
+        onOpenPage(Page.Settings)
+        scroll.pending = true
+        onConsume()
+    }
+    return scroll
 }
 
 private const val ENTER_SCALE = 0.96f
@@ -435,6 +471,7 @@ private fun settingsActions(
         onResetConfettiChange = viewModel::setResetConfetti,
         onResetIslandChange = viewModel::setResetIsland,
         onRedeemClaudeResetsChange = viewModel::setRedeemClaudeResets,
+        onResetExpiryRemindersChange = viewModel::setResetExpiryReminders,
         onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
         onRefreshResetIsland = resetIsland::refresh,
         onOpenPrototypes = { onNavigate(Page.Prototypes) },

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The Google Play build. Play allows USE_EXACT_ALARM only for alarm clock and calendar apps, and
+    the Accessibility API only for accessibility tools. Reset alerts use SCHEDULE_EXACT_ALARM
+    instead, which falls back to an inexact alarm until the user allows it, and the reset island
+    uses Display over other apps only. See docs/PLAY-STORE.md.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.USE_EXACT_ALARM"
+        tools:node="remove" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application>
+        <service
+            android:name=".island.ResetIslandService"
+            tools:node="remove" />
+    </application>
+</manifest>
