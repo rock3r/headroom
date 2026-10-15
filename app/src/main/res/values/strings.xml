@@ -188,8 +188,8 @@
     <string name="stats_subtitle_none">No history yet. It builds up with every sync.</string>
     <string name="stats_subtitle_demo">Example stats from demo data</string>
     <string name="stats_loading">Reading your history</string>
-    <string name="stats_scope_note">Each account counts its main limit: the weekly one, or the longest.</string>
-    <string name="stats_resets_title">Clean resets</string>
+    <string name="stats_scope_note">Statistics use each account\'s weekly limit, or its longest limit period if it has no weekly limit.</string>
+    <string name="stats_resets_title">Resets without reaching the limit</string>
     <string name="stats_resets_count">%1$d of %2$d</string>
     <string name="stats_resets_body">resets came without hitting the limit</string>
     <string name="stats_resets_streak">in a row</string>
@@ -199,13 +199,13 @@
         <item quantity="other">%1$d of %2$d resets came without hitting the limit. Current streak: %3$d.</item>
     </plurals>
     <string name="stats_resets_empty">No resets recorded yet. This fills in once a limit resets.</string>
-    <string name="stats_shares_title">Who works hardest</string>
-    <string name="stats_shares_headline">%1$s does %2$d%% of the work</string>
-    <string name="stats_shares_note">Share of all the quota burned, in percentage points of each limit.</string>
-    <string name="stats_shares_description">Share of the quota burned: %1$s</string>
-    <string name="stats_shares_empty">Nothing burned yet. This fills in after a few syncs.</string>
+    <string name="stats_shares_title">Usage by provider</string>
+    <string name="stats_shares_headline">%1$s accounts for %2$d%% of quota use</string>
+    <string name="stats_shares_note">Share of quota use, in percentage points of each limit.</string>
+    <string name="stats_shares_description">Share of quota use: %1$s</string>
+    <string name="stats_shares_empty">No quota use recorded yet. Usage appears after a few updates.</string>
     <string name="stats_share_item">%1$s %2$d%%</string>
-    <string name="stats_heatmap_title">When you burn quota</string>
+    <string name="stats_heatmap_title">When you use quota</string>
     <string name="stats_heatmap_busiest">Busiest on %1$s around %2$s</string>
     <string name="stats_heatmap_note">Local time, all accounts together. Darker means more quota used.</string>
     <string name="stats_heatmap_description">Quota use by day and hour, in local time. Busiest on %1$s around %2$s. By day: %3$s.</string>
@@ -214,25 +214,25 @@
         <item quantity="one">Needs a week of history. %d day so far.</item>
         <item quantity="other">Needs a week of history. %d days so far.</item>
     </plurals>
-    <string name="stats_persona_early_bird">Early bird</string>
-    <string name="stats_persona_nine_to_five">Nine to five</string>
-    <string name="stats_persona_evening">Evening hacker</string>
-    <string name="stats_persona_night_owl">Night owl</string>
-    <string name="stats_persona_weekend">Weekend warrior</string>
-    <string name="stats_closest_title">Closest call</string>
+    <string name="stats_persona_early_bird">Early mornings</string>
+    <string name="stats_persona_nine_to_five">Workday hours</string>
+    <string name="stats_persona_evening">Evenings</string>
+    <string name="stats_persona_night_owl">Late nights</string>
+    <string name="stats_persona_weekend">Weekends</string>
+    <string name="stats_closest_title">Highest use below the limit</string>
     <string name="stats_closest_body">%1$s reached %2$d%% on %3$s, then the limit reset.</string>
     <string name="stats_closest_empty">Appears once a limit resets.</string>
-    <string name="stats_closest_all_hits">Every recorded reset hit the limit. No close calls, only direct hits.</string>
+    <string name="stats_closest_all_hits">Usage reached the limit before every recorded reset.</string>
     <string name="stats_biggest_title">Biggest day</string>
     <string name="stats_biggest_body">%1$s used %2$d%% of its limit in one day, on %3$s.</string>
     <string name="stats_biggest_empty">No busy days yet. This fills in after a few syncs.</string>
-    <string name="stats_leftover_title">Left on the table</string>
+    <string name="stats_leftover_title">Unused quota at reset</string>
     <plurals name="stats_leftover_body">
         <item quantity="one">left unused, on average, when a limit reset. From %d reset.</item>
         <item quantity="other">left unused, on average, when a limit reset. From %d resets.</item>
     </plurals>
     <string name="stats_leftover_description">On average, %1$d%% of each limit was left unused at reset. %2$s.</string>
-    <string name="stats_leftover_empty">No resets yet, so nothing was left on the table.</string>
+    <string name="stats_leftover_empty">No resets recorded yet. Unused quota appears after the first reset.</string>
     <string name="stats_sparklines_title">Last 7 days</string>
     <string name="stats_sparklines_note">Drops are resets.</string>
     <string name="stats_sparkline_description">%1$s over the last 7 days: lowest %2$d%%, highest %3$d%%, %4$d%% now</string>
@@ -253,8 +253,8 @@
         <item quantity="one">%d elsewhere</item>
         <item quantity="other">%d elsewhere</item>
     </plurals>
-    <string name="stats_reset_usage_given_back">Gave back %1$s.</string>
-    <string name="stats_reset_usage_given_back_estimated">Gave back about %1$s.</string>
+    <string name="stats_reset_usage_given_back">Restored quota equal to %1$s.</string>
+    <string name="stats_reset_usage_given_back_estimated">Restored quota equal to about %1$s.</string>
     <string name="stats_reset_usage_and">" and "</string>
     <string name="stats_reset_usage_limit_session">%1$s times the session limit</string>
     <string name="stats_reset_usage_limit_daily">%1$s times the daily limit</string>
@@ -275,7 +275,7 @@
     </plurals>
     <string name="stats_reset_usage_description">Usage limit resets in the last %1$s: %2$s, %3$s.</string>
     <string name="stats_reset_usage_empty">No resets were used or expired in this period.</string>
-    <string name="stats_reset_usage_note">A reset counts as used when it is gone before its expiry date. \"Gave back\" adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.</string>
+    <string name="stats_reset_usage_note">A reset counts as used when it is gone before its expiry date. Restored quota adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.</string>
 
     <!-- Widgets -->
     <string name="widget_rings_title">Rings · 2×2</string>
@@ -323,7 +323,7 @@
     <string name="settings_try_reset_confetti">Try the reset confetti</string>
     <string name="settings_reset_confetti">Reset confetti</string>
     <string name="settings_reset_confetti_body">Confetti bursts from an account when its limit resets while the app is open.</string>
-    <string name="settings_delights_reduced">Neither plays while motion is reduced.</string>
+    <string name="settings_delights_reduced">Refresh shimmer and reset confetti do not play while motion is reduced.</string>
     <string name="settings_reset_island">Reset island (experimental)</string>
     <string name="settings_reset_island_body">A small black pill grows out of your camera cutout when a limit resets while Headroom is in the background.</string>
     <string name="settings_resets">Resets</string>

@@ -24,14 +24,14 @@ struct HighlightsRow: View {
     }
 
     private var closest: some View {
-        Highlight(title: "Closest call", account: closestCall?.account,
+        Highlight(title: "Highest use below the limit", account: closestCall?.account,
                   value: closestCall.map { Int($0.peak.rounded()) },
                   sentence: closestCall.map { call in
                       let date = Date(epochSeconds: call.peakAtEpochSeconds).formatted(.dateTime.month().day())
                       return String(localized: "\(call.account.name) reached \(Int(call.peak.rounded()))% on \(date), then the limit reset.")
                   },
                   empty: allHits
-                      ? "Every recorded reset hit the limit. No close calls, only direct hits."
+                      ? "Usage reached the limit before every recorded reset."
                       : "Appears once a limit resets.")
     }
 

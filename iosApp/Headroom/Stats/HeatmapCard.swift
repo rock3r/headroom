@@ -7,7 +7,7 @@ struct HeatmapCard: View {
     let coverageDays: Int?
 
     var body: some View {
-        StatCard(title: "When you burn quota", empty: heatmap == nil ? empty : nil) {
+        StatCard(title: "When you use quota", empty: heatmap == nil ? empty : nil) {
             if let heatmap {
                 HStack {
                     Text("Busiest on \(Self.dayName(Int(heatmap.busiestDay))) around \(Self.hourName(Int(heatmap.busiestHour)))")

@@ -2,7 +2,7 @@ Headroom: your AI limits, at a glance.
 
 Headroom is a free, open source Android app that shows how much of your AI subscription limits you have left: Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go and JetBrains AI, all on one screen.
 
-• Pace, not just percent: a tick on every bar shows where an even pace would put you, and a bar turns wavy when you're burning through it too fast.
+• Usage rate and forecasts: a tick on every bar shows an even pace. A wavy bar means you are using your quota faster than an even pace or have used more than 85%.
 • See it coming: the detail view tells you when you'll hit the limit at your current rate.
 • Use a reset in one tap: Codex and Grok resets refill your bars from a bottom sheet.
 • Know the moment it resets: an alert, or the reset island that grows out of the camera cutout.

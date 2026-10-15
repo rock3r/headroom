@@ -8,7 +8,7 @@ struct LeftOverCard: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        StatCard(title: "Left on the table", empty: leftOver == nil ? "No resets yet, so nothing was left on the table." : nil) {
+        StatCard(title: "Unused quota at reset", empty: leftOver == nil ? "No resets recorded yet. Unused quota appears after the first reset." : nil) {
             if let leftOver {
                 HStack(alignment: .firstTextBaseline) {
                     Text("\(Int(leftOver.averageLeft.rounded()))%")
