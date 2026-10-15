@@ -30,7 +30,7 @@ struct DelightsSettings: View {
         } header: {
             Text("Delights")
         } footer: {
-            Text("Neither plays while motion is reduced.")
+            Text("Refresh shimmer and reset confetti do not play while motion is reduced.")
         }
     }
 

@@ -55,7 +55,7 @@ struct ResetUsageCard: View {
         } header: {
             Text("Usage limit resets")
         } footer: {
-            Text("A reset counts as used when it is gone before its expiry date. \"Gave back\" adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.")
+            Text("A reset counts as used when it is gone before its expiry date. Restored quota adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.")
         }
     }
 
@@ -80,7 +80,7 @@ struct ResetUsageCard: View {
             .map { StatsTexts.givenBack(kind: $0.kind, times: $0.times) }
             .formatted(.list(type: .and))
         return givenBack.estimated
-            ? String(localized: "Gave back about \(limits).")
-            : String(localized: "Gave back \(limits).")
+            ? String(localized: "Restored quota equal to about \(limits).")
+            : String(localized: "Restored quota equal to \(limits).")
     }
 }

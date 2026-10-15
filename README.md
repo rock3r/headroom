@@ -67,7 +67,7 @@ Android 16 widget player.
 
 - **One overview for every subscription.** Each account shows its weekly (or monthly) usage, its
   session usage, and whether you are over or under an even pace.
-- **Pace, not just percent.** A tick on each bar shows where you would be if you used the limit
+- **Usage rate and forecasts.** A tick on each bar shows where you would be if you used the limit
   evenly. The detail screen draws the week to scale and says when you would reach 100% at the
   current rate.
 - **Wavy means attention.** A bar is wavy only when its account is over pace or above 85%.
@@ -78,8 +78,9 @@ Android 16 widget player.
   again. Expired accounts never drive the next reset or reset alerts.
 - **Usage limit resets.** Some providers hand out resets that refill a limit early. Headroom shows
   the ones each account has, with when each one expires. Codex and Grok resets can be used from a
-  bottom sheet that confirms the reset, refills the bars and shows what is left. Claude's resets
-  are shown for information only.
+  bottom sheet that confirms the reset, refills the bars and shows what is left. Claude resets
+  can also be redeemed when you enable "Redeem Claude resets (experimental)" in Settings.
+  This option is off by default and has not been tried with a real account. See [Usage-limit resets](docs/RESETS.md).
 - **Credits and new quotas.** One-time credits, such as Claude's cloud session credit, show how
   much is used and when they expire. A quota Headroom does not recognise yet still shows, with a
   note that says so.

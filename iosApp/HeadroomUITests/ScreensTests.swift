@@ -23,7 +23,7 @@ final class ScreensTests: XCTestCase {
         app.tabBars.buttons["Stats"].tap()
 
         XCTAssertTrue(app.staticTexts["Example stats from demo data"].waitForExistence(timeout: 10))
-        XCTAssertTrue(scrollTo(app.staticTexts["Who works hardest"]))
+        XCTAssertTrue(scrollTo(app.staticTexts["Usage by provider"]))
     }
 
     func testTheDetailShowsWhereTheWindowIsHeading() {

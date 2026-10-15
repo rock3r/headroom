@@ -8,9 +8,9 @@ struct SharesCard: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        StatCard(title: "Who works hardest", empty: shares.isEmpty ? "Nothing burned yet. This fills in after a few syncs." : nil) {
+        StatCard(title: "Usage by provider", empty: shares.isEmpty ? "No quota use recorded yet. Usage appears after a few updates." : nil) {
             if let top = shares.first {
-                Text("\(top.providerName) does \(percent(top.fraction))% of the work")
+                Text("\(top.providerName) accounts for \(percent(top.fraction))% of quota use")
                     .font(.headline)
                 HStack(spacing: 20) {
                     Chart(shares, id: \.providerId) { share in
@@ -31,8 +31,8 @@ struct SharesCard: View {
                     }
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Share of the quota burned: \(description)")
-                Text("Share of all the quota burned, in percentage points of each limit.")
+                .accessibilityLabel("Share of quota use: \(description)")
+                Text("Share of quota use, in percentage points of each limit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

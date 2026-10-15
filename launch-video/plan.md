@@ -22,7 +22,7 @@ from `cav beats`.
 ## Concept
 
 **"Know your headroom."** Everyone on an AI plan finds their limit by hitting it. Headroom shows
-how much is left, and whether you're burning it too fast. The video is made of Headroom's own
+how much is left, and whether you are using your quota faster than an even pace. The video is made of Headroom's own
 vocabulary: quota bars (flat = fine, wavy = attention), pace ticks, rings, cookie-shaped avatars,
 the reset island and confetti. Real app screenshots sit in a phone; the hero elements are rebuilt
 as live Cavalry layers so they can move.
@@ -54,7 +54,7 @@ Motion: M3 Expressive springs. Entrances `spring`/`outBack`, exits `inBack`, sha
 | 0–3 | 0–8 s | 0–479 | **Hook.** Paper. A huge quota bar fills fast, its pace tick slides past, it turns wavy, hits 100 % and snaps into a "Usage limit reached · resets in 4h 12m" pill with a shake. Last half beat: everything sucks into a dot. | "You're deep in a session." → "Then this." → "Know your headroom." |
 | 4–5 | 8–12 s | 480–719 | **Logo.** Hit on bar 4: the dot bursts to a cobalt field. The app icon's ring draws on to 75 %, its dot pops, "Headroom" cascades in. | "How much AI you have left. At a glance." |
 | 6–9 | 12–20 s | 720–1199 | **Overview.** The ring zooms through into a phone showing the overview. Eight provider avatars pop on eight beats beside it. | "Every subscription. One overview." |
-| 10–13 | 20–28 s | 1200–1679 | **Pace.** Crash zoom into the Claude card: the rebuilt bar fills to 71 %, the even-pace tick drops in at 60 %, the bar goes wavy on the downbeat, "11 pts over pace" pops. Codex's flat 34 % bar slides under it. | "Pace, not just percent." / "Wavy means slow down. Flat means fine." |
+| 10–13 | 20–28 s | 1200–1679 | **Pace.** Crash zoom into the Claude card: the rebuilt bar fills to 71 %, the even-pace tick drops in at 60 %, the bar goes wavy on the downbeat, "11 pts over pace" pops. Codex's flat 34 % bar slides under it. | "Usage rate and forecasts." / "Compare usage with an even pace." |
 | 14–17 | 28–36 s | 1680–2159 | **Detail.** Tap ripple on the card → phone shows the account detail. Beside it the rebuilt ring draws to 71 % (digits roll up) and the pace chart draws on with its dashed even-pace line. | "See where your week is heading." / "100 % in 1d 17h at this rate." |
 | 18–23 | 36–48 s | 2160–2879 | **Resets.** Night. A giant "15h 28m" countdown fast-forwards to zero. Hit on bar 20: the reset island grows out of a camera cutout, its ring fills green, "reset". Bar 21: back to paper with confetti over the phone. Resets screen slides in. | "Know the moment it resets." / "Alerts only when it really did." |
 | 24–27 | 48–56 s | 2880–3359 | **Widgets.** A wallpaper gradient; Rings, Shape, Bars and lock-screen widgets spring in on beats. | "Home screen. Lock screen." |

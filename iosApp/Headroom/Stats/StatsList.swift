@@ -22,7 +22,7 @@ struct StatsList: View {
             }
             LeftOverCard(leftOver: stats.leftOver)
             SparklinesCard(sparklines: stats.sparklines)
-            Text("Each account counts its main limit: the weekly one, or the longest.")
+            Text("Statistics use each account's weekly limit, or its longest limit period if it has no weekly limit.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .listRowBackground(Color.clear)
