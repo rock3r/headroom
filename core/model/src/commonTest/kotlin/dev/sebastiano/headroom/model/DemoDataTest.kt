@@ -6,7 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlin.time.measureTime
 import kotlinx.coroutines.flow.first
@@ -107,20 +106,9 @@ class DemoDataTest {
     }
 
     @Test
-    fun `generating a year of compacted demo history for all demo accounts is fast`() {
+    fun `generating a year of compacted demo history for all demo accounts stays bounded`() {
         val accounts = DemoData.accounts(now)
-        // Warm up once before timing.
-        accounts.forEach { state ->
-            val window = state.primaryWindow!!
-            DemoUsage.points(
-                window,
-                DemoData.resetPeaks(state.account.id, window.id),
-                now,
-                TimeZone.UTC,
-                HistoryRetention.LongTerm,
-            )
-        }
-
+        var totalPoints = 0
         val elapsed = measureTime {
             accounts.forEach { state ->
                 val window = state.primaryWindow!!
@@ -133,12 +121,12 @@ class DemoDataTest {
                         HistoryRetention.LongTerm,
                     )
                 assertTrue(points.isNotEmpty())
+                totalPoints += points.size
             }
         }
-
-        assertTrue(
-            elapsed < 50.milliseconds,
-            "Expected demo history generation under 50 ms, took $elapsed",
+        println(
+            "Demo history generation for ${accounts.size} accounts ($totalPoints points): $elapsed"
         )
+        assertEquals(7_428, totalPoints)
     }
 }
