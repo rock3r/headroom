@@ -1,12 +1,17 @@
 package dev.sebastiano.headroom.model
 
+import dev.sebastiano.headroom.model.stats.ResetPeaks
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
+import kotlin.time.measureTime
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.TimeZone
 
 class DemoDataTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")
@@ -76,5 +81,64 @@ class DemoDataTest {
         val after = repo.accounts.first().first { it.account.provider == Provider.Claude }
         assertTrue(after.primaryWindow!!.usedPercent > before.usedPercent)
         assertEquals(now, after.snapshot!!.fetchedAt)
+    }
+
+    @Test
+    fun `long-term demo usage covers a year shaped by compaction and short-term covers sixty days`() {
+        val claude = DemoData.accounts(now).first { it.account.provider == Provider.Claude }
+        val window = claude.primaryWindow!!
+        val peaks = DemoData.resetPeaks(claude.account.id, window.id)
+
+        val longTerm = DemoUsage.points(window, peaks, now, TimeZone.UTC, HistoryRetention.LongTerm)
+        val shortTerm =
+            DemoUsage.points(window, peaks, now, TimeZone.UTC, HistoryRetention.ShortTerm)
+
+        assertTrue(longTerm.first().at >= now.minus(365.days))
+        assertTrue(longTerm.first().at <= now.minus(364.days))
+        assertEquals(52, ResetPeaks.usedAtResets(longTerm).size)
+        assertEquals(peaks, ResetPeaks.usedAtResets(longTerm).takeLast(peaks.size))
+        // Already compacted: running compaction again changes nothing.
+        assertEquals(longTerm, HistoryRetention.LongTerm.compact(longTerm, now))
+
+        assertTrue(shortTerm.first().at >= now.minus(60.days))
+        assertTrue(shortTerm.first().at <= now.minus(59.days))
+        assertEquals(8, ResetPeaks.usedAtResets(shortTerm).size)
+        assertEquals(peaks, ResetPeaks.usedAtResets(shortTerm).takeLast(peaks.size))
+    }
+
+    @Test
+    fun `generating a year of compacted demo history for all demo accounts is fast`() {
+        val accounts = DemoData.accounts(now)
+        // Warm up once before timing.
+        accounts.forEach { state ->
+            val window = state.primaryWindow!!
+            DemoUsage.points(
+                window,
+                DemoData.resetPeaks(state.account.id, window.id),
+                now,
+                TimeZone.UTC,
+                HistoryRetention.LongTerm,
+            )
+        }
+
+        val elapsed = measureTime {
+            accounts.forEach { state ->
+                val window = state.primaryWindow!!
+                val points =
+                    DemoUsage.points(
+                        window,
+                        DemoData.resetPeaks(state.account.id, window.id),
+                        now,
+                        TimeZone.UTC,
+                        HistoryRetention.LongTerm,
+                    )
+                assertTrue(points.isNotEmpty())
+            }
+        }
+
+        assertTrue(
+            elapsed < 50.milliseconds,
+            "Expected demo history generation under 50 ms, took $elapsed",
+        )
     }
 }

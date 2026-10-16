@@ -109,9 +109,9 @@ class StatsViewModelTest {
 
             val state = stats.state.value
             assertTrue(state.isDemo)
-            // Five past weeks each for Claude, Codex and Grok, and two months for Copilot.
-            assertEquals(17, state.stats.resets?.total)
-            assertEquals(4, state.stats.resets?.hits)
+            // Fifty-two past weeks each for Claude, Codex and Grok, and twelve months for Copilot.
+            assertEquals(168, state.stats.resets?.total)
+            assertEquals(42, state.stats.resets?.hits)
             assertEquals(99.0, state.stats.closestCall?.peak)
             assertEquals(Provider.Grok, state.stats.closestCall?.account?.provider)
             assertEquals(4, state.stats.sparklines.size)

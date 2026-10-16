@@ -70,7 +70,7 @@ class StatsTest {
     fun `demo mode shows demo stats, labelled as demo data`() {
         openStats()
         rule.onNodeWithText("Example stats from demo data", substring = true).assertIsDisplayed()
-        scrollToDescription("of 17 resets came without hitting the limit")
+        scrollToDescription("of 168 resets came without hitting the limit")
         scrollToDescription("Share of quota use: ")
         scrollToDescription("Quota use by day and hour")
         scrollTo("Grok reached 99%")
