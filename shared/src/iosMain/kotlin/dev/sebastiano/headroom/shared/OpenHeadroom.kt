@@ -14,7 +14,6 @@ import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import okio.Path.Companion.toPath
 
 /**
@@ -50,7 +49,6 @@ public fun openHeadroom(directory: String, secrets: SecureValueStore): Headroom 
             resetProvider =
                 SyncedResetProvider(
                     accounts = { repository.current() },
-                    settings = { storage.settings.settings.first() },
                     fetcher = fetcher,
                     clients = clients,
                 ),

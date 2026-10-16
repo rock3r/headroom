@@ -40,8 +40,6 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
                     refreshShimmer = prefs.switch(REFRESH_SHIMMER) ?: defaults.refreshShimmer,
                     resetConfetti = prefs.switch(RESET_CONFETTI) ?: defaults.resetConfetti,
                     resetIsland = prefs.switch(RESET_ISLAND) ?: defaults.resetIsland,
-                    redeemClaudeResets =
-                        prefs.switch(REDEEM_CLAUDE_RESETS) ?: defaults.redeemClaudeResets,
                     resetExpiryReminders =
                         prefs.switch(RESET_EXPIRY_REMINDERS) ?: defaults.resetExpiryReminders,
                 )
@@ -84,10 +82,6 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         store.edit { it[RESET_ISLAND] = enabled }
     }
 
-    override suspend fun setRedeemClaudeResets(enabled: Boolean) {
-        store.edit { it[REDEEM_CLAUDE_RESETS] = enabled }
-    }
-
     override suspend fun setResetExpiryReminders(enabled: Boolean) {
         store.edit { it[RESET_EXPIRY_REMINDERS] = enabled }
     }
@@ -109,7 +103,6 @@ internal class DataStoreSettingsRepository(private val store: DataStore<Preferen
         val REFRESH_SHIMMER = booleanPreferencesKey("refresh_shimmer")
         val RESET_CONFETTI = booleanPreferencesKey("reset_confetti")
         val RESET_ISLAND = booleanPreferencesKey("reset_island")
-        val REDEEM_CLAUDE_RESETS = booleanPreferencesKey("redeem_claude_resets")
         val RESET_EXPIRY_REMINDERS = booleanPreferencesKey("reset_expiry_reminders")
     }
 }

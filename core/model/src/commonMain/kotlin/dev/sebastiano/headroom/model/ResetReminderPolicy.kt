@@ -37,8 +37,8 @@ public object ResetReminderPolicy {
 
     /**
      * The resets the user can act on that are still to expire, soonest first. Those are the resets
-     * of accounts whose sign-in works, of providers that can use resets with these [settings], in
-     * pools that can be used now or at a limit. Nothing when the user turned reminders off.
+     * of accounts whose sign-in works, of providers that can use resets, in pools that can be used
+     * now or at a limit. Nothing when the user turned reminders off ([settings]).
      */
     public fun expiringResets(
         accounts: List<AccountState>,
@@ -47,7 +47,7 @@ public object ResetReminderPolicy {
     ): List<ExpiringReset> {
         if (!settings.resetExpiryReminders) return emptyList()
         return accounts
-            .filter { !it.isSignInExpired && it.account.provider.canRedeemResets(settings) }
+            .filter { !it.isSignInExpired && it.account.provider.canRedeemResets() }
             .flatMap { state ->
                 state.snapshot
                     ?.resets

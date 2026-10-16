@@ -59,8 +59,6 @@ struct SettingsForm: View {
             Section("Resets") {
                 switchRow("resetExpiryReminders", "Remind me before a reset expires", settings.resetExpiryReminders,
                           body: "A notification about a day before a reset you can use expires. At most one a day, for every reset that expires soon.")
-                switchRow("redeemClaudeResets", "Redeem Claude resets (experimental)", settings.redeemClaudeResets,
-                          body: "Use Claude's saved resets from Headroom. Claude has not published this API, so it may fail or stop working.")
             }
             Section {
                 Picker("Update", selection: binding(settings.syncFrequency) { settingsApi.setSyncFrequency(id: $0) }) {

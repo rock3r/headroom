@@ -1,19 +1,18 @@
 # Usage-limit resets
 
 Provider-issued resets refill usage limits before their normal reset times.
-Headroom lists resets for Codex, Grok, Claude and Z.AI. Users can redeem Codex, Grok and Z.AI resets and request more Z.AI cards.
-Claude redemption requires "Redeem Claude resets (experimental)" in Settings. Claude resets remain read-only until the user enables that setting.
+Headroom lists resets for Codex, Grok, Claude and Z.AI. Users can redeem Codex, Grok, Claude and Z.AI resets and request more Z.AI cards.
 
 | Provider | Shows resets | Can use a reset | Notes |
 |---|---|---|---|
 | ChatGPT Codex | Yes | Yes | |
 | Grok | Yes | Yes | |
-| Claude | Yes | Experimental, off by default | The user turns it on in Settings. Never tried with a real account. |
+| Claude | Yes | Experimental | Claude has not published this API, so it may fail or stop working. |
 | Z.AI | After a ZCode sign-in | Yes | Z.AI resets need a separate ZCode sign-in. |
 | Muse | No | No | Meta gives Muse subscriptions no banked resets to list or use. Its limits refill at their `resets_at` times, which the reset alerts already cover. |
 
-`Provider.canRedeemResets(settings)` in `:core:model` defines redemption support.
-The UI and `SyncedResetProvider` call it with current settings.
+`Provider.canRedeemResets()` in `:core:model` defines redemption support.
+The UI and `SyncedResetProvider` call it.
 `Provider.redeemsResetsExperimentally` identifies Claude redemption as experimental. Claude's confirmation step displays an "Experimental" label.
 
 ## How the resets are read
@@ -217,7 +216,7 @@ For example, a notification says "Your ChatGPT Codex reset expires tomorrow at 0
 
 `ResetReminderPolicy` in `:core:model` applies these rules:
 
-- The sign-in must work, `Provider.canRedeemResets(settings)` must return true, and the pool must be `Ready` or `WaitingForLimit`.
+- The sign-in must work, `Provider.canRedeemResets()` must return true, and the pool must be `Ready` or `WaitingForLimit`.
   Each `ResetPool.expiries` entry represents one reset. Pools without expiry dates trigger no reminders.
 - Each reset receives one reminder, due `LEAD` (one day) before expiry.
 - Headroom sends at most one reminder daily. It lists that day's due resets in expiry order.
