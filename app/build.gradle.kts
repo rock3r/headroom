@@ -84,11 +84,21 @@ play {
 // Screenshots of the main screens, for the README. They are recorded, never compared in CI.
 roborazzi { outputDir.set(rootProject.file("docs/screenshots")) }
 
+aboutLibraries {
+    collect {
+        // What the plugin cannot see in the Maven dependency graph: vendored modules under
+        // third-party/.
+        configPath = file("config/aboutlibraries")
+    }
+    license { additionalLicenses.addAll("apache_2_0") }
+}
+
 dependencies {
     // Keep the app and its instrumented tests on the same version as androidx.test.
     constraints { implementation(libs.androidx.concurrent.futures) }
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
+    implementation(projects.thirdParty.composeCharts)
     implementation(projects.widget)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)

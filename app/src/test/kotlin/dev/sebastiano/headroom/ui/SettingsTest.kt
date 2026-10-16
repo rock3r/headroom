@@ -196,6 +196,9 @@ class SettingsTest {
                 .isSuccess
         }
         rule.onAllNodesWithText(material3).onFirst().assertIsDisplayed()
+        val composeCharts = "Compose Charts"
+        rule.onNodeWithTag(LICENCES_LIST_TAG).performScrollToNode(hasText(composeCharts))
+        rule.onAllNodesWithText(composeCharts).onFirst().assertIsDisplayed()
 
         rule.runOnUiThread { dispatcher.onBackPressed() }
         rule.waitForIdle()

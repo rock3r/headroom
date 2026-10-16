@@ -17,7 +17,9 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
                     consumerProguardFiles("consumer-rules.pro")
                 }
-                lint { configureZeroTolerance() }
+                if (!isThirdParty) {
+                    lint { configureZeroTolerance() }
+                }
             }
             configureKotlinAndroid()
 
@@ -29,6 +31,9 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 add("testImplementation", libs.library("turbine"))
             }
 
+            if (isThirdParty) {
+                tasks.matching { it.name.startsWith("lint") }.configureEach { enabled = false }
+            }
             configureQuality()
         }
 }
