@@ -27,10 +27,20 @@ class GlassesActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val state by home.state.collectAsStateWithLifecycle()
+            val settings by graph.settings.settings.collectAsStateWithLifecycle(initialValue = null)
             val formatter = rememberResetFormatter(graph.zone)
             val typography = remember { createGoogleSansFlexTypography() }
             GlimmerTheme(typography = typography) {
-                GlassesScreen(state = state, formatter = formatter, onBack = ::finish)
+                // The logos take the colours of the palette chosen in the app, so the cards wait
+                // until it is read.
+                settings?.let { current ->
+                    GlassesScreen(
+                        state = state,
+                        formatter = formatter,
+                        onBack = ::finish,
+                        palette = current.palette,
+                    )
+                }
             }
         }
     }
