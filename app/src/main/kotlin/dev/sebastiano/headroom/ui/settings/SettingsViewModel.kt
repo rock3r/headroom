@@ -30,6 +30,7 @@ data class SettingsUiState(
     val resetConfetti: Boolean = true,
     val resetIsland: Boolean = false,
     val resetExpiryReminders: Boolean = true,
+    val keepLongHistory: Boolean = true,
 )
 
 /** Reads the settings from the [settings] repository and stores the user's choices in it. */
@@ -80,6 +81,10 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
         viewModelScope.launch { settings.setResetExpiryReminders(enabled) }
     }
 
+    fun setKeepLongHistory(enabled: Boolean) {
+        viewModelScope.launch { settings.setKeepLongHistory(enabled) }
+    }
+
     private fun AppSettings.toUiState(appVersion: String) =
         SettingsUiState(
             quotaDisplay,
@@ -92,6 +97,7 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
             resetConfetti,
             resetIsland,
             resetExpiryReminders,
+            keepLongHistory,
         )
 
     private companion object {

@@ -120,7 +120,13 @@ public data class AppSettings(
      * [ResetReminderPolicy].
      */
     val resetExpiryReminders: Boolean = true,
-)
+    /** Keeps a year of usage history, thinned out as it gets older, instead of only 60 days. */
+    val keepLongHistory: Boolean = true,
+) {
+    /** How long usage history is kept, and whether older points are thinned out. */
+    public val historyRetention: HistoryRetention
+        get() = HistoryRetention.of(keepLongHistory)
+}
 
 /** Reads and stores the [AppSettings]. */
 public interface SettingsRepository {
@@ -145,6 +151,8 @@ public interface SettingsRepository {
     public suspend fun setResetIsland(enabled: Boolean)
 
     public suspend fun setResetExpiryReminders(enabled: Boolean)
+
+    public suspend fun setKeepLongHistory(enabled: Boolean)
 }
 
 /** Settings kept in memory, for demo builds, previews and tests without the data layer. */
@@ -191,5 +199,9 @@ public class InMemorySettingsRepository(initial: AppSettings = AppSettings()) : 
 
     override suspend fun setResetExpiryReminders(enabled: Boolean) {
         state.update { it.copy(resetExpiryReminders = enabled) }
+    }
+
+    override suspend fun setKeepLongHistory(enabled: Boolean) {
+        state.update { it.copy(keepLongHistory = enabled) }
     }
 }
