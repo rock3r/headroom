@@ -82,6 +82,17 @@ public class ZCodeSignIn(
         prepared = accountId to scope.async { readyPage() }
     }
 
+    /**
+     * Forgets the page [prepare] readied for [accountId], when whoever asked for it is gone. A
+     * readied page expires a few minutes after it is made, so it must not be kept for later.
+     */
+    public fun forgetPrepared(accountId: String) {
+        val ready = prepared
+        if (ready?.first != accountId) return
+        ready.second.cancel()
+        prepared = null
+    }
+
     /** The sign-in page, or null when making it failed: a failed prepare is not a failed tap. */
     private suspend fun readyPage(): DeviceSession? =
         try {

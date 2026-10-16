@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.test.espresso.Espresso
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.Account
@@ -113,7 +114,38 @@ class RedeemSheetZCodeSignInTest {
     @Test
     fun `the sheet readies the sign-in page before the tap`() {
         var sessions = 0
-        val zCode = newZCodeSignIn { sessions++ }
+        launchApp(newZCodeSignIn { sessions++ })
+        openZAiSheet()
+
+        // The page is readied while the user reads the sheet: the flow started once.
+        assertEquals(1, sessions)
+
+        rule.onNode(SIGN_IN_BUTTON and hasAnyAncestor(isDialog())).performClick()
+        rule.waitForIdle()
+
+        // The tap opens the readied page at once: no second flow, and the tab is up.
+        assertEquals(1, sessions)
+        assertEquals(PAGE_URL, shadowOf(rule.activity).nextStartedActivity?.dataString)
+    }
+
+    @Test
+    fun `closing the sheet without signing in forgets the readied page`() {
+        var sessions = 0
+        launchApp(newZCodeSignIn { sessions++ })
+        openZAiSheet()
+        assertEquals(1, sessions)
+
+        Espresso.pressBackUnconditionally()
+        rule.waitForIdle()
+        rule.onNode(SIGN_IN_BUTTON).performClick()
+        rule.waitForIdle()
+
+        // A readied page expires a few minutes after it is made, so a reopened sheet readies a
+        // new one instead of reusing a stale page.
+        assertEquals(2, sessions)
+    }
+
+    private fun launchApp(zCode: ZCodeSignIn) {
         val provider =
             object : ResetProvider {
                 override suspend fun availability(account: Account): ResetAvailability? =
@@ -139,17 +171,6 @@ class RedeemSheetZCodeSignInTest {
             }
         }
         rule.waitForIdle()
-        openZAiSheet()
-
-        // The page is readied while the user reads the sheet: the flow started once.
-        assertEquals(1, sessions)
-
-        rule.onNode(SIGN_IN_BUTTON and hasAnyAncestor(isDialog())).performClick()
-        rule.waitForIdle()
-
-        // The tap opens the readied page at once: no second flow, and the tab is up.
-        assertEquals(1, sessions)
-        assertEquals(PAGE_URL, shadowOf(rule.activity).nextStartedActivity?.dataString)
     }
 
     private fun openZAiSheet() {

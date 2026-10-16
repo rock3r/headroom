@@ -64,10 +64,11 @@ internal fun ResetSheetHost(
         onDispose {}
     }
     // Ready the sign-in page while the user reads, so the tap opens it at once. A failed sign-in
-    // readies a new page, so its retry opens at once too.
+    // readies a new page, so its retry opens at once too. A readied page expires a few minutes
+    // after it is made, so it is forgotten when the sheet goes.
     DisposableEffect(zCode, request.accountId, availability.requiresSignIn, signIn) {
         if (availability.requiresSignIn) zCode?.prepare(request.accountId)
-        onDispose {}
+        onDispose { zCode?.forgetPrepared(request.accountId) }
     }
     RedeemSheet(
         account = account.account,

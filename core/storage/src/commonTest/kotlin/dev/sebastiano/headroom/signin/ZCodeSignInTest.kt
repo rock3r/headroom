@@ -179,6 +179,30 @@ class ZCodeSignInTest {
         }
 
     @Test
+    fun `a forgotten prepare readies a new page on the next ask`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var starts = 0
+            val signIn =
+                ZCodeSignIn(
+                    start = {
+                        starts++
+                        FakeSession("https://chat.z.ai/$starts")
+                    },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                )
+
+            signIn.prepare("z1")
+            signIn.forgetPrepared("z1")
+            signIn.start("z1")
+
+            // The forgotten page is not reused: a ZCode page expires a few minutes after it is
+            // made, so a stale one would fail the moment it is used.
+            assertEquals(2, starts)
+            assertEquals(ZCodeSignInState.Waiting("z1", "https://chat.z.ai/2"), signIn.state.value)
+        }
+
+    @Test
     fun `logs each step and why it failed without tokens`() =
         runTest(UnconfinedTestDispatcher()) {
             val lines = mutableListOf<String>()
