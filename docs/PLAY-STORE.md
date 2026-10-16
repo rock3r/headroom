@@ -1,8 +1,7 @@
 # Google Play
 
-Headroom ships on Google Play as `dev.sebastiano.headroom`, from Marco Gomiero's developer
-account, next to the GitHub APK. This page holds everything the Play Console asks for that is not
-in the store listing files.
+Marco Gomiero's developer account publishes Headroom on Google Play as `dev.sebastiano.headroom`.
+GitHub also distributes an APK. This guide covers Console settings outside the store listing files.
 
 ## Where things live
 
@@ -14,40 +13,38 @@ in the store listing files.
 | Privacy policy | `https://www.prof18.com/headroom/pp/privacy-policy-oct26/` (source in the prof18.com site repo) |
 | Service account for uploads | `~/.local-config/headroom_play_config.json` locally, the `PLAY_SERVICE_ACCOUNT_JSON` secret in CI; never in this repo |
 
-The graphics are built from the README screenshots, so they always show demo data. After a UI
-change, record the screenshots again and redraw the graphics:
+Store graphics use the README screenshots and contain only demo data.
+After UI changes, record screenshots and regenerate the graphics:
 
 ```bash
 ./gradlew :app:recordRoborazziDebug :widget:recordWidgetGallery
 scripts/store-graphics/render.sh
 ```
 
-The listing text and the screenshot captions stay generic about providers on purpose: only the
-full description names them, so adding a provider means editing one paragraph.
+Only the full description names providers. Listing text and screenshot captions use general terms.
+Adding a provider therefore requires updating one paragraph.
 
 ## Policy notes for the Play build
 
-The Play build is the `play` build type in `app/build.gradle.kts`: the release build, signed the
-same way, with its own manifest in `app/src/play/AndroidManifest.xml`. Build the bundle with:
+The `play` build type in `app/build.gradle.kts` inherits the release build and its signing setup.
+It adds `app/src/play/AndroidManifest.xml`. Build its bundle with:
 
 ```bash
 ./gradlew :app:bundlePlay
 ```
 
-The bundle lands in `app/build/outputs/bundle/play/app-play.aab`. Without the `HEADROOM_KEY*`
-variables it is unsigned, and Play refuses it.
+Gradle writes `app/build/outputs/bundle/play/app-play.aab`.
+Without the `HEADROOM_KEY*` variables, Gradle leaves the bundle unsigned. Play rejects unsigned bundles.
 
-Two things in the GitHub build would not pass Play review, so the Play build leaves them out:
+The Play build changes two features to meet Play policy:
 
-- **`USE_EXACT_ALARM`** is only for alarm clock and calendar apps. The Play build declares
-  `SCHEDULE_EXACT_ALARM` instead. `AlarmResetScheduler` already falls back to an inexact alarm
-  when `canScheduleExactAlarms()` is false, so reset alerts may arrive a few minutes late unless
-  the user allows exact alarms.
-- **The reset island's accessibility service.** Play only accepts the Accessibility API for
-  accessibility tools, or with a declaration, an in-app disclosure and a video, and it refuses
-  most other uses. The Play build drops the service and keeps the Display over other apps
-  fallback. The set-up sheet in Settings notices that the service is missing and offers only
-  Display over other apps.
+- Play reserves `USE_EXACT_ALARM` for alarm clock and calendar apps.
+  The Play build declares `SCHEDULE_EXACT_ALARM`.
+  When `canScheduleExactAlarms()` returns false, `AlarmResetScheduler` uses an inexact alarm.
+  Reset alerts can arrive several minutes late unless the user allows exact alarms.
+- Play accepts Accessibility API use for accessibility tools or requires a declaration, disclosure and video.
+  It rejects most other uses. The Play build removes the reset island's accessibility service and keeps the Display over other apps fallback.
+  Settings detects the missing service and offers only Display over other apps.
 
 ## Store settings
 
@@ -64,35 +61,32 @@ Two things in the GitHub build would not pass Play review, so the Play build lea
 
 ## App access (instructions for the reviewer)
 
-Choose **All or some functionality is restricted**, and add one entry with no username or
-password:
+Choose **All or some functionality is restricted**. Add this entry without a username or password:
 
 > **Name:** Demo mode (no sign-in needed)
 >
 > **Instructions:**
 >
-> Headroom shows the usage limits of paid AI subscriptions (for example Claude, ChatGPT Codex and
-> GitHub Copilot). Signing in needs a paid subscription with one of those third-party services,
-> so we cannot share a test account. Instead, every feature can be reviewed in demo mode:
+> Headroom shows usage limits for paid AI subscriptions, including Claude, ChatGPT Codex and GitHub Copilot.
+> Sign-in requires a paid subscription with a provider. We cannot share a test account.
+> Demo mode provides example data for reviewing the app:
 >
-> 1. Install and open the app. With no account signed in, it starts in demo mode with clearly
->    labelled example data ("Demo data" banner at the top). No sign-in is needed.
-> 2. Overview: tap any account card to open its detail (usage ring, pace chart, reset alerts).
+> 1. Install and open Headroom without signing in. The app shows example accounts with a "Demo data" banner.
+> 2. Tap an Overview account card to see its usage ring, pace chart and reset alerts.
 > 3. Use the bottom toolbar (or the navigation rail on tablets) to open Resets and Stats.
-> 4. Tap the refresh button to simulate a sync.
-> 5. Tap the gear icon for Settings: theme, colours, widgets, alerts and the Quick Settings tile.
-> 6. Widgets: long-press the home screen, choose Widgets, and add any Headroom widget. It shows
->    the demo accounts.
-> 7. "Add account" in the banner lists the supported services. Each one opens that service's own
->    sign-in page in the browser, which needs a real subscription; you can back out at any point.
+> 4. Tap Refresh to simulate a sync.
+> 5. Tap the gear icon to review theme, colours, widgets, alerts and Quick Settings tile options.
+> 6. Long-press the home screen, choose Widgets, and add a Headroom widget. It displays demo accounts.
+> 7. Tap "Add account" in the banner to list supported services.
+>    Each service opens its browser sign-in page and requires a real subscription. You can cancel at any time.
 >
-> The app has no Headroom account, server, ads or in-app purchases. Notifications are only sent
-> when a usage limit resets or a sign-in expires.
+> Headroom has no account system, server, ads or in-app purchases.
+> Notifications cover usage resets, expiring reset credits and expired sign-ins.
 
 ## Ads
 
-No, the app does not contain ads. Check that the merged release manifest has no
-`com.google.android.gms.permission.AD_ID` before the first upload.
+Declare that the app has no ads.
+Before the first upload, check that the merged release manifest excludes `com.google.android.gms.permission.AD_ID`.
 
 ## Content rating (IARC questionnaire)
 
@@ -104,7 +98,7 @@ No, the app does not contain ads. Check that the merged release manifest has no
 - Allows digital purchases: **No**.
 - Web browser or search engine: **No**.
 
-Expected rating: Everyone / PEGI 3 / USK 0.
+These answers are expected to produce Everyone / PEGI 3 / USK 0 ratings.
 
 ## Target audience and content
 
@@ -113,9 +107,9 @@ Expected rating: Everyone / PEGI 3 / USK 0.
 
 ## Data safety
 
-Headroom has no server and no SDKs that send data. It sends sign-in tokens and requests only to
-the AI service that the user signed in to, which is the service the user is using, not a third
-party that Headroom shares data with.
+Headroom operates no server and includes no SDKs that send data.
+It sends sign-in tokens and requests only to the AI services selected by the user.
+The Data safety answers treat those requests as direct use of the selected service.
 
 | Question | Answer |
 |---|---|
@@ -123,10 +117,16 @@ party that Headroom shares data with.
 | Is all of the user data collected by your app encrypted in transit? | Yes (HTTPS only), if Play asks |
 | Do you provide a way for users to request that their data is deleted? | Not applicable: nothing is collected. Removing an account or uninstalling deletes everything. |
 
-If Play review pushes back on "No data collected", the fallback is to declare **Personal info →
-Email address** and **App activity → Other actions** as *collected*, *not shared*, *processed
-ephemerally: no*, *required: no*, purpose **App functionality**, because the account email and
-usage history are received from the provider and stored on the device.
+If Play rejects "No data collected", declare the locally stored provider email and usage history with these fields:
+
+| Field | Fallback answer |
+|---|---|
+| Types | **Personal info → Email address**; **App activity → Other actions** |
+| Collected | Yes |
+| Shared | No |
+| Processed ephemerally | No |
+| Required | No |
+| Purpose | **App functionality** |
 
 ## Other declarations
 
@@ -144,17 +144,17 @@ usage history are received from the provider and stored on the device.
 
 ## App signing
 
-Play App Signing uses the existing Headroom release key (see [RELEASING.md](RELEASING.md#the-release-key)),
-so an install from Play and one from GitHub or Obtainium can update each other. When the Console
-asks for the app signing key on the first upload, choose **Use a different key** → **Export and
-upload a key from Java keystore**, and run Google's PEPK tool on the keystore from 1Password with
-the encryption key the Console shows. The same key is also the upload key.
+Play App Signing uses Headroom's existing [release key](RELEASING.md#the-release-key).
+Play, GitHub and Obtainium installs can therefore update each other.
+On the first upload, choose **Use a different key** → **Export and upload a key from Java keystore**.
+Run Google's PEPK tool on the 1Password keystore with the Console's encryption key.
+Use the same key as the upload key.
 
 ## Publishing from CI
 
-The [Release workflow](../.github/workflows/release.yml) uploads the signed Play bundle with
-[Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher), which is enabled only
-for the `play` build type. It needs:
+The [Release workflow](../.github/workflows/release.yml) uploads signed bundles through
+[Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher).
+Only the `play` build type enables that plugin. Uploads require these settings:
 
 | What | Where |
 |---|---|
@@ -162,23 +162,27 @@ for the `play` build type. It needs:
 | The track | GitHub Actions variable `PLAY_TRACK` (`internal`, `alpha`, `beta` or `production`). Unset means `production`. |
 | The release notes | `app/src/main/play/release-notes/en-US/default.txt`, 500 characters at most |
 
-The service account belongs to Headroom alone. In the Play Console it has access to this app only,
-with these permissions: View app information, Release apps to testing tracks, Manage testing
-tracks and edit tester lists, Manage store presence, and Release to production, exclude devices,
-and use Play App Signing. Without the last one a production upload fails with "The caller does not
-have permission"; set `PLAY_TRACK` to `internal` and promote in the Console instead.
+The service account must have access only to Headroom. Grant these Console permissions:
 
-The workflow uploads only the bundle and its release notes, never the store listing, so edits
-made in the Console stay. To push the listing text and graphics in `app/src/main/play` on purpose,
-run this from a machine with the key:
+- View app information.
+- Release apps to testing tracks.
+- Manage testing tracks and edit tester lists.
+- Manage store presence.
+- Release to production, exclude devices, and use Play App Signing.
+
+Without the last permission, production uploads fail with "The caller does not have permission".
+Set `PLAY_TRACK` to `internal` and promote the release in the Console if that permission is unavailable.
+
+The workflow uploads the bundle and release notes. It preserves listing edits made in the Console.
+To upload listing text and graphics from `app/src/main/play`, run this command on a machine with the key:
 
 ```bash
 ANDROID_PUBLISHER_CREDENTIALS="$(cat ~/.local-config/headroom_play_config.json)" \
 ./gradlew :app:publishPlayListing
 ```
 
-To upload a bundle by hand, for example to retry a failed upload, build and sign it first (see
-[RELEASING.md](RELEASING.md#the-release-key)), then:
+For a manual upload or retry, first [build and sign the bundle](RELEASING.md#the-release-key).
+Then run:
 
 ```bash
 ANDROID_PUBLISHER_CREDENTIALS="$(cat ~/.local-config/headroom_play_config.json)" \
@@ -187,5 +191,5 @@ ANDROID_PUBLISHER_CREDENTIALS="$(cat ~/.local-config/headroom_play_config.json)"
 
 ## First release
 
-Headroom 1.2.0 (version code 3) was the first Play release, uploaded by hand from the `play`
-build. Releases after it go through the workflow.
+Headroom 1.2.0, version code 3, was the first Play release. Its upload used a manually built `play` bundle.
+Later releases use the workflow.

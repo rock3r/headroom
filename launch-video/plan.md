@@ -1,76 +1,103 @@
-# Headroom launch video: plan
+# Headroom launch video plan
 
-72 s, 1920 × 1080, 60 fps, 4320 frames, 120 BPM. One beat = 30 frames, one bar = 120 frames (2 s).
-36 bars. Every shared time lives in `build/timing.json` (bars → frames); music and scenes read it.
-If the sourced track has another tempo, the bar plan stays and the frame numbers are regenerated
-from `cav beats`.
+This document records the original storyboard and two timing revisions.
+The current build uses `build/timing.json`; the table below retains the original 120 BPM timing.
 
-> **Re-timed to the chosen track (`music/headroom-edm2-edit.wav`).** Lyria take edm-2 at 128 BPM
-> (bar = 1.875 s), with a rendered bell/sub stinger added where the groove stops at 71.39 s. 77 s,
-> 4620 frames. Shot frames live in `build/timing.json` (from `build/grid.json`); all 18 cuts land
-> on downbeats. Section map: intro bars 1–4 · drop bar 5 (7.63 s, logo) · overview bars 7–12 ·
-> texture change bar 13 (22.63 s, pace) · detail bars 17–20 · dark break bars 21–24 (night
-> countdown) · rise bar 25 (45.13 s, reset island) · confetti/resets bars 27–28 · re-entry bar 29
-> (52.63 s, widgets) · palettes bars 33–34 · outro bar 35 (63.88 s) · groove stops + stinger 71.39 s.
-> The bar/time columns below are the original 120 BPM plan.
+## Timing revisions
 
-> **Revision 2 (after review notes c_01–c_08):** 73.25 s; music edit v2 ends on bar 37 + stinger.
-> Shorter providers/night/outro; new reset sequence (s5c limit → s6a night → s6r1 'Use a reset' sheet →
-> s6r2 refill hit → s6b reset island); widgets in phone context; moving previz in `renders/previz.mp4`
-> built by `build/10_previz_a.js`, `20_previz_b.js`, `30_previz_c.js`, then `90_centre.js`.
+| Plan | Duration | Timing |
+|---|---|---|
+| Original | 72 s; 4320 frames | 1920 × 1080 at 60 frames per second (fps), 120 beats per minute (BPM), 36 bars |
+| Chosen track | 77 s; 4620 frames | Lyria take edm-2, `music/headroom-edm2-edit.wav`, 128 BPM; each bar lasts 1.875 s |
+| Revision 2, after c_01–c_08 | 73.25 s | Music edit v2 ends at bar 37 followed by a short closing sound |
+
+The original plan uses 30 frames per beat and 120 frames, or 2 seconds, per bar.
+Music and scene scripts read shared bar-to-frame timing from `build/timing.json`.
+If the source tempo changes, retain the bar plan and regenerate frame numbers from `cav beats`.
+
+The chosen-track revision derives shot frames from `build/grid.json` into `build/timing.json`.
+All 18 cuts occur on downbeats. A rendered bell and sub-bass closing sound starts when the rhythm stops at 71.39 s.
+
+| Chosen-track section | Bars | Start time where recorded |
+|---|---|---|
+| Intro | 1–4 | |
+| Logo | 5 | 7.63 s |
+| Overview | 7–12 | |
+| Pace, with a musical texture change | 13 | 22.63 s |
+| Detail | 17–20 | |
+| Dark countdown | 21–24 | |
+| Reset island, with rising music | 25 | 45.13 s |
+| Confetti and resets | 27–28 | |
+| Widgets, with the rhythm returning | 29 | 52.63 s |
+| Palettes | 33–34 | |
+| Closing section | 35 | 63.88 s |
+| Rhythm stops; closing sound begins | | 71.39 s |
+
+Revision 2 shortens the provider, dark countdown and closing sections. Widgets appear within a phone layout.
+The reset sequence runs through s5c limit, s6a night, s6r1 "Use a reset", s6r2 refill and s6b reset island.
+`renders/previz.mp4` contains the animated preview.
+Its build runs `build/10_previz_a.js`, `20_previz_b.js`, `30_previz_c.js` and `90_centre.js`, in that order.
 
 ## Concept
 
-**"Know your headroom."** Everyone on an AI plan finds their limit by hitting it. Headroom shows
-how much is left, and whether you are using your quota faster than an even pace. The video is made of Headroom's own
-vocabulary: quota bars (flat = fine, wavy = attention), pace ticks, rings, cookie-shaped avatars,
-the reset island and confetti. Real app screenshots sit in a phone; the hero elements are rebuilt
-as live Cavalry layers so they can move.
+The video shows remaining quota and compares usage with an even rate before a user reaches a limit.
+Its visual elements match Headroom: flat and wavy bars, pace ticks, rings, cookie-shaped avatars, reset island and confetti.
+Wavy bars indicate attention. Flat bars indicate normal usage.
+The original concept places app screenshots inside a phone and animates selected elements as editable Cavalry layers.
+The [implemented video](README.md) rebuilds every screen as layers.
 
-## Look (app-native, Material 3 Expressive)
+## Colours and typography
+
+The design follows the app's Material 3 Expressive appearance.
 
 | Role | Hex |
 |---|---|
-| Paper (light surface) | `#f8fafe` |
-| Ink | `#1a1c22` |
-| Cobalt (primary / icon bg) | `#305eb7` / `#3553b0` |
+| Light surface | `#f8fafe` |
+| Text | `#1a1c22` |
+| Cobalt primary / icon background | `#305eb7` / `#3553b0` |
 | Primary container | `#c9dfff` |
-| Tertiary (pink) container | `#fdcdef` |
-| Night (dark section) | `#0d0f14`, primary-on-dark `#a4c5ff` |
-| Reset green (island ring) | `#3ddc84` |
+| Tertiary pink container | `#fdcdef` |
+| Dark section | `#0d0f14`, primary-on-dark `#a4c5ff` |
+| Reset island ring | `#3ddc84` |
 | Provider accents (OKLCH L.56 C.14) | Claude `#b55422`, OpenCode `#887400`, Codex `#008b4e`, Z.AI `#008c8e`, Grok `#007fba`, Kimi `#556dc6`, Copilot `#885cb5`, JetBrains `#af4d80` |
-| Palette seeds (montage) | Coral `#ff6f61`, Tangerine `#ff8c1a`, Lemon `#ffd60a`, Lime `#8bd41a`, Lagoon `#00bfa5`, Sky `#2e9bff`, Grape `#8a4dff`, Bubblegum `#ff4fa3` |
+| Palette seeds | Coral `#ff6f61`, Tangerine `#ff8c1a`, Lemon `#ffd60a`, Lime `#8bd41a`, Lagoon `#00bfa5`, Sky `#2e9bff`, Grape `#8a4dff`, Bubblegum `#ff4fa3` |
 
-Type: Google Sans Flex only (the app's font). Display: weight 820–860, width 114–118, ROND 100,
-tight tracking. Labels: weight 620, ROND 50. Nothing under 30 px.
+Use Google Sans Flex, matching the app. Display text uses weight 820–860, width 114–118, ROND 100 and close letter spacing.
+Labels use weight 620 and ROND 50. All text must be at least 30 px.
 
-Motion: M3 Expressive springs. Entrances `spring`/`outBack`, exits `inBack`, shared-axis pushes
-`inOutCubic`. One hero at a time; staggered 3–4 frame steps; holds keep a slow drift.
+## Motion
 
-## Storyboard
+Use Material 3 Expressive springs. Entrances use `spring` or `outBack`, exits use `inBack`, and shared-axis transitions use `inOutCubic`.
+Focus each shot on one main element. Stagger elements by 3–4 frames and retain slow movement during holds.
 
-| Bars | Time | Frames | Shot | On screen |
+## Original storyboard
+
+The timings and numeric examples below belong to the original 120 BPM plan.
+Text describes the planned message; it does not change the rendered video's captions.
+
+| Bars | Time | Frames | Shot behaviour | Message |
 |---|---|---|---|---|
-| 0–3 | 0–8 s | 0–479 | **Hook.** Paper. A huge quota bar fills fast, its pace tick slides past, it turns wavy, hits 100 % and snaps into a "Usage limit reached · resets in 4h 12m" pill with a shake. Last half beat: everything sucks into a dot. | "You're deep in a session." → "Then this." → "Know your headroom." |
-| 4–5 | 8–12 s | 480–719 | **Logo.** Hit on bar 4: the dot bursts to a cobalt field. The app icon's ring draws on to 75 %, its dot pops, "Headroom" cascades in. | "How much AI you have left. At a glance." |
-| 6–9 | 12–20 s | 720–1199 | **Overview.** The ring zooms through into a phone showing the overview. Eight provider avatars pop on eight beats beside it. | "Every subscription. One overview." |
-| 10–13 | 20–28 s | 1200–1679 | **Pace.** Crash zoom into the Claude card: the rebuilt bar fills to 71 %, the even-pace tick drops in at 60 %, the bar goes wavy on the downbeat, "11 pts over pace" pops. Codex's flat 34 % bar slides under it. | "Usage rate and forecasts." / "Compare usage with an even pace." |
-| 14–17 | 28–36 s | 1680–2159 | **Detail.** Tap ripple on the card → phone shows the account detail. Beside it the rebuilt ring draws to 71 % (digits roll up) and the pace chart draws on with its dashed even-pace line. | "See where your week is heading." / "100 % in 1d 17h at this rate." |
-| 18–23 | 36–48 s | 2160–2879 | **Resets.** Night. A giant "15h 28m" countdown fast-forwards to zero. Hit on bar 20: the reset island grows out of a camera cutout, its ring fills green, "reset". Bar 21: back to paper with confetti over the phone. Resets screen slides in. | "Know the moment it resets." / "Alerts only when it really did." |
-| 24–27 | 48–56 s | 2880–3359 | **Widgets.** A wallpaper gradient; Rings, Shape, Bars and lock-screen widgets spring in on beats. | "Home screen. Lock screen." |
-| 28–29 | 56–60 s | 3360–3599 | **Make it yours.** Theme change spreads from a tap point, one palette per beat (light → bubblegum → lagoon → grape dark → tangerine dark…). | "Your colours. Your order." |
-| 30–35 | 60–72 s | 3600–4319 | **Outro.** Everything folds back into the icon dot on cobalt. Icon + wordmark land on bar 30; tagline; then "Free and open source · Android 16+", "github.com/rock3r/headroom", "Get it on Obtainium". Final chord bar 32, ring keeps breathing to the end. | "Know your headroom." + small "Not affiliated with any AI provider. Logos are their owners' trademarks." |
+| 0–3 | 0–8 s | 0–479 | A large quota bar fills on a light surface. Its pace tick passes, the bar becomes wavy and usage reaches 100%. It changes into a shaking "Usage limit reached · resets in 4h 12m" pill. Everything contracts to a dot during the final half beat. | A session can reach its usage limit. Headroom shows the remaining quota. |
+| 4–5 | 8–12 s | 480–719 | On bar 4, the dot expands over a cobalt background. The app ring draws to 75%, its dot appears, and the Headroom name animates in. | Headroom shows remaining AI quota. |
+| 6–9 | 12–20 s | 720–1199 | The camera moves through the ring into a phone showing Overview. Eight provider avatars appear beside it on eight beats. | Users can view subscriptions together. |
+| 10–13 | 20–28 s | 1200–1679 | The camera zooms into Claude's card. Usage reaches 71% and an even-pace tick appears at 60%. On the downbeat, the bar becomes wavy and shows "11 pts over pace". Codex's flat 34% bar appears below it. | Users can compare usage with an even rate and view forecasts. |
+| 14–17 | 28–36 s | 1680–2159 | A tap ripple opens account details. Beside the phone, a ring draws to 71% with animated digits. The pace chart draws its dashed even-pace line. | The forecast shows "100 % in 1d 17h at this rate." |
+| 18–23 | 36–48 s | 2160–2879 | A dark screen accelerates a "15h 28m" countdown to zero. On bar 20, the reset island expands from the camera cutout. Its ring fills green and shows "reset". Bar 21 returns to a light surface with confetti over the phone. The Resets screen slides in. | Alerts follow confirmed resets. |
+| 24–27 | 48–56 s | 2880–3359 | Rings, Shape, Bars and lock screen widgets animate onto a wallpaper gradient on beats. | Widgets work on home and lock screens. |
+| 28–29 | 56–60 s | 3360–3599 | Theme changes expand from the tap location. Palettes change each beat: light, Bubblegum, Lagoon, dark Grape and dark Tangerine. | Users can choose colours and account order. |
+| 30–35 | 60–72 s | 3600–4319 | Elements contract into the icon dot on cobalt. The icon and name appear on bar 30, followed by the tagline, licence/platform line, repository URL and Obtainium link. The final chord starts on bar 32. The ring continues a slow size animation until the end. | The video identifies Headroom as free and open source for Android 16+. It shows github.com/rock3r/headroom and Obtainium. It discloses no provider affiliation and identifies logos as their owners' trademarks. |
 
 ## Music
 
-Upbeat, bright, 120 BPM (or whatever the sourced track is): sparse plucks under the hook,
-a pause on the last half beat of bar 3, the drop on bar 4, a lift at bar 18 (night) with a
-filter sweep into the reset hit on bar 20, a breakdown-ish bar 28–29 for the palette montage,
-final hit bar 30 and chord tail to 72 s.
+The original music plan uses an upbeat 120 BPM track, adjusted to the source track's tempo when needed.
+Sparse plucked notes accompany the opening. The final half beat of bar 3 pauses before the main rhythm starts on bar 4.
+Bar 18 increases intensity for the dark section. A filter sweep leads to the reset accent on bar 20.
+Bars 28–29 reduce the arrangement for palette changes. The final accent starts on bar 30, with the chord continuing to 72 seconds.
 
 ## Assets
 
-- `../docs/screenshots/*.png` (1233 × 2673 Roborazzi captures, demo data) in a rebuilt phone.
-- `../docs/screenshots/widgets/*.png` (widget player captures).
-- `assets/logos/*.svg` extracted from `core/model/.../ProviderLogo.kt` (models.dev MIT / Simple Icons CC0; trademarks of their owners).
-- App icon rebuilt from `app/src/main/res/drawable/ic_launcher_foreground.xml`.
+- `../docs/screenshots/*.png` supplies 1233 × 2673 Roborazzi captures with demo data for the rebuilt phone.
+- `../docs/screenshots/widgets/*.png` supplies widget-player captures.
+- `assets/logos/*.svg` comes from `core/model/.../ProviderLogo.kt`.
+  The sources use models.dev's MIT licence and Simple Icons' CC0 terms. Logos remain their owners' trademarks.
+- The app icon follows `app/src/main/res/drawable/ic_launcher_foreground.xml`.
