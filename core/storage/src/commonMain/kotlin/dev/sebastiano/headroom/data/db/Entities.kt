@@ -82,6 +82,7 @@ internal data class UsagePointEntity(
     val windowId: String,
     val atEpochMs: Long,
     val usedPercent: Double,
+    val resetsAtEpochMs: Long? = null,
 )
 
 /**

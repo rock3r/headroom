@@ -14,6 +14,7 @@ import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import okio.Path.Companion.toPath
 
 /**
@@ -37,7 +38,10 @@ public fun openHeadroom(directory: String, secrets: SecureValueStore): Headroom 
             QuotaFetchers.create(),
             clients,
         )
-    val repository = storage.accounts(fetcher::fetch, Clock.System::now, scope)
+    val repository =
+        storage.accounts(fetcher::fetch, Clock.System::now, scope) {
+            storage.settings.settings.first().historyRetention
+        }
     val parts =
         HeadroomParts(
             repository = repository,

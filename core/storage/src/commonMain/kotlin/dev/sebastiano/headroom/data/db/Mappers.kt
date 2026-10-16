@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -74,4 +75,11 @@ internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
         amountUnit = amountUnit,
         expiresAtEpochMs = expiresAt?.toEpochMilliseconds(),
         isRecognised = isRecognised,
+    )
+
+internal fun UsagePointEntity.toDomain() =
+    UsagePoint(
+        at = Instant.fromEpochMilliseconds(atEpochMs),
+        usedPercent = usedPercent,
+        resetsAt = resetsAtEpochMs?.let(Instant::fromEpochMilliseconds),
     )
