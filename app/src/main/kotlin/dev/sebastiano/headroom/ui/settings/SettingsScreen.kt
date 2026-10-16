@@ -326,6 +326,9 @@ private fun LazyListScope.settingsRows(
             modifier = block.padding(horizontal = 6.dp),
         )
     }
+    tracedItem("Settings: SectionLabel usage history") {
+        SectionLabel(stringResource(R.string.settings_usage_history), block)
+    }
     tracedItem("Settings: KeepLongHistoryRow") {
         SettingsRow(
             headline = stringResource(R.string.settings_keep_long_history),

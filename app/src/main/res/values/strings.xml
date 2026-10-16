@@ -374,6 +374,7 @@
     <string name="settings_sync_hours_6">Every 6 hours</string>
     <string name="settings_sync_on_open">Only when I open the app</string>
     <string name="settings_sync_note">Reset alerts arrive on time whatever you choose here.</string>
+    <string name="settings_usage_history">Usage history</string>
     <string name="settings_keep_long_history">Keep long-term history</string>
     <string name="settings_keep_long_history_body">Keeps a year of usage for the charts, in less detail as it gets older. Turn off to keep only the last 60 days.</string>
     <string name="settings_widgets">Home screen widgets</string>

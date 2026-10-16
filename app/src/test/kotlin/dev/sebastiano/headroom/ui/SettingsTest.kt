@@ -159,6 +159,10 @@ class SettingsTest {
     @Test
     fun `the long-term history switch is on by default and tapping the row turns it off`() {
         openSettings()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasText("Usage history") and isHeading())
+        rule.onNode(hasText("Usage history") and isHeading()).assertIsDisplayed()
         rule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasTestTag(KEEP_LONG_HISTORY_TAG))
         rule.onNodeWithTag(KEEP_LONG_HISTORY_TAG).assertIsOn()
         rule.onNodeWithText("Keep long-term history").assertIsDisplayed()

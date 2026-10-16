@@ -191,23 +191,62 @@ class HistoryRetentionTest {
     }
 
     @Test
+    fun `an early redeem mid-period with unchanged resetsAt splits periods and keeps both peaks`() {
+        // Inside the same 3-hour bucket 45 days ago: the user hits 96%, redeems a reset credit
+        // while resetsAt stays the same, and climbs to 64% before the scheduled weekly reset.
+        val bucketStart = Instant.parse("2026-08-17T06:00:00Z")
+        val sameReset = bucketStart.plus(5.days)
+        val nextReset = sameReset.plus(7.days)
+        val beforeFirst = point(bucketStart.plus(10.minutes), 20.0, resetsAt = sameReset)
+        val beforePeak = point(bucketStart.plus(40.minutes), 96.0, resetsAt = sameReset)
+        val afterRedeemFirst = point(bucketStart.plus(60.minutes), 0.0, resetsAt = sameReset)
+        val afterRedeemMid = point(bucketStart.plus(100.minutes), 35.0, resetsAt = sameReset)
+        val afterRedeemPeak = point(bucketStart.plus(150.minutes), 64.0, resetsAt = sameReset)
+        val nextWeekFirst = point(bucketStart.plus(4.hours), 0.0, resetsAt = nextReset)
+        val points =
+            listOf(
+                beforeFirst,
+                beforePeak,
+                afterRedeemFirst,
+                afterRedeemMid,
+                afterRedeemPeak,
+                nextWeekFirst,
+            )
+
+        val kept = HistoryRetention.LongTerm.compact(points, now)
+        val twice = HistoryRetention.LongTerm.compact(kept, now)
+
+        assertEquals(
+            listOf(beforeFirst, beforePeak, afterRedeemFirst, afterRedeemPeak, nextWeekFirst),
+            kept,
+        )
+        assertEquals(kept, twice)
+        assertEquals(listOf(96.0, 64.0), ResetPeaks.usedAtResets(kept))
+    }
+
+    @Test
     fun `compaction is idempotent across all tiers and period boundaries`() {
         val start = now.minus(380.days)
         val points = mutableListOf<UsagePoint>()
         var cursor = start
         var cycle = 0
+        var redeemedInCycle = false
         var used = 0.0
         while (cursor <= now) {
             val age = now - cursor
             // Mix legacy points (null resetsAt) in the first half and points with resetsAt in the
-            // second half.
+            // second half, including mid-cycle redeems where resetsAt does not advance.
             val resetsAt = if (age > 180.days) null else start.plus(((cycle + 1) * 7).days)
             points += UsagePoint(at = cursor, usedPercent = used, resetsAt = resetsAt)
             cursor += 30.minutes
             used += 1.5
-            if (used >= 95.0) {
+            if (cycle % 5 == 2 && !redeemedInCycle && used >= 80.0) {
+                used = 0.0
+                redeemedInCycle = true
+            } else if (used >= 95.0) {
                 used = 0.0
                 cycle++
+                redeemedInCycle = false
             }
         }
 

@@ -91,9 +91,10 @@ private val TWELVE_HOUR_BUCKET_MS: Long = TWELVE_HOUR_BUCKET_HOURS.hours.inWhole
 
 /**
  * Single-pass compaction over [points] (oldest first). Splits into reset periods where
- * [UsagePoint.resetsAt] changes or usage drops by at least [ResetPeaks.MIN_DROP_POINTS], and marks
- * each period's first sample, its peak sample (latest on a tie), every sample up to
- * [HistoryRetention.FULL_RESOLUTION_SPAN] old, and the last sample of each epoch-aligned bucket.
+ * [UsagePoint.resetsAt] changes or usage drops from the running peak by at least
+ * [ResetPeaks.MIN_DROP_POINTS], and marks each period's first sample, its peak sample (latest on a
+ * tie), every sample up to [HistoryRetention.FULL_RESOLUTION_SPAN] old, and the last sample of each
+ * epoch-aligned bucket.
  */
 private fun markLongTermKept(
     points: List<UsagePoint>,
@@ -123,11 +124,10 @@ private class PeriodState {
     fun isBoundary(point: UsagePoint): Boolean {
         if (!active) return false
         val knownReset = periodResetsAt
-        return if (point.resetsAt != null && knownReset != null) {
-            point.resetsAt != knownReset
-        } else {
-            periodPeak - point.usedPercent >= ResetPeaks.MIN_DROP_POINTS
-        }
+        val resetsChanged =
+            point.resetsAt != null && knownReset != null && point.resetsAt != knownReset
+        val dropped = periodPeak - point.usedPercent >= ResetPeaks.MIN_DROP_POINTS
+        return resetsChanged || dropped
     }
 
     fun record(index: Int, point: UsagePoint, now: Instant, kept: BooleanArray) {
