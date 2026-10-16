@@ -11,10 +11,11 @@
 | `:core:data` | Android library | Encrypted token store, sync worker, reset alarms, notifications, the Android wiring (`DataGraph`) |
 | `:shared` | Kotlin Multiplatform (JVM, iOS) | The `HeadroomKit` framework for the iOS app: wiring, Keychain-backed token store, Swift-friendly view models |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
+| `:third-party:compose-charts` | Android library, Compose (vendored) | Declarative Compose charts (`charts-core` and `charts-compose` from `c5inco/compose-charts`) for the account detail usage history chart |
 | `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
 
-`:app` depends on `:widget`, `:core:designsystem` and `:core:data`.
+`:app` depends on `:widget`, `:core:designsystem`, `:third-party:compose-charts` and `:core:data`.
 `:core:data` depends on `:core:storage`, which depends on `:core:quota` and `:core:auth`.
 Those modules depend on `:core:model`.
 `:widget` uses `:core:designsystem` to share the app's colour palettes.
