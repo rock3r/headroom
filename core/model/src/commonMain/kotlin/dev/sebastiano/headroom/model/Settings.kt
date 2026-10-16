@@ -96,9 +96,8 @@ public enum class OverviewSort {
 /**
  * The user's app settings. The defaults are how the app behaved before it had settings, except the
  * delights, which are on until the user turns them off. The reset island is experimental and needs
- * accessibility access, so it is the one delight that stays off until the user turns it on. Using
- * Claude's resets is experimental too, and off until the user turns it on. Reminders before a reset
- * expires are on until the user turns them off.
+ * accessibility access, so it is the one delight that stays off until the user turns it on.
+ * Reminders before a reset expires are on until the user turns them off.
  */
 public data class AppSettings(
     val quotaDisplay: QuotaDisplay = QuotaDisplay.Used,
@@ -116,11 +115,6 @@ public data class AppSettings(
      * background. Experimental, and off by default.
      */
     val resetIsland: Boolean = false,
-    /**
-     * Headroom can use Claude's saved resets. Experimental, and off by default: see
-     * [redeemsResetsExperimentally].
-     */
-    val redeemClaudeResets: Boolean = false,
     /**
      * A notification about a day before a reset the user can use expires: see
      * [ResetReminderPolicy].
@@ -149,8 +143,6 @@ public interface SettingsRepository {
     public suspend fun setResetConfetti(enabled: Boolean)
 
     public suspend fun setResetIsland(enabled: Boolean)
-
-    public suspend fun setRedeemClaudeResets(enabled: Boolean)
 
     public suspend fun setResetExpiryReminders(enabled: Boolean)
 }
@@ -195,10 +187,6 @@ public class InMemorySettingsRepository(initial: AppSettings = AppSettings()) : 
 
     override suspend fun setResetIsland(enabled: Boolean) {
         state.update { it.copy(resetIsland = enabled) }
-    }
-
-    override suspend fun setRedeemClaudeResets(enabled: Boolean) {
-        state.update { it.copy(redeemClaudeResets = enabled) }
     }
 
     override suspend fun setResetExpiryReminders(enabled: Boolean) {

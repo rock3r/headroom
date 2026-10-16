@@ -110,14 +110,13 @@ public class DataGraph(
 
     /**
      * The resets of the signed-in accounts: read by each sync and stored with the snapshot, and
-     * used through the providers' reset clients, when the user's [settings] allow it.
+     * used through the providers' reset clients.
      */
     public val resetProvider: ResetProvider =
         SyncedResetProvider(
             // What storage holds now: right after a refresh, accounts.value may still be the old
             // one.
             accounts = { repository.current() },
-            settings = { settings.settings.first() },
             fetcher = accountFetcher,
             clients = resetClients,
             log = resetLog,

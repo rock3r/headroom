@@ -29,7 +29,6 @@ data class SettingsUiState(
     val refreshShimmer: Boolean = true,
     val resetConfetti: Boolean = true,
     val resetIsland: Boolean = false,
-    val redeemClaudeResets: Boolean = false,
     val resetExpiryReminders: Boolean = true,
 )
 
@@ -77,10 +76,6 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
         viewModelScope.launch { settings.setResetIsland(enabled) }
     }
 
-    fun setRedeemClaudeResets(enabled: Boolean) {
-        viewModelScope.launch { settings.setRedeemClaudeResets(enabled) }
-    }
-
     fun setResetExpiryReminders(enabled: Boolean) {
         viewModelScope.launch { settings.setResetExpiryReminders(enabled) }
     }
@@ -96,7 +91,6 @@ class SettingsViewModel(private val settings: SettingsRepository, appVersion: St
             refreshShimmer,
             resetConfetti,
             resetIsland,
-            redeemClaudeResets,
             resetExpiryReminders,
         )
 

@@ -276,7 +276,7 @@ internal object UiMapping {
         OverviewUi(
             accounts =
                 accounts.sortedFor(settings.overviewSort).map {
-                    account(it, now, settings, alerts, it.account.id in justReset)
+                    account(it, now, alerts, it.account.id in justReset)
                 },
             yourOrder = accounts.map { it.account.id },
             nowEpochSeconds = now.epochSeconds,
@@ -309,7 +309,6 @@ internal object UiMapping {
     fun account(
         state: AccountState,
         now: Instant,
-        settings: AppSettings = AppSettings(),
         alerts: AlertStates = AlertStates.Defaults,
         justReset: Boolean = false,
     ): AccountUi {
@@ -348,7 +347,7 @@ internal object UiMapping {
             updatedAtEpochSeconds = snapshot?.fetchedAt?.epochSeconds,
             // As on Android: the primary window decides, and stale data never asks for attention.
             needsAttention = primaryUi?.needsAttention ?: false,
-            resets = snapshot?.resets?.let { resets(state, it, settings) },
+            resets = snapshot?.resets?.let { resets(state, it) },
             balance = snapshot?.balance?.let { BalanceUi(it.amount, it.unit) },
             separateAllowances = state.account.provider.windowsAreSeparateAllowances,
             justReset = justReset,
@@ -358,7 +357,6 @@ internal object UiMapping {
     private fun resets(
         state: AccountState,
         resets: ResetAvailability,
-        settings: AppSettings,
     ): AccountResetsUi {
         val provider = state.account.provider
         val windows = state.snapshot?.windows.orEmpty()
@@ -368,7 +366,7 @@ internal object UiMapping {
             pools = resets.pools.map { pool(provider, windows, it) },
             canAskForMore = resets.canAskForMore,
             requiresSignIn = resets.requiresSignIn,
-            canRedeem = provider.canRedeemResets(settings),
+            canRedeem = provider.canRedeemResets(),
             ineligibleReason = resets.ineligibleReason,
             showsSummary = resets.showsSummary,
             holdsNone = resets.holdsNone,

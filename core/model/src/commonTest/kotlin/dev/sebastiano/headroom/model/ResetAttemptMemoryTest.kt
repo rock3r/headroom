@@ -80,20 +80,9 @@ class ResetAttemptMemoryTest {
     }
 
     @Test
-    fun `Codex Grok and Z_AI resets can be redeemed`() {
-        val redeemable = setOf(Provider.Codex, Provider.Grok, Provider.ZAi)
-        Provider.entries.forEach {
-            assertEquals(it in redeemable, it.canRedeemResets(AppSettings()), "$it")
-        }
-    }
-
-    @Test
-    fun `Claude resets can be redeemed only once the user turns it on`() {
-        val optedIn = AppSettings(redeemClaudeResets = true)
+    fun `Codex Grok Z_AI and Claude resets can be redeemed`() {
         val redeemable = setOf(Provider.Codex, Provider.Grok, Provider.ZAi, Provider.Claude)
-        Provider.entries.forEach {
-            assertEquals(it in redeemable, it.canRedeemResets(optedIn), "$it")
-        }
+        Provider.entries.forEach { assertEquals(it in redeemable, it.canRedeemResets(), "$it") }
     }
 
     @Test

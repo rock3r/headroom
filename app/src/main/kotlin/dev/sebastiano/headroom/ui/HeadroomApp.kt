@@ -471,7 +471,6 @@ private fun settingsActions(
         onRefreshShimmerChange = viewModel::setRefreshShimmer,
         onResetConfettiChange = viewModel::setResetConfetti,
         onResetIslandChange = viewModel::setResetIsland,
-        onRedeemClaudeResetsChange = viewModel::setRedeemClaudeResets,
         onResetExpiryRemindersChange = viewModel::setResetExpiryReminders,
         onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
         onRefreshResetIsland = resetIsland::refresh,

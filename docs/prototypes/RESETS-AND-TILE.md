@@ -7,7 +7,7 @@ The repository excludes those screenshots and the review recordings and GIFs.
 > [RESETS.md](../RESETS.md) describes the shipped feature and its current settings.
 > The prototype's combined Claude/Z.AI experimental switch no longer applies.
 > Codex, Grok and Z.AI support redemption. Z.AI requires ZCode sign-in.
-> Claude redemption uses its own experimental setting in the current app.
+> Claude redemption no longer has a setting; the current app always offers it.
 
 ## Run the prototype
 
