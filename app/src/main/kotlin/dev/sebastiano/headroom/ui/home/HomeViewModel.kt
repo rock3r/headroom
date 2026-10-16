@@ -4,18 +4,19 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
+import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
 import dev.sebastiano.headroom.appdata.ResetHistory
+import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaRepository
-import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.ResetTracker
-import dev.sebastiano.headroom.model.WindowKind
-import dev.sebastiano.headroom.model.chartSummary
+import dev.sebastiano.headroom.ui.detail.buildUsageHistoryModel
+import dev.sebastiano.headroom.ui.detail.isChartableHistoryWindow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -59,6 +60,10 @@ class HomeViewModel(
     overviewSort: Flow<OverviewSort> = flowOf(OverviewSort.YourOrder),
     /** Stores a new overview sort; [overviewSort] then emits it. */
     private val saveOverviewSort: suspend (OverviewSort) -> Unit = {},
+    /** Recorded or demo usage history for each long window of the selected account. */
+    usageHistory: UsageHistory = RepositoryUsageHistory(repository),
+    /** Whether long-term history (1 year) is enabled in settings. */
+    keepLongHistory: Flow<Boolean> = flowOf(true),
 ) : ViewModel() {
     private val refreshing = MutableStateFlow(false)
     /** Saved, so the detail pane shows the same account after the process is recreated. */
@@ -162,54 +167,108 @@ class HomeViewModel(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), initialState())
 
-    /** The window the chart shows, as account id to window id, when the user picked one. */
-    private val chartWindow = MutableStateFlow<Pair<String, String>?>(null)
+    /** Which long windows the user toggled off per account id. Empty means all are shown. */
+    private val hiddenChartWindows = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
 
     /** The selected account's detail. Without a selection it shows the first account. */
     val detail: StateFlow<DetailUiState?> =
-        combine(state, selectedId, chartWindow) { home, id, picked ->
+        combine(state, selectedId, hiddenChartWindows, keepLongHistory) {
+                home,
+                id,
+                hiddenByAccount,
+                longHistory ->
                 val account =
                     home.accounts.firstOrNull { it.id == id } ?: home.accounts.firstOrNull()
                 account?.let {
                     DetailSelection(
                         now = home.now,
                         account = it,
-                        pickedWindowId = picked?.takeIf { p -> p.first == it.id }?.second,
+                        hiddenWindowIds = hiddenByAccount[it.id].orEmpty(),
                         display = home.display,
+                        keepLongHistory = longHistory,
                     )
                 }
             }
             .distinctUntilChanged()
             .flatMapLatest { selection ->
                 if (selection == null) return@flatMapLatest flowOf(null)
-                val (now, account, picked) = selection
+                val now = selection.now
+                val account = selection.account
                 val display = selection.display
                 val state = repository.accounts.value.firstOrNull { it.account.id == account.id }
-                val options = state?.snapshot?.windows.orEmpty().filter { it.isChartable }
-                val window = options.firstOrNull { it.id == picked } ?: state?.primaryWindow
-                val chartWindows =
-                    account.windows.filter { summary -> options.any { it.id == summary.id } }
-                if (window == null) {
+                val primaryId = state?.primaryWindow?.id
+                val options =
+                    state
+                        ?.snapshot
+                        ?.windows
+                        .orEmpty()
+                        .filter { it.isChartableHistoryWindow }
+                        .sortedByDescending { it.id == primaryId }
+                val chartWindows = options.mapNotNull { option ->
+                    account.windows.firstOrNull { it.id == option.id }
+                }
+                if (options.isEmpty()) {
                     flowOf(DetailUiState(now, account, chart = null, display = display))
                 } else {
-                    repository.history(account.id, window.id).map { points ->
+                    val allIds = options.map { it.id }.toSet()
+                    val selectedIds =
+                        (allIds - selection.hiddenWindowIds).ifEmpty { setOf(options.first().id) }
+                    combine(
+                        options.map { window ->
+                            usageHistory.points(account.id, window).map { window.id to it }
+                        }
+                    ) { pairs ->
+                        val histories = pairs.toMap()
+                        val historyModel =
+                            buildUsageHistoryModel(
+                                accountId = account.id,
+                                windows = options,
+                                primaryWindowId = primaryId,
+                                histories = histories,
+                                selectedWindowIds = selectedIds,
+                                now = account.asOf(now),
+                                keepLongHistory = selection.keepLongHistory,
+                            )
+                        val primaryShown = historyModel?.primaryShownWindow
                         DetailUiState(
                             now = now,
                             account = account,
-                            chart = chartSummary(window, points, account.asOf(now)),
+                            chart = primaryShown?.summary,
                             chartWindows = chartWindows,
-                            chartWindowId = window.id,
+                            chartWindowId = primaryShown?.id,
                             display = display,
+                            history = historyModel,
                         )
                     }
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
 
-    /** Shows [windowId] of the selected account in the chart. */
+    /**
+     * Toggles [windowId] on or off in the selected account's usage history chart, keeping at least
+     * one long window selected.
+     */
+    fun toggleChartWindow(windowId: String) {
+        val current = detail.value ?: return
+        val accountId = current.account.id
+        val allIds = current.history?.windows?.map { it.id }?.toSet() ?: return
+        if (windowId !in allIds) return
+        hiddenChartWindows.update { byAccount ->
+            val currentHidden = byAccount[accountId].orEmpty().intersect(allIds)
+            val currentSelected = (allIds - currentHidden).ifEmpty { setOf(allIds.first()) }
+            val nextHidden =
+                if (windowId in currentSelected) {
+                    if (currentSelected.size <= 1) currentHidden else currentHidden + windowId
+                } else {
+                    currentHidden - windowId
+                }
+            byAccount + (accountId to nextHidden)
+        }
+    }
+
+    /** Alias for [toggleChartWindow]. */
     fun selectChartWindow(windowId: String) {
-        val accountId = detail.value?.account?.id ?: return
-        chartWindow.value = accountId to windowId
+        toggleChartWindow(windowId)
     }
 
     fun select(accountId: String) {
@@ -262,18 +321,6 @@ class HomeViewModel(
             )
             .copy(sortLoaded = false)
 
-    /**
-     * Weekly and monthly windows with a known start can be drawn against even pace. Credits and
-     * unknown windows have no pace.
-     */
-    private val QuotaWindow.isChartable: Boolean
-        get() =
-            (kind == WindowKind.Weekly || kind == WindowKind.Monthly) &&
-                resetsAt != null &&
-                length != null &&
-                !isUnlimited &&
-                !isInformational
-
     private data class Environment(
         val isDemo: Boolean,
         val accountsLoaded: Boolean,
@@ -286,8 +333,9 @@ class HomeViewModel(
     private data class DetailSelection(
         val now: Instant,
         val account: AccountSummary,
-        val pickedWindowId: String?,
+        val hiddenWindowIds: Set<String>,
         val display: QuotaDisplay,
+        val keepLongHistory: Boolean,
     )
 
     private companion object {

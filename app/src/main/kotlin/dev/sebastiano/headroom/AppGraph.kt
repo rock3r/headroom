@@ -158,6 +158,9 @@ class AppGraph(
                 quotaDisplay = settings.settings.map { it.quotaDisplay }.distinctUntilChanged(),
                 overviewSort = settings.settings.map { it.overviewSort }.distinctUntilChanged(),
                 saveOverviewSort = settings::setOverviewSort,
+                usageHistory = usageHistory,
+                keepLongHistory =
+                    settings.settings.map { it.keepLongHistory }.distinctUntilChanged(),
             )
         }
     }

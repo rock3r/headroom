@@ -2,6 +2,8 @@ package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
@@ -18,10 +20,17 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.designsystem.IndicatorStyle
+import dev.sebastiano.headroom.model.AppSettings
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
+import dev.sebastiano.headroom.ui.detail.HistoryRange
+import dev.sebastiano.headroom.ui.detail.USAGE_HISTORY_CHART_TAG
 import dev.sebastiano.headroom.ui.detail.alertSwitchTag
+import dev.sebastiano.headroom.ui.detail.chartRangeTag
 import dev.sebastiano.headroom.ui.detail.chartWindowTag
 import dev.sebastiano.headroom.ui.overview.accountCardTag
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,12 +83,90 @@ class DetailTest {
     }
 
     @Test
-    fun `the chart can show another long window`() {
+    fun `the chart overlays all long windows and filter chips keep at least one on`() {
         openClaude()
+        val weekly = rule.onNodeWithTag(chartWindowTag("seven_day"))
         val opus = rule.onNodeWithTag(chartWindowTag("seven_day_opus"))
-        opus.performScrollTo().assertIsNotSelected().performClick()
-        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected()
+        weekly.performScrollTo().assertIsSelected()
+        opus.assertIsSelected()
+
+        // Toggling the primary window off leaves Opus on and updates the projection to Opus's.
+        weekly.performClick()
         rule.onNodeWithTag(chartWindowTag("seven_day")).assertIsNotSelected()
+        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected()
+
+        // Tapping the last remaining chip does not turn it off.
+        opus.performClick()
+        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected()
+
+        // Single-window accounts omit the filter chips altogether.
+        rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
+        rule.onNodeWithTag(accountCardTag("demo-codex")).performClick()
+        rule.onNodeWithTag(chartWindowTag("secondary")).assertDoesNotExist()
+    }
+
+    @Test
+    fun `range buttons switch the viewport, update the description, and deselect on pan`() {
+        openClaude()
+        val periodButton = rule.onNodeWithTag(chartRangeTag(HistoryRange.Period))
+        val oneMonthButton = rule.onNodeWithTag(chartRangeTag(HistoryRange.OneMonth))
+        val threeMonthsButton = rule.onNodeWithTag(chartRangeTag(HistoryRange.ThreeMonths))
+        val oneYearButton = rule.onNodeWithTag(chartRangeTag(HistoryRange.OneYear))
+
+        periodButton.performScrollTo().assertIsSelected()
+        oneMonthButton.assertIsNotSelected()
+        threeMonthsButton.assertIsNotSelected()
+        oneYearButton.assertIsNotSelected()
+
+        val chartNode = rule.onNodeWithTag(USAGE_HISTORY_CHART_TAG).performScrollTo()
+        val initialDesc =
+            chartNode
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ContentDescription]
+                .joinToString(" ")
+        assertTrue(initialDesc.contains("Weekly · all models, Weekly · Opus"), initialDesc)
+        assertTrue(initialDesc.contains("No resets in view"), initialDesc)
+
+        // Custom accessibility actions are exposed with localised labels.
+        val actions = chartNode.fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertEquals(
+            listOf("Scroll back", "Scroll forward", "Zoom in", "Zoom out"),
+            actions.map { it.label },
+        )
+
+        // Tapping 1M animates to the 30-day window and brings past resets into view.
+        oneMonthButton.performClick()
+        rule.waitForIdle()
+        oneMonthButton.assertIsSelected()
+        periodButton.assertIsNotSelected()
+        val monthDesc =
+            chartNode
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ContentDescription]
+                .joinToString(" ")
+        assertTrue(monthDesc.contains("resets in view"), monthDesc)
+
+        // Panning back via the accessibility action deselects the preset range button.
+        val scrollBack = actions.first { it.label == "Scroll back" }
+        rule.runOnIdle { assertTrue(scrollBack.action()) }
+        rule.waitForIdle()
+        oneMonthButton.assertIsNotSelected()
+        periodButton.assertIsNotSelected()
+    }
+
+    @Test
+    fun `turning off long-term history hides the 1Y range button`() {
+        val settings = InMemorySettingsRepository(AppSettings(keepLongHistory = false))
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                HeadroomApp(graph = testGraph(rule.activity, settings = settings))
+            }
+        }
+        rule.onNodeWithTag(accountCardTag("demo-claude")).performClick()
+        rule.onNodeWithTag(chartRangeTag(HistoryRange.Period)).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(chartRangeTag(HistoryRange.OneMonth)).assertIsDisplayed()
+        rule.onNodeWithTag(chartRangeTag(HistoryRange.ThreeMonths)).assertIsDisplayed()
+        rule.onNodeWithTag(chartRangeTag(HistoryRange.OneYear)).assertDoesNotExist()
     }
 
     @Test

@@ -6,12 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -24,9 +22,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -43,12 +38,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
-import dev.sebastiano.headroom.designsystem.PaceChart
-import dev.sebastiano.headroom.designsystem.PaceChartModel
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
 import dev.sebastiano.headroom.designsystem.WorkingShimmer
@@ -80,7 +72,6 @@ import dev.sebastiano.headroom.ui.overview.AnimatedPercent
 import dev.sebastiano.headroom.ui.resets.AccountResets
 import dev.sebastiano.headroom.ui.resets.ResetHandlers
 import dev.sebastiano.headroom.ui.resets.ResetsCard
-import java.time.format.TextStyle
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -185,14 +176,15 @@ fun DetailScreen(
                     content.stale(stale),
                 )
                 // The chart follows the windows it draws; the resets come after the usage.
-                state.chart?.let {
+                val chart = state.chart
+                val history = state.history
+                if (chart != null && history != null) {
                     ChartCard(
-                        chart = it,
+                        chart = chart,
+                        history = history,
                         now = account.asOf(state.now),
                         formatter = formatter,
-                        windows = state.chartWindows,
-                        selectedWindowId = state.chartWindowId,
-                        onWindowChange = onChartWindowChange,
+                        onWindowToggle = onChartWindowChange,
                         display = state.display,
                         modifier = content.stale(stale),
                     )
@@ -464,36 +456,13 @@ private fun resetLine(window: WindowSummary, at: Instant, now: Instant, formatte
         else -> stringResource(R.string.detail_resets_at, formatter.long(at))
     }
 
-/** Picks which long window the chart draws, for accounts with more than one. */
-@Composable
-private fun ChartWindowPicker(
-    windows: List<WindowSummary>,
-    selectedWindowId: String?,
-    onWindowChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
-        windows.forEachIndexed { index, window ->
-            SegmentedButton(
-                selected = window.id == selectedWindowId,
-                onClick = { onWindowChange(window.id) },
-                shape = SegmentedButtonDefaults.itemShape(index, windows.size),
-                modifier = Modifier.testTag(chartWindowTag(window.id)),
-            ) {
-                Text(window.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
 @Composable
 private fun ChartCard(
     chart: ChartSummary,
+    history: UsageHistoryModel,
     now: Instant,
     formatter: ResetFormatter,
-    windows: List<WindowSummary>,
-    selectedWindowId: String?,
-    onWindowChange: (String) -> Unit,
+    onWindowToggle: (String) -> Unit,
     display: QuotaDisplay,
     modifier: Modifier = Modifier,
 ) {
@@ -522,37 +491,11 @@ private fun ChartCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (windows.size > 1) {
-                Spacer(Modifier.height(8.dp))
-                ChartWindowPicker(windows, selectedWindowId, onWindowChange)
-            }
-            Spacer(Modifier.height(4.dp))
-            val shown = display.percent(chart.usedPercent).roundToInt()
-            val above = chart.usedPercent > chart.expectedPercent
-            PaceChart(
-                model =
-                    PaceChartModel(
-                        start = chart.start,
-                        end = chart.end,
-                        now = now,
-                        usedPercent = chart.usedPercent,
-                        points = chart.points,
-                        projectedLimitAt = chart.projectedLimitAt,
-                        tickLabels = tickLabels(chart, formatter),
-                    ),
-                limitLabel = stringResource(R.string.detail_chart_limit),
-                contentDescription =
-                    stringResource(
-                        when (display) {
-                            QuotaDisplay.Used ->
-                                if (above) R.string.detail_chart_description_above
-                                else R.string.detail_chart_description_below
-                            QuotaDisplay.Left ->
-                                if (above) R.string.detail_chart_description_above_left
-                                else R.string.detail_chart_description_below_left
-                        },
-                        shown,
-                    ),
+            UsageHistoryChart(
+                model = history,
+                formatter = formatter,
+                display = display,
+                onWindowToggle = onWindowToggle,
             )
             Text(
                 text = projectionText(chart, now, formatter, display),
@@ -561,23 +504,6 @@ private fun ChartCard(
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-    }
-}
-
-/** Below this, a window reads as just reset. */
-private const val FRESH_MAX_PERCENT = 0.5
-private const val WEEK_DAYS = 7
-private const val MONTH_SLICES = 4
-
-/** Weekday names for a weekly window (starting on its first day); "1" to "4" for longer ones. */
-@Composable
-private fun tickLabels(chart: ChartSummary, formatter: ResetFormatter): List<String> {
-    val locale = LocalLocale.current.platformLocale
-    return if (chart.kind == WindowKind.Weekly) {
-        val first = formatter.dayOfWeek(chart.start)
-        (0 until WEEK_DAYS).map { first.plus(it.toLong()).getDisplayName(TextStyle.SHORT, locale) }
-    } else {
-        (1..MONTH_SLICES).map { it.toString() }
     }
 }
 
