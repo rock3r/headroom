@@ -33,6 +33,7 @@ import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.prototype.PrototypeTools
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
+import dev.sebastiano.headroom.signin.ZCodeSignIn
 import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import java.time.ZoneOffset
@@ -75,6 +76,7 @@ fun testGraph(
     resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
     resetProvider: ResetProvider = NoResets,
     prototypes: PrototypeTools? = null,
+    zCodeSignIn: ZCodeSignIn? = null,
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
@@ -115,6 +117,7 @@ fun testGraph(
                 real = ResetEventLog.None,
                 demo = DemoResetEvents(clock),
             ),
+        zCodeSignIn = zCodeSignIn,
     )
 }
 

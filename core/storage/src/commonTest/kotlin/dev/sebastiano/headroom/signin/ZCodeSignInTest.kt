@@ -131,6 +131,54 @@ class ZCodeSignInTest {
         }
 
     @Test
+    fun `a prepared page opens at once when the sign-in starts`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val session = FakeSession()
+            var starts = 0
+            val signIn =
+                ZCodeSignIn(
+                    start = {
+                        starts++
+                        session
+                    },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                )
+
+            signIn.prepare("z1")
+
+            // The page is readied before the tap, and nothing shows yet.
+            assertEquals(1, starts)
+            assertEquals(ZCodeSignInState.Idle, signIn.state.value)
+
+            signIn.start("z1")
+
+            // No second round trip: the page opens at once.
+            assertEquals(1, starts)
+            assertEquals(ZCodeSignInState.Waiting("z1", "https://chat.z.ai/a"), signIn.state.value)
+        }
+
+    @Test
+    fun `a page whose prepare failed starts again on tap`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val session = FakeSession()
+            var failures = 1
+            val signIn =
+                ZCodeSignIn(
+                    start = {
+                        if (failures-- > 0) throw AuthException.Network("offline") else session
+                    },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                )
+
+            signIn.prepare("z1")
+            signIn.start("z1")
+
+            assertEquals(ZCodeSignInState.Waiting("z1", "https://chat.z.ai/a"), signIn.state.value)
+        }
+
+    @Test
     fun `logs each step and why it failed without tokens`() =
         runTest(UnconfinedTestDispatcher()) {
             val lines = mutableListOf<String>()
