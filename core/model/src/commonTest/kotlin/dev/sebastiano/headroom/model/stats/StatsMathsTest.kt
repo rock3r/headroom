@@ -388,7 +388,14 @@ class StatsMathsTest {
             assertEquals(expected.fraction, actual.fraction, 1e-6)
         }
         val map = requireNotNull(compactStats.heatmap)
+        assertEquals(fullStats.heatmap, map)
         assertEquals(Persona.NineToFive, persona(map))
+        // Night hours (00:00..08:00) had no usage and are not smeared by 3h/12h buckets.
+        for (day in DayOfWeek.entries) {
+            for (hour in 0..8) {
+                assertEquals(0.0, map.at(day, hour), "Expected 0 burn on $day at $hour:00")
+            }
+        }
         assertTrue(compactStats.biggestDay != null && compactStats.biggestDay.points > 0.0)
     }
 }

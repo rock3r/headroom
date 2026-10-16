@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.ui.stats
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -96,8 +98,32 @@ internal fun ResetsCard(score: ResetScore?, modifier: Modifier = Modifier) {
                 }
                 StreakBadge(score.streak)
             }
-            ResetMarks(score.timeline)
-            ChartNote(stringResource(R.string.stats_resets_legend))
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val density = LocalDensity.current
+                val capacity =
+                    with(density) {
+                        maxResetMarks(
+                            widthPx = constraints.maxWidth,
+                            markPx = ResetMarkSize.roundToPx(),
+                            gapPx = ResetMarkGap.roundToPx(),
+                        )
+                    }
+                val shown = score.timeline.takeLast(capacity)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ResetMarks(shown)
+                    ChartNote(
+                        if (shown.size < score.timeline.size) {
+                            pluralStringResource(
+                                R.plurals.stats_resets_legend_latest,
+                                shown.size,
+                                shown.size,
+                            )
+                        } else {
+                            stringResource(R.string.stats_resets_legend)
+                        }
+                    )
+                }
+            }
         }
     }
 }

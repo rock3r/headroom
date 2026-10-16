@@ -194,6 +194,10 @@
     <string name="stats_resets_body">resets came without hitting the limit</string>
     <string name="stats_resets_streak">in a row</string>
     <string name="stats_resets_legend">One mark per reset, oldest first. Squares hit the limit.</string>
+    <plurals name="stats_resets_legend_latest">
+        <item quantity="one">Your latest %1$d reset, oldest first. Squares hit the limit.</item>
+        <item quantity="other">Your latest %1$d resets, oldest first. Squares hit the limit.</item>
+    </plurals>
     <plurals name="stats_resets_description">
         <item quantity="one">%1$d of %2$d reset came without hitting the limit. Current streak: %3$d.</item>
         <item quantity="other">%1$d of %2$d resets came without hitting the limit. Current streak: %3$d.</item>

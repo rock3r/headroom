@@ -19,8 +19,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlin.time.measureTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,5 +132,29 @@ class StatsViewModelTest {
             assertFalse(state.loading)
             assertEquals(null, state.stats.resets)
             assertEquals(null, state.stats.coverage)
+        }
+
+    @Test
+    fun `computing stats for four accounts with a year of history is fast`() =
+        runTest(main.dispatcher) {
+            val demoHistory = DemoUsageHistory(DemoResetHistory, { now }, ZoneOffset.UTC)
+            // Warm up once.
+            val warmup = viewModel(demoHistory)
+            val warmupJob = backgroundScope.launch { warmup.state.collect {} }
+            runCurrent()
+            warmupJob.cancel()
+
+            val elapsed = measureTime {
+                val vm = viewModel(demoHistory)
+                val job = backgroundScope.launch { vm.state.collect {} }
+                runCurrent()
+                assertFalse(vm.state.value.loading)
+                assertEquals(168, vm.state.value.stats.resets?.total)
+                job.cancel()
+            }
+            assertTrue(
+                elapsed < 50.milliseconds,
+                "Expected StatsViewModel year computation under 50 ms, took $elapsed",
+            )
         }
 }
