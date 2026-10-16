@@ -23,7 +23,6 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
@@ -119,8 +118,10 @@ fun RedeemSheet(
     /** How that sign-in is going, once it started from this sheet. */
     signIn: ZCodeSignInState = ZCodeSignInState.Idle,
 ) {
+    // A sign-in that finishes while the sheet is open refreshes the availability, and the new
+    // session then picks the resets up: the sheet goes on to them instead of closing.
     val session =
-        remember(account.id, intent) {
+        remember(account.id, intent, availability.requiresSignIn) {
             RedeemSession(account, availability, provider, intent, memory)
         }
     val step by session.step.collectAsStateWithLifecycle()
@@ -159,11 +160,6 @@ fun RedeemSheet(
                     .invokeOnCompletion { if (!sheetState.isVisible) onDismiss() }
             },
         )
-    // Signed in: the account's resets are read again, and the sheet has done its job.
-    DisposableEffect(signIn) {
-        if (signIn is ZCodeSignInState.Done) actions.onClose()
-        onDispose {}
-    }
     val signInNote =
         if (stubNote) stringResource(R.string.redeem_sign_in_stub)
         else signInLine(signIn, ResetCopy.signInService(account.provider))

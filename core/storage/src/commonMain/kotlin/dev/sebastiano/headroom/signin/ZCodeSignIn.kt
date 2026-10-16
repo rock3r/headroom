@@ -4,7 +4,9 @@ import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.TokenSet
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,10 +43,11 @@ public sealed interface ZCodeSignInState {
 
 /**
  * Runs the ZCode sign-in a Z.AI account's resets need, one at a time. [start] opens a ZCode flow,
- * whose page the app shows in the browser; the flow polls until the user signed in there. ZCode
- * finishes the sign-in on its own server, with no redirect back to the app, so [returnToApp] then
- * brings the app in front of the browser tab. [save] stores the tokens next to the account's API
- * key and refreshes the account, so its resets show. [log] gets one line per step, with no token.
+ * whose page the app shows in the browser; the flow polls until the user signed in there. [prepare]
+ * readies the page ahead of the tap, so the tap opens it at once. ZCode finishes the sign-in on its
+ * own server, with no redirect back to the app, so [returnToApp] then brings the app in front of
+ * the browser tab. [save] stores the tokens next to the account's API key and refreshes the
+ * account, so its resets show. [log] gets one line per step, with no token.
  */
 public class ZCodeSignIn(
     private val start: suspend () -> DeviceSession,
@@ -57,6 +60,52 @@ public class ZCodeSignIn(
     public val state: StateFlow<ZCodeSignInState> = mutableState.asStateFlow()
 
     private var job: Job? = null
+
+    /** The page being readied by [prepare], and the account it is for. */
+    private var prepared: Pair<String, Deferred<DeviceSession?>>? = null
+
+    /**
+     * Readies the ZCode page of [accountId] before [start] is asked for it, so the tap opens the
+     * page at once instead of waiting for the round trip that makes it. A sign-in already running
+     * for the account is left alone; a failed prepare is tried again on the tap.
+     */
+    public fun prepare(accountId: String) {
+        val current = mutableState.value
+        val running =
+            current.accountId == accountId &&
+                current !is ZCodeSignInState.Idle &&
+                current !is ZCodeSignInState.Failed
+        if (running) return
+        val ready = prepared
+        if (ready?.first == accountId && !ready.second.isCancelled) return
+        ready?.second?.cancel()
+        prepared = accountId to scope.async { readyPage() }
+    }
+
+    /**
+     * Forgets the page [prepare] readied for [accountId], when whoever asked for it is gone. A
+     * readied page expires a few minutes after it is made, so it must not be kept for later.
+     */
+    public fun forgetPrepared(accountId: String) {
+        val ready = prepared
+        if (ready?.first != accountId) return
+        ready.second.cancel()
+        prepared = null
+    }
+
+    /** The sign-in page, or null when making it failed: a failed prepare is not a failed tap. */
+    private suspend fun readyPage(): DeviceSession? =
+        try {
+            start()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: AuthException) {
+            log("ZCode sign-in: readying the page failed: ${failure.message}")
+            null
+        } catch (failure: IOException) {
+            log("ZCode sign-in: readying the page failed: ${failure::class.simpleName}")
+            null
+        }
 
     /**
      * Starts signing [accountId] in to ZCode. While its page already waits, this opens the same
@@ -72,11 +121,14 @@ public class ZCodeSignIn(
         }
         if (current is ZCodeSignInState.Starting && current.accountId == accountId) return
         job?.cancel()
+        val ready = prepared
+        prepared = null
+        if (ready != null && ready.first != accountId) ready.second.cancel()
         mutableState.value = ZCodeSignInState.Starting(accountId)
         job = scope.launch {
             mutableState.value =
                 try {
-                    val session = start()
+                    val session = ready?.let { awaitPrepared(accountId, it) } ?: start()
                     mutableState.value =
                         ZCodeSignInState.Waiting(accountId, session.verificationUrl)
                     log("ZCode sign-in: waiting for the browser")
@@ -103,8 +155,19 @@ public class ZCodeSignIn(
     public fun cancel() {
         job?.cancel()
         job = null
+        prepared?.second?.cancel()
+        prepared = null
         mutableState.value = ZCodeSignInState.Idle
     }
+
+    /**
+     * The page [prepare] readied for [accountId], or null when it is for another account or it
+     * failed: a failed prepare is not a failed sign-in, so the tap starts again.
+     */
+    private suspend fun awaitPrepared(
+        accountId: String,
+        ready: Pair<String, Deferred<DeviceSession?>>,
+    ): DeviceSession? = ready.takeIf { it.first == accountId }?.second?.await()
 
     private fun AuthException.toSignInError(): SignInError =
         when (this) {
