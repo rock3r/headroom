@@ -1,8 +1,8 @@
 # Headroom launch video
 
-The 75 second launch video for Headroom, built in [Cavalry](https://cavalry.scenegroup.co) from
-scripts. Nothing in the video is a screenshot: every screen, widget and transition is rebuilt as live
-layers by the files in `build/`, so the scene can be regenerated and re-rendered at any size.
+The 75-second Headroom launch video uses scripts in [Cavalry](https://cavalry.scenegroup.co).
+Scripts in `build/` draw every screen, widget and transition as editable layers.
+The video contains no screenshots. Rebuilding the scene allows rendering at any size.
 
 ## What is here
 
@@ -25,16 +25,18 @@ layers by the files in `build/`, so the scene can be regenerated and re-rendered
 
 ## Requirements
 
-- Cavalry, with the cav plugin and CLI. The video was built with cav 1.2.0 (helpers 1.2.0+218832b7).
-- The Google Sans Flex font installed on the machine that renders.
-- ffmpeg and ffprobe, which cav uses to mux the audio and check the render.
-- Paths are relative to this folder, so the repo can live anywhere. Cavalry scripts cannot see where
-  they are, so `build/run.sh` writes the folder's path to `build/.root.js` (ignored by git) and runs it
-  first. Always run the scripts through `run.sh` or `build.sh`, not with `cav run` directly.
+- Install Cavalry with the cav plugin and command-line interface (CLI).
+  The video build used cav 1.2.0 and helpers 1.2.0+218832b7.
+- Install Google Sans Flex on the rendering machine.
+- Install ffmpeg and ffprobe. cav uses them to combine audio with video and check the render.
+
+All paths are relative to this folder. Cavalry scripts cannot find their own location.
+`build/run.sh` writes the folder path to the git-ignored `build/.root.js` and runs that file first.
+Always use `run.sh` or `build.sh` to run scripts. Direct `cav run` calls skip this setup.
 
 ## Rebuild and render
 
-From this folder, with Cavalry open:
+Open Cavalry, then run these commands from this folder:
 
 ```sh
 sh build/build.sh
@@ -42,18 +44,18 @@ cav scene save scenes/launch.cv
 cav render -o renders/headroom-launch-1080p60.mp4 --audio music/headroom-edm2-v3.flac --scale 100 --timeout 120m
 ```
 
-`build.sh` clears the open scene before building. Use `--scale 50` for a quick preview render.
+`build.sh` clears the current scene before rebuilding it. Use `--scale 50` for a lower-resolution preview.
 
-The thumbnail is built separately, because it also clears the scene:
+Build the thumbnail separately. Its script also clears the current scene:
 
 ```sh
 sh build/run.sh build/01_ui.js build/02_os.js build/thumb.js
 cav frame 0 --scale 100 -o out/thumb.png
 ```
 
-Then scale it to 1280 x 720 for YouTube.
+Scale the resulting image to 1280 x 720 for YouTube.
 
 ## Music
 
-The soundtrack was generated with Google's Lyria and edited to the cut. Check Lyria's terms before
-reusing it outside this video.
+Google's Lyria generated the soundtrack. The edited track matches the video's timing.
+Check Lyria's terms before using the soundtrack outside this video.
