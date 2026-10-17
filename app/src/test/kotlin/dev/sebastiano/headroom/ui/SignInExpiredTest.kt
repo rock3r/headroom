@@ -21,8 +21,10 @@ import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.designsystem.IndicatorStyle
 import dev.sebastiano.headroom.designsystem.PaceChipState
 import dev.sebastiano.headroom.designsystem.StaleKey
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
@@ -164,5 +166,87 @@ class SignInExpiredTest {
         launch()
         rule.onNode(hasContentDescription("Resets")).performClick()
         rule.onAllNodesWithText("Claude · Weekly · all models").assertCountEquals(0)
+    }
+
+    @Test
+    fun `an expired API key card and detail explain how to replace it in the OpenCode Console`() {
+        val opencode =
+            DemoData.manyAccounts(FIXED_NOW.minus(2.hours))
+                .first { it.account.provider == Provider.OpenCodeGo }
+                .copy(lastError = QuotaErrorKind.Auth, authReason = AuthFailureReason.KeyExpired)
+        val openCodeCard = accountCardTag(opencode.account.id)
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                HeadroomApp(
+                    graph =
+                        testGraph(
+                            rule.activity,
+                            realAccounts = listOf(opencode),
+                            signInController = signIn,
+                        )
+                )
+            }
+        }
+
+        rule
+            .onNodeWithTag(openCodeCard)
+            .assert(hasContentDescription("API key expired, data from 2 hours ago"))
+        rule
+            .onNode(
+                inCard(openCodeCard) and
+                    hasText(
+                        "This API key has expired. Create a new key in the OpenCode Console, then replace it here."
+                    ),
+                useUnmergedTree = true,
+            )
+            .assertIsDisplayed()
+        rule
+            .onNode(inCard(openCodeCard) and hasText("Replace API key"))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assertIsDisplayed()
+
+        rule.onNodeWithTag(openCodeCard).performClick()
+        rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
+        rule
+            .onNodeWithText(
+                "This API key has expired. Create a new key in the OpenCode Console, then replace it here."
+            )
+            .assertIsDisplayed()
+        rule
+            .onNodeWithText("Replace API key")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        assertEquals(Provider.OpenCodeGo, (signIn.state.value as? SignInState.ApiKey)?.provider)
+    }
+
+    @Test
+    fun `a plain unauthorized API key card and detail say the key was rejected`() {
+        val opencode =
+            DemoData.manyAccounts(FIXED_NOW.minus(2.hours))
+                .first { it.account.provider == Provider.OpenCodeGo }
+                .copy(lastError = QuotaErrorKind.Auth, authReason = null)
+        val openCodeCard = accountCardTag(opencode.account.id)
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                HeadroomApp(
+                    graph =
+                        testGraph(
+                            rule.activity,
+                            realAccounts = listOf(opencode),
+                            signInController = signIn,
+                        )
+                )
+            }
+        }
+
+        rule
+            .onNodeWithTag(openCodeCard)
+            .assert(hasContentDescription("API key rejected, data from 2 hours ago"))
+        rule.onNode(inCard(openCodeCard) and hasText("Replace API key")).assertIsDisplayed()
+
+        rule.onNodeWithTag(openCodeCard).performClick()
+        rule.onNodeWithTag(DETAIL_TAG).assertIsDisplayed()
+        rule.onNodeWithText("Your OpenCode Go API key was rejected").assertIsDisplayed()
+        rule.onNodeWithText("Replace API key").assertIsDisplayed()
     }
 }

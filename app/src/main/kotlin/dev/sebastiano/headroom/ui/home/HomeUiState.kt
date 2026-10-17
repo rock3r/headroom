@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.ui.home
 
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.designsystem.PaceChipState
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
@@ -75,6 +76,8 @@ data class AccountSummary(
     val signInExpired: Boolean = false,
     /** When the numbers were fetched, or null before the first good sync. */
     val dataFrom: Instant? = null,
+    /** Why an [QuotaErrorKind.Auth] sync failed, when the provider gave a specific reason. */
+    val authReason: AuthFailureReason? = null,
 ) {
     /**
      * The instant the numbers describe: now for fresh data, the last good sync for stale data. Pace

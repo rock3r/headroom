@@ -80,7 +80,10 @@
     <string name="account_no_data">No usage data yet.</string>
     <!-- The compact call to action on an overview card whose sign-in expired. -->
     <string name="stale_card_title">Sign-in expired</string>
+    <string name="stale_card_title_key_expired">API key expired</string>
+    <string name="stale_card_title_key_rejected">API key rejected</string>
     <string name="stale_card_action">Sign in</string>
+    <string name="stale_card_action_api_key">Replace API key</string>
     <!-- When a stale account's numbers are from, such as "Last updated 2 hours ago". -->
     <string name="stale_last_updated">Last updated %1$s</string>
     <string name="stale_never_updated">Not updated yet</string>
@@ -101,9 +104,20 @@
     <!-- What a screen reader says about a stale account, such as "Sign-in expired, data from 2 hours ago". -->
     <string name="stale_description">Sign-in expired, data from %1$s</string>
     <string name="stale_description_no_data">Sign-in expired, no data yet</string>
+    <string name="stale_description_key_expired">API key expired, data from %1$s</string>
+    <string name="stale_description_key_expired_no_data">API key expired, no data yet</string>
+    <string name="stale_description_key_rejected">API key rejected, data from %1$s</string>
+    <string name="stale_description_key_rejected_no_data">API key rejected, no data yet</string>
     <string name="stale_banner_title">Your %1$s sign-in expired</string>
     <string name="stale_banner_body">Headroom can\'t update this account until you sign in again. The numbers below are the last it saw.</string>
     <string name="stale_banner_action">Sign in again</string>
+    <string name="stale_banner_title_key_expired">Your %1$s API key expired</string>
+    <string name="stale_banner_body_key_expired">This API key has expired. Create a new key in %1$s, then replace it here.</string>
+    <string name="stale_banner_title_key_rejected">Your %1$s API key was rejected</string>
+    <string name="stale_banner_body_key_rejected">%1$s rejected this API key. Replace it with a working key to update this account.</string>
+    <string name="stale_banner_action_api_key">Replace API key</string>
+    <string name="api_key_console_opencode">the OpenCode Console</string>
+    <string name="api_key_console_zai">the Z.AI console</string>
     <!-- A stale window whose reset time has passed: its numbers are from before the reset. -->
     <string name="stale_window_reset">Has reset</string>
     <string name="stale_window_reset_long">Has reset since the last update</string>
@@ -448,6 +462,8 @@
     <string name="signin_key_label">API key</string>
     <string name="signin_key_submit">Save key</string>
     <string name="signin_key_rejected">This key does not look right. Check that you copied all of it.</string>
+    <string name="signin_key_expired">%1$s says this key has expired — create a new one in %2$s.</string>
+    <string name="signin_key_unauthorized">%1$s rejected this API key. Check that you copied all of it.</string>
     <string name="signin_starting">Getting the sign-in ready</string>
     <string name="signin_finishing_title">Finishing sign-in</string>
     <string name="signin_finishing_body">Getting your %1$s limits…</string>

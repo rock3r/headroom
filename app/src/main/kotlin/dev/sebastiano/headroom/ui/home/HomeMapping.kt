@@ -106,6 +106,7 @@ internal fun AccountState.toSummary(
             },
         signInExpired = isSignInExpired,
         dataFrom = snapshot?.fetchedAt,
+        authReason = authReason,
     )
 }
 

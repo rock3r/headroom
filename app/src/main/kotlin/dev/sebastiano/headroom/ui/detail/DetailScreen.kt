@@ -136,16 +136,10 @@ fun DetailScreen(
                 DetailTopBar(account, onBack, sharedElements, content)
                 val stale = account.signInExpired
                 if (stale) {
-                    SignInExpiredBanner(
-                        provider = account.provider,
-                        dataFrom = account.dataFrom,
-                        now = state.now,
-                        onSignIn = { onSignInAgain(account.id) },
-                        modifier = content,
-                    )
+                    SignInExpiredBanner(account, state.now, { onSignInAgain(account.id) }, content)
                 }
                 // The ring, the windows and the chart are stale data: faded, and said so.
-                val staleText = if (stale) staleDescription(account.dataFrom, state.now) else null
+                val staleText = if (stale) staleDescription(account, state.now) else null
                 account.primary?.let {
                     HeroRing(
                         account,
