@@ -3,11 +3,13 @@ package dev.sebastiano.headroom.model
 import dev.sebastiano.headroom.model.stats.ResetPeaks
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class HistoryRetentionTest {
@@ -293,6 +295,94 @@ class HistoryRetentionTest {
         assertEquals(
             ResetPeaks.resets(points.filter { it.at >= now.minus(365.days) }),
             ResetPeaks.resets(once),
+        )
+    }
+
+    @Test
+    fun `jittering relative resetsAt across a year compacts like stable resetsAt and stays idempotent`() {
+        val start = now.minus(365.days)
+        val stablePoints = mutableListOf<UsagePoint>()
+        val jitteredPoints = mutableListOf<UsagePoint>()
+        val jitterOffsetsSeconds = listOf(-4L, 3L, -1L, 5L, -3L, 2L, 0L, -5L, 4L)
+        var cursor = start
+        var step = 0
+        while (cursor <= now) {
+            val week = (cursor - start).inWholeDays / 7
+            val inWeekHours = ((cursor - start) - (week * 7).days).inWholeMinutes / 60.0
+            val used = (inWeekHours / (7 * 24) * 88.0).coerceAtMost(88.0)
+            val stableReset = start.plus(((week + 1) * 7).days)
+            val jitter = jitterOffsetsSeconds[step % jitterOffsetsSeconds.size].seconds
+            stablePoints += UsagePoint(at = cursor, usedPercent = used, resetsAt = stableReset)
+            jitteredPoints +=
+                UsagePoint(at = cursor, usedPercent = used, resetsAt = stableReset + jitter)
+            cursor += 15.minutes
+            step++
+        }
+
+        val stableKept = HistoryRetention.LongTerm.compact(stablePoints, now)
+        val jitteredKept = HistoryRetention.LongTerm.compact(jitteredPoints, now)
+        val jitteredTwice = HistoryRetention.LongTerm.compact(jitteredKept, now)
+
+        assertEquals(
+            stableKept.map { it.at to it.usedPercent },
+            jitteredKept.map { it.at to it.usedPercent },
+        )
+        assertEquals(jitteredKept, jitteredTwice)
+    }
+
+    @Test
+    fun `ResetBoundary ignores forward and backward jitter and detects real advances or drops`() {
+        val baseReset = now.plus(4.days)
+        val previous = point(now.minus(15.minutes), usedPercent = 42.0, resetsAt = baseReset)
+
+        // Small forward jitter, exact match, and backward shift are not resets.
+        assertFalse(
+            ResetBoundary.isReset(
+                previous,
+                point(now, usedPercent = 43.0, resetsAt = baseReset.plus(5.seconds)),
+            )
+        )
+        assertFalse(
+            ResetBoundary.isReset(
+                previous,
+                point(now, usedPercent = 43.0, resetsAt = baseReset.plus(1.hours)),
+            )
+        )
+        assertFalse(
+            ResetBoundary.isReset(
+                previous,
+                point(now, usedPercent = 43.0, resetsAt = baseReset.minus(2.hours)),
+            )
+        )
+
+        // Advancing resetsAt beyond 1 hour (or 1/24 of windowLength when longer) is a reset.
+        assertTrue(
+            ResetBoundary.isReset(
+                previous,
+                point(now, usedPercent = 43.0, resetsAt = baseReset.plus(1.hours + 1.seconds)),
+            )
+        )
+        assertFalse(
+            ResetBoundary.isReset(
+                previous,
+                point(now, usedPercent = 43.0, resetsAt = baseReset.plus(6.hours)),
+                windowLength = 7.days,
+            )
+        )
+        assertTrue(
+            ResetBoundary.isReset(
+                previous,
+                point(now, usedPercent = 43.0, resetsAt = baseReset.plus(7.days)),
+                windowLength = 7.days,
+            )
+        )
+
+        // A drop of at least MIN_DROP_POINTS is a reset even without a resetsAt advance.
+        assertTrue(
+            ResetBoundary.isReset(
+                previous,
+                point(now, usedPercent = 37.0, resetsAt = baseReset.minus(3.seconds)),
+            )
         )
     }
 }

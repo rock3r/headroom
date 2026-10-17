@@ -7,7 +7,6 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.toLocalDateTime
 
 /** A limit hit in the demo: the demand was this much more than the limit, so usage stops at 100. */
@@ -87,27 +86,23 @@ private inline fun appendCycle(
 ) {
     val hours = (end - start).inWholeHours.toInt()
     if (hours <= 0) return
-    val weights = DoubleArray(hours)
-    var total = 0.0
-    val firstLocal = start.toLocalDateTime(zone)
-    var epochDay = firstLocal.date.toEpochDays()
-    var dayOfWeek = firstLocal.dayOfWeek
-    var localHour = firstLocal.hour
-    var dayFactor = 1.0 + DAY_WOBBLE * sin(epochDay.toDouble() * DAY_WOBBLE_FREQUENCY)
-    for (hour in 0 until hours) {
-        val weight = baseActivity(dayOfWeek, localHour) * dayFactor
-        weights[hour] = weight
-        total += weight
-        localHour++
-        if (localHour == HOURS_PER_DAY) {
-            localHour = 0
-            epochDay++
-            dayOfWeek = DayOfWeek(dayOfWeek.isoDayNumber % DAYS_PER_WEEK + 1)
-            dayFactor = 1.0 + DAY_WOBBLE * sin(epochDay.toDouble() * DAY_WOBBLE_FREQUENCY)
-        }
-    }
     val startEpochSeconds = start.epochSeconds
     val startNanoseconds = start.nanosecondsOfSecond
+    val weights = DoubleArray(hours)
+    var total = 0.0
+    for (hour in 0 until hours) {
+        val at =
+            Instant.fromEpochSeconds(
+                startEpochSeconds + hour * SECONDS_PER_HOUR,
+                startNanoseconds,
+            )
+        val local = at.toLocalDateTime(zone)
+        val dayFactor =
+            1.0 + DAY_WOBBLE * sin(local.date.toEpochDays().toDouble() * DAY_WOBBLE_FREQUENCY)
+        val weight = baseActivity(local.dayOfWeek, local.hour) * dayFactor
+        weights[hour] = weight
+        total += weight
+    }
     var sofar = 0.0
     for (hour in 0 until hours) {
         val at =
@@ -132,8 +127,6 @@ private fun baseActivity(dayOfWeek: DayOfWeek, hour: Int): Double {
 }
 
 private const val MIN_POINT_CAPACITY = 16
-private const val HOURS_PER_DAY = 24
-private const val DAYS_PER_WEEK = 7
 private const val SECONDS_PER_MINUTE = 60L
 private const val SECONDS_PER_HOUR = 3_600L
 private val WORK_MORNING = 9..12

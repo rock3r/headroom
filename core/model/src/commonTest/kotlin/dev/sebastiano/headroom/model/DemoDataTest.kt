@@ -11,6 +11,7 @@ import kotlin.time.measureTime
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 class DemoDataTest {
     private val now = Instant.parse("2026-09-27T12:32:00Z")
@@ -128,5 +129,62 @@ class DemoDataTest {
             "Demo history generation for ${accounts.size} accounts ($totalPoints points): $elapsed"
         )
         assertEquals(7_475, totalPoints)
+    }
+
+    @Test
+    fun `demo usage weights follow local wall-clock hours across spring and autumn DST transitions`() {
+        val rome = TimeZone.of("Europe/Rome")
+        // Spring forward in Europe/Rome: Sunday 2026-03-29 (02:00 CET -> 03:00 CEST).
+        val springReset = Instant.parse("2026-04-02T12:00:00Z")
+        // Fall back in Europe/Rome: Sunday 2026-10-25 (03:00 CEST -> 02:00 CET).
+        val autumnReset = Instant.parse("2026-10-29T12:00:00Z")
+
+        for (resetAt in listOf(springReset, autumnReset)) {
+            val window =
+                QuotaWindow(
+                    id = "seven_day",
+                    label = "Weekly",
+                    kind = WindowKind.Weekly,
+                    usedPercent = 80.0,
+                    resetsAt = resetAt,
+                    length = 7.days,
+                )
+            val points =
+                DemoUsage.points(
+                    window = window,
+                    peaks = listOf(85.0),
+                    now = resetAt,
+                    zone = rome,
+                    retention = HistoryRetention.ShortTerm,
+                )
+            val currentCycleStart = resetAt.minus(7.days)
+            val cyclePoints = points.filter { it.at >= currentCycleStart && it.at < resetAt }
+            val deltasByStart =
+                cyclePoints.zipWithNext().map { (from, to) ->
+                    from.at.toLocalDateTime(rome) to (to.usedPercent - from.usedPercent)
+                }
+            // Check the Monday after the Sunday DST transition.
+            val transitionDate = currentCycleStart.plus(4.days).toLocalDateTime(rome).date
+            val mondayDeltas =
+                deltasByStart
+                    .filter { (local, _) -> local.date == transitionDate }
+                    .associate { (local, delta) -> local.hour to delta }
+
+            for (nightHour in (0..8) + 23) {
+                assertEquals(
+                    0.0,
+                    mondayDeltas.getValue(nightHour),
+                    1e-9,
+                    "Expected no burn at local hour $nightHour on $transitionDate after DST",
+                )
+            }
+            val morningDelta = mondayDeltas.getValue(9)
+            val afternoonDelta = mondayDeltas.getValue(13)
+            assertTrue(
+                morningDelta > 0.0,
+                "Expected positive burn at 09:00 local time on $transitionDate",
+            )
+            assertEquals(1.4, afternoonDelta / morningDelta, 1e-6)
+        }
     }
 }

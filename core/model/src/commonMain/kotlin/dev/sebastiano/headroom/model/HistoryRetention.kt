@@ -82,6 +82,9 @@ private const val ONE_HOUR_BUCKET_HOURS = 1L
 private const val THREE_HOUR_BUCKET_HOURS = 3L
 private const val TWELVE_HOUR_BUCKET_HOURS = 12L
 
+private const val MIN_RESET_ADVANCE_HOURS = 1L
+private const val WINDOW_FRACTION_DIVISOR = 24
+
 private val ONE_HOUR_TIER_MAX: Duration = ONE_HOUR_TIER_DAYS.days
 private val THREE_HOUR_TIER_MAX: Duration = THREE_HOUR_TIER_DAYS.days
 
@@ -89,12 +92,47 @@ private val ONE_HOUR_BUCKET_MS: Long = ONE_HOUR_BUCKET_HOURS.hours.inWholeMillis
 private val THREE_HOUR_BUCKET_MS: Long = THREE_HOUR_BUCKET_HOURS.hours.inWholeMilliseconds
 private val TWELVE_HOUR_BUCKET_MS: Long = TWELVE_HOUR_BUCKET_HOURS.hours.inWholeMilliseconds
 
+/** Detects when two usage samples straddle a quota reset, for history compaction and charts. */
+public object ResetBoundary {
+    /**
+     * Minimum forward shift of [UsagePoint.resetsAt] that counts as a new reset period when the
+     * window length is unknown, or when 1/24 of the window length is shorter than an hour.
+     */
+    public val MIN_RESET_ADVANCE: Duration = MIN_RESET_ADVANCE_HOURS.hours
+
+    /**
+     * True when [next] belongs to a new reset period after [previous]: either [UsagePoint.resetsAt]
+     * advanced by more than the jitter tolerance (`maxOf(1.hours, windowLength / 24)` when
+     * [windowLength] is known, or [MIN_RESET_ADVANCE] otherwise), or usage dropped by at least
+     * [ResetPeaks.MIN_DROP_POINTS]. Earlier or equal [UsagePoint.resetsAt] values are clock jitter,
+     * never a reset.
+     */
+    public fun isReset(
+        previous: UsagePoint,
+        next: UsagePoint,
+        windowLength: Duration? = null,
+    ): Boolean {
+        val previousReset = previous.resetsAt
+        val nextReset = next.resetsAt
+        val tolerance =
+            if (windowLength != null && windowLength > Duration.ZERO) {
+                maxOf(MIN_RESET_ADVANCE, windowLength / WINDOW_FRACTION_DIVISOR)
+            } else {
+                MIN_RESET_ADVANCE
+            }
+        val resetAdvanced =
+            previousReset != null && nextReset != null && nextReset - previousReset > tolerance
+        val usageDropped = previous.usedPercent - next.usedPercent >= ResetPeaks.MIN_DROP_POINTS
+        return resetAdvanced || usageDropped
+    }
+}
+
 /**
  * Single-pass compaction over [points] (oldest first). Splits into reset periods where
- * [UsagePoint.resetsAt] changes or usage drops from the running peak by at least
- * [ResetPeaks.MIN_DROP_POINTS], and marks each period's first sample, its peak sample (the first
- * sample to reach the peak, matching [ResetPeaks.resets]), every sample up to
- * [HistoryRetention.FULL_RESOLUTION_SPAN] old, and the last sample of each epoch-aligned bucket.
+ * [ResetBoundary.isReset] detects a reset from the running period state, and marks each period's
+ * first sample, its peak sample (the first sample to reach the peak, matching [ResetPeaks.resets]),
+ * every sample up to [HistoryRetention.FULL_RESOLUTION_SPAN] old, and the last sample of each
+ * epoch-aligned bucket.
  */
 private fun markLongTermKept(
     points: List<UsagePoint>,
@@ -117,17 +155,20 @@ private class PeriodState {
     private var periodResetsAt: Instant? = null
     private var periodPeak = Double.NEGATIVE_INFINITY
     private var peakIndex = -1
+    private var lastAt: Instant = Instant.DISTANT_PAST
     private var lastBucketMs = -1L
     private var lastBucketIndex = Long.MIN_VALUE
     private var lastBucketPointIndex = -1
 
     fun isBoundary(point: UsagePoint): Boolean {
         if (!active) return false
-        val knownReset = periodResetsAt
-        val resetsChanged =
-            point.resetsAt != null && knownReset != null && point.resetsAt != knownReset
-        val dropped = periodPeak - point.usedPercent >= ResetPeaks.MIN_DROP_POINTS
-        return resetsChanged || dropped
+        val previous =
+            UsagePoint(
+                at = lastAt,
+                usedPercent = periodPeak,
+                resetsAt = periodResetsAt,
+            )
+        return ResetBoundary.isReset(previous, point)
     }
 
     fun record(index: Int, point: UsagePoint, now: Instant, kept: BooleanArray) {
@@ -140,7 +181,11 @@ private class PeriodState {
             periodPeak = point.usedPercent
             peakIndex = index
         }
-        if (point.resetsAt != null) periodResetsAt = point.resetsAt
+        lastAt = point.at
+        if (periodResetsAt == null && point.resetsAt != null) {
+            periodResetsAt = point.resetsAt
+            kept[index] = true
+        }
         val bucketMs = bucketSpanMs(now - point.at)
         if (bucketMs == null) {
             if (lastBucketPointIndex >= 0) {
