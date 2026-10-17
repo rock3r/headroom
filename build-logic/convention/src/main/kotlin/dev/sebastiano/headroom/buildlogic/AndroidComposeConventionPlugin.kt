@@ -27,7 +27,9 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
                 add("debugImplementation", libs.library("compose-ui-test-manifest"))
                 add("androidTestImplementation", bom)
                 add("androidTestImplementation", libs.library("compose-ui-test-junit4"))
-                add("detektPlugins", libs.library("composeRules-detekt"))
+                if (!isThirdParty) {
+                    add("detektPlugins", libs.library("composeRules-detekt"))
+                }
             }
         }
 }

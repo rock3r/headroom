@@ -65,7 +65,7 @@ These images come from the Android 16 widget player.
 ## Features
 
 - The overview shows each account's weekly or monthly usage, session usage, and difference from an even usage rate.
-- A tick on each bar shows an even usage rate. The detail screen scales the week and forecasts when usage will reach 100%.
+- A tick on each bar shows an even usage rate. The detail screen plots all of an account's weekly and monthly windows together over time (up to a year of history when "Keep long-term history" is on), marks past resets, shades the primary window's current period with its even-pace line and projection, and supports pan, pinch-zoom, scrubbing tooltips, window filter chips and Period / 1M / 3M / 1Y range presets.
 - Bars become wavy when the account exceeds an even usage rate or 85% usage. Other bars stay flat.
 - Expired sign-ins keep their last values, history, names and alerts. Headroom shows the values' age and offers sign-in again.
   Expired accounts cannot supply the next reset or trigger reset alerts.
@@ -153,7 +153,8 @@ The app runs on Android 16 (API 36) or later.
 | `:core:quota` | One fetcher per provider |
 | `:core:auth` | Sign-in flows, token refresh, token store contract |
 | `:core:data` | Room history, sync, reset alarms, notifications, encrypted tokens |
-| `:core:designsystem` | Theme, type, quota indicators, charts |
+| `:core:designsystem` | Theme, type, quota indicators, provider avatars |
+| `:third-party:compose-charts` | Vendored `compose-charts` library for the detail usage history chart |
 | `:widget` | Remote Compose widgets |
 | `:app` | Screens, navigation, adaptive layouts, wiring |
 

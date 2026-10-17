@@ -126,11 +126,23 @@
     <!-- The content description of the info button next to a quota Headroom does not know. -->
     <string name="detail_unknown_quota_info">About this quota</string>
     <string name="detail_unknown_quota_explanation">This is a new quota we don\'t recognise yet. Headroom shows it for your information, but doesn\'t know what it\'s for.</string>
-    <string name="detail_chart_week">This week</string>
-    <string name="detail_chart_month">This month</string>
-    <string name="detail_chart_window">This window</string>
+    <string name="detail_chart_title">Usage history</string>
     <string name="detail_chart_legend">dashed = even pace</string>
     <string name="detail_chart_limit">limit</string>
+    <string name="detail_chart_range_period">Period</string>
+    <string name="detail_chart_range_1m">1M</string>
+    <string name="detail_chart_range_3m">3M</string>
+    <string name="detail_chart_range_1y">1Y</string>
+    <string name="detail_chart_scroll_back">Scroll back</string>
+    <string name="detail_chart_scroll_forward">Scroll forward</string>
+    <string name="detail_chart_zoom_in">Zoom in</string>
+    <string name="detail_chart_zoom_out">Zoom out</string>
+    <string name="detail_chart_visible_description">%1$s, %2$s to %3$s. %4$s %5$s.</string>
+    <plurals name="detail_chart_resets_in_view">
+        <item quantity="one">%d reset in view</item>
+        <item quantity="other">%d resets in view</item>
+    </plurals>
+    <string name="detail_chart_no_resets_in_view">No resets in view</string>
     <string name="detail_chart_description_above">Usage so far: %1$d%%, above the even-pace line.</string>
     <string name="detail_chart_description_below">Usage so far: %1$d%%, at or below the even-pace line.</string>
     <string name="detail_projection_hit">At this rate you reach 100%% in about %1$s, %2$s before the reset.</string>

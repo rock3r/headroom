@@ -72,4 +72,24 @@ internal fun demoUsage(
     now: Instant,
     zone: ZoneId,
     retention: HistoryRetention = HistoryRetention.LongTerm,
-): List<UsagePoint> = DemoUsage.points(window, peaks, now, zone.toKotlinTimeZone(), retention)
+): List<UsagePoint> =
+    DemoUsage.points(
+        window = window,
+        peaks = peaks.ifEmpty { fallbackDemoPeaks(window.usedPercent) },
+        now = now,
+        zone = zone.toKotlinTimeZone(),
+        retention = retention,
+    )
+
+private fun fallbackDemoPeaks(usedPercent: Double): List<Double> {
+    val base = usedPercent.coerceIn(MIN_FALLBACK_BASE, MAX_FALLBACK_BASE)
+    return FALLBACK_PEAK_OFFSETS.map { offset ->
+        (base + offset).coerceIn(MIN_FALLBACK_PEAK, MAX_FALLBACK_PEAK)
+    }
+}
+
+private val FALLBACK_PEAK_OFFSETS = listOf(12.0, -8.0, 19.0, -4.0, 9.0)
+private const val MIN_FALLBACK_BASE = 25.0
+private const val MAX_FALLBACK_BASE = 80.0
+private const val MIN_FALLBACK_PEAK = 15.0
+private const val MAX_FALLBACK_PEAK = 96.0
