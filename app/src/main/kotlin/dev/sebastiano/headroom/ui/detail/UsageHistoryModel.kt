@@ -49,11 +49,18 @@ data class WindowHistorySeries(
     val isPrimary: Boolean,
     val colorSlot: Int,
     val markers: Markers = Markers.Last,
+    /**
+     * Summary of the current period anchored at [sampleAt] (the latest recorded sample in the
+     * period), so the written projection sentence, pace content description and plotted dotted
+     * projection line always agree.
+     */
     val summary: ChartSummary,
     /** All stored usage points up to `now`, ordered oldest first. */
     val points: List<UsagePoint>,
     /** Instants at which this window reset across [points], oldest first. */
     val resets: List<Instant>,
+    /** Timestamp of the latest sample in the current period that [summary] is anchored to. */
+    val sampleAt: Instant = points.lastOrNull()?.at ?: summary.start,
 )
 
 /**
@@ -184,21 +191,6 @@ data class UsageHistoryModel(
             accountId = accountId,
             shownWindows =
                 shownWindows.map { window ->
-                    val sampleAt = window.points.lastOrNull()?.at ?: window.summary.start
-                    val sampleSummary =
-                        chartSummary(
-                            window =
-                                QuotaWindow(
-                                    id = window.id,
-                                    label = window.label,
-                                    kind = window.kind,
-                                    usedPercent = window.summary.usedPercent,
-                                    resetsAt = window.summary.end,
-                                    length = window.summary.end - window.summary.start,
-                                ),
-                            points = window.points,
-                            now = sampleAt,
-                        )
                     SeriesPlotData(
                         id = window.id,
                         label = window.label,
@@ -210,9 +202,9 @@ data class UsageHistoryModel(
                         usedPercent = window.summary.usedPercent,
                         points = window.points,
                         resets = window.resets,
-                        sampleAt = sampleAt,
-                        projectedLimitAt = sampleSummary?.projectedLimitAt,
-                        projectedEndPercent = sampleSummary?.projectedEndPercent,
+                        sampleAt = window.sampleAt,
+                        projectedLimitAt = window.summary.projectedLimitAt,
+                        projectedEndPercent = window.summary.projectedEndPercent,
                     )
                 },
             minBound = minBound,
@@ -336,9 +328,15 @@ internal fun buildUsageHistoryModel(
             .sortedByDescending { it.id == primaryWindowId }
     if (chartable.isEmpty()) return null
     val series = chartable.mapIndexedNotNull { index, window ->
+        val resetsAt = window.resetsAt ?: return@mapIndexedNotNull null
+        val length = window.length ?: return@mapIndexedNotNull null
+        val periodStart = resetsAt.minus(length)
         val raw = histories[window.id].orEmpty()
         val prepared = prepareSeriesPoints(window, raw, now, dataFrom)
-        val summary = chartSummary(window, prepared, now) ?: return@mapIndexedNotNull null
+        val sampleAt =
+            prepared.lastOrNull()?.at?.takeIf { it in periodStart..resetsAt }
+                ?: (dataFrom ?: now).coerceIn(periodStart, resetsAt)
+        val summary = chartSummary(window, prepared, sampleAt) ?: return@mapIndexedNotNull null
         WindowHistorySeries(
             id = window.id,
             label = window.label,
@@ -349,6 +347,7 @@ internal fun buildUsageHistoryModel(
             summary = summary,
             points = prepared,
             resets = detectResets(prepared, window.length),
+            sampleAt = sampleAt,
         )
     }
     if (series.isEmpty()) return null

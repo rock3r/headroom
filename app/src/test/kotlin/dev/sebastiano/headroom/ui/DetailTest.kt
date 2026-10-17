@@ -41,6 +41,7 @@ import dev.sebastiano.headroom.ui.detail.alertSwitchTag
 import dev.sebastiano.headroom.ui.detail.buildUsageHistoryModel
 import dev.sebastiano.headroom.ui.detail.chartRangeTag
 import dev.sebastiano.headroom.ui.detail.chartWindowTag
+import dev.sebastiano.headroom.ui.detail.projectionText
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import java.time.ZoneOffset
 import java.util.Locale
@@ -261,7 +262,7 @@ class DetailTest {
     }
 
     @Test
-    fun `minute clock ticks do not rebuild the chart specs`() {
+    fun `minute and hour clock ticks keep projection text and plotted line in agreement without rebuilding specs`() {
         val claude = DemoData.accounts(FIXED_NOW).first()
         val windows = claude.snapshot!!.windows
         val histories = windows.associate { w ->
@@ -270,6 +271,7 @@ class DetailTest {
         val formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
         var currentNow by mutableStateOf(FIXED_NOW)
         var specBuilds = 0
+        var latestSentence = ""
 
         rule.setContent {
             val model =
@@ -284,6 +286,14 @@ class DetailTest {
                         dataFrom = FIXED_NOW,
                     )
                 )
+            val primary = model.primaryShownWindow!!
+            latestSentence =
+                projectionText(
+                    chart = primary.summary,
+                    now = primary.sampleAt,
+                    formatter = formatter,
+                    display = QuotaDisplay.Used,
+                )
             HeadroomTheme(dynamicColor = false) {
                 UsageHistoryChart(
                     model = model,
@@ -296,15 +306,22 @@ class DetailTest {
         }
         rule.waitForIdle()
         assertEquals(1, specBuilds)
+        assertEquals(
+            "At this rate you reach 100% in about 1d 17h, 1d 1h before the reset.",
+            latestSentence,
+        )
 
-        // Advance the clock across several minute ticks without a new sync: specs are not rebuilt.
+        // Advance the clock by minutes and by 6 hours without a new sync: specs are not rebuilt
+        // and the projection sentence stays aligned with the sampleAt-anchored plotted projection.
         currentNow = FIXED_NOW.plus(1.minutes)
         rule.waitForIdle()
-        currentNow = FIXED_NOW.plus(2.minutes)
-        rule.waitForIdle()
-        currentNow = FIXED_NOW.plus(5.minutes)
+        currentNow = FIXED_NOW.plus(6.hours)
         rule.waitForIdle()
         assertEquals(1, specBuilds)
+        assertEquals(
+            "At this rate you reach 100% in about 1d 17h, 1d 1h before the reset.",
+            latestSentence,
+        )
     }
 
     @Test

@@ -490,8 +490,9 @@ private fun ChartCard(
                 display = display,
                 onWindowToggle = onWindowToggle,
             )
+            val projectionAsOf = history.primaryShownWindow?.sampleAt ?: now
             Text(
-                text = projectionText(chart, now, formatter, display),
+                text = projectionText(chart, projectionAsOf, formatter, display),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
@@ -501,7 +502,7 @@ private fun ChartCard(
 }
 
 @Composable
-private fun projectionText(
+internal fun projectionText(
     chart: ChartSummary,
     now: Instant,
     formatter: ResetFormatter,

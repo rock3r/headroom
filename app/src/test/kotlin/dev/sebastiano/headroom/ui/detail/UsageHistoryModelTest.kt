@@ -556,12 +556,12 @@ class UsageHistoryModelTest {
     }
 
     @Test
-    fun `a minute clock tick updates live summaries without changing plotKey`() {
-        val window = weeklyWindow()
+    fun `advancing now by hours without a new sample keeps summary and plotKey in agreement`() {
+        val window = weeklyWindow(usedPercent = 59.0)
         val points =
             listOf(
                 UsagePoint(weeklyStart.plus(1.days), 25.0, resetsAt = weeklyReset),
-                UsagePoint(now, 71.0, resetsAt = weeklyReset),
+                UsagePoint(now, 59.0, resetsAt = weeklyReset),
             )
         val histories = mapOf(window.id to points)
 
@@ -577,7 +577,7 @@ class UsageHistoryModelTest {
                     dataFrom = now,
                 )
             )
-        val atOneMinute =
+        val atSixHours =
             assertNotNull(
                 buildUsageHistoryModel(
                     accountId = "acc-1",
@@ -585,17 +585,21 @@ class UsageHistoryModelTest {
                     primaryWindowId = window.id,
                     histories = histories,
                     selectedWindowIds = setOf(window.id),
-                    now = now.plus(1.minutes),
+                    now = now.plus(6.hours),
                     dataFrom = now,
                 )
             )
 
-        assertEquals(now.plus(1.minutes), atOneMinute.now)
-        assertTrue(
-            atOneMinute.primaryShownWindow!!.summary.expectedPercent >
-                atZero.primaryShownWindow!!.summary.expectedPercent
-        )
-        assertEquals(atZero.plotKey, atOneMinute.plotKey)
+        assertEquals(now.plus(6.hours), atSixHours.now)
+        // At 59% after 4 days, the rate at sampleAt hits 100% before reset; 6 hours later with no
+        // new sample, the summary and plotted projection stay anchored to sampleAt and agree.
+        val summaryAtSixHours = atSixHours.primaryShownWindow!!.summary
+        val plotDataAtSixHours = atSixHours.plotKey.shownWindows.single()
+        assertNotNull(summaryAtSixHours.projectedLimitAt)
+        assertEquals(summaryAtSixHours.projectedLimitAt, plotDataAtSixHours.projectedLimitAt)
+        assertEquals(summaryAtSixHours.projectedEndPercent, plotDataAtSixHours.projectedEndPercent)
+        assertEquals(atZero.primaryShownWindow!!.summary, summaryAtSixHours)
+        assertEquals(atZero.plotKey, atSixHours.plotKey)
     }
 
     @Test
