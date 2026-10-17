@@ -39,8 +39,21 @@ public enum class QuotaErrorKind {
     Unknown,
 }
 
+/**
+ * Additional detail when a fetch fails with [QuotaErrorKind.Auth], so the UI can distinguish an API
+ * key that has expired from a rejected key or an expired OAuth sign-in.
+ */
+public enum class AuthFailureReason {
+    /** The provider reports that the API key itself has expired and must be replaced. */
+    KeyExpired
+}
+
 public sealed interface QuotaResult {
     public data class Success(val snapshot: QuotaSnapshot) : QuotaResult
 
-    public data class Failure(val kind: QuotaErrorKind, val message: String) : QuotaResult
+    public data class Failure(
+        val kind: QuotaErrorKind,
+        val message: String,
+        val authReason: AuthFailureReason? = null,
+    ) : QuotaResult
 }

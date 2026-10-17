@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.quota
 
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,7 +44,25 @@ class FetchSupportTest {
 
         val outcome = client.fetchBody(QuotaHttpRequest(url = "https://example.com"), "Test")
 
-        assertEquals(QuotaErrorKind.Auth, assertIs<HttpOutcome.Failed>(outcome).failure.kind)
+        val failure = assertIs<HttpOutcome.Failed>(outcome).failure
+        assertEquals(QuotaErrorKind.Auth, failure.kind)
+        assertNull(failure.authReason)
+    }
+
+    @Test
+    fun `a 401 status passes the body to the auth reason hook`() = runTest {
+        val client = FakeQuotaHttpClient {
+            QuotaHttpResponse(statusCode = 401, body = "api_key_expired")
+        }
+
+        val outcome =
+            client.fetchBody(QuotaHttpRequest(url = "https://example.com"), "Test") { body ->
+                if (body == "api_key_expired") AuthFailureReason.KeyExpired else null
+            }
+
+        val failure = assertIs<HttpOutcome.Failed>(outcome).failure
+        assertEquals(QuotaErrorKind.Auth, failure.kind)
+        assertEquals(AuthFailureReason.KeyExpired, failure.authReason)
     }
 
     @Test

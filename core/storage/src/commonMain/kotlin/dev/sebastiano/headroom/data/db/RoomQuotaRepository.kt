@@ -178,8 +178,14 @@ internal class RoomQuotaRepository(
             // stays expired through later errors, such as a network error: only a sync that
             // works shows the user can stop worrying about it.
             is QuotaResult.Failure -> {
-                val expired = entity.lastError == QuotaErrorKind.Auth.name
-                dao.updateError(entity.id, if (expired) entity.lastError else result.kind.name)
+                val previous = entity.lastError
+                val keepExistingAuth =
+                    decodeErrorKind(previous) == QuotaErrorKind.Auth &&
+                        result.kind != QuotaErrorKind.Auth
+                val nextError =
+                    if (keepExistingAuth && previous != null) previous
+                    else encodeLastError(result.kind, result.authReason)
+                dao.updateError(entity.id, nextError)
             }
             null -> Unit
         }

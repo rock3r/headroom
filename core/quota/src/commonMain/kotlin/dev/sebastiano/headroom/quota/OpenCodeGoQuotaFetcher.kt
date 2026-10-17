@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.quota
 
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
@@ -32,7 +33,7 @@ public class OpenCodeGoQuotaFetcher(
                     ),
             )
         val body =
-            when (val outcome = httpClient.fetchBody(request, PROVIDER_NAME)) {
+            when (val outcome = httpClient.fetchBody(request, PROVIDER_NAME, ::parseAuthReason)) {
                 is HttpOutcome.Ok -> outcome.body
                 is HttpOutcome.Failed -> return outcome.failure
             }
@@ -68,6 +69,18 @@ public class OpenCodeGoQuotaFetcher(
         )
     }
 
+    private fun parseAuthReason(body: String): AuthFailureReason? {
+        if (body.isBlank()) return null
+        val code = parseOrNull {
+            quotaJson
+                .parseToJsonElement(body)
+                .jsonObject
+                .objectOrNull("error")
+                ?.stringOrNull("code")
+        }
+        return if (code == API_KEY_EXPIRED_CODE) AuthFailureReason.KeyExpired else null
+    }
+
     private data class WindowSpec(val id: String, val label: String, val length: Duration)
 
     private companion object {
@@ -75,6 +88,7 @@ public class OpenCodeGoQuotaFetcher(
         const val PLAN_LABEL = "OpenCode Go"
         const val DEFAULT_BASE_URL = "https://opencode.ai/zen/go"
         const val USAGE_PATH = "/v1/usage"
+        const val API_KEY_EXPIRED_CODE = "api_key_expired"
         val WINDOWS =
             listOf(
                 WindowSpec("rolling", "5 hour", FIVE_HOURS),

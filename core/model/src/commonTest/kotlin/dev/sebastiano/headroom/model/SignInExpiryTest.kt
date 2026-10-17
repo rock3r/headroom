@@ -73,4 +73,18 @@ class SignInExpiryTest {
         assertEquals(setOf("demo-claude"), decision.cancel)
         assertEquals(emptySet(), decision.notified)
     }
+
+    @Test
+    fun `an auth failure with a key expired reason still counts as expired`() {
+        val opencode =
+            DemoData.manyAccounts(now)
+                .first { it.account.provider == Provider.OpenCodeGo }
+                .copy(lastError = QuotaErrorKind.Auth, authReason = AuthFailureReason.KeyExpired)
+
+        assertTrue(opencode.isSignInExpired)
+        assertEquals(AuthFailureReason.KeyExpired, opencode.authReason)
+        assertTrue(Provider.OpenCodeGo.usesApiKey)
+        assertTrue(Provider.ZAi.usesApiKey)
+        assertFalse(Provider.Claude.usesApiKey)
+    }
 }
