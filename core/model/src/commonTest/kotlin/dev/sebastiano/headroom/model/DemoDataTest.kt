@@ -127,6 +127,6 @@ class DemoDataTest {
         println(
             "Demo history generation for ${accounts.size} accounts ($totalPoints points): $elapsed"
         )
-        assertEquals(7_428, totalPoints)
+        assertEquals(7_475, totalPoints)
     }
 }

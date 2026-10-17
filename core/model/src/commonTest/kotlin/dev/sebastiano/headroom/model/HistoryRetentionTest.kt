@@ -185,9 +185,44 @@ class HistoryRetentionTest {
 
         val kept = HistoryRetention.LongTerm.compact(points, now)
 
-        // Keeps first, the latest tied peak (lateTiePeak), and the bucket's last sample.
-        assertEquals(listOf(first, lateTiePeak, bucketLast, nextReset), kept)
-        assertEquals(listOf(92.0), ResetPeaks.usedAtResets(kept))
+        // Keeps first, the first tied peak (earlyTiePeak), and the bucket's last sample.
+        assertEquals(listOf(first, earlyTiePeak, bucketLast, nextReset), kept)
+        assertEquals(ResetPeaks.resets(points), ResetPeaks.resets(kept))
+    }
+
+    @Test
+    fun `a multi-day plateau peak older than seven days keeps the time the peak was first reached`() {
+        // 20 days ago (1-hour buckets): usage climbs to 94% on day 1 and plateaus for two more
+        // days before the weekly reset. The period's last sample is also on the plateau.
+        val periodStart = Instant.parse("2026-09-08T09:00:00Z")
+        val resetAt = periodStart.plus(7.days)
+        val first = point(periodStart, 15.0, resetsAt = resetAt)
+        val midClimb = point(periodStart.plus(20.minutes), 55.0, resetsAt = resetAt)
+        // Reaches 94% early in an hour bucket that also has a later 94% sample.
+        val plateauFirst = point(periodStart.plus(1.days + 10.minutes), 94.0, resetsAt = resetAt)
+        val plateauSameHour = point(periodStart.plus(1.days + 45.minutes), 94.0, resetsAt = resetAt)
+        val plateauDay2 = point(periodStart.plus(2.days + 3.hours), 94.0, resetsAt = resetAt)
+        val periodLast = point(periodStart.plus(3.days + 6.hours), 94.0, resetsAt = resetAt)
+        val nextPeriodFirst =
+            point(periodStart.plus(7.days + 5.minutes), 0.0, resetsAt = resetAt.plus(7.days))
+        val points =
+            listOf(
+                first,
+                midClimb,
+                plateauFirst,
+                plateauSameHour,
+                plateauDay2,
+                periodLast,
+                nextPeriodFirst,
+            )
+
+        val kept = HistoryRetention.LongTerm.compact(points, now)
+
+        // Both the first time the plateau was reached and the period's last sample stay.
+        assertTrue(plateauFirst in kept)
+        assertTrue(periodLast in kept)
+        assertEquals(ResetPeaks.resets(points), ResetPeaks.resets(kept))
+        assertEquals(listOf(plateauFirst), ResetPeaks.resets(kept))
     }
 
     @Test
@@ -256,8 +291,8 @@ class HistoryRetentionTest {
         assertEquals(once, twice)
         assertTrue(HistoryRetention.LongTerm.toDelete(once, now).isEmpty())
         assertEquals(
-            ResetPeaks.usedAtResets(points.filter { it.at >= now.minus(365.days) }),
-            ResetPeaks.usedAtResets(once),
+            ResetPeaks.resets(points.filter { it.at >= now.minus(365.days) }),
+            ResetPeaks.resets(once),
         )
     }
 }

@@ -374,9 +374,9 @@ class StatsMathsTest {
         val compactStats = stats(compacted, yearNow, TimeZone.UTC)
 
         assertEquals(Coverage(days = 365), compactStats.coverage)
+        assertEquals(pastResets(uncompacted), pastResets(compacted))
         assertEquals(fullStats.resets, compactStats.resets)
-        assertEquals(fullStats.closestCall?.peak, compactStats.closestCall?.peak)
-        assertEquals(fullStats.closestCall?.account, compactStats.closestCall?.account)
+        assertEquals(fullStats.closestCall, compactStats.closestCall)
         assertEquals(fullStats.leftOver, compactStats.leftOver)
         assertEquals(fullStats.sparklines, compactStats.sparklines)
         assertEquals(

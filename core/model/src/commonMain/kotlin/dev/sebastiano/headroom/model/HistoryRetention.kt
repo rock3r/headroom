@@ -92,9 +92,9 @@ private val TWELVE_HOUR_BUCKET_MS: Long = TWELVE_HOUR_BUCKET_HOURS.hours.inWhole
 /**
  * Single-pass compaction over [points] (oldest first). Splits into reset periods where
  * [UsagePoint.resetsAt] changes or usage drops from the running peak by at least
- * [ResetPeaks.MIN_DROP_POINTS], and marks each period's first sample, its peak sample (latest on a
- * tie), every sample up to [HistoryRetention.FULL_RESOLUTION_SPAN] old, and the last sample of each
- * epoch-aligned bucket.
+ * [ResetPeaks.MIN_DROP_POINTS], and marks each period's first sample, its peak sample (the first
+ * sample to reach the peak, matching [ResetPeaks.resets]), every sample up to
+ * [HistoryRetention.FULL_RESOLUTION_SPAN] old, and the last sample of each epoch-aligned bucket.
  */
 private fun markLongTermKept(
     points: List<UsagePoint>,
@@ -136,7 +136,7 @@ private class PeriodState {
             kept[index] = true
             peakIndex = index
             periodPeak = point.usedPercent
-        } else if (point.usedPercent >= periodPeak) {
+        } else if (point.usedPercent > periodPeak) {
             periodPeak = point.usedPercent
             peakIndex = index
         }
