@@ -490,9 +490,8 @@ private fun ChartCard(
                 display = display,
                 onWindowToggle = onWindowToggle,
             )
-            val projectionAsOf = history.primaryShownWindow?.sampleAt ?: now
             Text(
-                text = projectionText(chart, projectionAsOf, formatter, display),
+                text = projectionText(chart, now, formatter, display),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
@@ -509,11 +508,11 @@ internal fun projectionText(
     display: QuotaDisplay,
 ): String {
     val hit = chart.projectedLimitAt
-    val end = chart.projectedEndPercent
+    val end = chart.projectedEndPercent ?: if (hit != null) FULL_PERCENT else null
     val left = display == QuotaDisplay.Left
     return when {
         chart.usedPercent <= FRESH_MAX_PERCENT -> stringResource(R.string.detail_projection_fresh)
-        hit != null ->
+        hit != null && hit > now ->
             stringResource(
                 if (left) R.string.detail_projection_hit_left else R.string.detail_projection_hit,
                 formatter.countdown(now, hit),
@@ -537,6 +536,8 @@ internal fun projectionText(
         else -> ""
     }
 }
+
+private const val FULL_PERCENT = 100.0
 
 @Composable
 private fun AlertSection(

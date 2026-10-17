@@ -50,7 +50,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
@@ -290,7 +289,7 @@ class DetailTest {
             latestSentence =
                 projectionText(
                     chart = primary.summary,
-                    now = primary.sampleAt,
+                    now = currentNow,
                     formatter = formatter,
                     display = QuotaDisplay.Used,
                 )
@@ -311,17 +310,22 @@ class DetailTest {
             latestSentence,
         )
 
-        // Advance the clock by minutes and by 6 hours without a new sync: specs are not rebuilt
-        // and the projection sentence stays aligned with the sampleAt-anchored plotted projection.
-        currentNow = FIXED_NOW.plus(1.minutes)
-        rule.waitForIdle()
+        // Advance the clock by 6 hours without a new sync: specs are not rebuilt, the fixed hit
+        // endpoint stays "1d 1h before the reset", and the countdown to that endpoint ages by 6h.
         currentNow = FIXED_NOW.plus(6.hours)
         rule.waitForIdle()
         assertEquals(1, specBuilds)
         assertEquals(
-            "At this rate you reach 100% in about 1d 17h, 1d 1h before the reset.",
+            "At this rate you reach 100% in about 1d 11h, 1d 1h before the reset.",
             latestSentence,
         )
+
+        // Once the display clock passes the anchored hit time without a new sync, the sentence
+        // falls back to the end-of-week wording instead of formatting a zero/past countdown.
+        currentNow = FIXED_NOW.plus(2.days)
+        rule.waitForIdle()
+        assertEquals(1, specBuilds)
+        assertEquals("At this rate you end the week at about 100%.", latestSentence)
     }
 
     @Test
