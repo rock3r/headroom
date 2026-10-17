@@ -29,8 +29,11 @@ import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
+import dev.sebastiano.headroom.ui.detail.DescriptionMemo
 import dev.sebastiano.headroom.ui.detail.HistoryRange
 import dev.sebastiano.headroom.ui.detail.USAGE_HISTORY_CHART_TAG
 import dev.sebastiano.headroom.ui.detail.UsageHistoryChart
@@ -42,8 +45,12 @@ import dev.sebastiano.headroom.ui.overview.accountCardTag
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -298,5 +305,151 @@ class DetailTest {
         currentNow = FIXED_NOW.plus(5.minutes)
         rule.waitForIdle()
         assertEquals(1, specBuilds)
+    }
+
+    @Test
+    fun `description memo invalidates when viewport crosses a reset within the same hour`() {
+        val t1200 = Instant.parse("2026-09-20T12:00:00Z")
+        val t1220 = Instant.parse("2026-09-20T12:20:00Z")
+        val t1225Reset = Instant.parse("2026-09-20T12:25:00Z")
+        val t1228 = Instant.parse("2026-09-20T12:28:00Z")
+        val r2 = t1225Reset.plus(7.days)
+        val window =
+            QuotaWindow(
+                id = "seven_day",
+                label = "Weekly · all models",
+                kind = WindowKind.Weekly,
+                usedPercent = 50.0,
+                resetsAt = r2,
+                length = 7.days,
+            )
+        val points =
+            listOf(
+                UsagePoint(t1200, 80.0, resetsAt = t1225Reset),
+                UsagePoint(t1225Reset, 0.0, resetsAt = r2),
+                UsagePoint(FIXED_NOW, 50.0, resetsAt = r2),
+            )
+        val model =
+            requireNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = listOf(window),
+                    primaryWindowId = "seven_day",
+                    histories = mapOf("seven_day" to points),
+                    selectedWindowIds = setOf("seven_day"),
+                    now = FIXED_NOW,
+                    dataFrom = FIXED_NOW,
+                )
+            )
+        val memo =
+            DescriptionMemo(
+                resources = rule.activity.resources,
+                model = model,
+                formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true),
+                paceDescription = "Usage so far: 50%.",
+            )
+        val beforeCrossing =
+            memo.of(
+                t1220.toEpochMilliseconds().toDouble(),
+                FIXED_NOW.toEpochMilliseconds().toDouble(),
+            )
+        val afterCrossing =
+            memo.of(
+                t1228.toEpochMilliseconds().toDouble(),
+                FIXED_NOW.toEpochMilliseconds().toDouble(),
+            )
+        assertTrue(beforeCrossing.contains("1 reset in view"), beforeCrossing)
+        assertTrue(afterCrossing.contains("No resets in view"), afterCrossing)
+    }
+
+    @Test
+    fun `toggling a series chip or receiving a new reset updates the chart content description`() {
+        val r2 = FIXED_NOW.plus(3.days)
+        val w1 =
+            QuotaWindow(
+                id = "seven_day",
+                label = "Weekly · all models",
+                kind = WindowKind.Weekly,
+                usedPercent = 50.0,
+                resetsAt = r2,
+                length = 7.days,
+            )
+        val w2 =
+            QuotaWindow(
+                id = "seven_day_opus",
+                label = "Weekly · Opus",
+                kind = WindowKind.Weekly,
+                usedPercent = 30.0,
+                resetsAt = r2,
+                length = 7.days,
+            )
+        val formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
+        var selectedIds by mutableStateOf(setOf("seven_day", "seven_day_opus"))
+        var histories by
+            mutableStateOf(
+                mapOf(
+                    "seven_day" to listOf(UsagePoint(FIXED_NOW, 50.0, resetsAt = r2)),
+                    "seven_day_opus" to listOf(UsagePoint(FIXED_NOW, 30.0, resetsAt = r2)),
+                )
+            )
+
+        rule.setContent {
+            val model =
+                requireNotNull(
+                    buildUsageHistoryModel(
+                        accountId = "acc-1",
+                        windows = listOf(w1, w2),
+                        primaryWindowId = "seven_day",
+                        histories = histories,
+                        selectedWindowIds = selectedIds,
+                        now = FIXED_NOW,
+                        dataFrom = FIXED_NOW,
+                    )
+                )
+            HeadroomTheme(dynamicColor = false) {
+                UsageHistoryChart(
+                    model = model,
+                    formatter = formatter,
+                    display = QuotaDisplay.Used,
+                    onWindowToggle = { id -> selectedIds = selectedIds - id },
+                )
+            }
+        }
+        rule.waitForIdle()
+
+        val chartNode = rule.onNodeWithTag(USAGE_HISTORY_CHART_TAG)
+        val bothDesc =
+            chartNode
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ContentDescription]
+                .joinToString(" ")
+        assertTrue(bothDesc.contains("Weekly · all models, Weekly · Opus"), bothDesc)
+
+        rule.onNodeWithTag(chartWindowTag("seven_day")).performClick()
+        rule.waitForIdle()
+        val opusOnlyDesc =
+            chartNode
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ContentDescription]
+                .joinToString(" ")
+        assertFalse(opusOnlyDesc.contains("Weekly · all models"), opusOnlyDesc)
+        assertTrue(opusOnlyDesc.contains("Weekly · Opus"), opusOnlyDesc)
+
+        val midReset = FIXED_NOW.minus(2.hours)
+        histories =
+            histories +
+                ("seven_day_opus" to
+                    listOf(
+                        UsagePoint(FIXED_NOW.minus(4.hours), 75.0, resetsAt = r2),
+                        UsagePoint(midReset, 0.0, resetsAt = r2),
+                        UsagePoint(FIXED_NOW, 30.0, resetsAt = r2),
+                    ))
+        rule.waitForIdle()
+        val afterNewResetDesc =
+            chartNode
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.ContentDescription]
+                .joinToString(" ")
+        assertTrue(afterNewResetDesc.contains("1 reset in view"), afterNewResetDesc)
     }
 }

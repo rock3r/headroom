@@ -205,7 +205,7 @@ private fun UsageHistoryPlot(
         val chartAnimationSpec =
             if (animate && !densityOnlyChange) dataSpec else ChartMotion.Instant
         val descriptionMemo =
-            remember(resources, model, formatter, paceDescription) {
+            remember(resources, plotKey, formatter, paceDescription) {
                 DescriptionMemo(resources, model, formatter, paceDescription)
             }
         val liveDescription by
@@ -235,30 +235,45 @@ private fun UsageHistoryPlot(
     }
 }
 
-private class DescriptionMemo(
+internal class DescriptionMemo(
     private val resources: android.content.res.Resources,
     private val model: UsageHistoryModel,
     private val formatter: ResetFormatter,
     private val paceDescription: String,
 ) {
-    private var lastStartHour: Long = Long.MIN_VALUE
-    private var lastEndHour: Long = Long.MIN_VALUE
+    private val windowNames: String = model.shownWindows.joinToString { it.label }
+    private var lastStartSlot: Long = Long.MIN_VALUE
+    private var lastEndSlot: Long = Long.MIN_VALUE
+    private var lastLongSpan: Boolean = false
+    private var lastResetsInView: Int = -1
     private var lastText: String = ""
 
     fun of(startEpochMs: Double, endEpochMs: Double): String {
-        val startHour = startEpochMs.roundToLong().floorDiv(MILLIS_PER_HOUR)
-        val endHour = endEpochMs.roundToLong().floorDiv(MILLIS_PER_HOUR)
-        if (startHour == lastStartHour && endHour == lastEndHour && lastText.isNotEmpty()) {
+        val startSlot = startEpochMs.roundToLong().floorDiv(MILLIS_PER_QUARTER_HOUR)
+        val endSlot = endEpochMs.roundToLong().floorDiv(MILLIS_PER_QUARTER_HOUR)
+        val longSpan = (endEpochMs - startEpochMs) > LONG_DATE_SPAN_MS
+        val resetsInView = model.resetsInRange(startEpochMs, endEpochMs)
+        if (
+            startSlot == lastStartSlot &&
+                endSlot == lastEndSlot &&
+                longSpan == lastLongSpan &&
+                resetsInView == lastResetsInView &&
+                lastText.isNotEmpty()
+        ) {
             return lastText
         }
-        lastStartHour = startHour
-        lastEndHour = endHour
+        lastStartSlot = startSlot
+        lastEndSlot = endSlot
+        lastLongSpan = longSpan
+        lastResetsInView = resetsInView
         lastText =
             visibleRangeDescription(
                 resources = resources,
-                model = model,
+                windowNames = windowNames,
                 startEpochMs = startEpochMs,
                 endEpochMs = endEpochMs,
+                longSpan = longSpan,
+                resetsInView = resetsInView,
                 formatter = formatter,
                 paceDescription = paceDescription,
             )
@@ -476,19 +491,18 @@ internal fun paceContentDescription(
 
 private fun visibleRangeDescription(
     resources: android.content.res.Resources,
-    model: UsageHistoryModel,
+    windowNames: String,
     startEpochMs: Double,
     endEpochMs: Double,
+    longSpan: Boolean,
+    resetsInView: Int,
     formatter: ResetFormatter,
     paceDescription: String,
 ): String {
-    val windowNames = model.shownWindows.joinToString { it.label }
     val startInstant = Instant.fromEpochMilliseconds(startEpochMs.roundToLong())
     val endInstant = Instant.fromEpochMilliseconds(endEpochMs.roundToLong())
-    val longSpan = (endInstant - startInstant) > LONG_DATE_SPAN
     val startText = if (longSpan) formatter.date(startInstant) else formatter.day(startInstant)
     val endText = if (longSpan) formatter.date(endInstant) else formatter.day(endInstant)
-    val resetsInView = model.resetsInRange(startEpochMs, endEpochMs)
     val resetsText =
         if (resetsInView == 0) {
             resources.getString(R.string.detail_chart_no_resets_in_view)
@@ -533,7 +547,7 @@ internal fun rememberUsageHistoryChartStyle(): ChartStyle {
     val dark = surface.luminance() < DARK_SURFACE_LUMINANCE
     return remember(scheme, typography, dark) {
         val baseHue = scheme.primary.toOklch().hue
-        val palette =
+        val baseColors =
             listOf(
                 scheme.primary,
                 seriesAccent(baseHue + SECOND_HUE_SHIFT, dark, lightnessDelta = 0f),
@@ -541,8 +555,11 @@ internal fun rememberUsageHistoryChartStyle(): ChartStyle {
                 seriesAccent(baseHue + FOURTH_HUE_SHIFT, dark, lightnessDelta = 0.04f),
                 seriesAccent(baseHue + FIFTH_HUE_SHIFT, dark, lightnessDelta = -0.02f),
                 seriesAccent(baseHue + SIXTH_HUE_SHIFT, dark, lightnessDelta = 0.02f),
-                scheme.onSurfaceVariant.copy(alpha = PACE_LINE_ALPHA),
             )
+        // Slots 0..5 (primary) and 6..11 (overflow, paired with rotated glyphs and Markers.All),
+        // followed by slot 12 (PACE_COLOR_SLOT).
+        val palette =
+            baseColors + baseColors + scheme.onSurfaceVariant.copy(alpha = PACE_LINE_ALPHA)
         val labelStyle = typography.labelSmall.copy(color = scheme.onSurfaceVariant)
         val limitLabelStyle = typography.labelSmall.copy(color = scheme.error)
         ChartStyle(
@@ -658,10 +675,12 @@ private val HexagonGlyph: Glyph =
     )
 
 /**
- * Six distinct glyphs for the six series slots (`0 until SERIES_PALETTE_SIZE`), followed by a
- * placeholder at [PACE_COLOR_SLOT].
+ * Six distinct glyphs for the six primary series slots (`0..5`), followed by a rotated glyph order
+ * for the six overflow slots (`6..11`, so each overflow slot pairs its colour with a different
+ * glyph from its primary counterpart alongside [dev.c5inco.charts.core.Markers.All]), and a
+ * placeholder at [PACE_COLOR_SLOT] (`12`).
  */
-private val SeriesGlyphs: List<Glyph> =
+private val BaseSeriesGlyphs: List<Glyph> =
     listOf(
         Glyph.Circle,
         Glyph.Square,
@@ -669,15 +688,17 @@ private val SeriesGlyphs: List<Glyph> =
         TriangleGlyph,
         InvertedTriangleGlyph,
         HexagonGlyph,
-        Glyph.Circle,
     )
 
+private val SeriesGlyphs: List<Glyph> =
+    BaseSeriesGlyphs + (BaseSeriesGlyphs.drop(1) + BaseSeriesGlyphs.first()) + Glyph.Circle
+
 private val MIN_VIEWPORT_SPAN = 6.hours
-private val LONG_DATE_SPAN = 180.days
+private val LONG_DATE_SPAN_MS = 180.days.inWholeMilliseconds.toDouble()
 private val DETAIL_SPAN_MAX_MS = 45.days.inWholeMilliseconds.toDouble()
 private val MEDIUM_SPAN_MAX_MS = 180.days.inWholeMilliseconds.toDouble()
 private const val MIN_POSITIVE_SPAN_MS = 1.0
-private const val MILLIS_PER_HOUR = 3_600_000L
+private const val MILLIS_PER_QUARTER_HOUR = 900_000L
 private const val RANGE_MATCH_TOLERANCE_MS = 3_600_000.0
 private const val RANGE_MATCH_FRACTION = 0.02
 private const val PERIOD_BUTTON_WEIGHT = 1.6f

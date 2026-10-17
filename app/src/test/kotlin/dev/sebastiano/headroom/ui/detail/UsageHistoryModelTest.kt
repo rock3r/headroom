@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.ui.detail
 import dev.c5inco.charts.core.Gaps
 import dev.c5inco.charts.core.LineMark
 import dev.c5inco.charts.core.LinePattern
+import dev.c5inco.charts.core.Markers
 import dev.c5inco.charts.core.RuleMark
 import dev.c5inco.charts.core.TimeAxis
 import dev.c5inco.charts.core.XBandMark
@@ -598,7 +599,7 @@ class UsageHistoryModelTest {
     }
 
     @Test
-    fun `seven windows exclude PACE_COLOR_SLOT and distinguish overflow series with dashed line`() {
+    fun `seven windows exclude PACE_COLOR_SLOT and keep solid lines with overflow markers`() {
         val windows =
             (0 until 7).map { index ->
                 weeklyWindow(
@@ -627,15 +628,13 @@ class UsageHistoryModelTest {
         assertEquals(7, model.windows.size)
         // None of the 7 series may use the reserved pace colour slot.
         assertTrue(model.windows.none { it.colorSlot == PACE_COLOR_SLOT })
-        assertEquals(
-            (0 until SERIES_PALETTE_SIZE).toList(),
-            model.windows.take(6).map { it.colorSlot },
-        )
-        assertTrue(model.windows.take(6).all { it.linePattern == LinePattern.Solid })
-        // The 7th window wraps around the series palette and switches to a dashed line pattern.
+        assertEquals((0 until 7).toList(), model.windows.map { it.colorSlot })
+        assertTrue(model.windows.take(6).all { it.markers == Markers.Last })
+        // The 7th window uses overflow slot 6 (rotated colour+glyph pair) and Markers.All on a
+        // solid line so dashed remains exclusive to even pace.
         val seventh = model.windows[6]
-        assertEquals(0, seventh.colorSlot)
-        assertEquals(LinePattern.Dashed, seventh.linePattern)
+        assertEquals(SERIES_PALETTE_SIZE, seventh.colorSlot)
+        assertEquals(Markers.All, seventh.markers)
 
         val formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
         val spec =
@@ -647,11 +646,15 @@ class UsageHistoryModelTest {
                 description = "Usage chart",
             )
         val lineMarks = spec.marks.filterIsInstance<LineMark>()
-        val solidMark = lineMarks.single { it.pattern == LinePattern.Solid }
-        assertEquals(6, solidMark.series.size)
-        val dashedSeries =
-            lineMarks.filter { it.pattern == LinePattern.Dashed }.flatMap { it.series }
-        assertTrue(dashedSeries.any { it.name == "Weekly · 6" && it.color == 0 })
-        assertTrue(dashedSeries.any { it.name.startsWith("pace:") && it.color == PACE_COLOR_SLOT })
+        val solidMarks = lineMarks.filter { it.pattern == LinePattern.Solid }
+        assertEquals(2, solidMarks.size)
+        val lastMarkerSeries = solidMarks.single { it.markers == Markers.Last }.series
+        val allMarkerSeries = solidMarks.single { it.markers == Markers.All }.series
+        assertEquals(6, lastMarkerSeries.size)
+        assertEquals(listOf("Weekly · 6"), allMarkerSeries.map { it.name })
+        assertEquals(SERIES_PALETTE_SIZE, allMarkerSeries.single().color)
+
+        val dashedMarks = lineMarks.filter { it.pattern == LinePattern.Dashed }
+        assertTrue(dashedMarks.all { mark -> mark.series.all { it.color == PACE_COLOR_SLOT } })
     }
 }

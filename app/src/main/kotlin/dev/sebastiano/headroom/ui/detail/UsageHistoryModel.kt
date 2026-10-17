@@ -48,7 +48,7 @@ data class WindowHistorySeries(
     val kind: WindowKind,
     val isPrimary: Boolean,
     val colorSlot: Int,
-    val linePattern: LinePattern = LinePattern.Solid,
+    val markers: Markers = Markers.Last,
     val summary: ChartSummary,
     /** All stored usage points up to `now`, ordered oldest first. */
     val points: List<UsagePoint>,
@@ -67,7 +67,7 @@ internal data class SeriesPlotData(
     val label: String,
     val isPrimary: Boolean,
     val colorSlot: Int,
-    val linePattern: LinePattern,
+    val markers: Markers,
     val periodStart: Instant,
     val periodEnd: Instant,
     val usedPercent: Double,
@@ -204,7 +204,7 @@ data class UsageHistoryModel(
                         label = window.label,
                         isPrimary = window.isPrimary,
                         colorSlot = window.colorSlot,
-                        linePattern = window.linePattern,
+                        markers = window.markers,
                         periodStart = window.summary.start,
                         periodEnd = window.summary.end,
                         usedPercent = window.summary.usedPercent,
@@ -313,10 +313,12 @@ internal fun detectResets(
  * Builds the [UsageHistoryModel] for an account from its [windows] and per-window [histories], or
  * null when the account has no chartable long windows.
  *
- * Quota series are assigned palette slots in `0 until SERIES_PALETTE_SIZE` (excluding
- * [PACE_COLOR_SLOT]). The first [SERIES_PALETTE_SIZE] windows use [LinePattern.Solid] with distinct
- * colour+glyph pairs, and overflow windows (`>= 6`) fall back to [LinePattern.Dashed] so they stay
- * distinguishable when colours wrap.
+ * Every quota series is drawn with a solid stroke ([LinePattern.Solid]) so [LinePattern.Dashed]
+ * remains exclusive to the even-pace guide and [LinePattern.Dotted] to projections. Series are
+ * assigned palette slots in `0 until SERIES_SLOT_COUNT` (excluding [PACE_COLOR_SLOT]): slots `0
+ * until SERIES_PALETTE_SIZE` pair the 6 colours with 6 distinct glyphs and [Markers.Last], while
+ * overflow windows (`index >= SERIES_PALETTE_SIZE`) use slots `SERIES_PALETTE_SIZE until
+ * SERIES_SLOT_COUNT` (rotated colour+glyph pairs) and [Markers.All] along the solid line.
  */
 internal fun buildUsageHistoryModel(
     accountId: String,
@@ -342,9 +344,8 @@ internal fun buildUsageHistoryModel(
             label = window.label,
             kind = window.kind,
             isPrimary = window.id == primaryWindowId || index == 0,
-            colorSlot = Math.floorMod(index, SERIES_PALETTE_SIZE),
-            linePattern =
-                if (index < SERIES_PALETTE_SIZE) LinePattern.Solid else LinePattern.Dashed,
+            colorSlot = Math.floorMod(index, SERIES_SLOT_COUNT),
+            markers = if (index < SERIES_PALETTE_SIZE) Markers.Last else Markers.All,
             summary = summary,
             points = prepared,
             resets = detectResets(prepared, window.length),
@@ -482,9 +483,9 @@ internal fun buildUsageHistoryChartSpec(
     }
 
     shown
-        .groupBy { it.linePattern }
-        .forEach { (pattern, windowsForPattern) ->
-            val usageSeries = windowsForPattern.map { window ->
+        .groupBy { it.markers }
+        .forEach { (markerMode, windowsForMode) ->
+            val usageSeries = windowsForMode.map { window ->
                 Series(
                     name = window.label,
                     values =
@@ -500,9 +501,9 @@ internal fun buildUsageHistoryChartSpec(
                 LineMark(
                     series = usageSeries,
                     curve = Curve.Linear,
-                    markers = Markers.Last,
+                    markers = markerMode,
                     gaps = Gaps.Connect,
-                    pattern = pattern,
+                    pattern = LinePattern.Solid,
                 )
         }
 
@@ -759,11 +760,17 @@ private fun twoPointSeries(
     return values.asList()
 }
 
-/** Number of distinct (colour, glyph) slots reserved for quota series in [UsageHistoryChart]. */
+/** Number of primary (colour, glyph) slots before overflow marker mode kicks in. */
 internal const val SERIES_PALETTE_SIZE: Int = 6
 
+/**
+ * Total number of series slots (`0 until 12`): 6 primary `(colour, glyph)` pairs followed by 6
+ * rotated `(colour, glyph)` pairs for overflow windows.
+ */
+internal const val SERIES_SLOT_COUNT: Int = SERIES_PALETTE_SIZE * 2
+
 /** Palette slot reserved for the dashed even-pace guide line in [UsageHistoryChart]. */
-internal const val PACE_COLOR_SLOT: Int = SERIES_PALETTE_SIZE
+internal const val PACE_COLOR_SLOT: Int = SERIES_SLOT_COUNT
 
 /** Below this usage percentage, a window reads as just reset and has no projection line. */
 internal const val FRESH_MAX_PERCENT: Double = 0.5
