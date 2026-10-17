@@ -15,6 +15,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -77,7 +78,10 @@ import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 const val USAGE_HISTORY_CHART_TAG: String = "usage-history-chart"
 const val USAGE_HISTORY_TOOLTIP_TAG: String = "usage-history-tooltip"
@@ -97,6 +101,7 @@ fun UsageHistoryChart(
     display: QuotaDisplay,
     onWindowToggle: (windowId: String) -> Unit,
     modifier: Modifier = Modifier,
+    onBuildSpec: (() -> Unit)? = null,
 ) {
     val baseStyle = rememberUsageHistoryChartStyle()
     val animate = animationsEnabled()
@@ -123,6 +128,7 @@ fun UsageHistoryChart(
                 baseStyle = baseStyle,
                 animate = animate,
                 animateEntrance = animateEntrance,
+                onBuildSpec = onBuildSpec,
             )
         }
     }
@@ -136,6 +142,8 @@ private fun UsageHistoryPlot(
     baseStyle: ChartStyle,
     animate: Boolean,
     animateEntrance: Boolean,
+    onBuildSpec: (() -> Unit)? = null,
+    warmDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     val dataSpec = HeadroomMotion.dataSpec<Float>()
     val availableRanges = model.availableRanges
@@ -167,27 +175,31 @@ private fun UsageHistoryPlot(
             remember(resources) {
                 { percent: Int -> resources.getString(R.string.percent, percent) }
             }
-        // Both detail and overview specs (and their CartesianPrep caches) are built and warmed
-        // once per model + formatter, so viewport pan/zoom/fling never rebuilds a spec.
+        // Keyed strictly on the history-dependent plotKey + formatter (never on model.now), and
+        // warmed off the main thread so a 1-minute clock tick never rebuilds or warms specs.
+        val plotKey = model.plotKey
         val specs =
-            remember(model, formatter, limitLabel, percentFormat, paceDescription) {
+            remember(plotKey, formatter, limitLabel, percentFormat) {
+                onBuildSpec?.invoke()
                 buildUsageHistoryChartSpecs(
-                    model = model,
+                    plotKey = plotKey,
                     formatter = formatter,
                     limitLabel = limitLabel,
                     percentFormat = percentFormat,
-                    description = paceDescription,
                 )
             }
+        LaunchedEffect(specs, plotKey) {
+            withContext(warmDispatcher) { warmSpecCaches(specs, plotKey) }
+        }
         val usageSeriesCount = model.shownWindows.size
         val zoomDensity by
             remember(viewport) { derivedStateOf { ZoomDensity.forSpan(viewport.span) } }
         val spec = if (zoomDensity == ZoomDensity.Overview) specs.overview else specs.detail
         val style = remember(baseStyle, zoomDensity) { zoomDensity.applyTo(baseStyle) }
-        val lastState = remember { ZoomSyncState(model, zoomDensity) }
-        val densityOnlyChange = lastState.model == model && lastState.density != zoomDensity
+        val lastState = remember { ZoomSyncState(plotKey, zoomDensity) }
+        val densityOnlyChange = lastState.plotKey == plotKey && lastState.density != zoomDensity
         SideEffect {
-            lastState.model = model
+            lastState.plotKey = plotKey
             lastState.density = zoomDensity
         }
         val chartAnimationSpec =
@@ -254,7 +266,7 @@ private class DescriptionMemo(
     }
 }
 
-private class ZoomSyncState(var model: UsageHistoryModel, var density: ZoomDensity)
+private class ZoomSyncState(var plotKey: UsageHistoryPlotKey, var density: ZoomDensity)
 
 private enum class ZoomDensity(val lineWidth: Dp, val markerRadius: Dp) {
     Detail(lineWidth = 2.5.dp, markerRadius = 4.dp),
@@ -528,6 +540,7 @@ internal fun rememberUsageHistoryChartStyle(): ChartStyle {
                 seriesAccent(baseHue + THIRD_HUE_SHIFT, dark, lightnessDelta = -0.04f),
                 seriesAccent(baseHue + FOURTH_HUE_SHIFT, dark, lightnessDelta = 0.04f),
                 seriesAccent(baseHue + FIFTH_HUE_SHIFT, dark, lightnessDelta = -0.02f),
+                seriesAccent(baseHue + SIXTH_HUE_SHIFT, dark, lightnessDelta = 0.02f),
                 scheme.onSurfaceVariant.copy(alpha = PACE_LINE_ALPHA),
             )
         val labelStyle = typography.labelSmall.copy(color = scheme.onSurfaceVariant)
@@ -621,8 +634,43 @@ private val TriangleGlyph: Glyph =
         }
     )
 
+private val InvertedTriangleGlyph: Glyph =
+    Glyph.path(
+        Path().apply {
+            moveTo(0f, 0f)
+            lineTo(1f, 0f)
+            lineTo(0.5f, 1f)
+            close()
+        }
+    )
+
+private val HexagonGlyph: Glyph =
+    Glyph.path(
+        Path().apply {
+            moveTo(0.5f, 0f)
+            lineTo(0.95f, 0.25f)
+            lineTo(0.95f, 0.75f)
+            lineTo(0.5f, 1f)
+            lineTo(0.05f, 0.75f)
+            lineTo(0.05f, 0.25f)
+            close()
+        }
+    )
+
+/**
+ * Six distinct glyphs for the six series slots (`0 until SERIES_PALETTE_SIZE`), followed by a
+ * placeholder at [PACE_COLOR_SLOT].
+ */
 private val SeriesGlyphs: List<Glyph> =
-    listOf(Glyph.Circle, Glyph.Square, DiamondGlyph, TriangleGlyph, Glyph.Circle, Glyph.Circle)
+    listOf(
+        Glyph.Circle,
+        Glyph.Square,
+        DiamondGlyph,
+        TriangleGlyph,
+        InvertedTriangleGlyph,
+        HexagonGlyph,
+        Glyph.Circle,
+    )
 
 private val MIN_VIEWPORT_SPAN = 6.hours
 private val LONG_DATE_SPAN = 180.days
@@ -646,6 +694,7 @@ private const val SECOND_HUE_SHIFT = 145f
 private const val THIRD_HUE_SHIFT = 250f
 private const val FOURTH_HUE_SHIFT = 75f
 private const val FIFTH_HUE_SHIFT = 310f
+private const val SIXTH_HUE_SHIFT = 195f
 private const val LIGHT_SERIES_L = 0.52f
 private const val LIGHT_SERIES_C = 0.14f
 private const val DARK_SERIES_L = 0.80f

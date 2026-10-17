@@ -553,4 +553,105 @@ class UsageHistoryModelTest {
         assertTrue(ukDay.contains("Oct") && ukDay.contains("5"))
         assertTrue(usDay.contains("Oct") && usDay.contains("5"))
     }
+
+    @Test
+    fun `a minute clock tick updates live summaries without changing plotKey`() {
+        val window = weeklyWindow()
+        val points =
+            listOf(
+                UsagePoint(weeklyStart.plus(1.days), 25.0, resetsAt = weeklyReset),
+                UsagePoint(now, 71.0, resetsAt = weeklyReset),
+            )
+        val histories = mapOf(window.id to points)
+
+        val atZero =
+            assertNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = listOf(window),
+                    primaryWindowId = window.id,
+                    histories = histories,
+                    selectedWindowIds = setOf(window.id),
+                    now = now,
+                    dataFrom = now,
+                )
+            )
+        val atOneMinute =
+            assertNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = listOf(window),
+                    primaryWindowId = window.id,
+                    histories = histories,
+                    selectedWindowIds = setOf(window.id),
+                    now = now.plus(1.minutes),
+                    dataFrom = now,
+                )
+            )
+
+        assertEquals(now.plus(1.minutes), atOneMinute.now)
+        assertTrue(
+            atOneMinute.primaryShownWindow!!.summary.expectedPercent >
+                atZero.primaryShownWindow!!.summary.expectedPercent
+        )
+        assertEquals(atZero.plotKey, atOneMinute.plotKey)
+    }
+
+    @Test
+    fun `seven windows exclude PACE_COLOR_SLOT and distinguish overflow series with dashed line`() {
+        val windows =
+            (0 until 7).map { index ->
+                weeklyWindow(
+                    id = "w-$index",
+                    label = "Weekly · $index",
+                    usedPercent = 10.0 + index * 10.0,
+                )
+            }
+        val histories = windows.associate { w ->
+            w.id to listOf(UsagePoint(now, w.usedPercent, weeklyReset))
+        }
+
+        val model =
+            assertNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = windows,
+                    primaryWindowId = "w-0",
+                    histories = histories,
+                    selectedWindowIds = windows.map { it.id }.toSet(),
+                    now = now,
+                    dataFrom = now,
+                )
+            )
+
+        assertEquals(7, model.windows.size)
+        // None of the 7 series may use the reserved pace colour slot.
+        assertTrue(model.windows.none { it.colorSlot == PACE_COLOR_SLOT })
+        assertEquals(
+            (0 until SERIES_PALETTE_SIZE).toList(),
+            model.windows.take(6).map { it.colorSlot },
+        )
+        assertTrue(model.windows.take(6).all { it.linePattern == LinePattern.Solid })
+        // The 7th window wraps around the series palette and switches to a dashed line pattern.
+        val seventh = model.windows[6]
+        assertEquals(0, seventh.colorSlot)
+        assertEquals(LinePattern.Dashed, seventh.linePattern)
+
+        val formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
+        val spec =
+            buildUsageHistoryChartSpec(
+                model = model,
+                formatter = formatter,
+                limitLabel = "limit",
+                percentFormat = { "$it%" },
+                description = "Usage chart",
+            )
+        val lineMarks = spec.marks.filterIsInstance<LineMark>()
+        val solidMark = lineMarks.single { it.pattern == LinePattern.Solid }
+        assertEquals(6, solidMark.series.size)
+        val dashedSeries =
+            lineMarks.filter { it.pattern == LinePattern.Dashed }.flatMap { it.series }
+        assertTrue(dashedSeries.any { it.name == "Weekly · 6" && it.color == 0 })
+        assertTrue(dashedSeries.any { it.name.startsWith("pace:") && it.color == PACE_COLOR_SLOT })
+    }
 }

@@ -48,11 +48,46 @@ data class WindowHistorySeries(
     val kind: WindowKind,
     val isPrimary: Boolean,
     val colorSlot: Int,
+    val linePattern: LinePattern = LinePattern.Solid,
     val summary: ChartSummary,
     /** All stored usage points up to `now`, ordered oldest first. */
     val points: List<UsagePoint>,
     /** Instants at which this window reset across [points], oldest first. */
     val resets: List<Instant>,
+)
+
+/**
+ * History-dependent plot inputs for one window series. Anchored to the series' latest recorded
+ * sample ([sampleAt]) rather than the wall-clock ticker so a 1-minute clock tick never invalidates
+ * the compiled chart specs.
+ */
+@Immutable
+internal data class SeriesPlotData(
+    val id: String,
+    val label: String,
+    val isPrimary: Boolean,
+    val colorSlot: Int,
+    val linePattern: LinePattern,
+    val periodStart: Instant,
+    val periodEnd: Instant,
+    val usedPercent: Double,
+    val points: List<UsagePoint>,
+    val resets: List<Instant>,
+    val sampleAt: Instant,
+    val projectedLimitAt: Instant?,
+    val projectedEndPercent: Double?,
+)
+
+/**
+ * History- and selection-dependent key for building and warming [UsageHistorySpecs]. Invariant
+ * across 1-minute `now` ticks when no new sync point has arrived.
+ */
+@Immutable
+internal data class UsageHistoryPlotKey(
+    val accountId: String,
+    val shownWindows: List<SeriesPlotData>,
+    val minBound: Instant,
+    val maxBound: Instant,
 )
 
 /**
@@ -139,6 +174,50 @@ data class UsageHistoryModel(
 
     private val allResetEpochMs: LongArray =
         shownWindows.flatMap { it.resets }.map { it.toEpochMilliseconds() }.sorted().toLongArray()
+
+    /**
+     * History- and selection-dependent key for spec building and background cache warming. Does not
+     * depend on [now], so 1-minute clock ticks do not rebuild or re-warm the chart specs.
+     */
+    internal val plotKey: UsageHistoryPlotKey =
+        UsageHistoryPlotKey(
+            accountId = accountId,
+            shownWindows =
+                shownWindows.map { window ->
+                    val sampleAt = window.points.lastOrNull()?.at ?: window.summary.start
+                    val sampleSummary =
+                        chartSummary(
+                            window =
+                                QuotaWindow(
+                                    id = window.id,
+                                    label = window.label,
+                                    kind = window.kind,
+                                    usedPercent = window.summary.usedPercent,
+                                    resetsAt = window.summary.end,
+                                    length = window.summary.end - window.summary.start,
+                                ),
+                            points = window.points,
+                            now = sampleAt,
+                        )
+                    SeriesPlotData(
+                        id = window.id,
+                        label = window.label,
+                        isPrimary = window.isPrimary,
+                        colorSlot = window.colorSlot,
+                        linePattern = window.linePattern,
+                        periodStart = window.summary.start,
+                        periodEnd = window.summary.end,
+                        usedPercent = window.summary.usedPercent,
+                        points = window.points,
+                        resets = window.resets,
+                        sampleAt = sampleAt,
+                        projectedLimitAt = sampleSummary?.projectedLimitAt,
+                        projectedEndPercent = sampleSummary?.projectedEndPercent,
+                    )
+                },
+            minBound = minBound,
+            maxBound = maxBound,
+        )
 
     /** Target `[start, end]` in epoch milliseconds for [range]. */
     fun targetRange(range: HistoryRange): ViewportRange =
@@ -233,6 +312,11 @@ internal fun detectResets(
 /**
  * Builds the [UsageHistoryModel] for an account from its [windows] and per-window [histories], or
  * null when the account has no chartable long windows.
+ *
+ * Quota series are assigned palette slots in `0 until SERIES_PALETTE_SIZE` (excluding
+ * [PACE_COLOR_SLOT]). The first [SERIES_PALETTE_SIZE] windows use [LinePattern.Solid] with distinct
+ * colour+glyph pairs, and overflow windows (`>= 6`) fall back to [LinePattern.Dashed] so they stay
+ * distinguishable when colours wrap.
  */
 internal fun buildUsageHistoryModel(
     accountId: String,
@@ -242,6 +326,7 @@ internal fun buildUsageHistoryModel(
     selectedWindowIds: Set<String>?,
     now: Instant,
     keepLongHistory: Boolean = true,
+    dataFrom: Instant? = null,
 ): UsageHistoryModel? {
     val chartable =
         windows
@@ -250,14 +335,16 @@ internal fun buildUsageHistoryModel(
     if (chartable.isEmpty()) return null
     val series = chartable.mapIndexedNotNull { index, window ->
         val raw = histories[window.id].orEmpty()
-        val prepared = prepareSeriesPoints(window, raw, now)
+        val prepared = prepareSeriesPoints(window, raw, now, dataFrom)
         val summary = chartSummary(window, prepared, now) ?: return@mapIndexedNotNull null
         WindowHistorySeries(
             id = window.id,
             label = window.label,
             kind = window.kind,
             isPrimary = window.id == primaryWindowId || index == 0,
-            colorSlot = index,
+            colorSlot = Math.floorMod(index, SERIES_PALETTE_SIZE),
+            linePattern =
+                if (index < SERIES_PALETTE_SIZE) LinePattern.Solid else LinePattern.Dashed,
             summary = summary,
             points = prepared,
             resets = detectResets(prepared, window.length),
@@ -279,6 +366,7 @@ private fun prepareSeriesPoints(
     window: QuotaWindow,
     raw: List<UsagePoint>,
     now: Instant,
+    dataFrom: Instant?,
 ): List<UsagePoint> {
     val resetsAt = window.resetsAt ?: return emptyList()
     val length = window.length ?: return emptyList()
@@ -292,8 +380,18 @@ private fun prepareSeriesPoints(
             deduped += point
         }
     }
-    if (now in start..resetsAt && (deduped.isEmpty() || deduped.last().at < now)) {
-        deduped += UsagePoint(at = now, usedPercent = window.usedPercent, resetsAt = resetsAt)
+    val sampleAt = dataFrom ?: now
+    val hasCurrentPeriodSample =
+        deduped.isNotEmpty() &&
+            deduped.last().at >= start &&
+            (dataFrom == null || deduped.last().at >= dataFrom) &&
+            deduped.last().usedPercent == window.usedPercent
+    if (
+        !hasCurrentPeriodSample &&
+            sampleAt in start..resetsAt &&
+            (deduped.isEmpty() || deduped.last().at < sampleAt)
+    ) {
+        deduped += UsagePoint(at = sampleAt, usedPercent = window.usedPercent, resetsAt = resetsAt)
     }
     return deduped
 }
@@ -304,28 +402,28 @@ internal data class UsageHistorySpecs(
 )
 
 internal fun buildUsageHistoryChartSpecs(
-    model: UsageHistoryModel,
+    plotKey: UsageHistoryPlotKey,
     formatter: ResetFormatter,
     limitLabel: String,
     percentFormat: (Int) -> String,
-    description: String,
 ): UsageHistorySpecs {
+    val description = plotKey.shownWindows.joinToString { it.label }
     val detail =
         buildUsageHistoryChartSpec(
-            model = model,
+            plotKey = plotKey,
             formatter = formatter,
             limitLabel = limitLabel,
             percentFormat = percentFormat,
             description = description,
             resetStride = 1,
         )
-    val hasDenseResets = model.shownWindows.any { it.resets.size > MIN_RESETS_TO_THIN }
+    val hasDenseResets = plotKey.shownWindows.any { it.resets.size > MIN_RESETS_TO_THIN }
     val overview =
         if (!hasDenseResets) {
             detail
         } else {
             buildUsageHistoryChartSpec(
-                model = model,
+                plotKey = plotKey,
                 formatter = formatter,
                 limitLabel = limitLabel,
                 percentFormat = percentFormat,
@@ -336,12 +434,7 @@ internal fun buildUsageHistoryChartSpecs(
     return UsageHistorySpecs(detail = detail, overview = overview)
 }
 
-/**
- * Compiles [model] into a [CartesianChart] spec on a single merged [TimeAxis].
- *
- * Series timestamps are merged in $O(N \log N)$ over primitive epoch-millisecond arrays and aligned
- * in a single linear pass per series with `Double.NaN` holes connected by [Gaps.Connect].
- */
+/** Compiles [model] into a [CartesianChart] spec on a single merged [TimeAxis]. */
 internal fun buildUsageHistoryChartSpec(
     model: UsageHistoryModel,
     formatter: ResetFormatter,
@@ -349,103 +442,131 @@ internal fun buildUsageHistoryChartSpec(
     percentFormat: (Int) -> String,
     description: String,
     resetStride: Int = 1,
+): CartesianChart =
+    buildUsageHistoryChartSpec(
+        plotKey = model.plotKey,
+        formatter = formatter,
+        limitLabel = limitLabel,
+        percentFormat = percentFormat,
+        description = description,
+        resetStride = resetStride,
+    )
+
+/**
+ * Compiles [plotKey] into a [CartesianChart] spec on a single merged [TimeAxis].
+ *
+ * Series timestamps are merged in $O(N \log N)$ over primitive epoch-millisecond arrays and aligned
+ * in a single linear pass per series with `Double.NaN` holes connected by [Gaps.Connect].
+ */
+internal fun buildUsageHistoryChartSpec(
+    plotKey: UsageHistoryPlotKey,
+    formatter: ResetFormatter,
+    limitLabel: String,
+    percentFormat: (Int) -> String,
+    description: String,
+    resetStride: Int = 1,
 ): CartesianChart {
-    val shown = model.shownWindows
-    val uniqueMs = collectSortedEpochMillis(model, shown)
+    val shown = plotKey.shownWindows
+    val uniqueMs = collectSortedEpochMillis(plotKey, shown)
     val times = List(uniqueMs.size) { JavaInstant.ofEpochMilli(uniqueMs[it]) }
 
-    val usageSeries = shown.map { window ->
-        Series(
-            name = window.label,
-            values =
-                alignPointsToGrid(
-                    points = window.points,
-                    periodStartMs = window.summary.start.toEpochMilliseconds(),
-                    uniqueMs = uniqueMs,
-                ),
-            color = window.colorSlot,
-        )
-    }
-
     val marks = ArrayList<Mark>(shown.size * 3 + 4)
-    model.primaryShownWindow?.let { primary ->
+    val primary = shown.firstOrNull { it.isPrimary } ?: shown.firstOrNull()
+    primary?.let {
         marks +=
             XBandMark(
-                from = primary.summary.start.toJavaInstant(),
-                to = primary.summary.end.toJavaInstant(),
-                color = primary.colorSlot,
+                from = it.periodStart.toJavaInstant(),
+                to = it.periodEnd.toJavaInstant(),
+                color = it.colorSlot,
             )
     }
 
-    marks +=
-        LineMark(
-            series = usageSeries,
-            curve = Curve.Linear,
-            markers = Markers.Last,
-            gaps = Gaps.Connect,
-            pattern = LinePattern.Solid,
-        )
+    shown
+        .groupBy { it.linePattern }
+        .forEach { (pattern, windowsForPattern) ->
+            val usageSeries = windowsForPattern.map { window ->
+                Series(
+                    name = window.label,
+                    values =
+                        alignPointsToGrid(
+                            points = window.points,
+                            periodStartMs = window.periodStart.toEpochMilliseconds(),
+                            uniqueMs = uniqueMs,
+                        ),
+                    color = window.colorSlot,
+                )
+            }
+            marks +=
+                LineMark(
+                    series = usageSeries,
+                    curve = Curve.Linear,
+                    markers = Markers.Last,
+                    gaps = Gaps.Connect,
+                    pattern = pattern,
+                )
+        }
 
     appendPaceMarks(shown, uniqueMs, marks)
-    appendProjectionMarks(model.now, shown, uniqueMs, marks)
+    appendProjectionMarks(shown, uniqueMs, marks)
     appendResetRuleMarks(shown, resetStride.coerceAtLeast(1), marks)
     marks += RuleMark(y = MAX_PERCENT, label = limitLabel)
 
     val yFormat = ValueFormat { value -> percentFormat(value.roundToInt()) }
-    val chart =
-        CartesianChart(
-            x =
-                TimeAxis(
-                    times = times,
-                    min = model.minBound.toJavaInstant(),
-                    max = model.maxBound.toJavaInstant(),
-                    tickCount = TIME_AXIS_TICK_COUNT,
-                    format = formatter.chartTickFormat(),
-                    pointFormat = formatter.chartPointFormat(),
-                    zone = formatter.zone,
-                    locale = formatter.locale,
-                ),
-            marks = marks,
-            y =
-                ValueAxis(
-                    min = 0.0,
-                    max = MAX_PERCENT,
-                    tickCount = VALUE_AXIS_TICK_COUNT,
-                    format = yFormat,
-                    valueFormat = yFormat,
-                ),
-            description = description,
-        )
-    warmSpecCaches(chart, model)
-    return chart
+    return CartesianChart(
+        x =
+            TimeAxis(
+                times = times,
+                min = plotKey.minBound.toJavaInstant(),
+                max = plotKey.maxBound.toJavaInstant(),
+                tickCount = TIME_AXIS_TICK_COUNT,
+                format = formatter.chartTickFormat(),
+                pointFormat = formatter.chartPointFormat(),
+                zone = formatter.zone,
+                locale = formatter.locale,
+            ),
+        marks = marks,
+        y =
+            ValueAxis(
+                min = 0.0,
+                max = MAX_PERCENT,
+                tickCount = VALUE_AXIS_TICK_COUNT,
+                format = yFormat,
+                valueFormat = yFormat,
+            ),
+        description = description,
+    )
 }
 
 /**
- * Pre-populates `CartesianPrep`'s `xLabelCache` and `valueTextCache` across the full domain when
- * the spec is constructed, so panning or flinging across a year of points never runs
+ * Pre-populates `CartesianPrep`'s `xLabelCache` and `valueTextCache` across the full domain on a
+ * background dispatcher so panning or flinging across a year of points never runs
  * `DateTimeFormatter` or allocates formatted strings on a gesture frame.
  */
-private fun warmSpecCaches(chart: CartesianChart, model: UsageHistoryModel) {
-    val minMs = model.minBound.toEpochMilliseconds().toDouble()
-    val maxMs = model.maxBound.toEpochMilliseconds().toDouble()
+internal fun warmSpecCaches(specs: UsageHistorySpecs, plotKey: UsageHistoryPlotKey) {
+    val minMs = plotKey.minBound.toEpochMilliseconds().toDouble()
+    val maxMs = plotKey.maxBound.toEpochMilliseconds().toDouble()
     if (maxMs > minMs) {
-        dev.c5inco.charts.core.compile(
-            spec = chart,
-            size = dev.c5inco.charts.core.Extent(WARM_EXTENT_WIDTH, WARM_EXTENT_HEIGHT),
-            measure = { _, _ -> dev.c5inco.charts.core.Extent(WARM_TEXT_SIZE, WARM_TEXT_SIZE) },
-            viewport = ViewportRange(minMs, maxMs),
-        )
+        val range = ViewportRange(minMs, maxMs)
+        val extent = dev.c5inco.charts.core.Extent(WARM_EXTENT_WIDTH, WARM_EXTENT_HEIGHT)
+        val measure =
+            dev.c5inco.charts.core.TextMeasure { _, _ ->
+                dev.c5inco.charts.core.Extent(WARM_TEXT_SIZE, WARM_TEXT_SIZE)
+            }
+        dev.c5inco.charts.core.compile(specs.detail, extent, measure, viewport = range)
+        if (specs.overview !== specs.detail) {
+            dev.c5inco.charts.core.compile(specs.overview, extent, measure, viewport = range)
+        }
     }
 }
 
 /** One dashed even-pace diagonal per distinct current period `[start, end]` among shown windows. */
 private fun appendPaceMarks(
-    shown: List<WindowHistorySeries>,
+    shown: List<SeriesPlotData>,
     uniqueMs: LongArray,
     marks: MutableList<Mark>,
 ) {
     shown
-        .map { it.summary.start to it.summary.end }
+        .map { it.periodStart to it.periodEnd }
         .distinct()
         .forEach { (start, end) ->
             val startMs = start.toEpochMilliseconds()
@@ -477,35 +598,35 @@ private fun appendPaceMarks(
         }
 }
 
-/** One dotted projection line per shown window within its current period (`now` -> hit or end). */
+/**
+ * One dotted projection line per shown window within its current period (`sampleAt` -> hit or end).
+ */
 private fun appendProjectionMarks(
-    now: Instant,
-    shown: List<WindowHistorySeries>,
+    shown: List<SeriesPlotData>,
     uniqueMs: LongArray,
     marks: MutableList<Mark>,
 ) {
-    val nowMs = now.toEpochMilliseconds()
     val projectionSeries = ArrayList<Series>(shown.size)
     shown.forEach { window ->
-        val summary = window.summary
-        val projectedLimitAt = summary.projectedLimitAt
-        val projectedEndPercent = summary.projectedEndPercent
-        if (summary.usedPercent > FRESH_MAX_PERCENT) {
+        val sampleMs = window.sampleAt.toEpochMilliseconds()
+        val projectedLimitAt = window.projectedLimitAt
+        val projectedEndPercent = window.projectedEndPercent
+        if (window.usedPercent > FRESH_MAX_PERCENT) {
             val target =
                 when {
-                    projectedLimitAt != null && projectedLimitAt > now ->
+                    projectedLimitAt != null && projectedLimitAt > window.sampleAt ->
                         projectedLimitAt.toEpochMilliseconds() to MAX_PERCENT
-                    projectedEndPercent != null && summary.end > now ->
-                        summary.end.toEpochMilliseconds() to
+                    projectedEndPercent != null && window.periodEnd > window.sampleAt ->
+                        window.periodEnd.toEpochMilliseconds() to
                             projectedEndPercent.coerceIn(0.0, MAX_PERCENT)
                     else -> null
                 }
-            if (target != null && target.first > nowMs) {
+            if (target != null && target.first > sampleMs) {
                 val values =
                     twoPointSeries(
                         uniqueMs = uniqueMs,
-                        firstMs = nowMs,
-                        firstValue = summary.usedPercent.coerceIn(0.0, MAX_PERCENT),
+                        firstMs = sampleMs,
+                        firstValue = window.usedPercent.coerceIn(0.0, MAX_PERCENT),
                         secondMs = target.first,
                         secondValue = target.second,
                     )
@@ -536,7 +657,7 @@ private fun appendProjectionMarks(
  * the latest reset so the newest reset is always marked.
  */
 private fun appendResetRuleMarks(
-    shown: List<WindowHistorySeries>,
+    shown: List<SeriesPlotData>,
     resetStride: Int,
     marks: MutableList<Mark>,
 ) {
@@ -560,24 +681,24 @@ private fun appendResetRuleMarks(
 }
 
 private fun collectSortedEpochMillis(
-    model: UsageHistoryModel,
-    shown: List<WindowHistorySeries>,
+    plotKey: UsageHistoryPlotKey,
+    shown: List<SeriesPlotData>,
 ): LongArray {
-    val extraCount = shown.size * 4 + 3
+    val extraCount = shown.size * 5 + 2
     val totalCapacity = shown.sumOf { it.points.size } + extraCount
     val raw = LongArray(totalCapacity)
     var k = 0
-    raw[k++] = model.minBound.toEpochMilliseconds()
-    raw[k++] = model.maxBound.toEpochMilliseconds()
-    raw[k++] = model.now.toEpochMilliseconds()
+    raw[k++] = plotKey.minBound.toEpochMilliseconds()
+    raw[k++] = plotKey.maxBound.toEpochMilliseconds()
     for (window in shown) {
-        val startMs = window.summary.start.toEpochMilliseconds()
+        val startMs = window.periodStart.toEpochMilliseconds()
         raw[k++] = startMs
-        if (startMs > model.minBound.toEpochMilliseconds()) {
+        if (startMs > plotKey.minBound.toEpochMilliseconds()) {
             raw[k++] = startMs - 1L
         }
-        raw[k++] = window.summary.end.toEpochMilliseconds()
-        window.summary.projectedLimitAt?.let { raw[k++] = it.toEpochMilliseconds() }
+        raw[k++] = window.periodEnd.toEpochMilliseconds()
+        raw[k++] = window.sampleAt.toEpochMilliseconds()
+        window.projectedLimitAt?.let { raw[k++] = it.toEpochMilliseconds() }
         for (point in window.points) {
             raw[k++] = point.at.toEpochMilliseconds()
         }
@@ -638,8 +759,11 @@ private fun twoPointSeries(
     return values.asList()
 }
 
+/** Number of distinct (colour, glyph) slots reserved for quota series in [UsageHistoryChart]. */
+internal const val SERIES_PALETTE_SIZE: Int = 6
+
 /** Palette slot reserved for the dashed even-pace guide line in [UsageHistoryChart]. */
-internal const val PACE_COLOR_SLOT: Int = 5
+internal const val PACE_COLOR_SLOT: Int = SERIES_PALETTE_SIZE
 
 /** Below this usage percentage, a window reads as just reset and has no projection line. */
 internal const val FRESH_MAX_PERCENT: Double = 0.5

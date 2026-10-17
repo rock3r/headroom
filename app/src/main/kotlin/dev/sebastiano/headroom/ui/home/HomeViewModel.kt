@@ -170,76 +170,96 @@ class HomeViewModel(
     /** Which long windows the user toggled off per account id. Empty means all are shown. */
     private val hiddenChartWindows = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
 
-    /** The selected account's detail. Without a selection it shows the first account. */
-    val detail: StateFlow<DetailUiState?> =
-        combine(state, selectedId, hiddenChartWindows, keepLongHistory) {
-                home,
-                id,
-                hiddenByAccount,
-                longHistory ->
-                val account =
-                    home.accounts.firstOrNull { it.id == id } ?: home.accounts.firstOrNull()
-                account?.let {
-                    DetailSelection(
-                        now = home.now,
-                        account = it,
-                        hiddenWindowIds = hiddenByAccount[it.id].orEmpty(),
-                        display = home.display,
-                        keepLongHistory = longHistory,
+    private val selectedAccountWindows: Flow<AccountWindowsSelection?> =
+        combine(
+                repository.accounts,
+                selectedId,
+                state.map { home -> home.accounts.map { it.id } }.distinctUntilChanged(),
+            ) { accounts, id, orderedIds ->
+                val targetId = id ?: orderedIds.firstOrNull()
+                val accountState =
+                    accounts.firstOrNull { it.account.id == targetId } ?: accounts.firstOrNull()
+                accountState?.let {
+                    val primaryId = it.primaryWindow?.id
+                    val options =
+                        it.snapshot
+                            ?.windows
+                            .orEmpty()
+                            .filter { w -> w.isChartableHistoryWindow }
+                            .sortedByDescending { w -> w.id == primaryId }
+                    AccountWindowsSelection(
+                        accountId = it.account.id,
+                        primaryWindowId = primaryId,
+                        options = options,
                     )
                 }
             }
             .distinctUntilChanged()
-            .flatMapLatest { selection ->
-                if (selection == null) return@flatMapLatest flowOf(null)
-                val now = selection.now
-                val account = selection.account
-                val display = selection.display
-                val state = repository.accounts.value.firstOrNull { it.account.id == account.id }
-                val primaryId = state?.primaryWindow?.id
-                val options =
-                    state
-                        ?.snapshot
-                        ?.windows
-                        .orEmpty()
-                        .filter { it.isChartableHistoryWindow }
-                        .sortedByDescending { it.id == primaryId }
+
+    private val selectedAccountHistories:
+        Flow<
+            Pair<
+                AccountWindowsSelection?,
+                Map<String, List<dev.sebastiano.headroom.model.UsagePoint>>,
+            >
+        > =
+        selectedAccountWindows.flatMapLatest { selection ->
+            if (selection == null || selection.options.isEmpty()) {
+                flowOf(selection to emptyMap())
+            } else {
+                combine(
+                    selection.options.map { window ->
+                        usageHistory.points(selection.accountId, window).map { window.id to it }
+                    }
+                ) { pairs ->
+                    selection to pairs.toMap()
+                }
+            }
+        }
+
+    /** The selected account's detail. Without a selection it shows the first account. */
+    val detail: StateFlow<DetailUiState?> =
+        combine(state, hiddenChartWindows, keepLongHistory, selectedAccountHistories) {
+                home,
+                hiddenByAccount,
+                longHistory,
+                (selection, histories) ->
+                if (selection == null) return@combine null
+                val account =
+                    home.accounts.firstOrNull { it.id == selection.accountId }
+                        ?: home.accounts.firstOrNull()
+                        ?: return@combine null
+                val options = selection.options
                 val chartWindows = options.mapNotNull { option ->
                     account.windows.firstOrNull { it.id == option.id }
                 }
                 if (options.isEmpty()) {
-                    flowOf(DetailUiState(now, account, chart = null, display = display))
+                    DetailUiState(home.now, account, chart = null, display = home.display)
                 } else {
                     val allIds = options.map { it.id }.toSet()
-                    val selectedIds =
-                        (allIds - selection.hiddenWindowIds).ifEmpty { setOf(options.first().id) }
-                    combine(
-                        options.map { window ->
-                            usageHistory.points(account.id, window).map { window.id to it }
-                        }
-                    ) { pairs ->
-                        val histories = pairs.toMap()
-                        val historyModel =
-                            buildUsageHistoryModel(
-                                accountId = account.id,
-                                windows = options,
-                                primaryWindowId = primaryId,
-                                histories = histories,
-                                selectedWindowIds = selectedIds,
-                                now = account.asOf(now),
-                                keepLongHistory = selection.keepLongHistory,
-                            )
-                        val primaryShown = historyModel?.primaryShownWindow
-                        DetailUiState(
-                            now = now,
-                            account = account,
-                            chart = primaryShown?.summary,
-                            chartWindows = chartWindows,
-                            chartWindowId = primaryShown?.id,
-                            display = display,
-                            history = historyModel,
+                    val hiddenIds = hiddenByAccount[account.id].orEmpty()
+                    val selectedIds = (allIds - hiddenIds).ifEmpty { setOf(options.first().id) }
+                    val historyModel =
+                        buildUsageHistoryModel(
+                            accountId = account.id,
+                            windows = options,
+                            primaryWindowId = selection.primaryWindowId,
+                            histories = histories,
+                            selectedWindowIds = selectedIds,
+                            now = account.asOf(home.now),
+                            keepLongHistory = longHistory,
+                            dataFrom = account.dataFrom,
                         )
-                    }
+                    val primaryShown = historyModel?.primaryShownWindow
+                    DetailUiState(
+                        now = home.now,
+                        account = account,
+                        chart = primaryShown?.summary,
+                        chartWindows = chartWindows,
+                        chartWindowId = primaryShown?.id,
+                        display = home.display,
+                        history = historyModel,
+                    )
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
@@ -330,12 +350,10 @@ class HomeViewModel(
         val sort: OverviewSort,
     )
 
-    private data class DetailSelection(
-        val now: Instant,
-        val account: AccountSummary,
-        val hiddenWindowIds: Set<String>,
-        val display: QuotaDisplay,
-        val keepLongHistory: Boolean,
+    private data class AccountWindowsSelection(
+        val accountId: String,
+        val primaryWindowId: String?,
+        val options: List<dev.sebastiano.headroom.model.QuotaWindow>,
     )
 
     private companion object {

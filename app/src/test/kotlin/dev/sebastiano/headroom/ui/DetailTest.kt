@@ -1,6 +1,9 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -23,16 +26,24 @@ import androidx.compose.ui.test.performScrollToNode
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.designsystem.IndicatorStyle
 import dev.sebastiano.headroom.model.AppSettings
+import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
+import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
 import dev.sebastiano.headroom.ui.detail.HistoryRange
 import dev.sebastiano.headroom.ui.detail.USAGE_HISTORY_CHART_TAG
+import dev.sebastiano.headroom.ui.detail.UsageHistoryChart
 import dev.sebastiano.headroom.ui.detail.alertSwitchTag
+import dev.sebastiano.headroom.ui.detail.buildUsageHistoryModel
 import dev.sebastiano.headroom.ui.detail.chartRangeTag
 import dev.sebastiano.headroom.ui.detail.chartWindowTag
 import dev.sebastiano.headroom.ui.overview.accountCardTag
+import java.time.ZoneOffset
+import java.util.Locale
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -240,5 +251,52 @@ class DetailTest {
             .performScrollTo()
             .assertIsOff()
         rule.onNodeWithText("Monthly windows are off by default").assertExists()
+    }
+
+    @Test
+    fun `minute clock ticks do not rebuild the chart specs`() {
+        val claude = DemoData.accounts(FIXED_NOW).first()
+        val windows = claude.snapshot!!.windows
+        val histories = windows.associate { w ->
+            w.id to listOf(UsagePoint(FIXED_NOW, w.usedPercent, w.resetsAt))
+        }
+        val formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
+        var currentNow by mutableStateOf(FIXED_NOW)
+        var specBuilds = 0
+
+        rule.setContent {
+            val model =
+                requireNotNull(
+                    buildUsageHistoryModel(
+                        accountId = claude.account.id,
+                        windows = windows,
+                        primaryWindowId = claude.primaryWindow?.id,
+                        histories = histories,
+                        selectedWindowIds = null,
+                        now = currentNow,
+                        dataFrom = FIXED_NOW,
+                    )
+                )
+            HeadroomTheme(dynamicColor = false) {
+                UsageHistoryChart(
+                    model = model,
+                    formatter = formatter,
+                    display = QuotaDisplay.Used,
+                    onWindowToggle = {},
+                    onBuildSpec = { specBuilds++ },
+                )
+            }
+        }
+        rule.waitForIdle()
+        assertEquals(1, specBuilds)
+
+        // Advance the clock across several minute ticks without a new sync: specs are not rebuilt.
+        currentNow = FIXED_NOW.plus(1.minutes)
+        rule.waitForIdle()
+        currentNow = FIXED_NOW.plus(2.minutes)
+        rule.waitForIdle()
+        currentNow = FIXED_NOW.plus(5.minutes)
+        rule.waitForIdle()
+        assertEquals(1, specBuilds)
     }
 }
