@@ -182,9 +182,10 @@ internal class RoomQuotaRepository(
                 val keepExistingAuth =
                     decodeErrorKind(previous) == QuotaErrorKind.Auth &&
                         result.kind != QuotaErrorKind.Auth
+                val authReason = result.authReason ?: decodeAuthReason(previous)
                 val nextError =
                     if (keepExistingAuth && previous != null) previous
-                    else encodeLastError(result.kind, result.authReason)
+                    else encodeLastError(result.kind, authReason)
                 dao.updateError(entity.id, nextError)
             }
             null -> Unit

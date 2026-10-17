@@ -220,6 +220,12 @@ class RoomQuotaRepositoryTest {
             assertEquals(QuotaErrorKind.Auth, afterNetwork.lastError)
             assertEquals(AuthFailureReason.KeyExpired, afterNetwork.authReason)
 
+            result = QuotaResult.Failure(QuotaErrorKind.Auth, "unauthorized", authReason = null)
+            repo.refresh()
+            val afterGenericAuth = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, afterGenericAuth.lastError)
+            assertEquals(AuthFailureReason.KeyExpired, afterGenericAuth.authReason)
+
             // A row stored by an older build as plain "Auth" still loads as Auth with no reason.
             db.quotaDao().updateError(claude.account.id, "Auth")
             val legacy = repo.current().single()
