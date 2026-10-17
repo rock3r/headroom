@@ -31,4 +31,23 @@ struct FormatsTests {
         #expect(Formats.amount(200) == "200")
         #expect(Formats.amount(0.001) == "0.01")
     }
+
+    @Test func `API key expiry and rejection copy names the console and reason`() {
+        #expect(
+            Texts.apiKeyExpiredBody(providerId: "opencode-go", providerName: "OpenCode Go")
+                == "This API key has expired. Create a new key in the OpenCode Console, then replace it here."
+        )
+        #expect(
+            Texts.apiKeyRejection(providerId: "opencode-go", providerName: "OpenCode Go", rejection: "expired")
+                == "OpenCode says this key has expired — create a new one in the OpenCode Console."
+        )
+        #expect(
+            Texts.apiKeyRejection(providerId: "opencode-go", providerName: "OpenCode Go", rejection: "unauthorized")
+                == "OpenCode Go rejected this API key. Check that you copied all of it."
+        )
+        #expect(
+            Texts.apiKeyRejection(providerId: "opencode-go", providerName: "OpenCode Go", rejection: "malformed")
+                == "This key does not look right. Check that you copied all of it."
+        )
+    }
 }
