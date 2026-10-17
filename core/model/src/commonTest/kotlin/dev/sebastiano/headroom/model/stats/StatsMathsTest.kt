@@ -196,6 +196,15 @@ class StatsMathsTest {
     }
 
     @Test
+    fun `the heatmap needs a week of retained hourly history when an older account is trimmed out`() {
+        // Stale account last synced 40 days before the newer account, so all of its points are
+        // outside the 31-day hourly window; the newer account has only two hours of history.
+        val stale = source("old", Provider.Codex, 0L to 10.0, 24L to 50.0)
+        val recentShort = source("new", Provider.Claude, 960L to 0.0, 962L to 30.0)
+        assertNull(heatmap(listOf(stale, recentShort), TimeZone.UTC))
+    }
+
+    @Test
     fun `the heatmap puts the use in the hour of the week it happened`() {
         // Monday 09:00 to 10:00 burns 10, and the next Tuesday 14:00 to 16:00 burns 30.
         val week = source("c", Provider.Claude, 9L to 0.0, 10L to 10.0, 206L to 10.0, 208L to 40.0)

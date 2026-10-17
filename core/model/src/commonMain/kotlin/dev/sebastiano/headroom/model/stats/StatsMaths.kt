@@ -109,14 +109,13 @@ public fun shares(sources: List<StatsSource>): List<ProviderShare> {
  * history or without any use that can be placed in time.
  */
 public fun heatmap(sources: List<StatsSource>, zone: TimeZone): BurnHeatmap? {
-    val times = sources.flatMap { source -> source.points.map { it.at } }
-    val first = times.minOrNull() ?: return null
-    val last = times.maxOrNull() ?: return null
-    if (last - first < MIN_HEATMAP_SPAN) return null
+    val last = sources.flatMap { source -> source.points.map { it.at } }.maxOrNull() ?: return null
     val cutoff = last.minus(HEATMAP_RESOLUTION_SPAN)
+    val hourlyBySource = sources.map { source -> source.points.filter { it.at >= cutoff } }
+    val first = hourlyBySource.flatMap { points -> points.map { it.at } }.minOrNull() ?: return null
+    if (last - first < MIN_HEATMAP_SPAN) return null
     val cells = DoubleArray(BurnHeatmap.DAYS * BurnHeatmap.HOURS)
-    sources.forEach { source ->
-        val hourlyPoints = source.points.filter { it.at >= cutoff }
+    hourlyBySource.forEach { hourlyPoints ->
         hourlyBurn(hourlyPoints, zone).forEach { (hour, amount) -> cells[hour.cell] += amount }
     }
     return if (cells.any { it > 0.0 }) BurnHeatmap(cells.toList()) else null
