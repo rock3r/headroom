@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.ui.detail
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,7 +14,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -38,12 +39,12 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.window.core.layout.WindowSizeClass
 import dev.c5inco.charts.compose.AxisStyle
 import dev.c5inco.charts.compose.Chart
 import dev.c5inco.charts.compose.ChartMotion
 import dev.c5inco.charts.compose.ChartStyle
 import dev.c5inco.charts.compose.ChartTooltip
+import dev.c5inco.charts.compose.ChartViewport
 import dev.c5inco.charts.compose.DotStyle
 import dev.c5inco.charts.compose.FocusStyle
 import dev.c5inco.charts.compose.Glyph
@@ -79,6 +80,7 @@ import kotlin.time.Instant
 import kotlinx.coroutines.launch
 
 const val USAGE_HISTORY_CHART_TAG: String = "usage-history-chart"
+const val USAGE_HISTORY_TOOLTIP_TAG: String = "usage-history-tooltip"
 
 fun chartRangeTag(range: HistoryRange): String = "chart-range-${range.name}"
 
@@ -138,47 +140,25 @@ private fun UsageHistoryPlot(
     val dataSpec = HeadroomMotion.dataSpec<Float>()
     val availableRanges = model.availableRanges
     val viewport = rememberModelViewport(model)
-    val scope = rememberCoroutineScope()
-    var animatingRange by remember(viewport) { mutableStateOf<Pair<Long, HistoryRange>?>(null) }
-    val animationSerial = remember(viewport) { longArrayOf(0L) }
-    val selectedRange = rememberSelectedRange(viewport, model, animatingRange?.second)
-    val zoomDensity by remember(viewport) { derivedStateOf { ZoomDensity.forSpan(viewport.span) } }
-    val style = remember(baseStyle, zoomDensity) { zoomDensity.applyTo(baseStyle) }
-    val lastState = remember { ZoomSyncState(model, zoomDensity) }
-    val densityOnlyChange = lastState.model == model && lastState.density != zoomDensity
-    SideEffect {
-        lastState.model = model
-        lastState.density = zoomDensity
-    }
-    val chartAnimationSpec = if (animate && !densityOnlyChange) dataSpec else ChartMotion.Instant
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (availableRanges.size > 1) {
             Spacer(Modifier.height(8.dp))
             RangePresetButtons(
                 ranges = availableRanges,
-                selectedRange = selectedRange,
-                onSelectRange = { range ->
-                    val target = model.targetRange(range)
-                    val serial = ++animationSerial[0]
-                    if (!animate) {
-                        animatingRange = null
-                        viewport.snapTo(target.start, target.end)
-                    } else {
-                        animatingRange = serial to range
-                        scope.launch {
-                            try {
-                                viewport.animateTo(target.start, target.end, dataSpec)
-                            } finally {
-                                if (animatingRange?.first == serial) animatingRange = null
-                            }
-                        }
-                    }
-                },
+                viewport = viewport,
+                model = model,
+                animate = animate,
+                dataSpec = dataSpec,
             )
         }
 
-        Spacer(Modifier.height(14.dp))
+        val labelClearance =
+            with(LocalDensity.current) {
+                (MaterialTheme.typography.labelSmall.fontSize.toDp() *
+                    LIMIT_LABEL_CLEARANCE_FACTOR) + 6.dp
+            }
+        Spacer(Modifier.height(labelClearance))
         val primarySummary = model.primaryShownWindow?.summary ?: model.windows.first().summary
         val paceDescription = paceContentDescription(primarySummary, display)
         val limitLabel = stringResource(R.string.detail_chart_limit)
@@ -187,36 +167,46 @@ private fun UsageHistoryPlot(
             remember(resources) {
                 { percent: Int -> resources.getString(R.string.percent, percent) }
             }
-        val resetStride = zoomDensity.resetStride
-        val spec =
-            remember(model, formatter, limitLabel, percentFormat, paceDescription, resetStride) {
-                buildUsageHistoryChartSpec(
+        // Both detail and overview specs (and their CartesianPrep caches) are built and warmed
+        // once per model + formatter, so viewport pan/zoom/fling never rebuilds a spec.
+        val specs =
+            remember(model, formatter, limitLabel, percentFormat, paceDescription) {
+                buildUsageHistoryChartSpecs(
                     model = model,
                     formatter = formatter,
                     limitLabel = limitLabel,
                     percentFormat = percentFormat,
                     description = paceDescription,
-                    resetStride = resetStride,
                 )
             }
         val usageSeriesCount = model.shownWindows.size
+        val zoomDensity by
+            remember(viewport) { derivedStateOf { ZoomDensity.forSpan(viewport.span) } }
+        val spec = if (zoomDensity == ZoomDensity.Overview) specs.overview else specs.detail
+        val style = remember(baseStyle, zoomDensity) { zoomDensity.applyTo(baseStyle) }
+        val lastState = remember { ZoomSyncState(model, zoomDensity) }
+        val densityOnlyChange = lastState.model == model && lastState.density != zoomDensity
+        SideEffect {
+            lastState.model = model
+            lastState.density = zoomDensity
+        }
+        val chartAnimationSpec =
+            if (animate && !densityOnlyChange) dataSpec else ChartMotion.Instant
+        val descriptionMemo =
+            remember(resources, model, formatter, paceDescription) {
+                DescriptionMemo(resources, model, formatter, paceDescription)
+            }
+        val liveDescription by
+            remember(viewport, descriptionMemo) {
+                derivedStateOf { descriptionMemo.of(viewport.start, viewport.end) }
+            }
         Chart(
             spec = spec,
             modifier =
                 Modifier.fillMaxWidth()
                     .height(adaptiveChartHeight())
                     .testTag(USAGE_HISTORY_CHART_TAG)
-                    .semantics {
-                        contentDescription =
-                            visibleRangeDescription(
-                                resources = resources,
-                                model = model,
-                                startEpochMs = viewport.start,
-                                endEpochMs = viewport.end,
-                                formatter = formatter,
-                                paceDescription = paceDescription,
-                            )
-                    },
+                    .semantics { contentDescription = liveDescription },
             style = style,
             animationSpec = chartAnimationSpec,
             animateEntrance = animateEntrance,
@@ -233,12 +223,43 @@ private fun UsageHistoryPlot(
     }
 }
 
+private class DescriptionMemo(
+    private val resources: android.content.res.Resources,
+    private val model: UsageHistoryModel,
+    private val formatter: ResetFormatter,
+    private val paceDescription: String,
+) {
+    private var lastStartHour: Long = Long.MIN_VALUE
+    private var lastEndHour: Long = Long.MIN_VALUE
+    private var lastText: String = ""
+
+    fun of(startEpochMs: Double, endEpochMs: Double): String {
+        val startHour = startEpochMs.roundToLong().floorDiv(MILLIS_PER_HOUR)
+        val endHour = endEpochMs.roundToLong().floorDiv(MILLIS_PER_HOUR)
+        if (startHour == lastStartHour && endHour == lastEndHour && lastText.isNotEmpty()) {
+            return lastText
+        }
+        lastStartHour = startHour
+        lastEndHour = endHour
+        lastText =
+            visibleRangeDescription(
+                resources = resources,
+                model = model,
+                startEpochMs = startEpochMs,
+                endEpochMs = endEpochMs,
+                formatter = formatter,
+                paceDescription = paceDescription,
+            )
+        return lastText
+    }
+}
+
 private class ZoomSyncState(var model: UsageHistoryModel, var density: ZoomDensity)
 
-private enum class ZoomDensity(val lineWidth: Dp, val markerRadius: Dp, val resetStride: Int) {
-    Detail(lineWidth = 2.5.dp, markerRadius = 4.dp, resetStride = 1),
-    Medium(lineWidth = 1.75.dp, markerRadius = 3.5.dp, resetStride = 1),
-    Overview(lineWidth = 1.2.dp, markerRadius = 3.dp, resetStride = 4);
+private enum class ZoomDensity(val lineWidth: Dp, val markerRadius: Dp) {
+    Detail(lineWidth = 2.5.dp, markerRadius = 4.dp),
+    Medium(lineWidth = 1.75.dp, markerRadius = 3.5.dp),
+    Overview(lineWidth = 1.2.dp, markerRadius = 3.dp);
 
     fun applyTo(base: ChartStyle): ChartStyle =
         base.copy(
@@ -257,40 +278,7 @@ private enum class ZoomDensity(val lineWidth: Dp, val markerRadius: Dp, val rese
 }
 
 @Composable
-private fun rememberSelectedRange(
-    viewport: dev.c5inco.charts.compose.ChartViewport,
-    model: UsageHistoryModel,
-    animating: HistoryRange?,
-): HistoryRange? {
-    val bounds =
-        remember(viewport) {
-            ViewportBounds(
-                min = viewport.min,
-                max = viewport.max,
-                minSpan = viewport.minSpan,
-                maxSpan = viewport.maxSpan,
-            )
-        }
-    val matched by
-        remember(viewport, bounds, model) {
-            derivedStateOf {
-                model.availableRanges.firstOrNull { range ->
-                    val target = model.targetRange(range)
-                    val clamped = bounds.clamp(target.start, target.end)
-                    val tolerance =
-                        maxOf(RANGE_MATCH_TOLERANCE_MS, clamped.span * RANGE_MATCH_FRACTION)
-                    abs(viewport.start - clamped.start) <= tolerance &&
-                        abs(viewport.end - clamped.end) <= tolerance
-                }
-            }
-        }
-    return animating ?: matched
-}
-
-@Composable
-private fun rememberModelViewport(
-    model: UsageHistoryModel
-): dev.c5inco.charts.compose.ChartViewport {
+private fun rememberModelViewport(model: UsageHistoryModel): ChartViewport {
     val actions =
         ViewportActions(
             scrollBack = stringResource(R.string.detail_chart_scroll_back),
@@ -353,17 +341,61 @@ private fun WindowFilterChips(
 @Composable
 private fun RangePresetButtons(
     ranges: List<HistoryRange>,
-    selectedRange: HistoryRange?,
-    onSelectRange: (HistoryRange) -> Unit,
+    viewport: ChartViewport,
+    model: UsageHistoryModel,
+    animate: Boolean,
+    dataSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float>,
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
+    var animatingRange by remember(viewport) { mutableStateOf<Pair<Long, HistoryRange>?>(null) }
+    val animationSerial = remember(viewport) { longArrayOf(0L) }
+    val bounds =
+        remember(viewport) {
+            ViewportBounds(
+                min = viewport.min,
+                max = viewport.max,
+                minSpan = viewport.minSpan,
+                maxSpan = viewport.maxSpan,
+            )
+        }
+    val matchedRange by
+        remember(viewport, bounds, model) {
+            derivedStateOf {
+                ranges.firstOrNull { range ->
+                    val target = model.targetRange(range)
+                    val clamped = bounds.clamp(target.start, target.end)
+                    val tolerance =
+                        maxOf(RANGE_MATCH_TOLERANCE_MS, clamped.span * RANGE_MATCH_FRACTION)
+                    abs(viewport.start - clamped.start) <= tolerance &&
+                        abs(viewport.end - clamped.end) <= tolerance
+                }
+            }
+        }
+    val selectedRange = animatingRange?.second ?: matchedRange
     SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
         ranges.forEachIndexed { index, range ->
             val weight =
                 if (range == HistoryRange.Period) PERIOD_BUTTON_WEIGHT else SHORT_BUTTON_WEIGHT
             SegmentedButton(
                 selected = range == selectedRange,
-                onClick = { onSelectRange(range) },
+                onClick = {
+                    val target = model.targetRange(range)
+                    val serial = ++animationSerial[0]
+                    if (!animate) {
+                        animatingRange = null
+                        viewport.snapTo(target.start, target.end)
+                    } else {
+                        animatingRange = serial to range
+                        scope.launch {
+                            try {
+                                viewport.animateTo(target.start, target.end, dataSpec)
+                            } finally {
+                                if (animatingRange?.first == serial) animatingRange = null
+                            }
+                        }
+                    }
+                },
                 shape = SegmentedButtonDefaults.itemShape(index, ranges.size),
                 icon = {},
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
@@ -404,7 +436,9 @@ private fun UsageHistoryTooltip(
             group = usagePoints,
             anchor = XY(focus.anchor.x, usagePoints.minOf { it.y }),
         )
-    ChartTooltip(filtered, scene, style)
+    Box(modifier = Modifier.testTag(USAGE_HISTORY_TOOLTIP_TAG)) {
+        ChartTooltip(filtered, scene, style)
+    }
 }
 
 @Composable
@@ -464,18 +498,12 @@ private fun visibleRangeDescription(
 }
 
 @Composable
-private fun adaptiveChartHeight(): Dp {
-    val width = layoutWidth()
-    val sizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
-    val compactHeight =
-        !sizeClass.isHeightAtLeastBreakpoint(WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND)
-    return when {
-        compactHeight -> LandscapeChartHeight
-        width == LayoutWidth.Expanded -> ExpandedChartHeight
-        width == LayoutWidth.Medium -> MediumChartHeight
-        else -> CompactChartHeight
+private fun adaptiveChartHeight(): Dp =
+    when (layoutWidth()) {
+        LayoutWidth.Expanded -> ExpandedChartHeight
+        LayoutWidth.Medium -> MediumChartHeight
+        LayoutWidth.Compact -> CompactChartHeight
     }
-}
 
 /**
  * Theme-aware, colour-blind distinguishable [ChartStyle] for the usage history chart.
@@ -601,15 +629,16 @@ private val LONG_DATE_SPAN = 180.days
 private val DETAIL_SPAN_MAX_MS = 45.days.inWholeMilliseconds.toDouble()
 private val MEDIUM_SPAN_MAX_MS = 180.days.inWholeMilliseconds.toDouble()
 private const val MIN_POSITIVE_SPAN_MS = 1.0
+private const val MILLIS_PER_HOUR = 3_600_000L
 private const val RANGE_MATCH_TOLERANCE_MS = 3_600_000.0
 private const val RANGE_MATCH_FRACTION = 0.02
 private const val PERIOD_BUTTON_WEIGHT = 1.6f
 private const val SHORT_BUTTON_WEIGHT = 1f
+private const val LIMIT_LABEL_CLEARANCE_FACTOR = 0.85f
 
-private val LandscapeChartHeight = 148.dp
-private val CompactChartHeight = 180.dp
-private val MediumChartHeight = 220.dp
-private val ExpandedChartHeight = 240.dp
+private val CompactChartHeight = 184.dp
+private val MediumChartHeight = 240.dp
+private val ExpandedChartHeight = 280.dp
 
 private const val DARK_SURFACE_LUMINANCE = 0.5f
 private const val FULL_TURN = 360f

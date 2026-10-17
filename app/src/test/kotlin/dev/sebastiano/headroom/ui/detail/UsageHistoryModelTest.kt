@@ -431,14 +431,14 @@ class UsageHistoryModelTest {
         // Dashed pace lines and dotted projection lines exist only inside current periods.
         val paceMarks = lineMarks.filter { it.pattern == LinePattern.Dashed }
         assertEquals(2, paceMarks.size)
-        val projectionMarks = lineMarks.filter { it.pattern == LinePattern.Dotted }
-        assertEquals(2, projectionMarks.size)
+        val projectionMark = lineMarks.single { it.pattern == LinePattern.Dotted }
+        assertEquals(2, projectionMark.series.size)
         val beforeCurrentPeriodIdx = millis.indexOf(tPast1.toEpochMilliseconds())
         paceMarks.forEach { mark ->
             assertTrue(mark.series.single().values[beforeCurrentPeriodIdx].isNaN())
         }
-        projectionMarks.forEach { mark ->
-            assertTrue(mark.series.single().values[beforeCurrentPeriodIdx].isNaN())
+        projectionMark.series.forEach { series ->
+            assertTrue(series.values[beforeCurrentPeriodIdx].isNaN())
         }
 
         // XBandMark shades the primary window's current period; XRuleMark marks the reset; RuleMark

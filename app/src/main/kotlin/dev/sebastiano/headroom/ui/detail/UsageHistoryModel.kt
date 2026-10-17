@@ -25,6 +25,7 @@ import dev.sebastiano.headroom.model.stats.ResetPeaks
 import dev.sebastiano.headroom.ui.ResetFormatter
 import java.time.Instant as JavaInstant
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -136,6 +137,9 @@ data class UsageHistoryModel(
         }
     }
 
+    private val allResetEpochMs: LongArray =
+        shownWindows.flatMap { it.resets }.map { it.toEpochMilliseconds() }.sorted().toLongArray()
+
     /** Target `[start, end]` in epoch milliseconds for [range]. */
     fun targetRange(range: HistoryRange): ViewportRange =
         when (range) {
@@ -143,6 +147,11 @@ data class UsageHistoryModel(
                 ViewportRange(
                     defaultStart.toEpochMilliseconds().toDouble(),
                     defaultEnd.toEpochMilliseconds().toDouble(),
+                )
+            HistoryRange.OneYear ->
+                ViewportRange(
+                    minBound.toEpochMilliseconds().toDouble(),
+                    maxBound.toEpochMilliseconds().toDouble(),
                 )
             else -> {
                 val span = requireNotNull(range.duration)
@@ -155,13 +164,22 @@ data class UsageHistoryModel(
         }
 
     /** Number of resets across [shownWindows] that fall inside `(startEpochMs, endEpochMs]`. */
-    fun resetsInRange(startEpochMs: Double, endEpochMs: Double): Int =
-        shownWindows.sumOf { series ->
-            series.resets.count { reset ->
-                val ms = reset.toEpochMilliseconds().toDouble()
-                ms > startEpochMs && ms <= endEpochMs
-            }
-        }
+    fun resetsInRange(startEpochMs: Double, endEpochMs: Double): Int {
+        if (allResetEpochMs.isEmpty() || endEpochMs <= startEpochMs) return 0
+        val startIdx = firstIndexAfter(allResetEpochMs, startEpochMs.roundToLong())
+        val endIdx = firstIndexAfter(allResetEpochMs, endEpochMs.roundToLong())
+        return (endIdx - startIdx).coerceAtLeast(0)
+    }
+}
+
+private fun firstIndexAfter(sorted: LongArray, value: Long): Int {
+    var lo = 0
+    var hi = sorted.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (sorted[mid] <= value) lo = mid + 1 else hi = mid
+    }
+    return lo
 }
 
 /**
@@ -272,6 +290,44 @@ private fun prepareSeriesPoints(
     return deduped
 }
 
+internal data class UsageHistorySpecs(
+    val detail: CartesianChart,
+    val overview: CartesianChart,
+)
+
+internal fun buildUsageHistoryChartSpecs(
+    model: UsageHistoryModel,
+    formatter: ResetFormatter,
+    limitLabel: String,
+    percentFormat: (Int) -> String,
+    description: String,
+): UsageHistorySpecs {
+    val detail =
+        buildUsageHistoryChartSpec(
+            model = model,
+            formatter = formatter,
+            limitLabel = limitLabel,
+            percentFormat = percentFormat,
+            description = description,
+            resetStride = 1,
+        )
+    val hasDenseResets = model.shownWindows.any { it.resets.size > MIN_RESETS_TO_THIN }
+    val overview =
+        if (!hasDenseResets) {
+            detail
+        } else {
+            buildUsageHistoryChartSpec(
+                model = model,
+                formatter = formatter,
+                limitLabel = limitLabel,
+                percentFormat = percentFormat,
+                description = description,
+                resetStride = OVERVIEW_RESET_STRIDE,
+            )
+        }
+    return UsageHistorySpecs(detail = detail, overview = overview)
+}
+
 /**
  * Compiles [model] into a [CartesianChart] spec on a single merged [TimeAxis].
  *
@@ -328,29 +384,50 @@ internal fun buildUsageHistoryChartSpec(
     marks += RuleMark(y = MAX_PERCENT, label = limitLabel)
 
     val yFormat = ValueFormat { value -> percentFormat(value.roundToInt()) }
-    return CartesianChart(
-        x =
-            TimeAxis(
-                times = times,
-                min = model.minBound.toJavaInstant(),
-                max = model.maxBound.toJavaInstant(),
-                tickCount = TIME_AXIS_TICK_COUNT,
-                format = formatter.chartTickFormat(),
-                pointFormat = formatter.chartPointFormat(),
-                zone = formatter.zone,
-                locale = formatter.locale,
-            ),
-        marks = marks,
-        y =
-            ValueAxis(
-                min = 0.0,
-                max = MAX_PERCENT,
-                tickCount = VALUE_AXIS_TICK_COUNT,
-                format = yFormat,
-                valueFormat = yFormat,
-            ),
-        description = description,
-    )
+    val chart =
+        CartesianChart(
+            x =
+                TimeAxis(
+                    times = times,
+                    min = model.minBound.toJavaInstant(),
+                    max = model.maxBound.toJavaInstant(),
+                    tickCount = TIME_AXIS_TICK_COUNT,
+                    format = formatter.chartTickFormat(),
+                    pointFormat = formatter.chartPointFormat(),
+                    zone = formatter.zone,
+                    locale = formatter.locale,
+                ),
+            marks = marks,
+            y =
+                ValueAxis(
+                    min = 0.0,
+                    max = MAX_PERCENT,
+                    tickCount = VALUE_AXIS_TICK_COUNT,
+                    format = yFormat,
+                    valueFormat = yFormat,
+                ),
+            description = description,
+        )
+    warmSpecCaches(chart, model)
+    return chart
+}
+
+/**
+ * Pre-populates `CartesianPrep`'s `xLabelCache` and `valueTextCache` across the full domain when
+ * the spec is constructed, so panning or flinging across a year of points never runs
+ * `DateTimeFormatter` or allocates formatted strings on a gesture frame.
+ */
+private fun warmSpecCaches(chart: CartesianChart, model: UsageHistoryModel) {
+    val minMs = model.minBound.toEpochMilliseconds().toDouble()
+    val maxMs = model.maxBound.toEpochMilliseconds().toDouble()
+    if (maxMs > minMs) {
+        dev.c5inco.charts.core.compile(
+            spec = chart,
+            size = dev.c5inco.charts.core.Extent(WARM_EXTENT_WIDTH, WARM_EXTENT_HEIGHT),
+            measure = { _, _ -> dev.c5inco.charts.core.Extent(WARM_TEXT_SIZE, WARM_TEXT_SIZE) },
+            viewport = ViewportRange(minMs, maxMs),
+        )
+    }
 }
 
 /** One dashed even-pace diagonal per distinct current period `[start, end]` among shown windows. */
@@ -400,6 +477,7 @@ private fun appendProjectionMarks(
     marks: MutableList<Mark>,
 ) {
     val nowMs = now.toEpochMilliseconds()
+    val projectionSeries = ArrayList<Series>(shown.size)
     shown.forEach { window ->
         val summary = window.summary
         val projectedLimitAt = summary.projectedLimitAt
@@ -423,22 +501,23 @@ private fun appendProjectionMarks(
                         secondMs = target.first,
                         secondValue = target.second,
                     )
-                marks +=
-                    LineMark(
-                        series =
-                            listOf(
-                                Series(
-                                    name = "projection:${window.id}",
-                                    values = values,
-                                    color = window.colorSlot,
-                                )
-                            ),
-                        curve = Curve.Linear,
-                        gaps = Gaps.Connect,
-                        pattern = LinePattern.Dotted,
+                projectionSeries +=
+                    Series(
+                        name = "projection:${window.id}",
+                        values = values,
+                        color = window.colorSlot,
                     )
             }
         }
+    }
+    if (projectionSeries.isNotEmpty()) {
+        marks +=
+            LineMark(
+                series = projectionSeries,
+                curve = Curve.Linear,
+                gaps = Gaps.Connect,
+                pattern = LinePattern.Dotted,
+            )
     }
 }
 
@@ -561,6 +640,10 @@ private const val MAX_PERCENT = 100.0
 private const val ONE_MONTH_DAYS = 30L
 private const val THREE_MONTHS_DAYS = 90L
 private const val ONE_YEAR_DAYS = 365L
+private const val OVERVIEW_RESET_STRIDE = 4
 private const val TIME_AXIS_TICK_COUNT = 5
 private const val VALUE_AXIS_TICK_COUNT = 3
 private const val MIN_RESETS_TO_THIN = 20
+private const val WARM_EXTENT_WIDTH = 16_000f
+private const val WARM_EXTENT_HEIGHT = 200f
+private const val WARM_TEXT_SIZE = 8f
