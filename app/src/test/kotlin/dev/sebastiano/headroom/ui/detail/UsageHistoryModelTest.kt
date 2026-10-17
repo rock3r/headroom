@@ -22,6 +22,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class UsageHistoryModelTest {
@@ -113,6 +114,76 @@ class UsageHistoryModelTest {
             )
 
         assertEquals(listOf(tReset), detectResets(points))
+    }
+
+    @Test
+    fun `jittering resetsAt produces no spurious reset rules while advances and redeems produce one`() {
+        val window = weeklyWindow()
+        val r1 = weeklyStart
+        val r2 = weeklyReset
+        val jitterSeconds = listOf(-4L, 5L, -2L, 3L, -5L, 2L, 4L, -3L)
+        val tScheduledReset = r1
+        val tEarlyRedeem = r1.plus(2.days)
+        val points = buildList {
+            // Week 1: 8 syncs with resetsAt jittering by ± seconds and small usage growth (< 5%
+            // drop).
+            for (step in 0 until 8) {
+                val at = r1.minus((8 - step).hours)
+                val jitter = jitterSeconds[step % jitterSeconds.size].seconds
+                add(UsagePoint(at, usedPercent = 1.0 + step * 0.4, resetsAt = r1 + jitter))
+            }
+            // Real scheduled weekly advance (resetsAt advances by ~7 days, even with only a 3.8%
+            // drop).
+            add(UsagePoint(tScheduledReset, usedPercent = 0.0, resetsAt = r2.minus(3.seconds)))
+            add(
+                UsagePoint(
+                    tScheduledReset.plus(6.hours),
+                    usedPercent = 25.0,
+                    resetsAt = r2.plus(4.seconds),
+                )
+            )
+            add(
+                UsagePoint(
+                    tScheduledReset.plus(12.hours),
+                    usedPercent = 62.0,
+                    resetsAt = r2.minus(2.seconds),
+                )
+            )
+            // Early redeemed reset mid-week: resetsAt still jitters around r2, usage drops to 0%.
+            add(UsagePoint(tEarlyRedeem, usedPercent = 0.0, resetsAt = r2.plus(5.seconds)))
+            add(UsagePoint(now, usedPercent = 71.0, resetsAt = r2))
+        }
+
+        val model =
+            assertNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = listOf(window),
+                    primaryWindowId = window.id,
+                    histories = mapOf(window.id to points),
+                    selectedWindowIds = setOf(window.id),
+                    now = now,
+                )
+            )
+        val formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
+        val spec =
+            buildUsageHistoryChartSpec(
+                model = model,
+                formatter = formatter,
+                limitLabel = "limit",
+                percentFormat = { "$it%" },
+                description = "Usage chart",
+            )
+        val rules = spec.marks.filterIsInstance<XRuleMark>()
+
+        assertEquals(listOf(tScheduledReset, tEarlyRedeem), model.windows.single().resets)
+        assertEquals(
+            listOf(
+                tScheduledReset.toEpochMilliseconds().toDouble(),
+                tEarlyRedeem.toEpochMilliseconds().toDouble(),
+            ),
+            rules.map { it.x },
+        )
     }
 
     @Test

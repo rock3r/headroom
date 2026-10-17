@@ -18,10 +18,10 @@ import dev.c5inco.charts.core.XBandMark
 import dev.c5inco.charts.core.XRuleMark
 import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.ResetBoundary
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.model.chartSummary
-import dev.sebastiano.headroom.model.stats.ResetPeaks
 import dev.sebastiano.headroom.ui.ResetFormatter
 import java.time.Instant as JavaInstant
 import kotlin.math.roundToInt
@@ -195,29 +195,37 @@ internal val QuotaWindow.isChartableHistoryWindow: Boolean
             !isInformational
 
 /**
- * Finds every reset instant in [points] (ordered oldest first): where [UsagePoint.resetsAt] changes
- * or where usage drops by at least [ResetPeaks.MIN_DROP_POINTS] (which covers both early redeemed
- * resets that keep the same `resetsAt` and legacy points without `resetsAt`).
+ * Finds every reset instant in [points] (ordered oldest first) using [ResetBoundary.isReset], so
+ * the chart's reset markers agree with history compaction and ignore relative countdown jitter.
  */
-internal fun detectResets(points: List<UsagePoint>): List<Instant> {
+internal fun detectResets(
+    points: List<UsagePoint>,
+    windowLength: Duration? = null,
+): List<Instant> {
     if (points.size < 2) return emptyList()
     val resets = mutableListOf<Instant>()
     var periodResetsAt: Instant? = points.first().resetsAt
     var periodPeak: Double = points.first().usedPercent
+    var lastAt: Instant = points.first().at
     for (index in 1 until points.size) {
         val point = points[index]
-        val knownReset = periodResetsAt
-        val resetsAtChanged =
-            point.resetsAt != null && knownReset != null && point.resetsAt != knownReset
-        val dropped = periodPeak - point.usedPercent >= ResetPeaks.MIN_DROP_POINTS
-        if (resetsAtChanged || dropped) {
+        val previous =
+            UsagePoint(
+                at = lastAt,
+                usedPercent = periodPeak,
+                resetsAt = periodResetsAt,
+            )
+        if (ResetBoundary.isReset(previous, point, windowLength)) {
             resets += point.at
             periodResetsAt = point.resetsAt
             periodPeak = point.usedPercent
         } else {
-            if (point.resetsAt != null) periodResetsAt = point.resetsAt
+            if (periodResetsAt == null && point.resetsAt != null) {
+                periodResetsAt = point.resetsAt
+            }
             if (point.usedPercent > periodPeak) periodPeak = point.usedPercent
         }
+        lastAt = point.at
     }
     return resets
 }
@@ -252,7 +260,7 @@ internal fun buildUsageHistoryModel(
             colorSlot = index,
             summary = summary,
             points = prepared,
-            resets = detectResets(prepared),
+            resets = detectResets(prepared, window.length),
         )
     }
     if (series.isEmpty()) return null
