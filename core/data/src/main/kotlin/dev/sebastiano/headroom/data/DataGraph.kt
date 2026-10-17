@@ -94,7 +94,13 @@ public class DataGraph(
     private val accountFetcher =
         AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers, resetClients)
 
-    private val roomRepository = storage.accounts(accountFetcher::fetch, clock, scope)
+    /** The user's app settings: used or left, and how often to sync in the background. */
+    public val settings: SettingsRepository = storage.settings
+
+    private val roomRepository =
+        storage.accounts(accountFetcher::fetch, clock, scope) {
+            settings.settings.first().historyRetention
+        }
 
     /** Shows and removes the warning that an account's sign-in expired. */
     public val signInNotifier: SignInNotifier = AndroidSignInNotifier(appContext)
@@ -104,9 +110,6 @@ public class DataGraph(
             roomRepository,
             SignInAlerts(signInNotifier, SharedPreferencesSignInAlertLedger(appContext)),
         )
-
-    /** The user's app settings: used or left, and how often to sync in the background. */
-    public val settings: SettingsRepository = storage.settings
 
     /**
      * The resets of the signed-in accounts: read by each sync and stored with the snapshot, and

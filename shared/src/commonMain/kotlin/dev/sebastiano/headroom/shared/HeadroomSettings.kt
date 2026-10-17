@@ -37,6 +37,7 @@ public data class SettingsUi(
     /** The reset island: on iOS, the next reset as a Live Activity. */
     val resetIsland: Boolean,
     val resetExpiryReminders: Boolean,
+    val keepLongHistory: Boolean = true,
 )
 
 /** Reads and changes the settings. Unknown ids are ignored. */
@@ -69,8 +70,8 @@ internal constructor(
     }
 
     /**
-     * Sets one of the switches: `refreshShimmer`, `resetConfetti`, `resetIsland` or
-     * `resetExpiryReminders`.
+     * Sets one of the switches: `refreshShimmer`, `resetConfetti`, `resetIsland`,
+     * `resetExpiryReminders` or `keepLongHistory`.
      */
     public fun setSwitch(id: String, enabled: Boolean) {
         val setter: suspend (Boolean) -> Unit =
@@ -79,6 +80,7 @@ internal constructor(
                 "resetConfetti" -> repository::setResetConfetti
                 "resetIsland" -> repository::setResetIsland
                 "resetExpiryReminders" -> repository::setResetExpiryReminders
+                "keepLongHistory" -> repository::setKeepLongHistory
                 else -> return
             }
         scope.launch { setter(enabled) }
@@ -103,6 +105,7 @@ internal constructor(
                 resetConfetti = settings.resetConfetti,
                 resetIsland = settings.resetIsland,
                 resetExpiryReminders = settings.resetExpiryReminders,
+                keepLongHistory = settings.keepLongHistory,
             )
     }
 }

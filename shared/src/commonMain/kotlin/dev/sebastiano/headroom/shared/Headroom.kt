@@ -61,7 +61,8 @@ internal class HeadroomParts(
 public class Headroom
 internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
     private val clock = parts.clock
-    private val sources = Sources(parts.repository, parts.resetEvents, clock, parts.zone)
+    private val sources =
+        Sources(parts.repository, parts.resetEvents, clock, parts.zone, parts.settings)
     private val signInManager = SignInManager(parts.tokenStore, parts.repository)
     private val alertPreferences = parts.alerts
     private val settingsRepository = parts.settings

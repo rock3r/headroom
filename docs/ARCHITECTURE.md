@@ -58,7 +58,13 @@ The app, widgets and reset scheduler read those snapshots without making their o
 
 1. A WorkManager job, app start, pull-to-refresh action or widget tap requests a refresh for one or all accounts.
 2. Sync gets an access token from the token store and refreshes it if needed. It then calls the provider's fetcher.
-3. Sync saves the latest snapshot and one history point per window.
+3. Sync saves the latest snapshot and one history point per window, including when the window resets.
+   When long-term history is on (`HistoryRetention.LongTerm`, the default), sync keeps a year of history:
+   every point for 7 days, then one per 1-hour bucket up to 31 days, per 3-hour bucket up to 92 days, and
+   per 12-hour bucket up to 365 days, always keeping each reset period's first and peak points.
+   Compaction runs at most once an hour for the synced account and scans only points older than 7 days.
+   When long-term history is off (`HistoryRetention.ShortTerm`), sync keeps 60 days at full resolution and
+   deletes older points on the next sync.
 4. The UI and widgets observe the repository through a `Flow`.
 5. The reset scheduler sets an alarm for each weekly window, 10 seconds after `resets_at`.
    The alarm fetches the account again. It posts an alert after usage drops or `resets_at` advances by about a week.
@@ -152,6 +158,8 @@ Reset clients live in `:core:quota`, sync and storage integration in `:core:data
 ## Demo mode
 
 `FakeQuotaRepository` in `:core:model` supplies demo accounts when no account has signed in.
+`DemoUsage` generates hourly demo history across the retention horizon (a year when long-term history is on,
+60 days when off) and compacts it with `HistoryRetention`.
 UI tests, end-to-end tests and README screenshots use the same repository.
 
 ## Reset island (experimental)

@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.model.stats
 
 import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.HistoryRetention
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
@@ -195,6 +196,15 @@ class StatsMathsTest {
     }
 
     @Test
+    fun `the heatmap needs a week of retained hourly history when an older account is trimmed out`() {
+        // Stale account last synced 40 days before the newer account, so all of its points are
+        // outside the 31-day hourly window; the newer account has only two hours of history.
+        val stale = source("old", Provider.Codex, 0L to 10.0, 24L to 50.0)
+        val recentShort = source("new", Provider.Claude, 960L to 0.0, 962L to 30.0)
+        assertNull(heatmap(listOf(stale, recentShort), TimeZone.UTC))
+    }
+
+    @Test
     fun `the heatmap puts the use in the hour of the week it happened`() {
         // Monday 09:00 to 10:00 burns 10, and the next Tuesday 14:00 to 16:00 burns 30.
         val week = source("c", Provider.Claude, 9L to 0.0, 10L to 10.0, 206L to 10.0, 208L to 40.0)
@@ -306,5 +316,95 @@ class StatsMathsTest {
                 (DayOfWeek.MONDAY to 10) to 6.0,
             )
         assertEquals(Persona.WeekendWarrior, persona(map))
+    }
+
+    @Test
+    fun `a year of compacted history keeps resets shares sparklines and daytime heatmap intact`() {
+        val yearStart = Instant.parse("2025-10-01T00:00:00Z")
+        val yearNow = yearStart.plus(365.days)
+
+        fun yearSource(
+            id: String,
+            provider: Provider,
+            peaks: List<Double>,
+            currentUsed: Double,
+        ): StatsSource {
+            val points = mutableListOf<UsagePoint>()
+            for (week in 0 until 52) {
+                val weekStart = yearStart.plus((week * 7).days)
+                val weekEnd = weekStart.plus(7.days)
+                val peak = peaks[week % peaks.size]
+                // Hourly points across the week, with growth concentrated at 09:00..17:00 UTC.
+                var used = 0.0
+                val step = peak / (5 * 8)
+                for (hour in 0 until 7 * 24) {
+                    val at = weekStart.plus((hour * 3600L).seconds)
+                    if (at > yearNow) break
+                    points +=
+                        UsagePoint(
+                            at = at,
+                            usedPercent = used.coerceAtMost(peak),
+                            resetsAt = weekEnd,
+                        )
+                    val dayOfWeek = hour / 24
+                    val hourOfDay = hour % 24
+                    if (dayOfWeek < 5 && hourOfDay in 9..16) {
+                        used = (used + step).coerceAtMost(peak)
+                    }
+                }
+            }
+            points +=
+                UsagePoint(at = yearNow, usedPercent = currentUsed, resetsAt = yearNow.plus(3.days))
+            return StatsSource(
+                account = Account(id, provider, "$id@example.com"),
+                window =
+                    QuotaWindow(
+                        id = "weekly",
+                        label = "Weekly",
+                        kind = WindowKind.Weekly,
+                        usedPercent = currentUsed,
+                        resetsAt = yearNow.plus(3.days),
+                        length = 7.days,
+                    ),
+                points = points,
+            )
+        }
+
+        val uncompacted =
+            listOf(
+                yearSource("c", Provider.Claude, listOf(82.0, 95.0, 100.0, 88.0, 100.0), 71.0),
+                yearSource("x", Provider.Codex, listOf(40.0, 52.0, 38.0, 61.0, 45.0), 34.0),
+            )
+        val compacted = uncompacted.map { src ->
+            src.copy(points = HistoryRetention.LongTerm.compact(src.points, yearNow))
+        }
+
+        val fullStats = stats(uncompacted, yearNow, TimeZone.UTC)
+        val compactStats = stats(compacted, yearNow, TimeZone.UTC)
+
+        assertEquals(Coverage(days = 365), compactStats.coverage)
+        assertEquals(pastResets(uncompacted), pastResets(compacted))
+        assertEquals(fullStats.resets, compactStats.resets)
+        assertEquals(fullStats.closestCall, compactStats.closestCall)
+        assertEquals(fullStats.leftOver, compactStats.leftOver)
+        assertEquals(fullStats.sparklines, compactStats.sparklines)
+        assertEquals(
+            fullStats.shares.map { it.provider },
+            compactStats.shares.map { it.provider },
+        )
+        fullStats.shares.zip(compactStats.shares).forEach { (expected, actual) ->
+            assertEquals(expected.points, actual.points, 1e-6)
+            assertEquals(expected.fraction, actual.fraction, 1e-6)
+        }
+        val map = requireNotNull(compactStats.heatmap)
+        assertEquals(fullStats.heatmap, map)
+        assertEquals(Persona.NineToFive, persona(map))
+        // Night hours (00:00..08:00) had no usage and are not smeared by 3h/12h buckets.
+        for (day in DayOfWeek.entries) {
+            for (hour in 0..8) {
+                assertEquals(0.0, map.at(day, hour), "Expected 0 burn on $day at $hour:00")
+            }
+        }
+        assertTrue(compactStats.biggestDay != null && compactStats.biggestDay.points > 0.0)
     }
 }

@@ -194,6 +194,10 @@
     <string name="stats_resets_body">resets came without hitting the limit</string>
     <string name="stats_resets_streak">in a row</string>
     <string name="stats_resets_legend">One mark per reset, oldest first. Squares hit the limit.</string>
+    <plurals name="stats_resets_legend_latest">
+        <item quantity="one">Your latest %1$d reset, oldest first. Squares hit the limit.</item>
+        <item quantity="other">Your latest %1$d resets, oldest first. Squares hit the limit.</item>
+    </plurals>
     <plurals name="stats_resets_description">
         <item quantity="one">%1$d of %2$d reset came without hitting the limit. Current streak: %3$d.</item>
         <item quantity="other">%1$d of %2$d resets came without hitting the limit. Current streak: %3$d.</item>
@@ -374,6 +378,9 @@
     <string name="settings_sync_hours_6">Every 6 hours</string>
     <string name="settings_sync_on_open">Only when I open the app</string>
     <string name="settings_sync_note">Reset alerts arrive on time whatever you choose here.</string>
+    <string name="settings_usage_history">Usage history</string>
+    <string name="settings_keep_long_history">Keep long-term history</string>
+    <string name="settings_keep_long_history_body">Keeps a year of usage for the charts, in less detail as it gets older. Turn off to keep only the last 60 days.</string>
     <string name="settings_widgets">Home screen widgets</string>
     <string name="settings_widgets_note">Tap a style to add it. You can also add widgets from your home screen\'s widget list.</string>
     <string name="settings_about">About</string>

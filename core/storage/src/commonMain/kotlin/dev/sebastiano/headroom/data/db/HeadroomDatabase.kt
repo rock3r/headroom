@@ -16,7 +16,7 @@ import androidx.sqlite.execSQL
             UsagePointEntity::class,
             ResetEventEntity::class,
         ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 @ConstructedBy(HeadroomDatabaseConstructor::class)
@@ -133,6 +133,19 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 }
             }
 
+        /**
+         * Version 9 stores when a window was due to reset with each usage point, so history
+         * compaction can split points into reset periods. Existing points have none.
+         */
+        val MIGRATION_8_9: Migration =
+            object : Migration(8, 9) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL(
+                        "ALTER TABLE usage_points ADD COLUMN resetsAtEpochMs INTEGER"
+                    )
+                }
+            }
+
         /** Every migration, oldest first. */
         val MIGRATIONS: List<Migration> =
             listOf(
@@ -143,6 +156,7 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 MIGRATION_5_6,
                 MIGRATION_6_7,
                 MIGRATION_7_8,
+                MIGRATION_8_9,
             )
 
         /** The database file's name, the same on every platform. */

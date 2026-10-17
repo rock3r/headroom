@@ -274,15 +274,18 @@ class HeadroomTest {
     @Test
     fun `the settings come back as ids and changes apply`() {
         assertEquals("used", latest(headroom.settings::watch).quotaDisplay)
+        assertTrue(latest(headroom.settings::watch).keepLongHistory)
 
         headroom.settings.setQuotaDisplay("left")
         headroom.settings.setSwitch("resetExpiryReminders", false)
+        headroom.settings.setSwitch("keepLongHistory", false)
         headroom.settings.setSyncFrequency("hour1")
         scope.runCurrent()
 
         val updated = latest(headroom.settings::watch)
         assertEquals("left", updated.quotaDisplay)
         assertFalse(updated.resetExpiryReminders)
+        assertFalse(updated.keepLongHistory)
         assertEquals(60, updated.syncMinutes)
     }
 

@@ -11,6 +11,13 @@ import kotlinx.datetime.isoDayNumber
 /** The heatmap needs this much history, so that every day of the week has had a turn. */
 private val MIN_HEATMAP_SPAN: Duration = (BurnHeatmap.DAYS.toLong()).days
 
+/**
+ * Points up to this age stay at one-hour resolution or finer in
+ * [dev.sebastiano.headroom.model.HistoryRetention.LongTerm]. Older points are in 3-hour and 12-hour
+ * buckets that cannot place usage into a single hour of the day.
+ */
+private val HEATMAP_RESOLUTION_SPAN: Duration = 31.days
+
 /** The sparklines show this recent span. */
 public val SPARKLINE_SPAN: Duration = (BurnHeatmap.DAYS.toLong()).days
 
@@ -98,17 +105,18 @@ public fun shares(sources: List<StatsSource>): List<ProviderShare> {
 }
 
 /**
- * The use in each hour of the week, or null before a week of history or without any use that can be
- * placed in time.
+ * The use in each hour of the week from the hourly-resolution history, or null before a week of
+ * history or without any use that can be placed in time.
  */
 public fun heatmap(sources: List<StatsSource>, zone: TimeZone): BurnHeatmap? {
-    val times = sources.flatMap { source -> source.points.map { it.at } }
-    val first = times.minOrNull() ?: return null
-    val last = times.maxOrNull() ?: return null
+    val last = sources.flatMap { source -> source.points.map { it.at } }.maxOrNull() ?: return null
+    val cutoff = last.minus(HEATMAP_RESOLUTION_SPAN)
+    val hourlyBySource = sources.map { source -> source.points.filter { it.at >= cutoff } }
+    val first = hourlyBySource.flatMap { points -> points.map { it.at } }.minOrNull() ?: return null
     if (last - first < MIN_HEATMAP_SPAN) return null
     val cells = DoubleArray(BurnHeatmap.DAYS * BurnHeatmap.HOURS)
-    sources.forEach { source ->
-        hourlyBurn(source.points, zone).forEach { (hour, amount) -> cells[hour.cell] += amount }
+    hourlyBySource.forEach { hourlyPoints ->
+        hourlyBurn(hourlyPoints, zone).forEach { (hour, amount) -> cells[hour.cell] += amount }
     }
     return if (cells.any { it > 0.0 }) BurnHeatmap(cells.toList()) else null
 }

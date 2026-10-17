@@ -257,6 +257,7 @@ class AppGraph(
                         data.signInManager.complete(tokens)
                     }
                 }
+            val settings = data?.settings ?: InMemorySettingsRepository()
             return AppGraph(
                 quotaRepository = repository,
                 isDemo = repository.isDemo,
@@ -282,13 +283,13 @@ class AppGraph(
                 renameAccount = { id, name -> data?.repository?.renameAccount(id, name) },
                 removeAccount = { id -> data?.signInManager?.signOut(id) },
                 reorderAccounts = { ids -> data?.repository?.reorderAccounts(ids) },
-                settings = data?.settings ?: InMemorySettingsRepository(),
+                settings = settings,
                 appVersion = versionName(context),
                 usageHistory =
                     DemoAwareUsageHistory(
                         isDemo = repository.isDemo,
                         real = RepositoryUsageHistory(realAccounts),
-                        demo = DemoUsageHistory(DemoResetHistory, clock, zone),
+                        demo = DemoUsageHistory(DemoResetHistory, clock, zone, settings),
                     ),
                 resetIsland = resetIsland,
                 resetProvider =

@@ -219,6 +219,41 @@ class HeadroomDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `usage points saved before reset times were stored have none`() = runTest {
+        oldDatabase().use { v8 ->
+            VERSION_1_SCHEMA.forEach { v8.execSQL(it) }
+            v8.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+            v8.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+            v8.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+            v8.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+            v8.execSQL("ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+            v8.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
+            v8.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
+            v8.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
+            VERSION_7_RESET_EVENTS.forEach(v8::execSQL)
+            v8.execSQL(
+                "ALTER TABLE accounts ADD COLUMN resetsReadFailed INTEGER NOT NULL DEFAULT 0"
+            )
+            v8.execSQL("INSERT INTO accounts (id, provider, label) VALUES ('a1', 'claude', 'a1')")
+            v8.execSQL(
+                "INSERT INTO usage_points (accountId, windowId, atEpochMs, usedPercent) " +
+                    "VALUES ('a1', 'seven_day', 1700000000000, 42.5)"
+            )
+            v8.execSQL("PRAGMA user_version = 8")
+        }
+
+        val db = openCurrent()
+        try {
+            val point = db.quotaDao().observeHistory("a1", "seven_day").first().single()
+            assertEquals(1_700_000_000_000L, point.atEpochMs)
+            assertEquals(42.5, point.usedPercent)
+            assertNull(point.resetsAtEpochMs)
+        } finally {
+            db.close()
+        }
+    }
+
     private fun openCurrent(): HeadroomDatabase = databaseAt(file)
 
     private companion object {
