@@ -34,6 +34,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
@@ -48,6 +50,7 @@ import dev.c5inco.charts.compose.Glyph
 import dev.c5inco.charts.compose.GlyphSwatch
 import dev.c5inco.charts.compose.GridStyle
 import dev.c5inco.charts.compose.LineStyle
+import dev.c5inco.charts.compose.SceneCompile
 import dev.c5inco.charts.compose.StrokePattern
 import dev.c5inco.charts.compose.TooltipStyle
 import dev.c5inco.charts.compose.ViewportActions
@@ -93,7 +96,7 @@ fun UsageHistoryChart(
     onWindowToggle: (windowId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val style = rememberUsageHistoryChartStyle()
+    val baseStyle = rememberUsageHistoryChartStyle()
     val animate = animationsEnabled()
     // Reveal from the baseline once per account per screen visit, never on range/filter changes.
     val revealed = rememberSaveable(model.accountId) { booleanArrayOf(false) }
@@ -106,7 +109,7 @@ fun UsageHistoryChart(
             WindowFilterChips(
                 windows = model.windows,
                 selectedIds = model.selectedWindowIds,
-                style = style,
+                style = baseStyle,
                 onWindowToggle = onWindowToggle,
             )
         }
@@ -115,7 +118,7 @@ fun UsageHistoryChart(
                 model = model,
                 formatter = formatter,
                 display = display,
-                style = style,
+                baseStyle = baseStyle,
                 animate = animate,
                 animateEntrance = animateEntrance,
             )
@@ -128,18 +131,26 @@ private fun UsageHistoryPlot(
     model: UsageHistoryModel,
     formatter: ResetFormatter,
     display: QuotaDisplay,
-    style: ChartStyle,
+    baseStyle: ChartStyle,
     animate: Boolean,
     animateEntrance: Boolean,
 ) {
     val dataSpec = HeadroomMotion.dataSpec<Float>()
-    val chartAnimationSpec = if (animate) dataSpec else ChartMotion.Instant
     val availableRanges = model.availableRanges
     val viewport = rememberModelViewport(model)
     val scope = rememberCoroutineScope()
     var animatingRange by remember(viewport) { mutableStateOf<Pair<Long, HistoryRange>?>(null) }
     val animationSerial = remember(viewport) { longArrayOf(0L) }
     val selectedRange = rememberSelectedRange(viewport, model, animatingRange?.second)
+    val zoomDensity by remember(viewport) { derivedStateOf { ZoomDensity.forSpan(viewport.span) } }
+    val style = remember(baseStyle, zoomDensity) { zoomDensity.applyTo(baseStyle) }
+    val lastState = remember { ZoomSyncState(model, zoomDensity) }
+    val densityOnlyChange = lastState.model == model && lastState.density != zoomDensity
+    SideEffect {
+        lastState.model = model
+        lastState.density = zoomDensity
+    }
+    val chartAnimationSpec = if (animate && !densityOnlyChange) dataSpec else ChartMotion.Instant
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (availableRanges.size > 1) {
@@ -176,14 +187,16 @@ private fun UsageHistoryPlot(
             remember(resources) {
                 { percent: Int -> resources.getString(R.string.percent, percent) }
             }
+        val resetStride = zoomDensity.resetStride
         val spec =
-            remember(model, formatter, limitLabel, percentFormat, paceDescription) {
+            remember(model, formatter, limitLabel, percentFormat, paceDescription, resetStride) {
                 buildUsageHistoryChartSpec(
                     model = model,
                     formatter = formatter,
                     limitLabel = limitLabel,
                     percentFormat = percentFormat,
                     description = paceDescription,
+                    resetStride = resetStride,
                 )
             }
         val usageSeriesCount = model.shownWindows.size
@@ -207,6 +220,7 @@ private fun UsageHistoryPlot(
             style = style,
             animationSpec = chartAnimationSpec,
             animateEntrance = animateEntrance,
+            compile = if (densityOnlyChange) SceneCompile.InPlace else SceneCompile.Background,
             viewport = viewport,
         ) { focus, scene ->
             UsageHistoryTooltip(
@@ -216,6 +230,29 @@ private fun UsageHistoryPlot(
                 usageSeriesCount = usageSeriesCount,
             )
         }
+    }
+}
+
+private class ZoomSyncState(var model: UsageHistoryModel, var density: ZoomDensity)
+
+private enum class ZoomDensity(val lineWidth: Dp, val markerRadius: Dp, val resetStride: Int) {
+    Detail(lineWidth = 2.5.dp, markerRadius = 4.dp, resetStride = 1),
+    Medium(lineWidth = 1.75.dp, markerRadius = 3.5.dp, resetStride = 1),
+    Overview(lineWidth = 1.2.dp, markerRadius = 3.dp, resetStride = 4);
+
+    fun applyTo(base: ChartStyle): ChartStyle =
+        base.copy(
+            line = base.line.copy(width = lineWidth, markerRadius = markerRadius),
+            dot = base.dot.copy(radius = markerRadius),
+        )
+
+    companion object {
+        fun forSpan(spanMs: Double): ZoomDensity =
+            when {
+                spanMs <= DETAIL_SPAN_MAX_MS -> Detail
+                spanMs <= MEDIUM_SPAN_MAX_MS -> Medium
+                else -> Overview
+            }
     }
 }
 
@@ -304,7 +341,10 @@ private fun WindowFilterChips(
                         size = 10.dp,
                     )
                 },
-                modifier = Modifier.testTag(chartWindowTag(window.id)),
+                modifier =
+                    Modifier.testTag(chartWindowTag(window.id)).semantics {
+                        toggleableState = ToggleableState(selected)
+                    },
             )
         }
     }
@@ -479,16 +519,16 @@ internal fun rememberUsageHistoryChartStyle(): ChartStyle {
                 GridStyle(
                     color = scheme.outlineVariant.copy(alpha = GRID_ALPHA),
                     width = 1.dp,
-                    dash = 3.dp to 3.dp,
+                    dash = null,
                     horizontal = true,
-                    vertical = true,
+                    vertical = false,
                     baseline = scheme.outlineVariant,
                     reference = scheme.error,
                     referenceChip = surface,
                     referenceWidth = 1.dp,
                     referencePattern = StrokePattern.Dashed(2.dp, 3.dp),
                     xRule = scheme.onSurfaceVariant.copy(alpha = XRULE_ALPHA),
-                    xRuleWidth = 1.dp,
+                    xRuleWidth = 1.25.dp,
                     xRulePattern = StrokePattern.Dashed(4.dp, 4.dp),
                     band =
                         scheme.primary.copy(
@@ -558,6 +598,8 @@ private val SeriesGlyphs: List<Glyph> =
 
 private val MIN_VIEWPORT_SPAN = 6.hours
 private val LONG_DATE_SPAN = 180.days
+private val DETAIL_SPAN_MAX_MS = 45.days.inWholeMilliseconds.toDouble()
+private val MEDIUM_SPAN_MAX_MS = 180.days.inWholeMilliseconds.toDouble()
 private const val MIN_POSITIVE_SPAN_MS = 1.0
 private const val RANGE_MATCH_TOLERANCE_MS = 3_600_000.0
 private const val RANGE_MATCH_FRACTION = 0.02
@@ -580,8 +622,8 @@ private const val LIGHT_SERIES_C = 0.14f
 private const val DARK_SERIES_L = 0.80f
 private const val DARK_SERIES_C = 0.12f
 private const val PACE_LINE_ALPHA = 0.75f
-private const val GRID_ALPHA = 0.55f
-private const val XRULE_ALPHA = 0.55f
+private const val GRID_ALPHA = 0.35f
+private const val XRULE_ALPHA = 0.65f
 private const val LIGHT_BAND_ALPHA = 0.06f
 private const val DARK_BAND_ALPHA = 0.08f
 private const val FOCUS_RULE_ALPHA = 0.6f

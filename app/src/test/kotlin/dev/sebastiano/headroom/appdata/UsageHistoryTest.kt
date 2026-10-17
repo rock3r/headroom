@@ -110,6 +110,22 @@ class UsageHistoryTest {
     }
 
     @Test
+    fun `demo windows without explicit reset peaks still get a full year of history`() = runTest {
+        val opus =
+            DemoData.accounts(now).first().snapshot!!.windows.first { it.id == "seven_day_opus" }
+        val settings = InMemorySettingsRepository()
+        val history = DemoUsageHistory(DemoResetHistory, { now }, ZoneOffset.UTC, settings)
+
+        val longTerm = history.points("demo-claude", opus).first()
+        assertTrue(longTerm.first().at <= now.minus(364.days))
+        assertEquals(52, ResetPeaks.usedAtResets(longTerm).size)
+
+        settings.setKeepLongHistory(false)
+        val shortTerm = history.points("demo-claude", opus).first()
+        assertEquals(8, ResetPeaks.usedAtResets(shortTerm).size)
+    }
+
+    @Test
     fun `the real history comes from the repository`() = runTest {
         val repository = FakeQuotaRepository({ now })
         val window = repository.accounts.value.first().primaryWindow!!

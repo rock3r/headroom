@@ -2,8 +2,10 @@ package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
@@ -85,19 +87,35 @@ class DetailTest {
     @Test
     fun `the chart overlays all long windows and filter chips keep at least one on`() {
         openClaude()
+        rule.onNodeWithText("Usage history").performScrollTo().assertIsDisplayed()
         val weekly = rule.onNodeWithTag(chartWindowTag("seven_day"))
         val opus = rule.onNodeWithTag(chartWindowTag("seven_day_opus"))
-        weekly.performScrollTo().assertIsSelected()
-        opus.assertIsSelected()
+        weekly.performScrollTo().assertIsSelected().assertIsOn()
+        opus.assertIsSelected().assertIsOn()
+        assertEquals(
+            Role.Checkbox,
+            weekly.fetchSemanticsNode().config[SemanticsProperties.Role],
+        )
+        assertEquals(
+            ToggleableState.On,
+            weekly.fetchSemanticsNode().config[SemanticsProperties.ToggleableState],
+        )
 
-        // Toggling the primary window off leaves Opus on and updates the projection to Opus's.
+        // Toggling the primary window off leaves Opus on, updates checked semantics to Off, and
+        // keeps the range button row visible and stable.
         weekly.performClick()
-        rule.onNodeWithTag(chartWindowTag("seven_day")).assertIsNotSelected()
-        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected()
+        val weeklyAfter = rule.onNodeWithTag(chartWindowTag("seven_day"))
+        weeklyAfter.assertIsNotSelected().assertIsOff()
+        assertEquals(
+            ToggleableState.Off,
+            weeklyAfter.fetchSemanticsNode().config[SemanticsProperties.ToggleableState],
+        )
+        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected().assertIsOn()
+        rule.onNodeWithTag(chartRangeTag(HistoryRange.OneYear)).assertIsDisplayed()
 
         // Tapping the last remaining chip does not turn it off.
         opus.performClick()
-        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected()
+        rule.onNodeWithTag(chartWindowTag("seven_day_opus")).assertIsSelected().assertIsOn()
 
         // Single-window accounts omit the filter chips altogether.
         rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
@@ -117,6 +135,18 @@ class DetailTest {
         oneMonthButton.assertIsNotSelected()
         threeMonthsButton.assertIsNotSelected()
         oneYearButton.assertIsNotSelected()
+        assertEquals(
+            Role.RadioButton,
+            periodButton.fetchSemanticsNode().config[SemanticsProperties.Role],
+        )
+        assertEquals(
+            true,
+            periodButton.fetchSemanticsNode().config[SemanticsProperties.Selected],
+        )
+        assertEquals(
+            false,
+            oneMonthButton.fetchSemanticsNode().config[SemanticsProperties.Selected],
+        )
 
         val chartNode = rule.onNodeWithTag(USAGE_HISTORY_CHART_TAG).performScrollTo()
         val initialDesc =

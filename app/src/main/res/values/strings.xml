@@ -126,9 +126,7 @@
     <!-- The content description of the info button next to a quota Headroom does not know. -->
     <string name="detail_unknown_quota_info">About this quota</string>
     <string name="detail_unknown_quota_explanation">This is a new quota we don\'t recognise yet. Headroom shows it for your information, but doesn\'t know what it\'s for.</string>
-    <string name="detail_chart_week">This week</string>
-    <string name="detail_chart_month">This month</string>
-    <string name="detail_chart_window">This window</string>
+    <string name="detail_chart_title">Usage history</string>
     <string name="detail_chart_legend">dashed = even pace</string>
     <string name="detail_chart_limit">limit</string>
     <string name="detail_chart_range_period">Period</string>

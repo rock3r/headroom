@@ -474,14 +474,7 @@ private fun ChartCard(
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text =
-                        stringResource(
-                            when (chart.kind) {
-                                WindowKind.Weekly -> R.string.detail_chart_week
-                                WindowKind.Monthly -> R.string.detail_chart_month
-                                else -> R.string.detail_chart_window
-                            }
-                        ),
+                    text = stringResource(R.string.detail_chart_title),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )

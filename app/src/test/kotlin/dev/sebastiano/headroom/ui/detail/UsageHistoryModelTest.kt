@@ -261,6 +261,109 @@ class UsageHistoryModelTest {
     }
 
     @Test
+    fun `availableRanges and pan bounds stay stable when hiding the window with longer history`() {
+        val primary = weeklyWindow(id = "seven_day", label = "Weekly · all models")
+        val opus = weeklyWindow(id = "seven_day_opus", label = "Weekly · Opus", usedPercent = 52.0)
+        val histories =
+            mapOf(
+                primary.id to
+                    listOf(
+                        UsagePoint(now.minus(364.days), 10.0, weeklyReset.minus(357.days)),
+                        UsagePoint(now, 71.0, weeklyReset),
+                    ),
+                opus.id to listOf(UsagePoint(now.minus(2.hours), 52.0, weeklyReset)),
+            )
+
+        val bothShown =
+            assertNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = listOf(primary, opus),
+                    primaryWindowId = primary.id,
+                    histories = histories,
+                    selectedWindowIds = setOf(primary.id, opus.id),
+                    now = now,
+                )
+            )
+        val opusOnly =
+            assertNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = listOf(primary, opus),
+                    primaryWindowId = primary.id,
+                    histories = histories,
+                    selectedWindowIds = setOf(opus.id),
+                    now = now,
+                )
+            )
+
+        assertEquals(bothShown.availableRanges, opusOnly.availableRanges)
+        assertEquals(
+            listOf(
+                HistoryRange.Period,
+                HistoryRange.OneMonth,
+                HistoryRange.ThreeMonths,
+                HistoryRange.OneYear,
+            ),
+            opusOnly.availableRanges,
+        )
+        assertEquals(bothShown.minBound, opusOnly.minBound)
+        assertEquals(bothShown.maxBound, opusOnly.maxBound)
+    }
+
+    @Test
+    fun `reset rules use their series colour slot and thin out when closer than 6 dp apart`() {
+        val weekly = weeklyWindow(id = "seven_day", label = "Weekly")
+        val points = mutableListOf<UsagePoint>()
+        for (week in 52 downTo 1) {
+            val end = weeklyStart.minus(((week - 1) * 7).days)
+            val start = end.minus(7.days)
+            points += UsagePoint(start, 0.0, resetsAt = end)
+            points += UsagePoint(end.minus(1.minutes), 80.0, resetsAt = end)
+        }
+        points += UsagePoint(weeklyStart, 0.0, resetsAt = weeklyReset)
+        points += UsagePoint(now, 71.0, resetsAt = weeklyReset)
+
+        val model =
+            assertNotNull(
+                buildUsageHistoryModel(
+                    accountId = "acc-1",
+                    windows = listOf(weekly),
+                    primaryWindowId = weekly.id,
+                    histories = mapOf(weekly.id to points),
+                    selectedWindowIds = setOf(weekly.id),
+                    now = now,
+                )
+            )
+        val formatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
+        val monthSpec =
+            buildUsageHistoryChartSpec(
+                model = model,
+                formatter = formatter,
+                limitLabel = "limit",
+                percentFormat = { "$it%" },
+                description = "Usage chart",
+                resetStride = 1,
+            )
+        val yearSpec =
+            buildUsageHistoryChartSpec(
+                model = model,
+                formatter = formatter,
+                limitLabel = "limit",
+                percentFormat = { "$it%" },
+                description = "Usage chart",
+                resetStride = 4,
+            )
+
+        val monthRules = monthSpec.marks.filterIsInstance<XRuleMark>()
+        val yearRules = yearSpec.marks.filterIsInstance<XRuleMark>()
+        assertEquals(52, monthRules.size)
+        assertTrue(monthRules.all { it.color == 0 && it.pattern == LinePattern.Dashed })
+        assertTrue(yearRules.size in 12..14, "Expected thinned reset rules, got ${yearRules.size}")
+        assertEquals(monthRules.last().x, yearRules.last().x)
+    }
+
+    @Test
     fun `buildUsageHistoryChartSpec merges timestamps and adds pace projection band and rules`() {
         val weekly = weeklyWindow(id = "seven_day", label = "Weekly", usedPercent = 71.0)
         val monthly = monthlyWindow(id = "monthly", label = "Monthly", usedPercent = 30.0)

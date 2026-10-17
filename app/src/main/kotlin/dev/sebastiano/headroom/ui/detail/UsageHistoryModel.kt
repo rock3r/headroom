@@ -83,17 +83,22 @@ data class UsageHistoryModel(
                 .thenBy { !it.isPrimary }
         )
 
+    private val shortestAccountWindow: WindowHistorySeries? =
+        windows.minWithOrNull(
+            compareBy<WindowHistorySeries> { it.summary.end - it.summary.start }
+                .thenBy { !it.isPrimary }
+        )
+
     private val oldestPointAt: Instant =
-        shownWindows.mapNotNull { it.points.firstOrNull()?.at }.minOrNull()
-            ?: shortestShownWindow?.summary?.start
+        windows.mapNotNull { it.points.firstOrNull()?.at }.minOrNull()
+            ?: shortestAccountWindow?.summary?.start
             ?: now
 
-    /** Left pan bound: the oldest stored point, or the earliest shown period start when newer. */
-    val minBound: Instant =
-        minOf(oldestPointAt, shownWindows.minOfOrNull { it.summary.start } ?: now)
+    /** Left pan bound: the oldest stored point, or the earliest period start when newer. */
+    val minBound: Instant = minOf(oldestPointAt, windows.minOfOrNull { it.summary.start } ?: now)
 
-    /** Right pan bound: the end of the current period. */
-    val maxBound: Instant = shownWindows.maxOfOrNull { it.summary.end } ?: now
+    /** Right pan bound: the end of the current period across the account's long windows. */
+    val maxBound: Instant = windows.maxOfOrNull { it.summary.end } ?: now
 
     /** Default viewport start: the start of [shortestShownWindow]'s current period. */
     val defaultStart: Instant = shortestShownWindow?.summary?.start ?: minBound
@@ -102,11 +107,13 @@ data class UsageHistoryModel(
     val defaultEnd: Instant = shortestShownWindow?.summary?.end ?: maxBound
 
     /**
-     * Range presets supported by the shown windows' history. [HistoryRange.OneYear] requires both
-     * [keepLongHistory] and history extending beyond three months.
+     * Range presets supported by the account's long-window history. Computed across all [windows]
+     * so toggling a filter chip never adds or removes the range button row under the finger.
+     * [HistoryRange.OneYear] requires both [keepLongHistory] and history extending beyond three
+     * months.
      */
     val availableRanges: List<HistoryRange> = run {
-        val shortest = shortestShownWindow ?: return@run listOf(HistoryRange.Period)
+        val shortest = shortestAccountWindow ?: return@run listOf(HistoryRange.Period)
         val periodStart = shortest.summary.start
         val shortestLength = shortest.summary.end - periodStart
         val hasPastHistory = oldestPointAt < periodStart
@@ -277,6 +284,7 @@ internal fun buildUsageHistoryChartSpec(
     limitLabel: String,
     percentFormat: (Int) -> String,
     description: String,
+    resetStride: Int = 1,
 ): CartesianChart {
     val shown = model.shownWindows
     val uniqueMs = collectSortedEpochMillis(model, shown)
@@ -316,7 +324,7 @@ internal fun buildUsageHistoryChartSpec(
 
     appendPaceMarks(shown, uniqueMs, marks)
     appendProjectionMarks(model.now, shown, uniqueMs, marks)
-    appendResetRuleMarks(shown, marks)
+    appendResetRuleMarks(shown, resetStride.coerceAtLeast(1), marks)
     marks += RuleMark(y = MAX_PERCENT, label = limitLabel)
 
     val yFormat = ValueFormat { value -> percentFormat(value.roundToInt()) }
@@ -434,14 +442,31 @@ private fun appendProjectionMarks(
     }
 }
 
-/** Vertical [XRuleMark] at every reset of each shown window. */
-private fun appendResetRuleMarks(shown: List<WindowHistorySeries>, marks: MutableList<Mark>) {
+/**
+ * Vertical [XRuleMark] in each window's series colour at its resets. When [resetStride] > 1 and a
+ * window has more than [MIN_RESETS_TO_THIN] resets (e.g. 52 weekly resets in a 1-year view where
+ * rules would sit closer than ~6 dp apart), keeps every [resetStride]-th reset counting back from
+ * the latest reset so the newest reset is always marked.
+ */
+private fun appendResetRuleMarks(
+    shown: List<WindowHistorySeries>,
+    resetStride: Int,
+    marks: MutableList<Mark>,
+) {
     val seenRules = HashSet<Long>()
     shown.forEach { window ->
-        window.resets.forEach { reset ->
-            val ms = reset.toEpochMilliseconds()
+        val resets = window.resets
+        val stride = if (resets.size > MIN_RESETS_TO_THIN) resetStride else 1
+        val startIdx = if (stride > 1 && resets.isNotEmpty()) resets.lastIndex % stride else 0
+        for (index in startIdx until resets.size step stride) {
+            val ms = resets[index].toEpochMilliseconds()
             if (seenRules.add(ms)) {
-                marks += XRuleMark(x = ms.toDouble())
+                marks +=
+                    XRuleMark(
+                        x = ms.toDouble(),
+                        color = window.colorSlot,
+                        pattern = LinePattern.Dashed,
+                    )
             }
         }
     }
@@ -538,3 +563,4 @@ private const val THREE_MONTHS_DAYS = 90L
 private const val ONE_YEAR_DAYS = 365L
 private const val TIME_AXIS_TICK_COUNT = 5
 private const val VALUE_AXIS_TICK_COUNT = 3
+private const val MIN_RESETS_TO_THIN = 20
