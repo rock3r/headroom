@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 REPO_DIR="${1:-/Users/sebp/src/compose-charts}"
-REF="${2:-headroom-integration}"
+REF="${2:-main}"
 
 if [[ ! -d "$REPO_DIR/.git" && ! -f "$REPO_DIR/.git" ]]; then
     echo "Error: compose-charts git repository not found at $REPO_DIR" >&2

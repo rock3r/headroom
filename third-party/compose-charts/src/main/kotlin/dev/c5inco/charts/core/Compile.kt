@@ -332,6 +332,47 @@ internal class CartesianPrep(spec: CartesianChart) {
         seriesList?.let { list -> Array(list.size) { sIdx -> list[sIdx].values.toDoubleArray() } }
     }
 
+    /**
+     * For each `LineMark`/`AreaMark` series and index `i`, the largest index `<= i` with a finite
+     * value (or `-1` if none). Lets viewport compilation locate the nearest finite neighbour left
+     * of the window and the last finite datum inside the window in O(1) without scanning `NaN` runs.
+     */
+    val prevDefinedArrays: Array<Array<IntArray>?> = Array(spec.marks.size) { mIdx ->
+        val sArrs = seriesArrays[mIdx] ?: return@Array null
+        Array(sArrs.size) { sIdx ->
+            val raw = sArrs[sIdx]
+            val out = IntArray(raw.size)
+            var last = -1
+            for (i in raw.indices) {
+                if (raw[i].isFinite()) last = i
+                out[i] = last
+            }
+            out
+        }
+    }
+
+    /**
+     * For each `LineMark`/`AreaMark` series and index `i`, the smallest index `>= i` with a finite
+     * value (or `-1` if none). Lets viewport compilation locate the nearest finite neighbour right
+     * of the window in O(1) without scanning `NaN` runs.
+     */
+    val nextDefinedArrays: Array<Array<IntArray>?> = Array(spec.marks.size) { mIdx ->
+        val sArrs = seriesArrays[mIdx] ?: return@Array null
+        Array(sArrs.size) { sIdx ->
+            val raw = sArrs[sIdx]
+            val out = IntArray(raw.size)
+            var next = -1
+            for (i in raw.indices.reversed()) {
+                if (raw[i].isFinite()) next = i
+                out[i] = next
+            }
+            out
+        }
+    }
+
+    /** Total series sample reads performed by the most recent [compileCartesian] call, for testing O(window) work. */
+    internal var lastInspectedSamples: Int = 0
+
     val stackUpperArrays: Map<Int, Array<DoubleArray>> = HashMap<Int, Array<DoubleArray>>().also { map ->
         spec.marks.forEachIndexed { mIdx, mark ->
             if (mark is AreaMark && mark.stacked) {
@@ -437,39 +478,66 @@ private fun flushStackedColumn(
 }
 
 /**
- * Finds the index range `[start, endExclusive)` to compile for a series of length [n] under
- * [viewport] culling and [gaps]: includes `[inStart..inEnd]`, plus one neighbor beyond each edge
- * (scanning past leading/trailing `NaN`s when [gaps] connects across missing samples so connected
- * segments run all the way to the plot border).
+ * The visible index slice `[winStart, winEndExclusive)` and the single overhang index on each side
+ * (`leftIdx < winStart` and `rightIdx >= winEndExclusive`, or `-1` when none) for a series of
+ * length [n]. Under [Gaps.Connect] or [Gaps.ConnectWithin], uses the precomputed [prevDefined] and
+ * [nextDefined] tables in O(1) so long `NaN` runs outside the viewport are never scanned.
  */
-private fun culledSeriesWindow(
+private class SeriesSlice(
+    val leftIdx: Int,
+    val winStart: Int,
+    val winEndExclusive: Int,
+    val rightIdx: Int,
+    val lastDefinedInWin: Int,
+) {
+    val winCount: Int get() = winEndExclusive - winStart
+    val inspectedCount: Int get() = (if (leftIdx >= 0) 1 else 0) + winCount + (if (rightIdx >= 0) 1 else 0)
+
+    fun contains(index: Int): Boolean =
+        index >= 0 && (index == leftIdx || index in winStart until winEndExclusive || index == rightIdx)
+}
+
+private fun culledSeriesSlice(
     n: Int,
     inStart: Int,
     inEnd: Int,
-    cullStart: Int,
-    cullEnd: Int,
     sValues: DoubleArray,
+    prevDefined: IntArray,
+    nextDefined: IntArray,
     gaps: Gaps,
     hasViewport: Boolean,
     xAscending: Boolean,
-): Pair<Int, Int> {
-    if (!hasViewport || !xAscending || n <= 0) return 0 to n
-    if (gaps == Gaps.Break) {
-        val s = min(cullStart, n)
-        val e = min(cullEnd + 1, n)
-        return s to max(s, e)
+): SeriesSlice {
+    if (!hasViewport || !xAscending || n <= 0) {
+        val last = if (n > 0) prevDefined[n - 1] else -1
+        return SeriesSlice(leftIdx = -1, winStart = 0, winEndExclusive = n, rightIdx = -1, lastDefinedInWin = last)
     }
-    var left = min(inStart - 1, n - 1)
-    while (left >= 0 && !sValues[left].isFinite()) left--
-    val start = if (left >= 0) left else min(inStart.coerceAtLeast(0), n)
-    var right = max(0, inEnd + 1)
-    while (right < n && !sValues[right].isFinite()) right++
-    val endExclusive = if (right < n) right + 1 else min(max(0, inEnd + 1), n)
-    return min(start, endExclusive) to max(start, endExclusive)
+    val winStart = inStart.coerceIn(0, n)
+    val winEndExclusive = (inEnd + 1).coerceIn(winStart, n)
+    val lastInWin = if (winEndExclusive > winStart) {
+        prevDefined[winEndExclusive - 1].takeIf { it >= winStart } ?: -1
+    } else if (inStart in 0 until n && sValues[inStart].isFinite()) {
+        inStart
+    } else {
+        -1
+    }
+    val leftCandidate = min(inStart - 1, n - 1)
+    val leftIdx = when {
+        leftCandidate < 0 -> -1
+        gaps == Gaps.Break -> leftCandidate
+        else -> prevDefined[leftCandidate]
+    }
+    val rightCandidate = max(0, inEnd + 1)
+    val rightIdx = when {
+        rightCandidate >= n -> -1
+        gaps == Gaps.Break -> rightCandidate
+        else -> nextDefined[rightCandidate]
+    }
+    return SeriesSlice(leftIdx, winStart, winEndExclusive, rightIdx, lastInWin)
 }
 
 /**
- * M4 per-pixel-column decimation over `start until endExclusive`, respecting [gaps]:
+ * M4 per-pixel-column decimation over [slice], respecting [gaps]:
  *
  * - [Gaps.Break]: flushes the column and emits one `NaN` index per contiguous missing run.
  * - [Gaps.Connect]: skips `NaN`s so connected holes never turn into breaks.
@@ -481,10 +549,7 @@ private fun culledSeriesWindow(
  * when decimating a stacked area) and `last`. Returns the count written.
  */
 private fun decimateM4Indices(
-    start: Int,
-    endExclusive: Int,
-    winStart: Int,
-    winEndExclusive: Int,
+    slice: SeriesSlice,
     xValues: DoubleArray,
     xDomainStart: Double,
     colScale: Double,
@@ -499,17 +564,14 @@ private fun decimateM4Indices(
     var lastDefined = -1
     var inGapBreak = false
 
-    for (i in start until winStart) {
-        val v = sValues[i]
+    val leftIdx = slice.leftIdx
+    if (leftIdx >= 0) {
+        val v = sValues[leftIdx]
         if (v.isFinite()) {
-            if (!maxGap.isNaN() && lastDefined >= 0 && i > lastDefined + 1 && abs(xValues[i] - xValues[lastDefined]) > maxGap) {
-                out[k++] = lastDefined + 1
-            }
-            out[k++] = i
-            lastDefined = i
-            inGapBreak = false
-        } else if (gaps == Gaps.Break && !inGapBreak) {
-            out[k++] = i
+            out[k++] = leftIdx
+            lastDefined = leftIdx
+        } else if (gaps == Gaps.Break) {
+            out[k++] = leftIdx
             inGapBreak = true
         }
     }
@@ -526,7 +588,7 @@ private fun decimateM4Indices(
     var lowMinVal = Double.POSITIVE_INFINITY
     var lowMaxVal = Double.NEGATIVE_INFINITY
 
-    for (i in winStart until winEndExclusive) {
+    for (i in slice.winStart until slice.winEndExclusive) {
         val v = sValues[i]
         if (!v.isFinite()) {
             if (gaps == Gaps.Break) {
@@ -616,18 +678,16 @@ private fun decimateM4Indices(
         }
         inGapBreak = false
     }
-    for (i in winEndExclusive until endExclusive) {
-        val v = sValues[i]
+    val rightIdx = slice.rightIdx
+    if (rightIdx >= 0) {
+        val v = sValues[rightIdx]
         if (v.isFinite()) {
-            if (!maxGap.isNaN() && lastDefined >= 0 && i > lastDefined + 1 && abs(xValues[i] - xValues[lastDefined]) > maxGap) {
+            if (!maxGap.isNaN() && lastDefined >= 0 && rightIdx > lastDefined + 1 && abs(xValues[rightIdx] - xValues[lastDefined]) > maxGap) {
                 out[k++] = lastDefined + 1
             }
-            out[k++] = i
-            lastDefined = i
-            inGapBreak = false
+            out[k++] = rightIdx
         } else if (gaps == Gaps.Break && !inGapBreak) {
-            out[k++] = i
-            inGapBreak = true
+            out[k++] = rightIdx
         }
     }
     return k
@@ -893,37 +953,69 @@ private fun compileCartesian(
     fun formatVal(markIndex: Int, s: Int, i: Int, v: Double): String =
         prep.valueText(markIndex, s, i, v, valueFormat, cacheValueTexts)
     fun inWindow(i: Int): Boolean = viewport == null || (i in inStart..inEnd && (xValues == null || xValues[i] in viewLo..viewHi))
+    var inspectedSamples = 0
     fun buildUndecimatedPoints(
-        start: Int,
-        endExclusive: Int,
+        slice: SeriesSlice,
         sValues: DoubleArray,
         gaps: Gaps,
         yFor: (Int, Double) -> Float,
     ): List<XY> {
-        val count = max(0, endExclusive - start)
+        val cap = slice.inspectedCount
+        val out = ArrayList<XY>(cap)
         if (gaps == Gaps.Break) {
-            val out = ArrayList<XY>(count)
-            for (i in start until endExclusive) {
+            if (slice.leftIdx >= 0) {
+                val i = slice.leftIdx
+                val raw = sValues[i]
+                out += XY(xAt(i), if (raw.isFinite()) yFor(i, raw) else Float.NaN)
+            }
+            for (i in slice.winStart until slice.winEndExclusive) {
+                val raw = sValues[i]
+                out += XY(xAt(i), if (raw.isFinite()) yFor(i, raw) else Float.NaN)
+            }
+            if (slice.rightIdx >= 0) {
+                val i = slice.rightIdx
                 val raw = sValues[i]
                 out += XY(xAt(i), if (raw.isFinite()) yFor(i, raw) else Float.NaN)
             }
             return out
         }
-        val out = ArrayList<XY>(count)
         var lastDefined = -1
-        for (i in start until endExclusive) {
+        fun visit(i: Int) {
             val raw = sValues[i]
-            if (!raw.isFinite()) continue
+            if (!raw.isFinite()) return
             if (lastDefined >= 0 && i > lastDefined + 1 && gaps is Gaps.ConnectWithin) {
                 val xPrev = xValues?.get(lastDefined) ?: lastDefined.toDouble()
                 val xCurr = xValues?.get(i) ?: i.toDouble()
                 if (abs(xCurr - xPrev) > gaps.maxGap) {
-                    for (k in (lastDefined + 1) until i) out += XY(xAt(k), Float.NaN)
+                    if (viewport == null) {
+                        for (k in (lastDefined + 1) until i) out += XY(xAt(k), Float.NaN)
+                    } else {
+                        out += XY(xAt(lastDefined + 1), Float.NaN)
+                    }
                 }
             }
             out += XY(xAt(i), yFor(i, raw))
             lastDefined = i
         }
+        if (slice.leftIdx >= 0) visit(slice.leftIdx)
+        for (i in slice.winStart until slice.winEndExclusive) visit(i)
+        if (slice.rightIdx >= 0) visit(slice.rightIdx)
+        return out
+    }
+    fun buildUndecimatedAreaBottom(
+        slice: SeriesSlice,
+        sValues: DoubleArray,
+        sStack: List<Pair<Double, Double>>?,
+        closeY: Float,
+    ): List<XY> {
+        val out = ArrayList<XY>(slice.inspectedCount)
+        fun visit(i: Int) {
+            val raw = sValues[i]
+            out += XY(xAt(i), if (!raw.isFinite()) Float.NaN else sStack?.get(i)?.first?.let(::yStack) ?: closeY)
+        }
+        if (slice.leftIdx >= 0) visit(slice.leftIdx)
+        for (i in slice.winStart until slice.winEndExclusive) visit(i)
+        if (slice.rightIdx >= 0) visit(slice.rightIdx)
         return out
     }
     fun capped(start: Float, width: Float, cap: Float): Pair<Float, Float> =
@@ -988,33 +1080,26 @@ private fun compileCartesian(
                 val xDomainSpan = if (sx != null) sx.domainEnd - sx.domainStart else 0.0
                 val colScale = if (xDomainSpan != 0.0) plot.width / xDomainSpan else 0.0
                 val markArrays = prep.seriesArrays[markIndex]!!
+                val prevArrays = prep.prevDefinedArrays[markIndex]!!
+                val nextArrays = prep.nextDefinedArrays[markIndex]!!
                 // Size for the visible window (+ overhang) so even an alternating finite/NaN series cannot overflow.
                 val m4Buf = if (decimateMark) IntArray(visibleSpanCount + 4) else null
                 mark.series.forEachIndexed { s, series ->
                     val sValues = markArrays[s]
                     val n = min(sValues.size, positions)
-                    val (start, endExclusive) = culledSeriesWindow(
-                        n, inStart, inEnd, cullStart, cullEnd, sValues, mark.gaps, viewport != null, prep.xAscending,
+                    val slice = culledSeriesSlice(
+                        n, inStart, inEnd, sValues, prevArrays[s], nextArrays[s], mark.gaps, viewport != null, prep.xAscending,
                     )
-                    val winStart = if (viewport != null && prep.xAscending) max(start, inStart) else start
-                    val winEndExclusive = if (viewport != null && prep.xAscending) min(endExclusive, inEnd + 1) else endExclusive
-                    val winCount = max(0, winEndExclusive - winStart)
+                    inspectedSamples += slice.inspectedCount
                     // A missing value keeps its x but has no y, which breaks the line there.
-                    if (decimateMark && winCount > plotCols && m4Buf != null) {
+                    if (decimateMark && slice.winCount > plotCols && m4Buf != null) {
                         val keptCount = decimateM4Indices(
-                            start, endExclusive, winStart, winEndExclusive,
-                            xValues, sx.domainStart, colScale, plotCols, sValues, mark.gaps, m4Buf,
+                            slice, xValues, sx.domainStart, colScale, plotCols, sValues, mark.gaps, m4Buf,
                         )
                         val pts = ArrayList<XY>(keptCount)
                         var lastFocusCol = -1
                         var colFocusCount = 0
-                        var lastDefinedIdx = -1
-                        for (i in winEndExclusive - 1 downTo winStart) {
-                            if (sValues[i].isFinite()) {
-                                lastDefinedIdx = i
-                                break
-                            }
-                        }
+                        val lastDefinedIdx = slice.lastDefinedInWin
                         for (k in 0 until keptCount) {
                             val i = m4Buf[k]
                             val raw = sValues[i]
@@ -1043,7 +1128,7 @@ private fun compileCartesian(
                             Markers.None -> Unit
                             Markers.Last -> {
                                 val lastIdx = prep.lastDefined(markIndex, s)
-                                if (lastIdx in start until endExclusive) {
+                                if (slice.contains(lastIdx)) {
                                     val pt = XY(sx(xValues[lastIdx]), y(sValues[lastIdx]))
                                     marks += DotNode("marker:${series.name}", pt, m.markerRadius, first + s, lastIdx, isMarker = true)
                                 }
@@ -1058,28 +1143,31 @@ private fun compileCartesian(
                             }
                         }
                     } else {
-                        val pts = buildUndecimatedPoints(start, endExclusive, sValues, mark.gaps) { _, v -> y(v) }
+                        val pts = buildUndecimatedPoints(slice, sValues, mark.gaps) { _, v -> y(v) }
                         marks += LineNode("line:${series.name}", pts, first + s, mark.curve, pattern = mark.pattern)
                         when (mark.markers) {
                             Markers.None -> Unit
                             Markers.Last -> {
                                 val lastIdx = prep.lastDefined(markIndex, s)
-                                if (lastIdx in start until endExclusive) {
+                                if (slice.contains(lastIdx)) {
                                     val pt = XY(xAt(lastIdx), y(sValues[lastIdx]))
                                     marks += DotNode("marker:${series.name}", pt, m.markerRadius, first + s, lastIdx, isMarker = true)
                                 }
                             }
                             Markers.All -> {
-                                for (i in start until endExclusive) {
+                                fun emitMarker(i: Int) {
                                     val raw = sValues[i]
                                     if (raw.isFinite()) {
                                         marks += DotNode("marker:${series.name}:$i", XY(xAt(i), y(raw)), m.markerRadius, first + s, i, isMarker = true)
                                     }
                                 }
+                                if (slice.leftIdx >= 0) emitMarker(slice.leftIdx)
+                                for (i in slice.winStart until slice.winEndExclusive) emitMarker(i)
+                                if (slice.rightIdx >= 0) emitMarker(slice.rightIdx)
                             }
                         }
                         val checkX = viewport != null && !prep.xAscending && xValues != null
-                        for (i in winStart until winEndExclusive) {
+                        for (i in slice.winStart until slice.winEndExclusive) {
                             val raw = sValues[i]
                             if (!raw.isFinite()) continue
                             if (checkX && (xValues[i] < viewLo || xValues[i] > viewHi)) continue
@@ -1100,6 +1188,8 @@ private fun compileCartesian(
                 val xDomainSpan = if (sx != null) sx.domainEnd - sx.domainStart else 0.0
                 val colScale = if (xDomainSpan != 0.0) plot.width / xDomainSpan else 0.0
                 val markArrays = prep.seriesArrays[markIndex]!!
+                val prevArrays = prep.prevDefinedArrays[markIndex]!!
+                val nextArrays = prep.nextDefinedArrays[markIndex]!!
                 val markUpperArrays = prep.stackUpperArrays[markIndex]
                 val markLowerArrays = prep.stackLowerArrays[markIndex]
                 // Size for the visible window (+ overhang) so even an alternating finite/NaN series cannot overflow.
@@ -1112,31 +1202,22 @@ private fun compileCartesian(
                 mark.series.forEachIndexed { s, series ->
                     val sValues = markArrays[s]
                     val n = min(sValues.size, positions)
-                    val (start, endExclusive) = culledSeriesWindow(
-                        n, inStart, inEnd, cullStart, cullEnd, sValues, mark.gaps, viewport != null, prep.xAscending,
+                    val slice = culledSeriesSlice(
+                        n, inStart, inEnd, sValues, prevArrays[s], nextArrays[s], mark.gaps, viewport != null, prep.xAscending,
                     )
-                    val winStart = if (viewport != null && prep.xAscending) max(start, inStart) else start
-                    val winEndExclusive = if (viewport != null && prep.xAscending) min(endExclusive, inEnd + 1) else endExclusive
-                    val winCount = max(0, winEndExclusive - winStart)
+                    inspectedSamples += slice.inspectedCount
                     val sStack = stack?.get(s)
-                    if (decimateMark && winCount > plotCols && m4Buf != null) {
+                    if (decimateMark && slice.winCount > plotCols && m4Buf != null) {
                         val upperVals = markUpperArrays?.get(s) ?: sValues
                         val lowerVals = markLowerArrays?.get(s)
                         val keptCount = decimateM4Indices(
-                            start, endExclusive, winStart, winEndExclusive,
-                            xValues, sx.domainStart, colScale, plotCols, upperVals, mark.gaps, m4Buf, lowerVals,
+                            slice, xValues, sx.domainStart, colScale, plotCols, upperVals, mark.gaps, m4Buf, lowerVals,
                         )
                         val top = ArrayList<XY>(keptCount)
                         val bot = ArrayList<XY>(keptCount)
                         var lastFocusCol = -1
                         var colFocusCount = 0
-                        var lastDefinedIdx = -1
-                        for (i in winEndExclusive - 1 downTo winStart) {
-                            if (sValues[i].isFinite()) {
-                                lastDefinedIdx = i
-                                break
-                            }
-                        }
+                        val lastDefinedIdx = slice.lastDefinedInWin
                         for (k in 0 until keptCount) {
                             val i = m4Buf[k]
                             val raw = sValues[i]
@@ -1169,23 +1250,17 @@ private fun compileCartesian(
                         marks += AreaNode("area:${series.name}", top, bot, first + s, mark.curve, signSplit = split, floor = floor)
                         areaEdges += LineNode("area-edge:${series.name}", top, first + s, mark.curve, isAreaEdge = true, signSplit = split, floor = floor)
                     } else {
-                        val top = buildUndecimatedPoints(start, endExclusive, sValues, mark.gaps) { i, v ->
+                        val top = buildUndecimatedPoints(slice, sValues, mark.gaps) { i, v ->
                             sStack?.get(i)?.second?.let(::yStack) ?: y(v)
                         }
                         val bot = if (mark.gaps == Gaps.Break) {
-                            val count = max(0, endExclusive - start)
-                            val bList = ArrayList<XY>(count)
-                            for (i in start until endExclusive) {
-                                val raw = sValues[i]
-                                bList += XY(xAt(i), if (!raw.isFinite()) Float.NaN else sStack?.get(i)?.first?.let(::yStack) ?: closeY)
-                            }
-                            bList
+                            buildUndecimatedAreaBottom(slice, sValues, sStack, closeY)
                         } else {
                             top.map { p -> XY(p.x, if (p.y.isFinite()) closeY else Float.NaN) }
                         }
                         marks += AreaNode("area:${series.name}", top, bot, first + s, mark.curve, signSplit = split, floor = floor)
                         areaEdges += LineNode("area-edge:${series.name}", top, first + s, mark.curve, isAreaEdge = true, signSplit = split, floor = floor)
-                        for (i in winStart until winEndExclusive) {
+                        for (i in slice.winStart until slice.winEndExclusive) {
                             val raw = sValues[i]
                             if (!raw.isFinite() || !inWindow(i)) continue
                             val px = xAt(i)
@@ -1336,6 +1411,7 @@ private fun compileCartesian(
         prep.legend
     }
 
+    prep.lastInspectedSamples = inspectedSamples
     return ChartScene(
         size, plot, zeroY, sceneSeries, guides, marks, labels, points, prep.focusMode, spec.description,
         clipPlot = viewport != null,
