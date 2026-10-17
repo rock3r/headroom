@@ -57,8 +57,15 @@ data class ViewportBounds(
     /** Largest permitted window span, never exceeding [totalSpan]. */
     val effectiveMaxSpan: Double = min(maxSpan, totalSpan).coerceAtLeast(Double.MIN_VALUE)
 
-    /** Smallest permitted window span, positive and never exceeding [effectiveMaxSpan]. */
-    val effectiveMinSpan: Double = max(minSpan, max(totalSpan * 1e-6, Double.MIN_VALUE)).coerceAtMost(effectiveMaxSpan)
+    /**
+     * Smallest permitted window span, positive, representable at the domain's magnitude (at least
+     * two ULPs near [min] and [max] when [totalSpan] allows), and never exceeding [effectiveMaxSpan].
+     */
+    val effectiveMinSpan: Double = maxOf(
+        if (minSpan > 0.0) minSpan else totalSpan * 1e-6,
+        max(Math.ulp(min), Math.ulp(max)) * 2.0,
+        Double.MIN_VALUE,
+    ).coerceAtMost(effectiveMaxSpan)
 
     /**
      * Clamps `[start, end]` into `[min, max]` with its span in `[effectiveMinSpan, effectiveMaxSpan]`.
@@ -71,7 +78,7 @@ data class ViewportBounds(
         val hi = max(start, end)
         val rawSpan = hi - lo
         val targetSpan = rawSpan.coerceIn(effectiveMinSpan, effectiveMaxSpan)
-        val unshiftedStart = if (rawSpan == targetSpan) lo else (lo + hi) * 0.5 - targetSpan * 0.5
+        val unshiftedStart = if (rawSpan == targetSpan) lo else midpoint(lo, hi) - targetSpan * 0.5
         return placeSpan(unshiftedStart, targetSpan)
     }
 
@@ -92,7 +99,11 @@ data class ViewportBounds(
      * of the window before and after the zoom, so the datum under a pinch centroid stays under the
      * fingers.
      */
-    fun zoom(range: ViewportRange, factor: Double, anchor: Double = (range.start + range.end) * 0.5): ViewportRange {
+    fun zoom(
+        range: ViewportRange,
+        factor: Double,
+        anchor: Double = range.start + (range.end - range.start) * 0.5,
+    ): ViewportRange {
         require(factor.isFinite() && factor > 0.0) { "Zoom factor must be finite and positive, was $factor" }
         require(anchor.isFinite()) { "Zoom anchor must be finite, was $anchor" }
         val currentSpan = range.span
@@ -105,8 +116,21 @@ data class ViewportBounds(
     private fun placeSpan(desiredStart: Double, span: Double): ViewportRange {
         val latestStart = (max - span).coerceAtLeast(min)
         val clampedStart = desiredStart.coerceIn(min, latestStart)
-        val clampedEnd = (clampedStart + span).coerceAtMost(max)
-        val finalStart = if (clampedEnd == max) latestStart else clampedStart
+        var clampedEnd = (clampedStart + span).coerceAtMost(max)
+        var finalStart = if (clampedEnd == max) latestStart else clampedStart
+        if (clampedEnd <= finalStart) {
+            if (finalStart < max) {
+                clampedEnd = Math.nextUp(finalStart).coerceAtMost(max)
+            } else {
+                finalStart = Math.nextDown(max).coerceAtLeast(min)
+                clampedEnd = max
+            }
+        }
         return ViewportRange(finalStart, clampedEnd)
     }
+}
+
+private fun midpoint(lo: Double, hi: Double): Double {
+    val span = hi - lo
+    return if (span.isFinite()) lo + span * 0.5 else lo * 0.5 + hi * 0.5
 }

@@ -174,6 +174,27 @@ internal class CartesianPrep(spec: CartesianChart) {
         spec.marks.foldIndexed(0) { i, next, mark -> arr[i] = next; next + seriesCount(mark) }
     }
     val totalSeries: Int = spec.marks.sumOf(::seriesCount)
+    val seriesMarkIndex: IntArray = IntArray(totalSeries)
+    val seriesLocalIndex: IntArray = IntArray(totalSeries)
+    val seriesMarkKind: Array<MarkKind?> = arrayOfNulls(totalSeries)
+
+    init {
+        spec.marks.forEachIndexed { mIdx, mark ->
+            val count = seriesCount(mark)
+            val first = firstSeries[mIdx]
+            val kind = when (mark) {
+                is LineMark -> MarkKind.Line
+                is AreaMark -> MarkKind.Area
+                else -> null
+            }
+            for (s in 0 until count) {
+                seriesMarkIndex[first + s] = mIdx
+                seriesLocalIndex[first + s] = s
+                seriesMarkKind[first + s] = kind
+            }
+        }
+    }
+
     val hasMarkers: Boolean = spec.marks.any { it is LineMark && it.markers != Markers.None }
     val hasDots: Boolean = spec.marks.any { it is DotMark }
     val boxedDomainX: Array<Double?>? = xValues?.let { xs -> Array(xs.size) { xs[it] } }
@@ -476,7 +497,7 @@ private fun decimateM4Indices(
     val maxGap = (gaps as? Gaps.ConnectWithin)?.maxGap ?: Double.NaN
     var k = 0
     var lastDefined = -1
-    var lastWasNaN = false
+    var inGapBreak = false
 
     for (i in start until winStart) {
         val v = sValues[i]
@@ -486,10 +507,10 @@ private fun decimateM4Indices(
             }
             out[k++] = i
             lastDefined = i
-            lastWasNaN = false
-        } else if (gaps == Gaps.Break && !lastWasNaN) {
+            inGapBreak = false
+        } else if (gaps == Gaps.Break && !inGapBreak) {
             out[k++] = i
-            lastWasNaN = true
+            inGapBreak = true
         }
     }
 
@@ -520,14 +541,17 @@ private fun decimateM4Indices(
                     maxVal = Double.NEGATIVE_INFINITY
                     lowMinVal = Double.POSITIVE_INFINITY
                     lowMaxVal = Double.NEGATIVE_INFINITY
+                    inGapBreak = false
                 }
-                if (!lastWasNaN) {
+                if (!inGapBreak) {
                     out[k++] = i
-                    lastWasNaN = true
+                    inGapBreak = true
                 }
             }
             continue
         }
+        // A finite sample ends any active gap break so a subsequent NaN in the same column emits its own break.
+        inGapBreak = false
         if (!maxGap.isNaN() && lastDefined >= 0 && i > lastDefined + 1 && abs(xValues[i] - xValues[lastDefined]) > maxGap) {
             if (firstIdx >= 0) {
                 k = if (lowerValues == null) {
@@ -561,7 +585,6 @@ private fun decimateM4Indices(
             }
             currentCol = col
         }
-        lastWasNaN = false
         if (firstIdx < 0) firstIdx = i
         lastIdx = i
         if (v < minVal) {
@@ -591,7 +614,7 @@ private fun decimateM4Indices(
         } else {
             flushStackedColumn(out, k, firstIdx, minIdx, maxIdx, lowMinIdx, lowMaxIdx, lastIdx)
         }
-        lastWasNaN = false
+        inGapBreak = false
     }
     for (i in winEndExclusive until endExclusive) {
         val v = sValues[i]
@@ -601,10 +624,10 @@ private fun decimateM4Indices(
             }
             out[k++] = i
             lastDefined = i
-            lastWasNaN = false
-        } else if (gaps == Gaps.Break && !lastWasNaN) {
+            inGapBreak = false
+        } else if (gaps == Gaps.Break && !inGapBreak) {
             out[k++] = i
-            lastWasNaN = true
+            inGapBreak = true
         }
     }
     return k
@@ -673,10 +696,10 @@ private fun compileCartesian(
     val catSizes = if (categories != null && xVisible) categories.map { measure.measure(it, TextKind.TickX) } else emptyList()
     val tickHeight = if (xVisible) measure.measure("0", TextKind.TickX).height else 0f
     val usesBands = categories != null && hasSlots
-    var left = if (yVisible) (ySizes.maxOfOrNull { it.width } ?: 0f) + m.labelGap else inset
+    var left = if (yVisible) max((ySizes.maxOfOrNull { it.width } ?: 0f) + m.labelGap, inset) else inset
     var right = when {
         !xVisible -> inset
-        categories == null -> m.markerRadius
+        categories == null -> max(m.markerRadius, inset)
         else -> 0f
     }
     if (categories != null && !usesBands && xVisible) {
@@ -965,8 +988,8 @@ private fun compileCartesian(
                 val xDomainSpan = if (sx != null) sx.domainEnd - sx.domainStart else 0.0
                 val colScale = if (xDomainSpan != 0.0) plot.width / xDomainSpan else 0.0
                 val markArrays = prep.seriesArrays[markIndex]!!
-                val m4Buf = if (decimateMark) IntArray(min(visibleSpanCount, plotCols * 6) + 4) else null
-                val hasConnectedGaps = mark.gaps != Gaps.Break
+                // Size for the visible window (+ overhang) so even an alternating finite/NaN series cannot overflow.
+                val m4Buf = if (decimateMark) IntArray(visibleSpanCount + 4) else null
                 mark.series.forEachIndexed { s, series ->
                     val sValues = markArrays[s]
                     val n = min(sValues.size, positions)
@@ -976,6 +999,7 @@ private fun compileCartesian(
                     val winStart = if (viewport != null && prep.xAscending) max(start, inStart) else start
                     val winEndExclusive = if (viewport != null && prep.xAscending) min(endExclusive, inEnd + 1) else endExclusive
                     val winCount = max(0, winEndExclusive - winStart)
+                    // A missing value keeps its x but has no y, which breaks the line there.
                     if (decimateMark && winCount > plotCols && m4Buf != null) {
                         val keptCount = decimateM4Indices(
                             start, endExclusive, winStart, winEndExclusive,
@@ -983,6 +1007,7 @@ private fun compileCartesian(
                         )
                         val pts = ArrayList<XY>(keptCount)
                         var lastFocusCol = -1
+                        var colFocusCount = 0
                         var lastDefinedIdx = -1
                         for (i in winEndExclusive - 1 downTo winStart) {
                             if (sValues[i].isFinite()) {
@@ -999,8 +1024,12 @@ private fun compileCartesian(
                             pts += pt
                             if (defined && i in inStart..inEnd) {
                                 val col = ((xValues[i] - sx.domainStart) * colScale).toInt().coerceIn(0, plotCols - 1)
-                                if (hasConnectedGaps || col != lastFocusCol || i == lastDefinedIdx) {
+                                if (col != lastFocusCol) {
                                     lastFocusCol = col
+                                    colFocusCount = 0
+                                }
+                                if (colFocusCount < 4 || i == lastDefinedIdx) {
+                                    colFocusCount++
                                     points += FocusPoint(
                                         first + s, i, MarkKind.Line, pt.x, pt.y, pt.x,
                                         prep.xLabel(i), raw, prep.valueText(markIndex, s, i, raw, valueFormat, cacheValueTexts),
@@ -1073,8 +1102,8 @@ private fun compileCartesian(
                 val markArrays = prep.seriesArrays[markIndex]!!
                 val markUpperArrays = prep.stackUpperArrays[markIndex]
                 val markLowerArrays = prep.stackLowerArrays[markIndex]
-                val m4Buf = if (decimateMark) IntArray(min(visibleSpanCount, plotCols * 6) + 4) else null
-                val hasConnectedGaps = mark.gaps != Gaps.Break
+                // Size for the visible window (+ overhang) so even an alternating finite/NaN series cannot overflow.
+                val m4Buf = if (decimateMark) IntArray(visibleSpanCount + 4) else null
                 // Unclamped: with zero cropped out of the domain, every value is on one side of it.
                 val split = if (mark.diverging) SignSplit(y(0.0), negativeBelow = y.domainEnd > y.domainStart) else null
                 // The row the fill closes on: zero (clamped), or the bottom of the price area.
@@ -1100,6 +1129,7 @@ private fun compileCartesian(
                         val top = ArrayList<XY>(keptCount)
                         val bot = ArrayList<XY>(keptCount)
                         var lastFocusCol = -1
+                        var colFocusCount = 0
                         var lastDefinedIdx = -1
                         for (i in winEndExclusive - 1 downTo winStart) {
                             if (sValues[i].isFinite()) {
@@ -1121,8 +1151,12 @@ private fun compileCartesian(
                                 bot += XY(px, bounds?.first?.let(::yStack) ?: closeY)
                                 if (i in inStart..inEnd) {
                                     val col = ((xValues[i] - sx.domainStart) * colScale).toInt().coerceIn(0, plotCols - 1)
-                                    if (hasConnectedGaps || col != lastFocusCol || i == lastDefinedIdx) {
+                                    if (col != lastFocusCol) {
                                         lastFocusCol = col
+                                        colFocusCount = 0
+                                    }
+                                    if (colFocusCount < 6 || i == lastDefinedIdx) {
+                                        colFocusCount++
                                         points += FocusPoint(
                                             first + s, i, MarkKind.Area, px, py, px,
                                             prep.xLabel(i), raw, prep.valueText(markIndex, s, i, raw, valueFormat, cacheValueTexts),
@@ -1270,10 +1304,44 @@ private fun compileCartesian(
         if (markIndex == lastArea) marks += areaEdges
     }
 
+    fun resolveAlignedPoint(globalSeries: Int, d: Int): FocusPoint? {
+        if (globalSeries !in 0 until prep.totalSeries || d !in 0 until positions || !inWindow(d)) return null
+        val kind = prep.seriesMarkKind[globalSeries] ?: return null
+        val markIndex = prep.seriesMarkIndex[globalSeries]
+        val s = prep.seriesLocalIndex[globalSeries]
+        val sValues = prep.seriesArrays[markIndex]?.get(s) ?: return null
+        if (d >= sValues.size) return null
+        val raw = sValues[d]
+        if (!raw.isFinite()) return null
+        val px = xAt(d)
+        val py = if (kind == MarkKind.Area) {
+            stacks[markIndex]?.get(s)?.get(d)?.second?.let(::yStack) ?: y(raw)
+        } else {
+            y(raw)
+        }
+        return FocusPoint(
+            globalSeries, d, kind, px, py, px,
+            xLabel(d), raw, formatVal(markIndex, s, d, raw),
+            domainX = domainX(d),
+        )
+    }
+
+    val sceneSeries = if (positions > 0) {
+        prep.legend.mapIndexed { sIdx, info ->
+            info.copy().also { copied ->
+                copied.alignedPointAt = { d -> resolveAlignedPoint(sIdx, d) }
+            }
+        }
+    } else {
+        prep.legend
+    }
+
     return ChartScene(
-        size, plot, zeroY, prep.legend, guides, marks, labels, points, prep.focusMode, spec.description,
+        size, plot, zeroY, sceneSeries, guides, marks, labels, points, prep.focusMode, spec.description,
         clipPlot = viewport != null,
-    )
+    ).also { scene ->
+        if (positions > 0) scene.alignedPointAt = ::resolveAlignedPoint
+    }
 }
 
 /** Category labels never take more than this fraction of a horizontal bar chart's width. */

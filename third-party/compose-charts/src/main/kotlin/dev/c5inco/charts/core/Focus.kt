@@ -46,20 +46,45 @@ fun ChartScene.focusAt(pointer: XY, maxDistance: Float = Float.POSITIVE_INFINITY
             val nearest = points.minWith(
                 compareBy<FocusPoint> { abs(it.slot - pointer.x) }.thenBy { abs(it.y - pointer.y) },
             )
-            // At most one datum per series: when a dense range packs several x positions within
-            // half a pixel of the needle, pick each series' point nearest the needle's slot.
-            val group = points.filter { abs(it.slot - nearest.slot) < 0.5f }
-                .groupBy { it.series }
-                .values
-                .map { candidates ->
-                    candidates.minWith(
-                        compareBy<FocusPoint> { abs(it.slot - nearest.slot) }
-                            .thenBy { it.datum != nearest.datum }
-                            .thenBy { abs(it.slot - pointer.x) }
-                            .thenBy { abs(it.y - pointer.y) },
-                    )
+            // At most one datum per series: for aligned Cartesian series, resolve every series at
+            // the selected datum index from the raw values (skipping NaNs) so all rows in the
+            // tooltip report the exact same x position even when M4 decimation retained different
+            // extrema across series.
+            val hasAligned = alignedPointAt != null || series.any { it.alignedPointAt != null }
+            val group = if (hasAligned && nearest.kind != MarkKind.Dot && nearest.datum >= 0) {
+                val datum = nearest.datum
+                val byDatum = points.filter { it.datum == datum && it.kind != MarkKind.Dot }.associateBy { it.series }
+                val resolved = ArrayList<FocusPoint>(series.size)
+                for (s in series.indices) {
+                    val pt = byDatum[s] ?: resolveAligned(s, datum)
+                    if (pt != null) resolved += pt
                 }
-                .sortedBy { it.series }
+                points.filter { it.kind == MarkKind.Dot && abs(it.slot - nearest.slot) < 0.5f }
+                    .groupBy { it.series }
+                    .forEach { (s, candidates) ->
+                        if (resolved.none { it.series == s }) {
+                            resolved += candidates.minWith(
+                                compareBy<FocusPoint> { abs(it.slot - nearest.slot) }
+                                    .thenBy { abs(it.slot - pointer.x) }
+                                    .thenBy { abs(it.y - pointer.y) },
+                            )
+                        }
+                    }
+                resolved.sortedBy { it.series }
+            } else {
+                points.filter { abs(it.slot - nearest.slot) < 0.5f }
+                    .groupBy { it.series }
+                    .values
+                    .map { candidates ->
+                        candidates.minWith(
+                            compareBy<FocusPoint> { abs(it.slot - nearest.slot) }
+                                .thenBy { it.datum != nearest.datum }
+                                .thenBy { abs(it.slot - pointer.x) }
+                                .thenBy { abs(it.y - pointer.y) },
+                        )
+                    }
+                    .sortedBy { it.series }
+            }
             // A finger on a painted segment (a stacked bar) beats the nearest value.
             val primary = group.lastOrNull { it.hit?.contains(pointer) == true }
                 ?: group.minBy { abs(it.y - pointer.y) }

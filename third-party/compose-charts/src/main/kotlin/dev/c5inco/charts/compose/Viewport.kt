@@ -7,6 +7,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -67,8 +68,10 @@ class ChartViewport(
     initialEnd: Double = max,
     val minSpan: Double = 0.0,
     val maxSpan: Double = max - min,
-    val actions: ViewportActions = ViewportActions(),
+    actions: ViewportActions = ViewportActions(),
 ) {
+    /** Accessibility action labels exposed in semantics; updatable on locale changes without resetting the window. */
+    var actions: ViewportActions by mutableStateOf(actions)
     constructor(
         min: Instant,
         max: Instant,
@@ -168,7 +171,7 @@ class ChartViewport(
      * [anchor] (in domain units; defaults to the window's centre). While neither data bound is hit,
      * [anchor] stays at the same relative position in the window.
      */
-    fun zoomBy(factor: Double, anchor: Double = (start + end) * 0.5) {
+    fun zoomBy(factor: Double, anchor: Double = start + (end - start) * 0.5) {
         stopAnimation()
         val next = bounds.zoom(ViewportRange(start, end), factor, anchor)
         applyRange(next)
@@ -265,7 +268,7 @@ fun rememberChartViewport(
     maxSpan: Double = max - min,
     actions: ViewportActions = ViewportActions(),
 ): ChartViewport = rememberSaveable(
-    min, max, minSpan, maxSpan, actions,
+    min, max, minSpan, maxSpan,
     saver = ChartViewport.Saver(min, max, minSpan, maxSpan, actions),
 ) {
     ChartViewport(
@@ -277,7 +280,7 @@ fun rememberChartViewport(
         maxSpan = maxSpan,
         actions = actions,
     )
-}
+}.also { it.actions = actions }
 
 /**
  * Remembers and saves a [ChartViewport] over `[min, max]` instants for a [dev.c5inco.charts.core.TimeAxis].

@@ -32,7 +32,7 @@ object SceneMotion {
         guides = scene.guides.map { entering(it, scene) },
         marks = scene.marks.map { entering(it, scene) },
         labels = scene.labels.map { entering(it, scene) },
-    )
+    ).also { it.alignedPointAt = scene.alignedPointAt }
 
     /**
      * Where a chart's first appearance starts: [enter]'s collapsed guides and labels, and no marks,
@@ -40,7 +40,8 @@ object SceneMotion {
      * bottom) like marks arriving in a later update. `lerp(enter(scene), scene, t)` grows every mark
      * together instead.
      */
-    fun reveal(scene: ChartScene): ChartScene = enter(scene).copy(marks = emptyList())
+    fun reveal(scene: ChartScene): ChartScene =
+        enter(scene).copy(marks = emptyList()).also { it.alignedPointAt = scene.alignedPointAt }
 
     /**
      * The scene at [t] (0..1) on the way from [from] to [to]. When either scene is polar, lines and
@@ -55,7 +56,7 @@ object SceneMotion {
             guides = layer(from.guides, to.guides, to, t, polar),
             marks = layer(from.marks, to.marks, to, t, polar),
             labels = layer(from.labels, to.labels, to, t, polar),
-        )
+        ).also { it.alignedPointAt = to.alignedPointAt }
     }
 
     private fun layer(from: List<Node>, to: List<Node>, scene: ChartScene, t: Float, polar: Boolean): List<Node> {

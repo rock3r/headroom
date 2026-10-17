@@ -56,14 +56,31 @@ data class ChartScene(
      * visible bars, candles or dots stop cleanly at the plot border.
      */
     val clipPlot: Boolean = false,
-)
+) {
+    /**
+     * Resolves the [FocusPoint] of aligned [series] at [datum] on a [CartesianChart] from the raw
+     * series values when M4 decimation omitted that datum from [points] for that series. Null when
+     * the series has no finite value at [datum] or is not an aligned line/area series.
+     */
+    internal var alignedPointAt: ((series: Int, datum: Int) -> FocusPoint?)? = null
+
+    internal fun resolveAligned(seriesIndex: Int, datum: Int): FocusPoint? =
+        alignedPointAt?.invoke(seriesIndex, datum) ?: series.getOrNull(seriesIndex)?.alignedPointAt?.invoke(datum)
+}
 
 /**
  * A legend entry. [color] is a palette slot; [colorBelow] is the slot below zero of a
  * [AreaMark.diverging] area series, and null for every other series. [candle] marks a
  * [CandleMark] series, which is painted by direction (up and down) rather than by its slot.
  */
-data class SeriesInfo(val name: String, val color: Int, val colorBelow: Int? = null, val candle: Boolean = false)
+data class SeriesInfo(val name: String, val color: Int, val colorBelow: Int? = null, val candle: Boolean = false) {
+    /**
+     * Resolves this series' [FocusPoint] at [datum] on a [CartesianChart]. Carried on [SeriesInfo]
+     * (which is part of [ChartScene]'s primary constructor) so `scene.copy(...)` preserves it
+     * automatically across [SceneMotion.enter], [SceneMotion.reveal] and [SceneMotion.lerp].
+     */
+    internal var alignedPointAt: ((datum: Int) -> FocusPoint?)? = null
+}
 
 /** [XRule] is a vertical reference line on a continuous x axis; [Wick] is a candle's line from its low to its high. */
 enum class RuleKind { GridX, GridY, AxisX, AxisY, Baseline, Reference, XRule, Wick }
@@ -333,6 +350,7 @@ data class CandleDetail(
  */
 fun ChartScene.pointAt(series: Int, datum: Int): XY? =
     points.firstOrNull { it.series == series && it.datum == datum }?.let { XY(it.x, it.y) }
+        ?: resolveAligned(series, datum)?.let { XY(it.x, it.y) }
 
 /**
  * The last defined datum of [series], by datum index: the live end of a line. Trailing missing
