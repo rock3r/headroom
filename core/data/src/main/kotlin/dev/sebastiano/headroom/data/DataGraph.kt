@@ -137,7 +137,8 @@ public class DataGraph(
     public val alertPreferences: AlertPreferences = storage.alertPreferences
 
     /** Turns finished sign-ins into accounts, and signs accounts out. */
-    public val signInManager: SignInManager = SignInManager(tokenStore, repository)
+    public val signInManager: SignInManager =
+        SignInManager(tokenStore, repository, fetchers = quotaFetchers)
 
     private val scheduler =
         AlarmResetScheduler(appContext) { overdue ->

@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.data.account
 
+import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.TokenSet
@@ -7,12 +8,20 @@ import dev.sebastiano.headroom.auth.ZCodeCredential
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.UsagePoint
+import dev.sebastiano.headroom.quota.ProviderCredentials
+import dev.sebastiano.headroom.quota.QuotaFetcher
+import dev.sebastiano.headroom.quota.QuotaFetchers
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -279,5 +288,102 @@ class SignInManagerTest {
 
         assertNull(store.load(ZCodeCredential.idFor("z1")))
         assertEquals(emptyList(), accounts.state.value)
+    }
+
+    private val openCodeKey =
+        TokenSet(Provider.OpenCodeGo, CredentialKind.ApiKey, "old-key", null, null)
+
+    private fun openCodeFetchers(onFetch: (ProviderCredentials) -> QuotaResult): QuotaFetchers =
+        QuotaFetchers(
+            listOf(
+                object : QuotaFetcher {
+                    override val provider: Provider = Provider.OpenCodeGo
+
+                    override suspend fun fetch(credentials: ProviderCredentials): QuotaResult =
+                        onFetch(credentials)
+                }
+            )
+        )
+
+    private val openCodeSnapshot =
+        QuotaSnapshot(
+            provider = Provider.OpenCodeGo,
+            accountId = "oc",
+            planLabel = "OpenCode Go",
+            windows = emptyList(),
+            fetchedAt = Instant.fromEpochSeconds(0),
+        )
+
+    @Test
+    fun `an expired API key is rejected and leaves the stored credential untouched`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        SignInManager(store, accounts) { "oc" }.complete(openCodeKey)
+        accounts.refreshed.clear()
+        val fetchers = openCodeFetchers {
+            QuotaResult.Failure(
+                QuotaErrorKind.Auth,
+                "expired",
+                authReason = AuthFailureReason.KeyExpired,
+            )
+        }
+        val manager = SignInManager(store, accounts, fetchers) { "oc-2" }
+
+        val rejected =
+            assertFailsWith<InvalidApiKeyException> {
+                manager.reauthenticate("oc", openCodeKey.copy(accessToken = "expired-key"))
+            }
+        assertEquals(Provider.OpenCodeGo, rejected.provider)
+        assertEquals(AuthFailureReason.KeyExpired, rejected.reason)
+        assertEquals("old-key", store.load("oc")?.accessToken)
+        assertEquals(emptyList<String?>(), accounts.refreshed)
+
+        val rejectedNew =
+            assertFailsWith<InvalidApiKeyException> {
+                manager.complete(openCodeKey.copy(accessToken = "expired-key"))
+            }
+        assertEquals(AuthFailureReason.KeyExpired, rejectedNew.reason)
+        assertNull(store.load("oc-2"))
+    }
+
+    @Test
+    fun `a valid API key passes validation replaces the credential and refreshes`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        SignInManager(store, accounts) { "oc" }.complete(openCodeKey)
+        accounts.refreshed.clear()
+        val seenKeys = mutableListOf<String>()
+        val fetchers = openCodeFetchers { credentials ->
+            seenKeys += credentials.accessToken
+            QuotaResult.Success(openCodeSnapshot)
+        }
+        val manager = SignInManager(store, accounts, fetchers) { "oc-2" }
+
+        manager.reauthenticate("oc", openCodeKey.copy(accessToken = "fresh-key"))
+
+        assertEquals(listOf("fresh-key"), seenKeys)
+        assertEquals("fresh-key", store.load("oc")?.accessToken)
+        assertEquals(listOf<String?>("oc"), accounts.refreshed)
+    }
+
+    @Test
+    fun `a network error while validating an API key does not save it`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        SignInManager(store, accounts) { "oc" }.complete(openCodeKey)
+        accounts.refreshed.clear()
+        val fetchers = openCodeFetchers { QuotaResult.Failure(QuotaErrorKind.Network, "offline") }
+        val manager = SignInManager(store, accounts, fetchers) { "oc-2" }
+
+        assertFailsWith<AuthException.Network> {
+            manager.reauthenticate("oc", openCodeKey.copy(accessToken = "new-key"))
+        }
+        assertEquals("old-key", store.load("oc")?.accessToken)
+        assertEquals(emptyList<String?>(), accounts.refreshed)
+
+        assertFailsWith<AuthException.Network> {
+            manager.complete(openCodeKey.copy(accessToken = "new-key"))
+        }
+        assertNull(store.load("oc-2"))
     }
 }

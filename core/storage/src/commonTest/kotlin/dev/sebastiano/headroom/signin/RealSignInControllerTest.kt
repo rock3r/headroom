@@ -4,7 +4,9 @@ import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.data.account.DifferentAccountException
+import dev.sebastiano.headroom.data.account.InvalidApiKeyException
 import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.Provider
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -381,5 +383,70 @@ class RealSignInControllerTest {
                 SignInState.Browser(Provider.Claude, "https://example.com/authorize"),
                 controller.state.value,
             )
+        }
+
+    @Test
+    fun `an expired or unauthorized API key stays on the key step with the rejection reason`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var reason: AuthFailureReason? = AuthFailureReason.KeyExpired
+            var fail = true
+            val controller =
+                RealSignInController(
+                    FakeSteps(),
+                    backgroundScope,
+                    completeAgain = { accountId, tokens ->
+                        if (fail) throw InvalidApiKeyException(tokens.provider, reason)
+                        Account(accountId, tokens.provider, tokens.provider.displayName)
+                    },
+                    complete = { error("a new account must not be added") },
+                )
+            controller.start(Provider.OpenCodeGo, accountId = "oc-1")
+
+            controller.submitApiKey("expired-key")
+            assertEquals(
+                SignInState.ApiKey(
+                    Provider.OpenCodeGo,
+                    keyRejected = true,
+                    rejection = ApiKeyRejection.Expired,
+                ),
+                controller.state.value,
+            )
+
+            reason = null
+            controller.submitApiKey("wrong-key")
+            assertEquals(
+                SignInState.ApiKey(
+                    Provider.OpenCodeGo,
+                    keyRejected = true,
+                    rejection = ApiKeyRejection.Unauthorized,
+                ),
+                controller.state.value,
+            )
+
+            fail = false
+            controller.submitApiKey("good-key")
+            assertEquals(
+                SignInState.Success(Provider.OpenCodeGo, "OpenCode Go"),
+                controller.state.value,
+            )
+        }
+
+    @Test
+    fun `a network failure while validating an API key reports a network error and can retry`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val controller =
+                RealSignInController(FakeSteps(), backgroundScope) {
+                    throw AuthException.Network("offline")
+                }
+            controller.start(Provider.OpenCodeGo)
+
+            controller.submitApiKey("some-key")
+            assertEquals(
+                SignInState.Failed(Provider.OpenCodeGo, SignInError.Network),
+                controller.state.value,
+            )
+
+            controller.retry()
+            assertEquals(SignInState.ApiKey(Provider.OpenCodeGo), controller.state.value)
         }
 }
