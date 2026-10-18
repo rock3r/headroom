@@ -51,8 +51,8 @@ The account offers a sign-in button. Headroom posts one warning notification and
 
 ### Widgets
 
-The launcher draws each widget from a Remote Compose document.
-These images come from the Android 16 widget player.
+Every widget is a Remote Compose document drawn by the launcher, so the widgets need Android 16 or
+later, the first version with a widget player. The pictures below come from that player.
 
 | Rings, one account | Rings, several accounts | Shape |
 |---|---|---|
@@ -112,9 +112,10 @@ It encrypts tokens with an Android Keystore key and excludes them from backups.
 
 ## Installing
 
-Download the APK from the [latest release](https://github.com/rock3r/headroom/releases/latest) and open it on your phone.
-Headroom requires Android 16 or later. Every release uses the same signing key, so updates install over earlier releases.
-[docs/RELEASING.md](docs/RELEASING.md) describes the release process.
+Download the APK from the [latest release](https://github.com/rock3r/headroom/releases/latest) and
+open it on your phone. Headroom needs Android 14 or later, and its widgets Android 16 or later.
+Releases are signed with the same key every time, so later releases install over earlier ones. [docs/RELEASING.md](docs/RELEASING.md)
+explains how a release is made.
 
 ### With Obtainium
 
@@ -143,7 +144,7 @@ Install JDK 21 and Android SDK platform 37 before building.
 ./gradlew :app:installDebug
 ```
 
-The app runs on Android 16 (API 36) or later.
+The app needs Android 14 (API 34) or later. The widgets need Android 16 (API 36) or later.
 
 ## Project layout
 

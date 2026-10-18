@@ -125,9 +125,17 @@ dependencies {
     implementation(libs.xr.projected)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
+    // Spatial panels and orbiters in Full Space on XR devices; a no-op everywhere else.
+    implementation(libs.xr.compose)
+    // The headset provides the XR extensions at runtime. R8 needs their classes to minify.
+    compileOnly(libs.xr.extensions)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
+    // Fake XR runtime and SceneCore, so Robolectric tests can run the app in Full Space.
+    testImplementation(libs.xr.compose.testing)
+    testImplementation(libs.xr.runtime.testing)
+    testImplementation(libs.xr.scenecore.testing)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }

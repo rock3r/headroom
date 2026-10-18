@@ -24,7 +24,7 @@ import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.data.reset.AndroidResetLog
 import dev.sebastiano.headroom.glasses.GlassesLauncher
-import dev.sebastiano.headroom.glasses.ProjectedGlassesLauncher
+import dev.sebastiano.headroom.glasses.glassesLauncher
 import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
@@ -314,7 +314,7 @@ class AppGraph(
                 resetAttempts = data?.resetAttempts ?: ResetAttemptStore.None,
                 resetScope = scope,
                 tileAdder = StatusBarTileAdder(context.applicationContext),
-                glassesLauncher = ProjectedGlassesLauncher(context.applicationContext),
+                glassesLauncher = glassesLauncher(context.applicationContext),
                 tileSettings = tileSettings,
                 prototypes = prototypeTools,
                 demoAccounts = demoAccounts,

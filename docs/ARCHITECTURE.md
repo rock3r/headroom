@@ -12,7 +12,7 @@
 | `:shared` | Kotlin Multiplatform (JVM, iOS) | The `HeadroomKit` framework for the iOS app: wiring, Keychain-backed token store, Swift-friendly view models |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
 | `:third-party:compose-charts` | Android library, Compose (vendored) | Declarative Compose charts (`charts-core` and `charts-compose` from `c5inco/compose-charts`) for the account detail usage history chart |
-| `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
+| `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen, from Android 16 |
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
 
 `:app` depends on `:widget`, `:core:designsystem`, `:third-party:compose-charts` and `:core:data`.
@@ -203,7 +203,8 @@ While display glasses are connected, the overview shows a glasses button next to
 `GlassesLauncher` watches the connection (`ProjectedContext.isProjectedDeviceConnected`) and starts
 `GlassesActivity` on the glasses' display (`ProjectedContext.createProjectedActivityOptions`). The
 manifest gives the activity `requiredDisplayCategory="xr_projected"`, so it never opens on the
-phone's screen.
+phone's screen. The projected library needs Android 16, so on older versions `glassesLauncher()`
+returns `GlassesLauncher.Unavailable` and the button never shows.
 
 The activity reads the same `HomeViewModel` as the overview, so the glasses show the same accounts
 in the same order, with the same used or left setting. `glassesPages` turns the state into pages:
@@ -223,3 +224,31 @@ the same size.
 
 Glimmer and the projected library are alpha releases, and the projected launch and connection
 calls are marked experimental.
+
+## XR headsets (Full Space)
+
+On an Android XR headset the app opens in Full Space
+(`android.window.PROPERTY_XR_ACTIVITY_START_MODE` in the manifest). It uses Jetpack Compose for XR
+from the `ui.spatial` package. Everywhere else, including a headset's Home Space,
+`isSpatialUiEnabled()` is false and the app is the same adaptive app as on any device.
+
+- `SpatialPanels` in `HeadroomApp` puts the window in a `SpatialMainPanel` and, beside it, a
+  `SpatialPanel` for the account detail. The user can move and resize both. It lives above the
+  pages, so the main panel stays still while Settings, Accounts and Licences replace the home.
+- The main panel takes the window's size, so `layoutWidth()` keeps picking the layout. The
+  activity handles its own size changes (`configChanges`), as `SpatialMainPanel` needs.
+- The Overview tab hands its detail to a `DetailPanelSlot` (`DetailPanelContent`) while it is
+  composed. The list fills the main panel, and opening an account only selects it. The Resets tab
+  opens accounts in the Overview, as it does in an expanded window. Resets, Stats and the other
+  pages have no detail panel.
+- `HomeNavigationOrbiter` replaces the floating toolbar or the navigation rail with an `Orbiter`
+  on the same edge of the main panel: the bottom when compact, the start otherwise
+  (`navigationEdge()`).
+
+The tests use Robolectric and the fake XR runtime (`FullSpaceTest`). Two quirks of that setup:
+
+- An orbiter or a panel that leaves the composition keeps its semantics under Robolectric, so
+  tests check what is inside or outside the window (`APP_TAG`), or the subspace nodes, rather than
+  the absence of a node.
+- `Espresso.pressBack()` reaches another window. Tests call the activity's
+  `onBackPressedDispatcher` instead.

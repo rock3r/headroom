@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+        The widget providers are on only where the widget player is, from Android 16: see
+        res/values/bools.xml.
+    -->
     <application>
         <receiver
             android:name=".RingsWidgetProvider"
+            android:enabled="@bool/widgets_available"
             android:exported="false"
             android:label="@string/widget_rings_label">
             <intent-filter>
@@ -16,6 +21,7 @@
 
         <receiver
             android:name=".BarsWidgetProvider"
+            android:enabled="@bool/widgets_available"
             android:exported="false"
             android:label="@string/widget_bars_label">
             <intent-filter>
@@ -28,6 +34,7 @@
 
         <receiver
             android:name=".ShapeWidgetProvider"
+            android:enabled="@bool/widgets_available"
             android:exported="false"
             android:label="@string/widget_shape_label">
             <intent-filter>
@@ -40,6 +47,7 @@
 
         <receiver
             android:name=".CountdownWidgetProvider"
+            android:enabled="@bool/widgets_available"
             android:exported="false"
             android:label="@string/widget_countdown_label">
             <intent-filter>

@@ -5,9 +5,11 @@ import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
+import android.os.Build
 import android.view.View
 import android.widget.FrameLayout
 import androidx.core.graphics.createBitmap
+import androidx.test.filters.SdkSuppress
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.widget.WidgetConfig
@@ -37,6 +39,8 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = RecordingHostApplication::class, qualifiers = "xxhdpi")
+// The widget player these tests play the widgets in is Android 16 and later only.
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WidgetGalleryRecorder {
     private val context = RuntimeEnvironment.getApplication()

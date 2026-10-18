@@ -27,6 +27,7 @@ import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
+import dev.sebastiano.headroom.ui.settings.ADD_TILE_TAG
 import dev.sebastiano.headroom.ui.settings.KEEP_LONG_HISTORY_TAG
 import dev.sebastiano.headroom.ui.settings.LICENCES_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.LICENCES_TAG
@@ -38,6 +39,7 @@ import dev.sebastiano.headroom.ui.settings.syncFrequencyTag
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.Rule
@@ -269,6 +271,22 @@ class SettingsTest {
         rule
             .onNodeWithText("Your launcher cannot add widgets from apps", substring = true)
             .assertIsDisplayed()
+    }
+
+    @Test
+    @Config(sdk = [34])
+    fun `before Android 16, which has no widget player, settings offers no widgets`() {
+        openSettings()
+        val list = rule.onNodeWithTag(SETTINGS_LIST_TAG)
+        // The rows on either side of the widgets are still there.
+        list.performScrollToNode(hasTestTag(syncFrequencyTag(SyncFrequency.Hours3)))
+        list.performScrollToNode(hasTestTag(ADD_TILE_TAG))
+        WidgetStyle.entries.forEach { style ->
+            assertFailsWith<AssertionError> {
+                list.performScrollToNode(hasTestTag(addWidgetTag(style)))
+            }
+        }
+        assertFailsWith<AssertionError> { list.performScrollToNode(hasText("Home screen widgets")) }
     }
 
     private fun gesture(progress: Float) =

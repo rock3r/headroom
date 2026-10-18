@@ -38,6 +38,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.booleanResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -70,6 +71,7 @@ import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
 import dev.sebastiano.headroom.ui.components.scrollToKey
 import dev.sebastiano.headroom.ui.revealContentEntrance
+import dev.sebastiano.headroom.widget.R as WidgetR
 import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlinx.coroutines.flow.first
 
@@ -145,10 +147,10 @@ data class ResetIslandUi(
 
 /**
  * The app settings: the accounts, used or left, the appearance (light or dark, the colours and
- * reduced motion), the delights, the reset reminders, how often to sync in the background, the home
- * screen widgets, the open-source licences and the app version. It closes with the close button in
- * its header, which the overview's settings button turns into. The caller handles back, with the
- * predictive back gesture.
+ * reduced motion), the delights, the reset reminders and the experimental use of Claude's resets,
+ * how often to sync in the background, the home screen widgets (from Android 16), the open-source
+ * licences and the app version. It closes with the close button in its header, which the overview's
+ * settings button turns into. The caller handles back, with the predictive back gesture.
  */
 @Composable
 fun SettingsScreen(
@@ -181,6 +183,8 @@ fun SettingsScreen(
     // The delights do not play with reduced motion: the in-app switch, or animations off on the
     // device. The section says so.
     val animate = animationsEnabled()
+    // Widgets need the widget player that Android 16 ships; before it, there is nothing to add.
+    val showWidgets = booleanResource(WidgetR.bool.widgets_available)
     Surface(modifier = modifier.fillMaxSize().testTag(SETTINGS_TAG)) {
         PageScaffold(
             onClose = actions.onClose,
@@ -196,6 +200,7 @@ fun SettingsScreen(
                 actions = actions,
                 resetIsland = resetIsland,
                 animate = animate,
+                showWidgets = showWidgets,
                 width = width,
                 onShowIslandSetup = { showIslandSetup = true },
                 tileStatus = tileStatus,
@@ -229,6 +234,7 @@ private fun LazyListScope.settingsRows(
     actions: SettingsActions,
     resetIsland: ResetIslandUi,
     animate: Boolean,
+    showWidgets: Boolean,
     width: Modifier,
     onShowIslandSetup: () -> Unit,
     tileStatus: TileAddResult?,
@@ -340,28 +346,30 @@ private fun LazyListScope.settingsRows(
             modifier = block.testTag(KEEP_LONG_HISTORY_TAG),
         )
     }
-    tracedItem("Settings: SectionLabel widgets") {
-        SectionLabel(stringResource(R.string.settings_widgets), block)
-    }
-    val styles = WidgetStyle.entries
-    styles.forEachIndexed { index, style ->
-        tracedItem("Settings: WidgetRow", key = "widget-${style.name}") {
-            WidgetRow(
-                style = style,
-                onAdd = { actions.onAddWidget(style) },
-                index = index,
-                count = styles.size,
-                modifier = if (index == 0) block else width,
+    if (showWidgets) {
+        tracedItem("Settings: SectionLabel widgets") {
+            SectionLabel(stringResource(R.string.settings_widgets), block)
+        }
+        val styles = WidgetStyle.entries
+        styles.forEachIndexed { index, style ->
+            tracedItem("Settings: WidgetRow", key = "widget-${style.name}") {
+                WidgetRow(
+                    style = style,
+                    onAdd = { actions.onAddWidget(style) },
+                    index = index,
+                    count = styles.size,
+                    modifier = if (index == 0) block else width,
+                )
+            }
+        }
+        tracedItem("Settings: widgets note") {
+            Text(
+                text = stringResource(R.string.settings_widgets_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = block.padding(horizontal = 6.dp),
             )
         }
-    }
-    tracedItem("Settings: widgets note") {
-        Text(
-            text = stringResource(R.string.settings_widgets_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = block.padding(horizontal = 6.dp),
-        )
     }
     tracedItem("Settings: SectionLabel quick settings", key = TILE_SECTION_KEY) {
         SectionLabel(stringResource(R.string.settings_quick_settings), block)

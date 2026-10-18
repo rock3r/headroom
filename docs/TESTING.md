@@ -65,6 +65,17 @@ Native graphics stores pixels outside the Java heap, so the garbage collector do
 
 ### Widgets
 
-Widget tests play every captured document in Robolectric's Android 16 widget player.
-They fail if the player draws only the card background.
-The player supports document level 6 only. Widget capture therefore uses level 6.
+Widget tests play every captured document in Robolectric's copy of the Android 16 widget player
+and fail when only the card background is drawn. That player supports document level 6 only, so
+the widgets are captured at that level.
+
+### Older Android versions
+
+The app runs on Android 14 and later. Robolectric runs tests on the target SDK unless a test says
+otherwise, so behaviour that differs on older versions gets its own test with
+`@Config(sdk = [34])`: for example, no widgets before Android 16.
+
+Keep tests that draw AGSL shaders (the delights, the liquid ripple, the Haze blur) on the default
+SDK. Robolectric's native graphics for SDK 34 has an older shader compiler, which rejects shaders
+that Android 14 compiles, such as `layout(color)` uniforms and a `const` loop bound. An Android 14
+emulator compiles every shader in the app.

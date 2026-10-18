@@ -60,7 +60,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 const val STATS_TAG: String = "stats"
 
-/** The Stats tab. Collected only while the tab shows: no stats work off screen. */
+/**
+ * The Stats tab of the home. It collects [state] only while the tab shows, so no stats work runs
+ * off screen.
+ */
 @Composable
 internal fun StatsTab(
     state: StateFlow<StatsUiState>,

@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -66,12 +67,17 @@ import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
 import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
+import dev.sebastiano.headroom.ui.spatial.SpatialPanels
+import dev.sebastiano.headroom.ui.spatial.rememberDetailPanelSlot
 import dev.sebastiano.headroom.ui.stats.StatsTab
 import dev.sebastiano.headroom.ui.stats.StatsViewModel
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
+
+/** The app's window content. In Full Space, orbiters and other panels draw outside it. */
+const val APP_TAG: String = "headroom-app"
 
 /**
  * The whole app: the home scaffold (overview, resets, stats, and the account detail), and the
@@ -136,8 +142,10 @@ fun HeadroomApp(
                 page = if (accountsFromSettings) Page.Settings else Page.Home
             }
             .withDeviceActions()
+    // In Full Space, the overview hands its account detail to a panel beside the main one.
+    val detailPanel = rememberDetailPanelSlot()
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().testTag(APP_TAG)) {
         val back = shown.backFrom(accountsFromSettings, accounts.step)
         val pageTransition = rememberPageTransition(shown, back) { page = it }
         Pages(
@@ -175,6 +183,7 @@ fun HeadroomApp(
                         onEntranceStart = { entrancePlayed = true },
                         onSignInAgain = signInAgain,
                         onOpenOnGlasses = openOnGlasses,
+                        detailPanel = detailPanel,
                         openAccountRequest = openNow,
                         onConsumeOpenAccount = {
                             page = Page.Home
@@ -188,6 +197,7 @@ fun HeadroomApp(
         }
         AppSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
+    SpatialPanels(detailPanel)
     HomeDelights(home = home, onBurstFinish = homeViewModel::onResetBurstShown)
     ResetSheetHost(sheet, graph, live, resets, formatter) {
         accountsFromSettings = false

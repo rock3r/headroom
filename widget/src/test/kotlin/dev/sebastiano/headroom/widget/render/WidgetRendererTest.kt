@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.graphics.Canvas
+import android.os.Build
 import android.os.Looper
 import android.os.Parcel
 import android.os.SystemClock
@@ -12,6 +13,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.RemoteViews
 import androidx.core.graphics.createBitmap
+import androidx.test.filters.SdkSuppress
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
@@ -59,6 +61,8 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], application = RecordingHostApplication::class)
+// The widget player these tests play the widgets in is Android 16 and later only.
+@SdkSuppress(minSdkVersion = Build.VERSION_CODES.BAKLAVA)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WidgetRendererTest {
     private val context = RuntimeEnvironment.getApplication()

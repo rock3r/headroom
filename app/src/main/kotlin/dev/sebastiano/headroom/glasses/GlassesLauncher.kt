@@ -2,6 +2,8 @@ package dev.sebastiano.headroom.glasses
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,10 +41,19 @@ fun GlassesLauncher.openWhileConnected(): (() -> Unit)? {
 }
 
 /**
+ * The launcher for this device. The projected library needs Android 16, so before it there are no
+ * glasses.
+ */
+fun glassesLauncher(context: Context): GlassesLauncher =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) ProjectedGlassesLauncher(context)
+    else GlassesLauncher.Unavailable
+
+/**
  * Finds the glasses and their display through [ProjectedContext]. Its connection and launch calls
  * are still experimental in the projected library.
  */
 @OptIn(ExperimentalProjectedApi::class)
+@RequiresApi(Build.VERSION_CODES.BAKLAVA)
 class ProjectedGlassesLauncher(
     private val context: Context,
     /** Where the connection is observed. */
