@@ -1,5 +1,7 @@
 package dev.sebastiano.headroom.quota
 
+import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
@@ -8,6 +10,7 @@ import dev.sebastiano.headroom.model.WindowKind
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -324,6 +327,33 @@ class GrokQuotaFetcherTest {
         assertEquals(listOf("weekly"), snapshot.windows.map { it.id })
         assertEquals(false, snapshot.cursorReadFailed)
         assertEquals(false, snapshot.cursorLinked)
+    }
+
+    @Test
+    fun `the Cursor windows never take the account's headline from its own window`() = runTest {
+        respond(
+            weekly = jsonResponse(fixture("grok/billing_unified.json")),
+            monthly = jsonResponse(fixture("grok/billing_monthly.json")),
+            cursorPeriod = jsonResponse(fixture("cursor/current_period_usage.json")),
+            cursorSand = jsonResponse(fixture("cursor/sand_usage_status.json")),
+        )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(
+                    fetcher.fetch(credentials(CursorSignIn.Ready("cursor-token")))
+                )
+                .snapshot
+
+        // The account is on the monthly fallback and Grok Bot is weekly: without the distinction
+        // the card, the pace and the sorting would all follow Cursor's pool instead of the
+        // subscription the account is actually on.
+        val account = Account("a1", Provider.Grok, "sam")
+        assertEquals("monthly", AccountState(account, snapshot).primaryWindow?.id)
+        assertEquals(
+            listOf("monthly", "cursor-models", "cursor-other-models", "grok-bot"),
+            snapshot.windows.map { it.id },
+        )
+        assertTrue(snapshot.windows.drop(1).all { it.isSecondary })
     }
 
     @Test

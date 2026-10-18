@@ -4,6 +4,7 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
@@ -52,6 +53,8 @@ class CursorQuotaReaderTest {
             listOf("cursor-models", "cursor-other-models", "grok-bot"),
             windows.map { it.id },
         )
+        // They belong to the Cursor account, not to the account they are shown beside.
+        assertTrue(windows.all { it.isSecondary })
         val models = windows[0]
         assertEquals("Cursor Models", models.label)
         assertEquals("Cursor", models.group)

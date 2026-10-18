@@ -39,6 +39,14 @@ public data class QuotaWindow(
      * windows set it; other providers leave it null. It is not a token and must not be logged.
      */
     val binding: String? = null,
+    /**
+     * True for a window a second sign-in added to the account, such as the pools a Grok account's
+     * Cursor sign-in reports. It is shown, alerted on and followed like any other window, but it
+     * never becomes the account's [dev.sebastiano.headroom.model.AccountState.primaryWindow]: the
+     * headline, the pace and the sorting describe the account's own limit, which signing in to
+     * something else must not change.
+     */
+    val isSecondary: Boolean = false,
 ) {
     val remainingPercent: Double
         get() = (MAX_PERCENT - usedPercent).coerceIn(0.0, MAX_PERCENT)

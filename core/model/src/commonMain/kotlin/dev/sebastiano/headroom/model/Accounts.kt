@@ -35,9 +35,12 @@ public data class AccountState(
         get() {
             val windows =
                 snapshot?.windows.orEmpty().filterNot { it.isUnlimited || it.isInformational }
-            return windows.firstOrNull { it.kind == WindowKind.Weekly }
-                ?: windows.firstOrNull { it.kind == WindowKind.Monthly }
-                ?: windows.maxByOrNull { it.length?.inWholeMilliseconds ?: 0L }
+            // A window a second sign-in added never leads: the account's own limit does, even when
+            // the added one is weekly and the account's is monthly.
+            val own = windows.filterNot { it.isSecondary }.ifEmpty { windows }
+            return own.firstOrNull { it.kind == WindowKind.Weekly }
+                ?: own.firstOrNull { it.kind == WindowKind.Monthly }
+                ?: own.maxByOrNull { it.length?.inWholeMilliseconds ?: 0L }
         }
 
     /**

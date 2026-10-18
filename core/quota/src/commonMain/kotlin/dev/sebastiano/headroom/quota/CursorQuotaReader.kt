@@ -53,7 +53,9 @@ public class CursorQuotaReader(private val httpClient: QuotaHttpClient) {
             parseOrNull { parseModelWindows(periodBody) }
                 ?: return CursorRead.Failed(QuotaErrorKind.Parse)
         val bot = readBotWindow(base, headers)
-        return CursorRead.Known(models + listOfNotNull(bot))
+        // They belong to the Cursor account the second sign-in connected, not to the account whose
+        // numbers they sit beside, so they never lead it.
+        return CursorRead.Known((models + listOfNotNull(bot)).map { it.copy(isSecondary = true) })
     }
 
     private suspend fun post(url: String, headers: Map<String, String>): HttpOutcome =
