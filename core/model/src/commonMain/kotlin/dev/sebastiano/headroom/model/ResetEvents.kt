@@ -53,10 +53,17 @@ public interface ResetEventLog {
     public fun events(since: Instant): Flow<List<ResetEvent>>
 
     /**
-     * Records that the redeem [attemptKey] of [poolId] worked. A second call with the same key
-     * records nothing, so a retry that the provider answers "already used" counts once.
+     * Records that the redeem [attemptKey] of [poolId] worked. [attemptedAt] is when the attempt
+     * was first sent, so a retry confirmed after the reset expired still matches that reset. A
+     * second call with the same key records nothing, so a retry that the provider answers "already
+     * used" counts once.
      */
-    public suspend fun redeemed(account: Account, poolId: String, attemptKey: ResetAttemptKey)
+    public suspend fun redeemed(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+        attemptedAt: Instant? = null,
+    )
 
     public companion object {
         /** Keeps nothing. */
@@ -68,6 +75,7 @@ public interface ResetEventLog {
                     account: Account,
                     poolId: String,
                     attemptKey: ResetAttemptKey,
+                    attemptedAt: Instant?,
                 ) = Unit
             }
     }

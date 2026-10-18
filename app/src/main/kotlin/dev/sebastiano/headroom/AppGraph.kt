@@ -138,6 +138,7 @@ class AppGraph(
             accounts = quotaRepository.accounts,
             scope = resetScope,
             refreshUsage = { accountId -> quotaRepository.refresh(accountId) },
+            clock = clock,
             recordRedeem = resetEvents::redeemed,
         )
 

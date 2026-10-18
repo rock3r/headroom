@@ -22,6 +22,8 @@ import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.RedeemOutcome
 import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetAvailability
+import dev.sebastiano.headroom.model.ResetEvent
+import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetProvider
@@ -66,6 +68,7 @@ class HeadroomTest {
     private val repository = MemoryAccountsRepository()
     private val settings = InMemorySettingsRepository()
     private val alerts = MemoryAlertPreferences()
+    private val resetEvents = RecordingResetEvents()
     private val resetProvider = CountingResetProvider()
     private val headroom =
         Headroom(
@@ -75,6 +78,7 @@ class HeadroomTest {
                 signInSteps = ApiKeySteps,
                 settings = settings,
                 alerts = alerts,
+                resetEvents = resetEvents,
                 resetProvider = resetProvider,
                 clock = { now },
                 zone = { TimeZone.UTC },
@@ -487,10 +491,47 @@ class HeadroomTest {
         scope.runCurrent()
         assertEquals(0, resetProvider.redeems)
     }
+
+    @Test
+    fun `a redeem retry that confirms an earlier try records the first try time`() {
+        val firstTry = now
+        repository.accounts.value =
+            DemoData.accounts(now).map { state ->
+                state.copy(
+                    snapshot =
+                        state.snapshot!!.copy(
+                            resets =
+                                ResetAvailability(
+                                    listOf(
+                                        ResetPool(
+                                            "weekly",
+                                            "Weekly",
+                                            1,
+                                            ResetScope.of(WindowKind.Weekly),
+                                        )
+                                    )
+                                )
+                        )
+                )
+            }
+        resetProvider.outcome = RedeemOutcome.Failed(QuotaErrorKind.Network)
+        headroom.resets.redeem.start("demo-codex", askForMore = false)
+        scope.runCurrent()
+        headroom.resets.redeem.confirm()
+        scope.runCurrent()
+
+        now = firstTry + 2.minutes
+        resetProvider.outcome = RedeemOutcome.Success(resetsLeft = null, replayed = true)
+        headroom.resets.redeem.tryAgain()
+        scope.runCurrent()
+
+        assertEquals<List<Instant?>>(listOf(firstTry), resetEvents.attemptedAt)
+    }
 }
 
 private class CountingResetProvider : ResetProvider by NoResets {
     var redeems = 0
+    var outcome: RedeemOutcome = RedeemOutcome.NothingToReset
 
     override suspend fun redeem(
         account: Account,
@@ -498,7 +539,22 @@ private class CountingResetProvider : ResetProvider by NoResets {
         attemptKey: ResetAttemptKey,
     ): RedeemOutcome {
         redeems++
-        return RedeemOutcome.NothingToReset
+        return outcome
+    }
+}
+
+private class RecordingResetEvents : ResetEventLog {
+    val attemptedAt = mutableListOf<Instant?>()
+
+    override fun events(since: Instant): Flow<List<ResetEvent>> = flowOf(emptyList())
+
+    override suspend fun redeemed(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+        attemptedAt: Instant?,
+    ) {
+        this.attemptedAt += attemptedAt
     }
 }
 

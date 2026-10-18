@@ -65,6 +65,7 @@ class StatsViewModelTest {
             account: Account,
             poolId: String,
             attemptKey: ResetAttemptKey,
+            attemptedAt: Instant?,
         ) = Unit
     }
 

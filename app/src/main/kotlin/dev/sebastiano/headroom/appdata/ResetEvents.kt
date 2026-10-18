@@ -26,8 +26,12 @@ class DemoAwareResetEvents(
         (if (demoMode) demo else real).events(since)
     }
 
-    override suspend fun redeemed(account: Account, poolId: String, attemptKey: ResetAttemptKey) =
-        real.redeemed(account, poolId, attemptKey)
+    override suspend fun redeemed(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+        attemptedAt: Instant?,
+    ) = real.redeemed(account, poolId, attemptKey, attemptedAt)
 }
 
 /** A plausible reset history for the demo accounts: a few months of Codex, Grok and Claude. */
@@ -37,8 +41,12 @@ class DemoResetEvents(private val clock: () -> Instant) : ResetEventLog {
         return flowOf(demo(now).filter { it.at >= since }.sortedBy { it.at })
     }
 
-    override suspend fun redeemed(account: Account, poolId: String, attemptKey: ResetAttemptKey) =
-        Unit
+    override suspend fun redeemed(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+        attemptedAt: Instant?,
+    ) = Unit
 
     private fun demo(now: Instant): List<ResetEvent> = DemoData.resetEvents(now)
 }

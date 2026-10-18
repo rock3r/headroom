@@ -264,8 +264,8 @@ Providers list one expiry date per reset. The detector matches resets by that da
 
 - A reset missing after expiry counts as expired.
 - A reset missing before expiry counts as used. Without expiry dates, a lower count indicates use.
-- `ResetCenter` calls `RoomResetEventLog.redeemed` immediately after successful redemption, before refreshing usage.
-  A unique attempt key prevents duplicate records from retries, `already_used` responses or "Check again".
+- `ResetCenter` calls `RoomResetEventLog.redeemed` immediately after successful redemption, before refreshing usage, passing the time the attempt was first sent.
+  A unique attempt key prevents duplicate records from retries, `already_used` responses or "Check again", and the first-send time lets a retry confirmed after expiry still match the reset.
   Later syncs match the missing reset to the pending redemption without adding another use.
   Matching selects the missing reset with the earliest expiry after redemption, following provider redemption order.
 - A sync can save after provider redemption but before Headroom records success. That sync initially labels the use "elsewhere".

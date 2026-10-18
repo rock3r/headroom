@@ -8,7 +8,9 @@ import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetRefresh
+import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -42,13 +44,21 @@ class ResetCenter(
     private val scope: CoroutineScope,
     private val refreshUsage: suspend (accountId: String) -> Unit = {},
     private val refreshDelay: Duration = ResetRefresh.DELAY,
+    private val clock: () -> Instant = Clock.System::now,
     private val recordRedeem:
-        suspend (account: Account, poolId: String, attemptKey: ResetAttemptKey) -> Unit =
-        { _, _, _ ->
+        suspend (
+            account: Account,
+            poolId: String,
+            attemptKey: ResetAttemptKey,
+            attemptedAt: Instant,
+        ) -> Unit =
+        { _, _, _, _ ->
         },
 ) : ResetProvider {
     private val state = MutableStateFlow<Map<String, ResetAvailability>>(emptyMap())
     private val refreshingIds = MutableStateFlow<Set<String>>(emptySet())
+    private val lock = Any()
+    private val attemptTimes = LinkedHashMap<ResetAttemptKey, Instant>()
 
     /** The accounts whose usage is being refreshed after a reset. */
     val refreshing: StateFlow<Set<String>> = refreshingIds.asStateFlow()
@@ -83,17 +93,37 @@ class ResetCenter(
         account: Account,
         poolId: String,
         attemptKey: ResetAttemptKey,
-    ): RedeemOutcome =
-        provider.redeem(account, poolId, attemptKey).also {
-            settle(account, poolId, attemptKey, it)
+    ): RedeemOutcome {
+        val attemptedAt = rememberAttempt(attemptKey)
+        return provider.redeem(account, poolId, attemptKey).also {
+            settle(account, poolId, attemptKey, attemptedAt, it)
         }
+    }
 
     override suspend fun check(
         account: Account,
         poolId: String,
         attemptKey: ResetAttemptKey,
-    ): RedeemOutcome =
-        provider.check(account, poolId, attemptKey).also { settle(account, poolId, attemptKey, it) }
+    ): RedeemOutcome {
+        val attemptedAt = rememberAttempt(attemptKey)
+        return provider.check(account, poolId, attemptKey).also {
+            settle(account, poolId, attemptKey, attemptedAt, it)
+        }
+    }
+
+    private fun rememberAttempt(attemptKey: ResetAttemptKey): Instant =
+        synchronized(lock) {
+            attemptTimes.getOrPut(attemptKey) {
+                while (attemptTimes.size >= MAX_ATTEMPTS) {
+                    attemptTimes.remove(attemptTimes.keys.first())
+                }
+                clock()
+            }
+        }
+
+    private fun forgetAttempt(attemptKey: ResetAttemptKey) {
+        synchronized(lock) { attemptTimes.remove(attemptKey) }
+    }
 
     /**
      * Reads the resets again after an attempt that ended, and refreshes the usage after one that
@@ -103,10 +133,14 @@ class ResetCenter(
         account: Account,
         poolId: String,
         attemptKey: ResetAttemptKey,
+        attemptedAt: Instant,
         outcome: RedeemOutcome,
     ) {
         if (!outcome.isSettled) return
-        if (outcome is RedeemOutcome.Success) recordRedeem(account, poolId, attemptKey)
+        forgetAttempt(attemptKey)
+        if (outcome is RedeemOutcome.Success) {
+            recordRedeem(account, poolId, attemptKey, attemptedAt)
+        }
         refresh(account)
         if (outcome !is RedeemOutcome.Success) return
         refreshingIds.update { it + account.id }
@@ -129,4 +163,8 @@ class ResetCenter(
             if (outcome is AskOutcome.Granted) refreshUsage(account.id)
             refresh(account)
         }
+
+    private companion object {
+        const val MAX_ATTEMPTS = 16
+    }
 }

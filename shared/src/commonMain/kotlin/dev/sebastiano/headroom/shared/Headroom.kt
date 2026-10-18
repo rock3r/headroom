@@ -105,6 +105,7 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
             memory = parts.resetMemory,
             events = parts.resetEvents,
             scope = scope,
+            clock = clock,
             startZCode = parts.startZCode,
             saveZCode = { accountId, tokens ->
                 signInManager.signInToZCode(accountId, tokens)

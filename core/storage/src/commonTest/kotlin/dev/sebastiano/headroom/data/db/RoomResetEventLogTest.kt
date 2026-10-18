@@ -150,6 +150,25 @@ class RoomResetEventLogTest {
         }
 
     @Test
+    fun `a retry confirmed after the reset expired still settles it using the first attempt time`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            val firstTry = soon.minus(1.minutes)
+
+            now = soon.plus(1.minutes)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"), attemptedAt = firstTry)
+            now = now.plus(2.seconds)
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            val event = events().single()
+            assertEquals(ResetEventKind.Used, event.kind)
+            assertEquals(ResetUseSource.Headroom, event.source)
+            assertEquals(firstTry, event.at)
+            assertEquals(soon, event.expiresAt)
+        }
+
+    @Test
     fun `a redeem recorded after a sync already found its reset gone takes over that use`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)
