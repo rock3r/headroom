@@ -155,11 +155,11 @@ Only a successful sync clears the Auth error.
 ## Usage-limit resets
 
 Sync reads Codex, Grok, Claude and Z.AI resets alongside usage. Room saves them with the snapshot.
-Users can redeem Codex, Grok and Z.AI resets. Claude redemption requires the experimental setting; otherwise Claude resets remain read-only.
+Users can redeem Codex, Grok, Claude and Z.AI resets and request more Z.AI cards. Claude's confirmation step marks redemption as experimental because Claude has not published this API.
 Z.AI requires a separate ZCode sign-in. `:core:auth` stores that credential alongside the account's API key.
 Headroom reminds users about usable resets about a day before expiry.
 Sync records used and expired resets for Stats.
-Reset clients live in `:core:quota`, sync and storage integration in `:core:data`, and screens in `:app`.
+Reset clients live in `:core:quota`, storage in `:core:storage`, sync and reminder scheduling in `:core:data`, and screens in `:app`.
 [RESETS.md](RESETS.md) describes redemption, history and logging.
 
 ## Demo mode
