@@ -7,6 +7,15 @@ Home screen and lock screen widgets show your usage. Reset alerts tell you when 
 Headroom is free software under the [Apache License 2.0](LICENSE).
 
 <p align="center">
+  <a href="https://play.google.com/store/apps/details?id=dev.sebastiano.headroom"><img src="docs/media/badge_google_play.png" alt="Get it on Google Play" height="80"></a>
+</p>
+
+<p align="center">
+  Or install the APK from <a href="https://github.com/rock3r/headroom/releases/latest">GitHub releases</a> or with <a href="#with-obtainium">Obtainium</a>.
+  The Google Play version has <a href="#google-play-differences">two small limitations</a>.
+</p>
+
+<p align="center">
   <img src="docs/media/demo.gif" alt="Headroom demo: the overview, opening an account, the Resets tab and a refresh" width="300">
 </p>
 
@@ -15,7 +24,7 @@ The recording is also available as a [video](docs/media/demo.mp4). It shows demo
 > [!IMPORTANT]
 > Headroom reads usage from undocumented endpoints. It signs in with the OAuth clients used by
 > each provider's command-line tools. Providers can change or block access at any time.
-> Their terms may prohibit this access. Headroom targets personal use and sideloading.
+> Their terms may prohibit this access. Headroom targets personal use.
 > Headroom has no affiliation with these providers.
 
 ## Screenshots
@@ -71,8 +80,7 @@ These images come from the Android 16 widget player.
   Expired accounts cannot supply the next reset or trigger reset alerts.
 - Provider-issued resets refill limits early. Headroom lists each reset and its expiry date.
   The Codex and Grok confirmation sheet refills the bars after a successful reset and shows the remaining reset count.
-  Enable "Redeem Claude resets (experimental)" in Settings to use Claude resets.
-  This setting defaults to off. Nobody has tested Claude redemption with a real account.
+  Claude resets work the same way. The confirmation notes that Claude's reset API is unpublished.
   See [Usage-limit resets](docs/RESETS.md) for provider support, including Z.AI.
 - One-time credits show usage and expiry dates, including Claude's cloud session credit.
   Headroom also displays unfamiliar quotas and labels them as unrecognised.
@@ -112,9 +120,35 @@ It encrypts tokens with an Android Keystore key and excludes them from backups.
 
 ## Installing
 
+Headroom requires Android 16 or later. Google Play and GitHub releases use the same signing key, so you
+can switch between them. An update from either source installs over the other and keeps your
+accounts and history. [docs/RELEASING.md](docs/RELEASING.md) describes the release process.
+
+### From Google Play
+
+The easiest way to install Headroom and get updates automatically:
+
+[<img src="docs/media/badge_google_play.png" alt="Get it on Google Play" height="64">](https://play.google.com/store/apps/details?id=dev.sebastiano.headroom)
+
+<a id="google-play-differences"></a>
+
+> [!NOTE]
+> Google Play policy requires two changes in the Play version. Everything else is the same.
+>
+> - **Reset alerts can arrive a few minutes late.** Play does not allow `USE_EXACT_ALARM` for this
+>   kind of app, so the Play version asks for the "Alarms & reminders" permission instead. Without
+>   it, Android delivers alerts with an inexact alarm. Allow it in Android's app settings for
+>   on-time alerts.
+> - **The reset island cannot use its accessibility service.** The Play version only offers the
+>   Display over other apps mode. In that mode the island draws below the status bar and does not
+>   appear on the lock screen.
+>
+> The APK from GitHub releases or Obtainium has neither limitation. [docs/PLAY-STORE.md](docs/PLAY-STORE.md)
+> explains these differences.
+
+### From GitHub releases
+
 Download the APK from the [latest release](https://github.com/rock3r/headroom/releases/latest) and open it on your phone.
-Headroom requires Android 16 or later. Every release uses the same signing key, so updates install over earlier releases.
-[docs/RELEASING.md](docs/RELEASING.md) describes the release process.
 
 ### With Obtainium
 
