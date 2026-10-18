@@ -31,6 +31,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.model.CursorPrompt
 import dev.sebastiano.headroom.signin.ServiceSignIn
 import dev.sebastiano.headroom.signin.ServiceSignInState
+import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -107,7 +108,7 @@ fun CursorPromptRow(
         body = stringResource(cursorBody(prompt)),
         action = stringResource(cursorAction(prompt)),
         waiting = stringResource(R.string.cursor_prompt_waiting),
-        onAction = { prompt.action(connect, summary.id) },
+        onAction = { prompt.action(connect, summary.id, mine) },
         onDismiss = { connect.dismiss(summary.id) },
         modifier = modifier.testTag(cursorPromptRowTag(summary.id)),
         banner = false,
@@ -127,14 +128,15 @@ fun CursorPromptBanner(
 ) {
     val prompt = summary.cursorPrompt ?: return
     val state by connect.state.collectAsStateWithLifecycle()
+    val mine = state.takeIf { it.accountId == summary.id }
     CursorPromptSurface(
         prompt = prompt,
-        state = state.takeIf { it.accountId == summary.id },
+        state = mine,
         title = stringResource(cursorBannerTitle(prompt), summary.provider.displayName),
         body = stringResource(cursorBody(prompt)),
         action = stringResource(cursorAction(prompt)),
         waiting = stringResource(R.string.cursor_prompt_waiting),
-        onAction = { prompt.action(connect, summary.id) },
+        onAction = { prompt.action(connect, summary.id, mine) },
         onDismiss = null,
         modifier = modifier.testTag(CURSOR_PROMPT_BANNER_TAG),
         banner = true,
@@ -156,13 +158,18 @@ private fun CursorPromptSurface(
     modifier: Modifier = Modifier,
 ) {
     val running = state is ServiceSignInState.Starting || state is ServiceSignInState.Waiting
+    val failed = (state as? ServiceSignInState.Failed)?.error
     val container =
-        if (prompt == CursorPrompt.ReadFailed) MaterialTheme.colorScheme.errorContainer
+        if (prompt == CursorPrompt.ReadFailed || failed != null)
+            MaterialTheme.colorScheme.errorContainer
         else MaterialTheme.colorScheme.tertiaryContainer
     val onContainer =
-        if (prompt == CursorPrompt.ReadFailed) MaterialTheme.colorScheme.onErrorContainer
+        if (prompt == CursorPrompt.ReadFailed || failed != null)
+            MaterialTheme.colorScheme.onErrorContainer
         else MaterialTheme.colorScheme.onTertiaryContainer
-    val icon = if (prompt == CursorPrompt.ReadFailed) HeadroomIcons.Error else HeadroomIcons.Info
+    val icon =
+        if (prompt == CursorPrompt.ReadFailed || failed != null) HeadroomIcons.Error
+        else HeadroomIcons.Info
     val shape = if (banner) RoundedCornerShape(24.dp) else RoundedCornerShape(16.dp)
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -191,7 +198,13 @@ private fun CursorPromptSurface(
             ) {
                 Text(text = title, style = MaterialTheme.typography.labelLarge)
                 Text(
-                    text = if (running) waiting else body,
+                    text =
+                        when {
+                            running -> waiting
+                            // A sign-in that failed says so: the button below starts it again.
+                            failed != null -> stringResource(signInFailure(failed))
+                            else -> body
+                        },
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -218,12 +231,18 @@ private fun CursorPromptSurface(
 
 /**
  * What the prompt's button does. Asking to connect opens the Cursor sign-in; a read that failed
- * only needs the numbers read again, so it does not ask the user to sign in a second time.
+ * only needs the numbers read again, so it does not ask the user to sign in a second time; and a
+ * sign-in that failed is started again, which is the only thing that ends that.
  */
-private fun CursorPrompt.action(connect: CursorConnect, accountId: String) {
-    when (this) {
-        CursorPrompt.NotLinked -> connect.connect(accountId)
-        CursorPrompt.ReadFailed -> connect.retry()
+private fun CursorPrompt.action(
+    connect: CursorConnect,
+    accountId: String,
+    state: ServiceSignInState?,
+) {
+    when {
+        state is ServiceSignInState.Failed -> connect.connect(accountId)
+        this == CursorPrompt.NotLinked -> connect.connect(accountId)
+        else -> connect.retry()
     }
 }
 
@@ -249,4 +268,14 @@ private fun cursorAction(prompt: CursorPrompt): Int =
     when (prompt) {
         CursorPrompt.NotLinked -> R.string.cursor_prompt_action
         CursorPrompt.ReadFailed -> R.string.cursor_prompt_retry
+    }
+
+/** What a sign-in that failed says, in the prompt that started it. */
+private fun signInFailure(error: SignInError): Int =
+    when (error) {
+        SignInError.Denied -> R.string.signin_error_denied
+        SignInError.Expired -> R.string.signin_error_expired
+        SignInError.Network -> R.string.signin_error_network
+        SignInError.DifferentAccount -> R.string.signin_error_different_account
+        SignInError.Unknown -> R.string.signin_error_unknown
     }

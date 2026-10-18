@@ -134,7 +134,7 @@ fun AccountCard(
                     )
                 }
             }
-            if (cursor != null) {
+            if (cursor != null && !account.signInExpired) {
                 CursorPromptRow(account, cursor)
             }
         }
