@@ -94,6 +94,7 @@ fun HeadroomApp(
     val resets = collectResets(graph)
     val formatter = rememberResetFormatter(graph.zone)
     val cursorConnect = rememberCursorConnect(graph, homeViewModel, live.isDemo)
+    OpenSignInPage(graph.cursorSignIn)
     val snackbar = remember { SnackbarHostState() }
     val addWidget = rememberWidgetAdder(graph.widgetPinner, snackbar)
     var page by rememberSaveable { mutableStateOf(Page.Home) }

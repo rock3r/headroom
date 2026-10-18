@@ -50,8 +50,11 @@ public sealed interface ServiceSignInState {
  * brings the app in front of the browser tab. [save] stores the tokens next to the account's own
  * credential and refreshes the account, so the data that needs them shows. [log] gets one line per
  * step, with no token. [label] names the service in those lines, such as "ZCode" or "Cursor".
- * [onWaiting] gets the page's URL each time the app waits for the user, including when the page is
- * asked for again.
+ *
+ * The page itself, [ServiceSignInState.Waiting.url], is the screens' to open: a browser tab has to
+ * start from the running activity, so that it belongs to this app's task and coming back to the app
+ * takes the tab away. [watch] keeps the app out of Android's frozen state while the flow runs, so
+ * the poll that ends it can still work while the user is in the browser.
  */
 public class ServiceSignIn(
     private val label: String = "Sign-in",
@@ -59,7 +62,7 @@ public class ServiceSignIn(
     private val save: suspend (accountId: String, tokens: TokenSet) -> Unit,
     private val scope: CoroutineScope,
     private val returnToApp: () -> Unit = {},
-    private val onWaiting: (url: String) -> Unit = {},
+    private val watch: SignInWatch = SignInWatch.None,
     private val log: (String) -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow<ServiceSignInState>(ServiceSignInState.Idle)
@@ -77,20 +80,21 @@ public class ServiceSignIn(
         if (current is ServiceSignInState.Waiting && current.accountId == accountId) {
             log("$label sign-in: opening the page again")
             mutableState.value = current.copy(opened = current.opened + 1)
-            onWaiting(current.url)
             return
         }
         if (current is ServiceSignInState.Starting && current.accountId == accountId) return
         job?.cancel()
         mutableState.value = ServiceSignInState.Starting(accountId)
         job = scope.launch {
+            // The app must stay out of the frozen state for the whole flow: it is the poll that
+            // notices the sign-in, and the app only comes back in front once it did.
+            watch.start(label)
             mutableState.value =
                 try {
                     val session = start()
                     mutableState.value =
                         ServiceSignInState.Waiting(accountId, session.verificationUrl)
                     log("$label sign-in: waiting for the browser")
-                    onWaiting(session.verificationUrl)
                     val tokens = session.awaitTokens()
                     log("$label sign-in: signed in, saving")
                     returnToApp()
@@ -106,6 +110,8 @@ public class ServiceSignIn(
                     // The sign-in worked but storing it did not.
                     log("$label sign-in could not be saved: ${failure::class.simpleName}")
                     ServiceSignInState.Failed(accountId, SignInError.Unknown)
+                } finally {
+                    watch.stop()
                 }
         }
     }

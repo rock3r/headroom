@@ -55,24 +55,85 @@ class ServiceSignInTest {
         }
 
     @Test
-    fun `the page opens when the sign-in waits and again when it is asked for`() =
+    fun `asking again for the page the sign-in waits on opens it again`() =
         runTest(UnconfinedTestDispatcher()) {
             val session = FakeSession()
-            val opened = mutableListOf<String>()
             val signIn =
                 ServiceSignIn(
                     start = { session },
                     save = { _, _ -> },
                     scope = backgroundScope,
-                    onWaiting = { opened += it },
                 )
 
             signIn.start("z1")
-            assertEquals(listOf("https://chat.z.ai/a"), opened)
+            assertEquals(
+                ServiceSignInState.Waiting("z1", "https://chat.z.ai/a"),
+                signIn.state.value,
+            )
 
             // Asking again opens the same page, which the user may have closed.
             signIn.start("z1")
-            assertEquals(listOf("https://chat.z.ai/a", "https://chat.z.ai/a"), opened)
+            assertEquals(
+                ServiceSignInState.Waiting("z1", "https://chat.z.ai/a", opened = 2),
+                signIn.state.value,
+            )
+        }
+
+    private class FakeWatch : SignInWatch {
+        val events = mutableListOf<String>()
+
+        override fun start(service: String) {
+            events += "watch $service"
+        }
+
+        override fun stop() {
+            events += "unwatch"
+        }
+    }
+
+    @Test
+    fun `the app is kept awake for as long as the sign-in waits`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val session = FakeSession()
+            val watch = FakeWatch()
+            val signIn =
+                ServiceSignIn(
+                    start = { session },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                    label = "Cursor",
+                    watch = watch,
+                )
+
+            signIn.start("g1")
+            // Android freezes a background app, which would stop the poll that ends the sign-in.
+            assertEquals(listOf("watch Cursor"), watch.events)
+
+            session.result.complete(tokens)
+            assertEquals(listOf("watch Cursor", "unwatch"), watch.events)
+        }
+
+    @Test
+    fun `a sign-in that fails or is cancelled stops being watched`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val failed = FakeSession()
+            val watch = FakeWatch()
+            val signIn =
+                ServiceSignIn(
+                    start = { failed },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                    watch = watch,
+                )
+            signIn.start("g1")
+            failed.result.completeExceptionally(AuthException.Network("offline"))
+            assertEquals(ServiceSignInState.Failed("g1", SignInError.Network), signIn.state.value)
+            assertEquals(listOf("watch Sign-in", "unwatch"), watch.events)
+
+            watch.events.clear()
+            signIn.start("g1")
+            signIn.cancel()
+            assertEquals(listOf("watch Sign-in", "unwatch"), watch.events)
         }
 
     @Test
