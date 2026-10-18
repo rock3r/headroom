@@ -13,7 +13,7 @@ import dev.sebastiano.headroom.model.logo
  * The provider's logo as a vector, centred in a square with the logo's inset around it. It is
  * filled in one colour, so tint it with the colour it sits on. Each vector is built once.
  */
-internal fun providerLogoVector(provider: Provider): ImageVector = logoVectors.getValue(provider)
+fun providerLogoVector(provider: Provider): ImageVector = logoVectors.getValue(provider)
 
 private val logoVectors: Map<Provider, ImageVector> by lazy {
     Provider.entries.associateWith { logoVector(it.logo, it.displayName) }

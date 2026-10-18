@@ -130,6 +130,8 @@ internal fun HomeScaffold(
     resets: AccountResets = AccountResets(),
     resetHandlers: ResetHandlers = ResetHandlers(),
     onSignInAgain: (accountId: String) -> Unit = {},
+    /** Opens Headroom on connected display glasses; null without glasses. */
+    onOpenOnGlasses: (() -> Unit)? = null,
 ) {
     val width = layoutWidth()
     val spatial = isSpatialUiEnabled()
@@ -199,8 +201,7 @@ internal fun HomeScaffold(
                             onSortChange = onSortChange,
                             onAllResets = { selectTab(HomeTab.Resets) },
                             onOpenAccounts = onOpenAccounts,
-                            onOpenSettings = onOpenSettings,
-                            settingsReveal = settingsReveal,
+                            header = HeaderButtons(onOpenSettings, settingsReveal, onOpenOnGlasses),
                             bottomPadding = bottomPadding,
                             playEntrance = playEntrance,
                             onEntranceStart = onEntranceStart,
@@ -312,6 +313,13 @@ private fun rememberSharedElements(
     }
 }
 
+/** The overview title's buttons: Settings, and Open on glasses while glasses are connected. */
+private class HeaderButtons(
+    val onOpenSettings: () -> Unit,
+    val settingsReveal: PageReveal?,
+    val onOpenOnGlasses: (() -> Unit)?,
+)
+
 /**
  * The Overview tab: the list of accounts and their detail. In Full Space the detail goes to
  * [detailPanel], beside the main panel, so the list fills the main panel and only selects accounts.
@@ -330,8 +338,7 @@ private fun OverviewPanes(
     onSortChange: (OverviewSort) -> Unit,
     onAllResets: () -> Unit,
     onOpenAccounts: () -> Unit,
-    onOpenSettings: () -> Unit,
-    settingsReveal: PageReveal?,
+    header: HeaderButtons,
     bottomPadding: androidx.compose.ui.unit.Dp,
     playEntrance: Boolean,
     onEntranceStart: () -> Unit,
@@ -358,9 +365,9 @@ private fun OverviewPanes(
             },
             onAllResets = onAllResets,
             onOpenAccounts = onOpenAccounts,
-            onOpenSettings = onOpenSettings,
+            onOpenSettings = header.onOpenSettings,
             onSortChange = onSortChange,
-            settingsReveal = settingsReveal,
+            settingsReveal = header.settingsReveal,
             columns = overviewColumns(width, spatial),
             selectedAccountId = if (twoPanes) detail?.account?.id else null,
             bottomPadding = bottomPadding,
@@ -370,6 +377,7 @@ private fun OverviewPanes(
             resets = details.resets,
             seen = seen,
             onSignInAgain = details.onSignInAgain,
+            onOpenOnGlasses = header.onOpenOnGlasses,
         )
     }
     if (spatial) {

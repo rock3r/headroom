@@ -120,6 +120,11 @@ dependencies {
     debugImplementation(libs.androidx.tracing.wire)
     debugImplementation(libs.compose.runtime.tracing)
     implementation(libs.reorderable)
+    implementation(libs.xr.glimmer)
+    implementation(libs.xr.glimmer.google.fonts)
+    implementation(libs.xr.projected)
+    implementation(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
     // Spatial panels and orbiters in Full Space on XR devices; a no-op everywhere else.
     implementation(libs.xr.compose)
     // The headset provides the XR extensions at runtime. R8 needs their classes to minify.

@@ -40,6 +40,8 @@ haze = "2.0.0"
 materialKolor = "5.0.1"
 aboutLibraries = "15.2.0"
 reorderable = "3.1.0"
+xrGlimmer = "1.0.0-alpha21"
+xrProjected = "1.0.0-alpha13"
 
 coroutines = "1.11.0"
 serialization = "1.9.0"
@@ -81,6 +83,9 @@ compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview"
 compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
+xr-glimmer = { module = "androidx.xr.glimmer:glimmer", version.ref = "xrGlimmer" }
+xr-glimmer-google-fonts = { module = "androidx.xr.glimmer:glimmer-google-fonts", version.ref = "xrGlimmer" }
+xr-projected = { module = "androidx.xr.projected:projected", version.ref = "xrProjected" }
 compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 compose-material3-adaptive-navigationSuite = { module = "androidx.compose.material3:material3-adaptive-navigation-suite", version.ref = "material3" }
 compose-material3-adaptive = { module = "androidx.compose.material3.adaptive:adaptive", version.ref = "material3Adaptive" }

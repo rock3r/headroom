@@ -46,6 +46,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.glasses.openWhileConnected
 import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.signin.SignInState
@@ -100,6 +101,7 @@ fun HeadroomApp(
     val liveDetail by homeViewModel.detail.collectAsStateWithLifecycle()
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
+    val openOnGlasses = graph.glassesLauncher.openWhileConnected()
     val resets = collectResets(graph)
     val formatter = rememberResetFormatter(graph.zone)
     val snackbar = remember { SnackbarHostState() }
@@ -144,10 +146,7 @@ fun HeadroomApp(
     val detailPanel = rememberDetailPanelSlot()
 
     Box(modifier = modifier.fillMaxSize().testTag(APP_TAG)) {
-        // Inside a sign-in, the accounts screen handles back itself, one step at a time.
-        val back =
-            (if (shown == Page.Accounts && accountsFromSettings) Page.Settings else shown.back)
-                .takeIf { shown != Page.Accounts || accounts.step == AccountsStep.List }
+        val back = shown.backFrom(accountsFromSettings, accounts.step)
         val pageTransition = rememberPageTransition(shown, back) { page = it }
         Pages(
             transition = rememberTransition(pageTransition.state, label = "page"),
@@ -183,6 +182,7 @@ fun HeadroomApp(
                         playEntrance = !entrancePlayed,
                         onEntranceStart = { entrancePlayed = true },
                         onSignInAgain = signInAgain,
+                        onOpenOnGlasses = openOnGlasses,
                         detailPanel = detailPanel,
                         openAccountRequest = openNow,
                         onConsumeOpenAccount = {
@@ -563,6 +563,15 @@ private enum class Page {
                 Licences,
                 Prototypes -> Settings
             }
+
+    /**
+     * Where system back goes from this page. Inside a sign-in it is null: the accounts screen
+     * handles back itself, one step at a time.
+     */
+    fun backFrom(accountsFromSettings: Boolean, step: AccountsStep): Page? =
+        (if (this == Accounts && accountsFromSettings) Settings else back).takeIf {
+            this != Accounts || step == AccountsStep.List
+        }
 }
 
 private fun SignInState.isWaitingForUser() =

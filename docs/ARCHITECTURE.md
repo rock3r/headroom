@@ -197,6 +197,34 @@ The `island` package in `:app` owns its UI and Android service.
   `AndroidResetNotifier` posts the notification, then waits for `ResetIsland.awaitIdle()` to confirm overlay removal.
   The worker coroutine keeps the process active during that wait, about five seconds.
 
+## Display glasses (experimental)
+
+While display glasses are connected, the overview shows a glasses button next to Settings.
+`GlassesLauncher` watches the connection (`ProjectedContext.isProjectedDeviceConnected`) and starts
+`GlassesActivity` on the glasses' display (`ProjectedContext.createProjectedActivityOptions`). The
+manifest gives the activity `requiredDisplayCategory="xr_projected"`, so it never opens on the
+phone's screen. The projected library needs Android 16, so on older versions `glassesLauncher()`
+returns `GlassesLauncher.Unavailable` and the button never shows.
+
+The activity reads the same `HomeViewModel` as the overview, so the glasses show the same accounts
+in the same order, with the same used or left setting. `glassesPages` turns the state into pages:
+the next reset first, then one page per account. The UI is Jetpack Compose Glimmer, not Material:
+a `GlimmerHorizontalPager` of one card at a time, a `Card` for the next reset and a
+`LeadingImageCard` with the provider's logo for each account. The background is black, which the
+glasses' additive display draws as see-through. System back closes the activity.
+
+Each logo has the colour of its provider's avatar in the app's dark theme, with the palette chosen
+in the app's settings (`ProviderPalette`, harmonised with that palette's primary colour). The dark
+theme's light tones read best on the black background, so the glasses use them whatever the phone's
+theme is.
+
+`GlassesPreviews.kt` has Compose previews on Android Studio's "Display Glasses" device
+(`id:ai_glasses_device`, 450 x 450 px at mdpi). The Roborazzi screenshots in `docs/screenshots` use
+the same size.
+
+Glimmer and the projected library are alpha releases, and the projected launch and connection
+calls are marked experimental.
+
 ## XR headsets (Full Space)
 
 On an Android XR headset the app opens in Full Space

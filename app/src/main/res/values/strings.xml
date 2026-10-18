@@ -475,4 +475,11 @@
     <string name="signin_error_network">There was no connection. Check it and try again.</string>
     <string name="signin_error_unknown">Something went wrong. Try again.</string>
     <string name="signin_retry">Try again</string>
+    <!-- Smart glasses: the button on the overview, and the cards the glasses show. -->
+    <string name="action_open_on_glasses">Open on glasses</string>
+    <string name="glasses_no_reset">No resets coming up</string>
+    <!-- One quota on a glasses card, such as "Weekly · 71% used · Wed 7:00 AM". -->
+    <string name="glasses_window_line">%1$s · %2$s · %3$s</string>
+    <!-- One quota on a glasses card without a reset time, such as "Weekly · 71% used". -->
+    <string name="glasses_window_line_no_reset">%1$s · %2$s</string>
 </resources>

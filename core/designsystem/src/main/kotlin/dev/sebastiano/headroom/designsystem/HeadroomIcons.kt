@@ -16,6 +16,7 @@ object HeadroomIcons {
     @DrawableRes val DragIndicator: Int = R.drawable.ic_drag_indicator
     @DrawableRes val DashboardFilled: Int = R.drawable.ic_dashboard_filled
     @DrawableRes val Error: Int = R.drawable.ic_error
+    @DrawableRes val Eyeglasses: Int = R.drawable.ic_eyeglasses
     @DrawableRes val EventRepeat: Int = R.drawable.ic_event_repeat
     @DrawableRes val Info: Int = R.drawable.ic_info
     @DrawableRes val Key: Int = R.drawable.ic_key

@@ -72,6 +72,16 @@
         </activity>
 
         <!--
+            What display glasses show, projected from the phone. requiredDisplayCategory keeps it off
+            the phone's own screen; the overview's glasses button starts it on the glasses' display.
+        -->
+        <activity
+            android:name=".glasses.GlassesActivity"
+            android:exported="false"
+            android:requiredDisplayCategory="xr_projected"
+            android:theme="@style/Theme.Headroom.Glasses" />
+
+        <!--
             The reset island's window owner. Only accessibility overlays draw above the status bar and
             on the lock screen. The service asks for no events and no window content: see
             res/xml/reset_island_service.xml. Android only lets the user turn it on in Settings.
