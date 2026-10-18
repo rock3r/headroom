@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.data.account
 
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialProvider
+import dev.sebastiano.headroom.auth.CursorCredential
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.ZCodeCredential
 import dev.sebastiano.headroom.auth.ZCodeTokens
@@ -9,6 +10,7 @@ import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.quota.CursorSignIn
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetchers
 import dev.sebastiano.headroom.quota.ResetClients
@@ -31,7 +33,12 @@ import kotlinx.io.IOException
  * [ZCodeCredential.idFor] its id. The reset read's credentials carry it as
  * [ProviderCredentials.zCode], refreshed when needed, while the usage fetch runs with the API key
  * alone. A ZCode sign-in that does not work never fails the usage fetch, and a sync waits for it at
- * most [ZCODE_SIGN_IN_WAIT].
+ * most [SECOND_SIGN_IN_WAIT].
+ *
+ * A Grok account's Cursor windows need its Cursor sign-in, saved next to its xAI sign-in under
+ * [CursorCredential.idFor] its id. The usage fetch's credentials carry it as
+ * [ProviderCredentials.cursor], refreshed when needed. A Cursor sign-in that does not work never
+ * fails the Grok fetch, and a sync waits for it at most [SECOND_SIGN_IN_WAIT].
  */
 public class AccountQuotaFetcher(
     private val credentials: CredentialProvider,
@@ -59,9 +66,23 @@ public class AccountQuotaFetcher(
             // Only the reset read needs the ZCode sign-in. A sync waits for it only so long, so a
             // token endpoint that does not answer never holds up the usage.
             val resetRead = reader?.let {
-                async { it.read(credential.toProviderCredentials(syncZCodeSignIn(account))) }
+                async {
+                    it.read(
+                        credential.toProviderCredentials(
+                            zCode = syncZCodeSignIn(account),
+                            cursor = null,
+                        )
+                    )
+                }
             }
-            when (val result = fetcher.fetch(credential.toProviderCredentials(zCode = null))) {
+            // Only the usage fetch needs the Cursor sign-in. A sync waits for it only so long, so
+            // a token endpoint that does not answer never holds up the usage.
+            val usageCredentials =
+                credential.toProviderCredentials(
+                    zCode = null,
+                    cursor = syncCursorSignIn(account),
+                )
+            when (val result = fetcher.fetch(usageCredentials)) {
                 is QuotaResult.Success -> {
                     val read = resetRead?.await()
                     QuotaResult.Success(
@@ -88,13 +109,44 @@ public class AccountQuotaFetcher(
      * @throws IOException when the token store cannot be read or written.
      */
     internal suspend fun providerCredentials(account: Account): ProviderCredentials =
-        validCredential(account).toProviderCredentials(zCodeSignIn(account))
+        validCredential(account)
+            .toProviderCredentials(zCode = zCodeSignIn(account), cursor = cursorSignIn(account))
 
-    /** [zCodeSignIn] for a sync: unavailable when it takes longer than [ZCODE_SIGN_IN_WAIT]. */
+    /** [zCodeSignIn] for a sync: unavailable when it takes longer than [SECOND_SIGN_IN_WAIT]. */
     private suspend fun syncZCodeSignIn(account: Account): ZCodeSignIn? {
         if (account.provider != Provider.ZAi) return null
-        return withTimeoutOrNull(ZCODE_SIGN_IN_WAIT.inWholeMilliseconds) { zCodeSignIn(account) }
+        return withTimeoutOrNull(SECOND_SIGN_IN_WAIT.inWholeMilliseconds) { zCodeSignIn(account) }
             ?: ZCodeSignIn.Unavailable
+    }
+
+    /** [cursorSignIn] for a sync: unavailable when it takes longer than [SECOND_SIGN_IN_WAIT]. */
+    private suspend fun syncCursorSignIn(account: Account): CursorSignIn? {
+        if (account.provider != Provider.Grok) return null
+        return withTimeoutOrNull(SECOND_SIGN_IN_WAIT.inWholeMilliseconds) { cursorSignIn(account) }
+            ?: CursorSignIn.Unavailable
+    }
+
+    /** The Cursor sign-in of a Grok account, refreshed when needed. Null for other providers. */
+    private suspend fun cursorSignIn(account: Account): CursorSignIn? {
+        if (account.provider != Provider.Grok) return null
+        return try {
+            CursorSignIn.Ready(
+                credentials.validCredential(CursorCredential.idFor(account.id)).accessToken
+            )
+        } catch (failure: AuthException) {
+            when (failure) {
+                is AuthException.NotSignedIn,
+                is AuthException.SignInExpired,
+                is AuthException.SignInFailed -> CursorSignIn.Missing
+                is AuthException.Rejected ->
+                    if (failure.requiresSignIn) CursorSignIn.Missing else CursorSignIn.Unavailable
+                is AuthException.Network,
+                is AuthException.TimedOut,
+                is AuthException.InvalidResponse -> CursorSignIn.Unavailable
+            }
+        } catch (_: IOException) {
+            CursorSignIn.Unavailable
+        }
     }
 
     /** The ZCode sign-in of a Z.AI account, refreshed when needed. Null for other providers. */
@@ -124,7 +176,10 @@ public class AccountQuotaFetcher(
     private suspend fun validCredential(account: Account): StoredCredential =
         credentials.validCredential(account.id)
 
-    private fun StoredCredential.toProviderCredentials(zCode: ZCodeSignIn?) =
+    private fun StoredCredential.toProviderCredentials(
+        zCode: ZCodeSignIn?,
+        cursor: CursorSignIn?,
+    ) =
         ProviderCredentials(
             // Copilot's usage endpoint takes the long-lived GitHub token, not the Copilot token.
             accessToken =
@@ -136,6 +191,7 @@ public class AccountQuotaFetcher(
             // JetBrains switches the refresh token's audience to list the account's AI licenses.
             refreshToken = if (provider == Provider.JetBrains) refreshToken else null,
             zCode = zCode,
+            cursor = cursor,
         )
 
     private fun AuthException.toErrorKind(): QuotaErrorKind =
@@ -152,10 +208,13 @@ public class AccountQuotaFetcher(
 
     public companion object {
         /**
-         * How long a sync waits for the ZCode sign-in, refresh included. A token endpoint that
-         * answers does so well within it. Past it, the sync reads no resets and keeps the stored
-         * ones.
+         * How long a sync waits for a second sign-in (ZCode, Cursor), refresh included. A token
+         * endpoint that answers does so well within it. Past it, the sync goes on without the
+         * windows or resets that sign-in would have read.
          */
-        public val ZCODE_SIGN_IN_WAIT: Duration = 5.seconds
+        public val SECOND_SIGN_IN_WAIT: Duration = 5.seconds
+
+        /** The former name of [SECOND_SIGN_IN_WAIT], kept for source compatibility. */
+        public val ZCODE_SIGN_IN_WAIT: Duration = SECOND_SIGN_IN_WAIT
     }
 }

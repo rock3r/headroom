@@ -61,6 +61,7 @@ public fun openHeadroom(directory: String, secrets: SecureValueStore): Headroom 
                 ResetAttemptMemory(store = FileResetAttemptStore(folder / "reset-attempts.json")),
             quotaFetchers = fetchers,
             startZCode = { AuthSignInSteps(authMethods).startZCode() },
+            startCursor = { AuthSignInSteps(authMethods).startCursor() },
             onClose = storage::close,
         )
     return Headroom(parts, scope)

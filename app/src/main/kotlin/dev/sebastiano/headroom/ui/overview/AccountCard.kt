@@ -42,6 +42,8 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.asFraction
+import dev.sebastiano.headroom.ui.components.CursorConnect
+import dev.sebastiano.headroom.ui.components.CursorPromptRow
 import dev.sebastiano.headroom.ui.components.SignInExpiredRow
 import dev.sebastiano.headroom.ui.components.errorText
 import dev.sebastiano.headroom.ui.components.quotaLabel
@@ -72,6 +74,8 @@ fun AccountCard(
     /** What the card last showed, so values that changed while it was off screen animate in. */
     seen: SeenValues? = null,
     onSignIn: () -> Unit = {},
+    /** The Cursor sign-in of this Grok account, when the app can offer one. */
+    cursor: CursorConnect? = null,
 ) {
     val container =
         sharedElements?.run {
@@ -129,6 +133,9 @@ fun AccountCard(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+            }
+            if (cursor != null) {
+                CursorPromptRow(account, cursor)
             }
         }
     }

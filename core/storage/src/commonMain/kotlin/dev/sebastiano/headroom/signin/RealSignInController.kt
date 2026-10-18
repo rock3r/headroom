@@ -276,6 +276,14 @@ public class AuthSignInSteps(
         return DeviceAdapter(prompt) { flow.awaitTokens(prompt) }
     }
 
+    /** Starts the Cursor sign-in that a Grok account's Cursor windows need. It shows no code. */
+    public suspend fun startCursor(): DeviceSession {
+        val flow = methods.cursorSignIn
+        val prompt = flow.start()
+        // No onAuthorized: the Cursor caller brings the app forward itself, after it saves.
+        return DeviceAdapter(prompt) { flow.awaitTokens(prompt) }
+    }
+
     private class BrowserAdapter(private val signIn: BrowserSignIn) : BrowserSession {
         override val authorizeUrl: String = signIn.authorizeUrl
 

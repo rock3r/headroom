@@ -31,6 +31,8 @@ internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
                 },
             resets = account.resetsJson?.let(ResetsCodec::decode),
             resetsReadFailed = account.resetsReadFailed,
+            cursorLinked = account.cursorLinked,
+            cursorReadFailed = account.cursorReadFailed,
         )
     }
     return AccountState(

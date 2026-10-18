@@ -45,6 +45,7 @@ internal class HeadroomParts(
     val resetMemory: ResetAttemptMemory = ResetAttemptMemory(),
     val quotaFetchers: QuotaFetchers? = null,
     val startZCode: suspend () -> DeviceSession = { error("No ZCode sign-in here") },
+    val startCursor: suspend () -> DeviceSession = { error("No Cursor sign-in here") },
     val clock: () -> Instant = Clock.System::now,
     val zone: () -> TimeZone = TimeZone::currentSystemDefault,
     /** Where the stats maths runs: off the main thread. */
@@ -108,6 +109,11 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
             startZCode = parts.startZCode,
             saveZCode = { accountId, tokens ->
                 signInManager.signInToZCode(accountId, tokens)
+                sources.refresh(accountId)
+            },
+            startCursor = parts.startCursor,
+            saveCursor = { accountId, tokens ->
+                signInManager.signInToCursor(accountId, tokens)
                 sources.refresh(accountId)
             },
         )

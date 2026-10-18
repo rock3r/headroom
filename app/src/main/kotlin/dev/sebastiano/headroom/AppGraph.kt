@@ -3,6 +3,7 @@ package dev.sebastiano.headroom
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
@@ -21,6 +22,7 @@ import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
 import dev.sebastiano.headroom.appdata.ResetCenter
 import dev.sebastiano.headroom.appdata.ResetHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
+import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.data.DataGraph
 import dev.sebastiano.headroom.data.reset.AndroidResetLog
 import dev.sebastiano.headroom.island.ResetIslandAccess
@@ -28,6 +30,7 @@ import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.NoResets
+import dev.sebastiano.headroom.model.PromptDismissals
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetAttemptMemory
 import dev.sebastiano.headroom.model.ResetAttemptStore
@@ -37,10 +40,12 @@ import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.prototype.PrototypeTools
 import dev.sebastiano.headroom.prototype.prototypeTools
 import dev.sebastiano.headroom.signin.AuthSignInSteps
+import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.RealSignInController
+import dev.sebastiano.headroom.signin.ServiceSignIn
 import dev.sebastiano.headroom.signin.SignInController
-import dev.sebastiano.headroom.signin.ZCodeSignIn
+import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.tile.StatusBarTileAdder
 import dev.sebastiano.headroom.tile.TileAdder
 import dev.sebastiano.headroom.tile.TileSettings
@@ -127,7 +132,11 @@ class AppGraph(
     /** The demo accounts, so debug tools can show a scenario such as an expired sign-in. */
     val demoAccounts: FakeQuotaRepository? = null,
     /** The ZCode sign-in that Z.AI resets need; null without the data layer. */
-    val zCodeSignIn: ZCodeSignIn? = null,
+    val zCodeSignIn: ServiceSignIn? = null,
+    /** The Cursor sign-in that Grok accounts' Cursor windows need; null without a data layer. */
+    val cursorSignIn: ServiceSignIn? = null,
+    /** The prompts the user dismissed, one per account. */
+    val promptDismissals: PromptDismissals = PromptDismissals.None,
     /** The resets used and expired, for the Stats tab; redeems in Headroom are recorded here. */
     val resetEvents: ResetEventLog = ResetEventLog.None,
 ) {
@@ -161,6 +170,7 @@ class AppGraph(
                 usageHistory = usageHistory,
                 keepLongHistory =
                     settings.settings.map { it.keepLongHistory }.distinctUntilChanged(),
+                promptDismissals = promptDismissals,
             )
         }
     }
@@ -261,6 +271,12 @@ class AppGraph(
                     }
                 }
             val settings = data?.settings ?: InMemorySettingsRepository()
+            val (zCodeSignIn, cursorSignIn) =
+                secondSignIns(data, steps, scope, bringAppToFront) { url ->
+                    // The prompt shows on the card and on the account, so the sign-in opens the
+                    // page itself, once, however many of them are on screen.
+                    signInTabIntent(context).launchUrl(context, url.toUri())
+                }
             return AppGraph(
                 quotaRepository = repository,
                 isDemo = repository.isDemo,
@@ -313,18 +329,66 @@ class AppGraph(
                 prototypes = prototypeTools,
                 demoAccounts = demoAccounts,
                 resetEvents = resetEvents(repository.isDemo, data, clock),
-                zCodeSignIn =
-                    if (data == null || steps == null) null
-                    else
-                        ZCodeSignIn(
-                            start = steps::startZCode,
-                            save = data.signInManager::signInToZCode,
-                            scope = scope,
-                            returnToApp = bringAppToFront,
-                            log = AndroidResetLog::debug,
-                        ),
+                zCodeSignIn = zCodeSignIn,
+                cursorSignIn = cursorSignIn,
+                promptDismissals = data?.promptDismissals ?: PromptDismissals.None,
             )
         }
+
+        /**
+         * The second sign-ins of an account: ZCode, which a Z.AI account's resets need, and Cursor,
+         * which a Grok account's Cursor windows need. Both are null when there is no data layer to
+         * save them in, as in the demo.
+         */
+        private fun secondSignIns(
+            data: DataGraph?,
+            steps: AuthSignInSteps?,
+            scope: CoroutineScope,
+            bringAppToFront: () -> Unit,
+            onCursorWaiting: (url: String) -> Unit,
+        ): Pair<ServiceSignIn?, ServiceSignIn?> {
+            if (data == null || steps == null) return null to null
+            val zCode =
+                serviceSignIn(
+                    "ZCode",
+                    steps::startZCode,
+                    data.signInManager::signInToZCode,
+                    scope,
+                    bringAppToFront,
+                )
+            val cursor =
+                serviceSignIn(
+                    "Cursor",
+                    steps::startCursor,
+                    data.signInManager::signInToCursor,
+                    scope,
+                    bringAppToFront,
+                    onCursorWaiting,
+                )
+            return zCode to cursor
+        }
+
+        /**
+         * One of an account's second sign-ins: ZCode, which a Z.AI account's resets need, or
+         * Cursor, which a Grok account's Cursor windows need. ZCode is null in the demo too.
+         */
+        private fun serviceSignIn(
+            label: String,
+            start: suspend () -> DeviceSession,
+            save: suspend (accountId: String, tokens: TokenSet) -> Unit,
+            scope: CoroutineScope,
+            bringAppToFront: () -> Unit,
+            onWaiting: (url: String) -> Unit = {},
+        ): ServiceSignIn =
+            ServiceSignIn(
+                label = label,
+                start = start,
+                save = save,
+                scope = scope,
+                returnToApp = bringAppToFront,
+                onWaiting = onWaiting,
+                log = AndroidResetLog::debug,
+            )
 
         private fun WidgetStyle.toWidgetStyle(): dev.sebastiano.headroom.widget.WidgetStyle =
             when (this) {

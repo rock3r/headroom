@@ -32,19 +32,29 @@ class GrokQuotaFetcherTest {
         server.close()
     }
 
-    private fun credentials() =
-        ProviderCredentials(accessToken = "test-access-token", baseUrl = server.baseUrl())
+    private fun credentials(cursor: CursorSignIn? = null) =
+        ProviderCredentials(
+            accessToken = "test-access-token",
+            baseUrl = server.baseUrl(),
+            cursor = cursor,
+        )
 
     private fun respond(
         weekly: MockResponse,
         monthly: MockResponse? = null,
         user: MockResponse? = null,
+        settings: MockResponse? = null,
+        cursorPeriod: MockResponse? = null,
+        cursorSand: MockResponse? = null,
     ) {
         server.respondByTarget(
             buildMap {
                 put(WEEKLY_TARGET, weekly)
                 monthly?.let { put(MONTHLY_TARGET, it) }
                 user?.let { put(USER_TARGET, it) }
+                settings?.let { put(SETTINGS_TARGET, it) }
+                cursorPeriod?.let { put(CURSOR_PERIOD_TARGET, it) }
+                cursorSand?.let { put(CURSOR_SAND_TARGET, it) }
             }
         )
     }
@@ -100,7 +110,7 @@ class GrokQuotaFetcherTest {
         assertEquals("SuperGrok", snapshot.planLabel)
         assertEquals(88.0, snapshot.windows.single().usedPercent)
         assertEquals(ONE_WEEK, snapshot.windows.single().length)
-        assertEquals(listOf(WEEKLY_TARGET, USER_TARGET), requestedTargets())
+        assertEquals(listOf(WEEKLY_TARGET, SETTINGS_TARGET, USER_TARGET), requestedTargets())
     }
 
     @Test
@@ -245,9 +255,73 @@ class GrokQuotaFetcherTest {
         assertNull(grokPlanLabel("  "))
     }
 
+    @Test
+    fun `loads the plan from the settings when billing omits it`() = runTest {
+        respond(
+            weekly = jsonResponse(fixture("grok/billing_weekly_no_tier.json")),
+            settings = jsonResponse(fixture("grok/settings.json")),
+        )
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals("SuperGrok Heavy", snapshot.planLabel)
+        assertEquals(listOf(WEEKLY_TARGET, SETTINGS_TARGET), requestedTargets())
+    }
+
+    @Test
+    fun `adds the Cursor windows when a Cursor sign-in is ready`() = runTest {
+        respond(
+            weekly = jsonResponse(fixture("grok/billing_weekly.json")),
+            cursorPeriod = jsonResponse(fixture("cursor/current_period_usage.json")),
+            cursorSand = jsonResponse(fixture("cursor/sand_usage_status.json")),
+        )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(
+                    fetcher.fetch(credentials(CursorSignIn.Ready("cursor-token")))
+                )
+                .snapshot
+
+        assertEquals(
+            listOf("weekly", "cursor-models", "cursor-other-models", "grok-bot"),
+            snapshot.windows.map { it.id },
+        )
+        assertEquals(false, snapshot.cursorReadFailed)
+    }
+
+    @Test
+    fun `keeps the Grok window and flags the sync when the Cursor read fails`() = runTest {
+        respond(
+            weekly = jsonResponse(fixture("grok/billing_weekly.json")),
+            cursorPeriod = MockResponse(code = 401),
+        )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(
+                    fetcher.fetch(credentials(CursorSignIn.Ready("cursor-token")))
+                )
+                .snapshot
+
+        assertEquals(listOf("weekly"), snapshot.windows.map { it.id })
+        assertEquals(true, snapshot.cursorReadFailed)
+    }
+
+    @Test
+    fun `makes no Cursor requests without a ready Cursor sign-in`() = runTest {
+        respond(weekly = jsonResponse(fixture("grok/billing_weekly.json")))
+
+        assertIs<QuotaResult.Success>(fetcher.fetch(credentials(CursorSignIn.Missing)))
+        assertIs<QuotaResult.Success>(fetcher.fetch(credentials(CursorSignIn.Unavailable)))
+
+        assertEquals(listOf(WEEKLY_TARGET, WEEKLY_TARGET), requestedTargets())
+    }
+
     private companion object {
         const val WEEKLY_TARGET = "/v1/billing?format=credits"
         const val MONTHLY_TARGET = "/v1/billing"
         const val USER_TARGET = "/v1/user"
+        const val SETTINGS_TARGET = "/v1/settings"
+        const val CURSOR_PERIOD_TARGET = "/aiserver.v1.DashboardService/GetCurrentPeriodUsage"
+        const val CURSOR_SAND_TARGET = "/aiserver.v1.DashboardService/GetSandUsageStatus"
     }
 }

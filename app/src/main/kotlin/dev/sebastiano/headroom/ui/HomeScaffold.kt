@@ -74,6 +74,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.model.OverviewSort
+import dev.sebastiano.headroom.ui.components.CursorConnect
 import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.HomeUiState
@@ -122,6 +123,8 @@ internal fun HomeScaffold(
     resets: AccountResets = AccountResets(),
     resetHandlers: ResetHandlers = ResetHandlers(),
     onSignInAgain: (accountId: String) -> Unit = {},
+    /** The Cursor sign-in of a Grok account, when the app can offer one. */
+    cursor: CursorConnect? = null,
 ) {
     val width = layoutWidth()
     var tab by rememberSaveable { mutableStateOf(HomeTab.Overview) }
@@ -140,6 +143,7 @@ internal fun HomeScaffold(
             resets,
             resetHandlers,
             onSignInAgain,
+            cursor,
             opener,
         )
     val suiteType = width.navigationSuiteType
@@ -357,6 +361,7 @@ private fun OverviewPanes(
             resets = details.resets,
             seen = seen,
             onSignInAgain = details.onSignInAgain,
+            cursor = details.cursor,
         )
     }
 }
@@ -425,6 +430,7 @@ private class DetailActions(
     val resets: AccountResets,
     val resetHandlers: ResetHandlers,
     val onSignInAgain: (accountId: String) -> Unit,
+    val cursor: CursorConnect?,
     private val opener: AccountOpener,
 ) {
     /** The account whose detail must bring its Resets card into view, or null. */
@@ -510,6 +516,7 @@ private fun ListDetailPanes(
                             resetHandlers = details.resetHandlers,
                             revealResets = details.revealResetsOf == current.account.id,
                             onRevealResets = details.onRevealResets,
+                            cursor = details.cursor,
                         )
                     }
                 }
@@ -656,6 +663,7 @@ private fun DetailPane(
             onSignInAgain = details.onSignInAgain,
             revealResets = details.revealResetsOf == shown.account.id,
             onRevealResets = details.onRevealResets,
+            cursor = details.cursor,
         )
     }
 }

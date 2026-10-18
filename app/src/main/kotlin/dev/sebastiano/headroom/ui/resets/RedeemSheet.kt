@@ -57,8 +57,8 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.signin.ServiceSignInState
 import dev.sebastiano.headroom.signin.SignInError
-import dev.sebastiano.headroom.signin.ZCodeSignInState
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.delights.DelightsHost
 import dev.sebastiano.headroom.ui.delights.LocalDelights
@@ -117,7 +117,7 @@ fun RedeemSheet(
      */
     onSignIn: (() -> Unit)? = null,
     /** How that sign-in is going, once it started from this sheet. */
-    signIn: ZCodeSignInState = ZCodeSignInState.Idle,
+    signIn: ServiceSignInState = ServiceSignInState.Idle,
 ) {
     val session =
         remember(account.id, intent) {
@@ -161,7 +161,7 @@ fun RedeemSheet(
         )
     // Signed in: the account's resets are read again, and the sheet has done its job.
     DisposableEffect(signIn) {
-        if (signIn is ZCodeSignInState.Done) actions.onClose()
+        if (signIn is ServiceSignInState.Done) actions.onClose()
         onDispose {}
     }
     val signInNote =
@@ -195,13 +195,13 @@ fun RedeemSheet(
 /** The line that says how the sign-in to [service] is going, or null before it starts. */
 @Composable
 @ReadOnlyComposable
-private fun signInLine(state: ZCodeSignInState, service: String): String? =
+private fun signInLine(state: ServiceSignInState, service: String): String? =
     when (state) {
-        ZCodeSignInState.Idle,
-        is ZCodeSignInState.Done -> null
-        is ZCodeSignInState.Starting,
-        is ZCodeSignInState.Waiting -> stringResource(R.string.redeem_sign_in_waiting, service)
-        is ZCodeSignInState.Failed ->
+        ServiceSignInState.Idle,
+        is ServiceSignInState.Done -> null
+        is ServiceSignInState.Starting,
+        is ServiceSignInState.Waiting -> stringResource(R.string.redeem_sign_in_waiting, service)
+        is ServiceSignInState.Failed ->
             when (state.error) {
                 SignInError.Network -> stringResource(R.string.redeem_sign_in_network, service)
                 SignInError.Expired -> stringResource(R.string.redeem_sign_in_expired, service)

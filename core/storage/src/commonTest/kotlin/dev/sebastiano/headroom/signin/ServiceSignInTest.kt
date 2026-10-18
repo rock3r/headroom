@@ -14,7 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ZCodeSignInTest {
+class ServiceSignInTest {
     private val tokens = TokenSet(Provider.ZAi, CredentialKind.OAuth, "business", "bundle", null)
 
     private class FakeSession(override val verificationUrl: String = "https://chat.z.ai/a") :
@@ -31,7 +31,7 @@ class ZCodeSignInTest {
             val session = FakeSession()
             val events = mutableListOf<String>()
             val signIn =
-                ZCodeSignIn(
+                ServiceSignIn(
                     start = { session },
                     save = { id, saved ->
                         assertEquals(tokens, saved)
@@ -42,13 +42,37 @@ class ZCodeSignInTest {
                 )
 
             signIn.start("z1")
-            assertEquals(ZCodeSignInState.Waiting("z1", "https://chat.z.ai/a"), signIn.state.value)
+            assertEquals(
+                ServiceSignInState.Waiting("z1", "https://chat.z.ai/a"),
+                signIn.state.value,
+            )
             assertTrue(events.isEmpty())
 
             session.result.complete(tokens)
-            assertEquals(ZCodeSignInState.Done("z1"), signIn.state.value)
+            assertEquals(ServiceSignInState.Done("z1"), signIn.state.value)
             // The browser tab gives way to the app as soon as the sign-in is through.
             assertEquals(listOf("return", "save z1"), events)
+        }
+
+    @Test
+    fun `the page opens when the sign-in waits and again when it is asked for`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val session = FakeSession()
+            val opened = mutableListOf<String>()
+            val signIn =
+                ServiceSignIn(
+                    start = { session },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                    onWaiting = { opened += it },
+                )
+
+            signIn.start("z1")
+            assertEquals(listOf("https://chat.z.ai/a"), opened)
+
+            // Asking again opens the same page, which the user may have closed.
+            signIn.start("z1")
+            assertEquals(listOf("https://chat.z.ai/a", "https://chat.z.ai/a"), opened)
         }
 
     @Test
@@ -65,14 +89,14 @@ class ZCodeSignInTest {
             cases.forEach { (failure, error) ->
                 val session = FakeSession()
                 val signIn =
-                    ZCodeSignIn(
+                    ServiceSignIn(
                         start = { session },
                         save = { _, _ -> },
                         scope = backgroundScope,
                     )
                 signIn.start("z1")
                 session.result.completeExceptionally(failure)
-                assertEquals(ZCodeSignInState.Failed("z1", error), signIn.state.value)
+                assertEquals(ServiceSignInState.Failed("z1", error), signIn.state.value)
             }
         }
 
@@ -84,7 +108,7 @@ class ZCodeSignInTest {
             val sessions = ArrayDeque(listOf(first, second))
             val saved = mutableListOf<String>()
             val signIn =
-                ZCodeSignIn(
+                ServiceSignIn(
                     start = { sessions.removeFirst() },
                     save = { id, _ -> saved += id },
                     scope = backgroundScope,
@@ -93,11 +117,14 @@ class ZCodeSignInTest {
             signIn.start("z1")
             signIn.start("z2")
             first.result.complete(tokens)
-            assertEquals(ZCodeSignInState.Waiting("z2", "https://chat.z.ai/2"), signIn.state.value)
+            assertEquals(
+                ServiceSignInState.Waiting("z2", "https://chat.z.ai/2"),
+                signIn.state.value,
+            )
 
             signIn.cancel()
             second.result.complete(tokens)
-            assertEquals(ZCodeSignInState.Idle, signIn.state.value)
+            assertEquals(ServiceSignInState.Idle, signIn.state.value)
             assertTrue(saved.isEmpty())
         }
 
@@ -107,7 +134,7 @@ class ZCodeSignInTest {
             val session = FakeSession()
             var starts = 0
             val signIn =
-                ZCodeSignIn(
+                ServiceSignIn(
                     start = {
                         starts++
                         session
@@ -121,13 +148,13 @@ class ZCodeSignInTest {
             signIn.start("z1")
 
             assertEquals(1, starts)
-            val again = signIn.state.value as ZCodeSignInState.Waiting
+            val again = signIn.state.value as ServiceSignInState.Waiting
             assertEquals("https://chat.z.ai/a", again.url)
             // A new value, so the page opens again.
             assertTrue(again != first)
 
             session.result.complete(tokens)
-            assertEquals(ZCodeSignInState.Done("z1"), signIn.state.value)
+            assertEquals(ServiceSignInState.Done("z1"), signIn.state.value)
         }
 
     @Test
@@ -136,7 +163,7 @@ class ZCodeSignInTest {
             val lines = mutableListOf<String>()
             val session = FakeSession()
             val signIn =
-                ZCodeSignIn(
+                ServiceSignIn(
                     start = { session },
                     save = { _, _ -> },
                     scope = backgroundScope,

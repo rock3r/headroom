@@ -21,6 +21,16 @@ public data class QuotaSnapshot(
      * the resets it read last, rather than none.
      */
     val resetsReadFailed: Boolean = false,
+    /**
+     * True when a second Cursor sign-in is linked to this account, so its Cursor model pools and
+     * its Grok Bot pool join the snapshot. False when the user has not connected Cursor here.
+     */
+    val cursorLinked: Boolean = false,
+    /**
+     * True when the sync could not read the linked Cursor account's usage. The Grok usage is still
+     * new; the snapshot holds no Cursor windows. Only set when [cursorLinked] is true.
+     */
+    val cursorReadFailed: Boolean = false,
 )
 
 /** An amount left to spend, such as AI credits. */

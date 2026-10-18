@@ -1,0 +1,10 @@
+{
+  "currentPeriodStart": "2026-10-11T19:49:11.555Z",
+  "nextResetTimestampUtc": "2026-10-18T19:49:11.555Z",
+  "usagePercent": 47.910477,
+  "hasAvailableUsage": true,
+  "hasNonZeroIncludedLimit": true,
+  "grokPlanLabel": "Grok Bot Plan",
+  "cursorPlanName": "Ultra",
+  "billingBrand": "SAND_BILLING_BRAND_CURSOR"
+}

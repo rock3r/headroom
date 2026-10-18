@@ -28,6 +28,16 @@ internal data class AccountEntity(
      * ones.
      */
     @ColumnInfo(defaultValue = "0") val resetsReadFailed: Boolean = false,
+    /**
+     * True when a second Cursor sign-in is linked to this account, so the snapshot holds its Cursor
+     * windows. False when the user has not connected Cursor here.
+     */
+    @ColumnInfo(defaultValue = "0") val cursorLinked: Boolean = false,
+    /**
+     * True when the last sync that worked could not read the linked Cursor account's usage, so the
+     * account's windows hold no Cursor windows.
+     */
+    @ColumnInfo(defaultValue = "0") val cursorReadFailed: Boolean = false,
 )
 
 @Entity(
