@@ -34,6 +34,7 @@ import dev.sebastiano.headroom.data.reset.SharedPreferencesResetReminderLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
 import dev.sebastiano.headroom.data.sync.SyncWorker
 import dev.sebastiano.headroom.model.AlertPreferences
+import dev.sebastiano.headroom.model.PromptDismissals
 import dev.sebastiano.headroom.model.ResetAttemptStore
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
@@ -96,6 +97,9 @@ public class DataGraph(
 
     /** The user's app settings: used or left, and how often to sync in the background. */
     public val settings: SettingsRepository = storage.settings
+
+    /** The prompts the user dismissed, one per account. */
+    public val promptDismissals: PromptDismissals = storage.promptDismissals
 
     private val roomRepository =
         storage.accounts(accountFetcher::fetch, clock, scope) {

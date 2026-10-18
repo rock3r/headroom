@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.designsystem.PaceChipState
 import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.ChartSummary
+import dev.sebastiano.headroom.model.CursorPrompt
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
@@ -78,6 +79,16 @@ data class AccountSummary(
     val dataFrom: Instant? = null,
     /** Why an [QuotaErrorKind.Auth] sync failed, when the provider gave a specific reason. */
     val authReason: AuthFailureReason? = null,
+    /**
+     * What the app asks about this account's second Cursor sign-in, or null when it asks nothing:
+     * either the sign-in works, or the user dismissed the prompt.
+     */
+    val cursorPrompt: CursorPrompt? = null,
+    /**
+     * True when the user dismissed the Cursor prompt. The account card hides it; the account, once
+     * opened, still offers the connection, so a dismissal is never a dead end.
+     */
+    val cursorPromptDismissed: Boolean = false,
 ) {
     /**
      * The instant the numbers describe: now for fresh data, the last good sync for stale data. Pace

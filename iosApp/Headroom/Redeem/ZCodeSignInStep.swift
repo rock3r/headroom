@@ -16,7 +16,7 @@ struct ZCodeSignInStep: View {
             .onChange(of: pageOpening, initial: true) { _, opening in
                 if let opening, let url = URL(string: opening.url) { browser.open(url) } else { browser.close() }
             }
-            .onChange(of: model.zCodeStep is ZCodeUiDone) { _, done in
+            .onChange(of: model.zCodeStep is ServiceSignInUiDone) { _, done in
                 if done {
                     model.headroom.resets.redeem.start(accountId: account.id, askForMore: askForMore)
                     onSignedIn()
@@ -28,9 +28,9 @@ struct ZCodeSignInStep: View {
     @ViewBuilder
     private var content: some View {
         switch model.zCodeStep {
-        case is ZCodeUiStarting, is ZCodeUiDone:
+        case is ServiceSignInUiStarting, is ServiceSignInUiDone:
             ProgressView()
-        case is ZCodeUiWaiting:
+        case is ServiceSignInUiWaiting:
             ContentUnavailableView {
                 Label("Sign in to ZCode", systemImage: "person.badge.key")
             } description: {
@@ -38,7 +38,7 @@ struct ZCodeSignInStep: View {
             } actions: {
                 Button("Open the sign-in page", systemImage: "safari", action: start)
             }
-        case let failed as ZCodeUiFailed:
+        case let failed as ServiceSignInUiFailed:
             ContentUnavailableView {
                 Label("Sign in to ZCode", systemImage: "exclamationmark.triangle")
             } description: {
@@ -61,7 +61,7 @@ struct ZCodeSignInStep: View {
 
     /// The page to show, and how many times it was asked for, so asking again opens it again.
     private var pageOpening: PageOpening? {
-        (model.zCodeStep as? ZCodeUiWaiting).map { PageOpening(url: $0.url, opened: Int($0.opened)) }
+        (model.zCodeStep as? ServiceSignInUiWaiting).map { PageOpening(url: $0.url, opened: Int($0.opened)) }
     }
 
     private func start() {

@@ -121,6 +121,21 @@
     <!-- A stale window whose reset time has passed: its numbers are from before the reset. -->
     <string name="stale_window_reset">Has reset</string>
     <string name="stale_window_reset_long">Has reset since the last update</string>
+    <!-- The call to action that connects a Grok account's separate Cursor sign-in. -->
+    <string name="cursor_prompt_title">See Cursor usage too</string>
+    <string name="cursor_prompt_banner_title">Connect your Cursor account to %1$s</string>
+    <string name="cursor_prompt_body">Cursor serves its own model pools and the Grok Bot pool from a separate Cursor account. Connect it to see them here.</string>
+    <string name="cursor_prompt_action">Connect</string>
+    <string name="cursor_prompt_failed_title">Couldn\'t read Cursor usage</string>
+    <string name="cursor_prompt_failed_banner_title">Couldn\'t read the Cursor usage of %1$s</string>
+    <string name="cursor_prompt_failed_body">Your Cursor sign-in is connected, but its usage could not be read this time.</string>
+    <string name="cursor_prompt_retry">Retry</string>
+    <string name="cursor_prompt_waiting">Finish signing in to Cursor in your browser.</string>
+    <string name="cursor_prompt_dismiss">Not now</string>
+    <string name="sign_in_watch_channel_name">Signing in</string>
+    <string name="sign_in_watch_channel_description">Shown while a sign-in waits for you in the browser.</string>
+    <string name="sign_in_watch_title">Finish signing in to %1$s</string>
+    <string name="sign_in_watch_text">Headroom comes back to the front when you are done.</string>
     <string name="detail_plan_label">%1$s · %2$s</string>
     <string name="detail_balance">Balance</string>
     <!-- An amount used out of a window's limit, then its unit, such as "12 / 200 credits used". -->

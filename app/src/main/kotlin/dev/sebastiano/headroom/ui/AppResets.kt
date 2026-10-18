@@ -18,8 +18,8 @@ import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.model.RedeemIntent
 import dev.sebastiano.headroom.prototype.PrototypeEnv
 import dev.sebastiano.headroom.prototype.PrototypeTools
-import dev.sebastiano.headroom.signin.ZCodeSignIn
-import dev.sebastiano.headroom.signin.ZCodeSignInState
+import dev.sebastiano.headroom.signin.ServiceSignIn
+import dev.sebastiano.headroom.signin.ServiceSignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
@@ -58,7 +58,7 @@ internal fun ResetSheetHost(
     val context = LocalContext.current
     // Once per change: the page opens when this sheet's sign-in starts waiting for the browser.
     DisposableEffect(signIn) {
-        if (signIn is ZCodeSignInState.Waiting) {
+        if (signIn is ServiceSignInState.Waiting) {
             signInTabIntent(context).launchUrl(context, signIn.url.toUri())
         }
         onDispose {}
@@ -89,11 +89,11 @@ internal fun ResetSheetHost(
  * sheet again neither opens its page again nor closes the sheet.
  */
 @Composable
-private fun zCodeSignInFor(zCode: ZCodeSignIn?, accountId: String): ZCodeSignInState {
-    zCode ?: return ZCodeSignInState.Idle
+private fun zCodeSignInFor(zCode: ServiceSignIn?, accountId: String): ServiceSignInState {
+    zCode ?: return ServiceSignInState.Idle
     val atOpen = remember(zCode, accountId) { zCode.state.value }
     val state by zCode.state.collectAsStateWithLifecycle()
-    return if (state.accountId == accountId && state != atOpen) state else ZCodeSignInState.Idle
+    return if (state.accountId == accountId && state != atOpen) state else ServiceSignInState.Idle
 }
 
 /**

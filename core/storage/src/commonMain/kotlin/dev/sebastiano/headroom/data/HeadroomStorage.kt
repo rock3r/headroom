@@ -6,10 +6,12 @@ import dev.sebastiano.headroom.data.db.HeadroomDatabase
 import dev.sebastiano.headroom.data.db.RoomQuotaRepository
 import dev.sebastiano.headroom.data.db.RoomResetEventLog
 import dev.sebastiano.headroom.data.prefs.DataStoreAlertPreferences
+import dev.sebastiano.headroom.data.prefs.DataStorePromptDismissals
 import dev.sebastiano.headroom.data.prefs.DataStoreSettingsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.HistoryRetention
+import dev.sebastiano.headroom.model.PromptDismissals
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.SettingsRepository
@@ -32,6 +34,9 @@ internal constructor(
     public val settings: SettingsRepository = DataStoreSettingsRepository(settingsStore)
 
     public val alertPreferences: AlertPreferences = DataStoreAlertPreferences(alertStore)
+
+    /** The prompts the user dismissed, one per account. */
+    public val promptDismissals: PromptDismissals = DataStorePromptDismissals(alertStore)
 
     /** The alert switches as they change, to reschedule alarms when one is flipped. */
     public val alertChanges: Flow<Preferences> = alertStore.data

@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.data.account
 
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialKind
+import dev.sebastiano.headroom.auth.CursorCredential
 import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.auth.ZCodeCredential
@@ -223,6 +224,57 @@ class SignInManagerTest {
 
     private val zCodeTokens =
         TokenSet(Provider.ZAi, CredentialKind.OAuth, "business", "bundle", null, label = "ada")
+
+    private val grokTokens =
+        TokenSet(Provider.Grok, CredentialKind.OAuth, "xai-access", "xai-refresh", null)
+
+    private val cursorTokens =
+        TokenSet(Provider.Grok, CredentialKind.OAuth, "cursor-access", "cursor-refresh", null)
+
+    @Test
+    fun `a Cursor sign-in is stored next to the Grok account and refreshes it`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        val manager = SignInManager(store, accounts) { "g1" }
+        manager.complete(grokTokens)
+        accounts.refreshed.clear()
+
+        manager.signInToCursor("g1", cursorTokens)
+        manager.signInToCursor("g1", cursorTokens.copy(accessToken = "cursor-access-2"))
+
+        assertEquals("xai-access", store.load("g1")?.accessToken)
+        assertEquals("cursor-access-2", store.load(CursorCredential.idFor("g1"))?.accessToken)
+        assertEquals(listOf<String?>("g1", "g1"), accounts.refreshed)
+    }
+
+    @Test
+    fun `signing out removes the Cursor sign-in too`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        val manager = SignInManager(store, accounts) { "g1" }
+        manager.complete(grokTokens)
+        manager.signInToCursor("g1", cursorTokens)
+
+        manager.signOut("g1")
+
+        assertNull(store.load("g1"))
+        assertNull(store.load(CursorCredential.idFor("g1")))
+    }
+
+    @Test
+    fun `a Cursor sign-in that finishes after its account was removed is dropped`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        val manager = SignInManager(store, accounts) { "g1" }
+        manager.complete(grokTokens)
+        manager.signOut("g1")
+        accounts.refreshed.clear()
+
+        manager.signInToCursor("g1", cursorTokens)
+
+        assertNull(store.load(CursorCredential.idFor("g1")))
+        assertEquals(emptyList<String?>(), accounts.refreshed)
+    }
 
     @Test
     fun `a ZCode sign-in is stored next to the Z_AI account and refreshes it`() = runTest {
