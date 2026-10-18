@@ -139,7 +139,9 @@ step "a sync moved Claude from $before to $after" 2-synced
 
 # An account's detail, and back.
 tap "Claude"
-wait_for "Reset alerts" > /dev/null
+# The detail's back button sits at the top, so it shows on every display size; "Reset alerts"
+# can be below the fold.
+wait_for "Back" > /dev/null
 wait_gone "Demo data"
 check_alive
 step "the detail for Claude shows" 3-detail
