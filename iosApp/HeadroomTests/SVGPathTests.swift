@@ -42,7 +42,7 @@ struct SVGPathTests {
         let providers = [
             ("claude", 40.0), ("codex", 40.0), ("copilot", 40.0), ("grok", 40.0),
             ("kimi", 40.0), ("zai", 40.0), ("opencode-go", 24.0), ("jetbrains", 24.0),
-            ("muse", 40.0),
+            ("muse", 40.0), ("gemini", 40.0),
         ]
         let kit = ProvidersKt.allProviders()
         for (id, viewport) in providers {

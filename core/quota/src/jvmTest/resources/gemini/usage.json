@@ -1,0 +1,21 @@
+{
+  "plan": "Gemini Code Assist Standard",
+  "limits": [
+    {
+      "name": "daily",
+      "label": "Daily",
+      "limit": 1500,
+      "used": 450,
+      "reset_time": "2026-10-19T07:00:00Z",
+      "window_seconds": 86400
+    },
+    {
+      "name": "session",
+      "label": "Session",
+      "limit": 60,
+      "used": 15,
+      "reset_time": "2026-10-18T20:00:00Z",
+      "window_seconds": 18000
+    }
+  ]
+}

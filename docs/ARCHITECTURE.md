@@ -119,6 +119,12 @@ An account without an active subscription returns no `subs_usage`. Headroom repo
 Meta supplies no stored usage-limit resets for Muse Code, so Muse has no reset client.
 Normal reset alerts use the quota windows' reset times.
 
+### Gemini usage
+
+`GeminiQuotaFetcher` reads subscription and rate limits from `/v1/usage` on `cloudaicompanion.googleapis.com`, matching the Gemini Code Assist CLI request.
+`GeminiOAuth` in `:core:auth` implements Google OAuth 2.0 PKCE with a loopback redirect to `http://localhost:<port>/oauth2callback`.
+Google issues access and refresh tokens. `daily` becomes a daily window and `session` a session window.
+
 ## Expired sign-in
 
 A sync failure with `QuotaErrorKind.Auth` sets `AccountState.isSignInExpired`.

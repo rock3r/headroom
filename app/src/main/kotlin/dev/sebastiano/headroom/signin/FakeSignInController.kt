@@ -68,7 +68,8 @@ class FakeSignInController(initial: SignInState = SignInState.Idle) : SignInCont
             Provider.Claude,
             Provider.Codex,
             Provider.Grok,
-            Provider.JetBrains -> SignInState.Browser(provider, DEMO_AUTHORIZATION_URL)
+            Provider.JetBrains,
+            Provider.Gemini -> SignInState.Browser(provider, DEMO_AUTHORIZATION_URL)
             Provider.Copilot,
             Provider.Kimi,
             Provider.Muse -> SignInState.DeviceCode(provider, DEMO_USER_CODE, DEMO_VERIFICATION_URL)

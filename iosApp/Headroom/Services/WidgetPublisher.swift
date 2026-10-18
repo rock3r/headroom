@@ -25,6 +25,7 @@ enum WidgetPublisher {
     private static let shortNames = [
         "claude": "Claude", "codex": "Codex", "copilot": "Copilot", "grok": "Grok", "kimi": "Kimi",
         "zai": "Z.AI", "opencode-go": "OpenCode", "jetbrains": "JetBrains", "muse": "Muse",
+        "gemini": "Gemini",
     ]
 
     static func publish(overview: OverviewUi, providers: [ProviderUi]) {

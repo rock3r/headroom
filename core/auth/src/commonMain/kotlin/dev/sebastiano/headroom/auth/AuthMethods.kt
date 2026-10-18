@@ -70,6 +70,7 @@ public class AuthMethods(
     private val kimi = KimiDeviceAuth(http, clock)
     private val muse = MuseDeviceAuth(http, clock)
     private val zCode = ZCodeAuth(http, clock)
+    private val gemini = GeminiOAuth(http, clock)
 
     /**
      * The refreshers of every provider that can refresh. API key providers have none, and neither
@@ -86,6 +87,7 @@ public class AuthMethods(
             Provider.Copilot to copilot,
             Provider.Kimi to kimi,
             Provider.ZAi to zCode,
+            Provider.Gemini to gemini,
         )
 
     /**
@@ -102,6 +104,7 @@ public class AuthMethods(
             Provider.Grok -> AuthMethod.Browser(browser(grok), offersCodePage = false)
             Provider.JetBrains -> AuthMethod.Browser(browser(jetBrains), offersCodePage = false)
             Provider.Codex -> AuthMethod.Browser(browser(codex), offersCodePage = false)
+            Provider.Gemini -> AuthMethod.Browser(browser(gemini), offersCodePage = false)
             Provider.Copilot -> AuthMethod.DeviceCode(DeviceCodeFlow(copilot, clock))
             Provider.Kimi -> AuthMethod.DeviceCode(DeviceCodeFlow(kimi, clock))
             Provider.Muse -> AuthMethod.DeviceCode(DeviceCodeFlow(muse, clock))

@@ -31,6 +31,7 @@ object ProviderPalette {
             Provider.Codex -> 155f
             Provider.ZAi -> 195f
             Provider.Grok -> 235f
+            Provider.Gemini -> 255f
             Provider.Kimi -> 270f
             Provider.Copilot -> 305f
             Provider.JetBrains -> 350f

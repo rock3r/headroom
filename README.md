@@ -1,7 +1,7 @@
 # Headroom
 
 Headroom shows your remaining AI subscription quotas on Android. It supports Claude, ChatGPT Codex,
-GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go, JetBrains AI and Muse.
+GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go, JetBrains AI, Muse and Gemini.
 Home screen and lock screen widgets show your usage. Reset alerts tell you when a weekly limit resets.
 
 Headroom is free software under the [Apache License 2.0](LICENSE).

@@ -26,6 +26,7 @@ class AuthMethodsTest {
                 Provider.OpenCodeGo to AuthMethod.ApiKey::class,
                 Provider.JetBrains to AuthMethod.Browser::class,
                 Provider.Muse to AuthMethod.DeviceCode::class,
+                Provider.Gemini to AuthMethod.Browser::class,
             ),
             kinds,
         )
@@ -78,6 +79,7 @@ class AuthMethodsTest {
                 Provider.Kimi,
                 Provider.JetBrains,
                 Provider.ZAi,
+                Provider.Gemini,
             ),
             methods.refreshers.keys,
         )

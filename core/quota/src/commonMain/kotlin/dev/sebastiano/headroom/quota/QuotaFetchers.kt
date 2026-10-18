@@ -40,6 +40,7 @@ public class QuotaFetchers(fetchers: List<QuotaFetcher>) {
                     OpenCodeGoQuotaFetcher(httpClient, clock),
                     JetBrainsQuotaFetcher(httpClient, clock, jetBrainsLog),
                     MuseQuotaFetcher(httpClient, clock),
+                    GeminiQuotaFetcher(httpClient, clock),
                 )
             )
     }

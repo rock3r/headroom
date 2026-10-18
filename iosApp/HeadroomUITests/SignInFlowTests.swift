@@ -22,7 +22,7 @@ final class SignInFlowTests: XCTestCase {
         app.buttons["Add account"].firstMatch.tap()
 
         XCTAssertTrue(app.staticTexts["Choose a provider"].waitForExistence(timeout: 5))
-        for name in ["Claude", "ChatGPT Codex", "GitHub Copilot", "Grok", "Kimi Code", "Z.AI", "OpenCode Go", "JetBrains AI", "Muse"] {
+        for name in ["Claude", "ChatGPT Codex", "GitHub Copilot", "Grok", "Kimi Code", "Z.AI", "OpenCode Go", "JetBrains AI", "Muse", "Gemini"] {
             XCTAssertTrue(app.buttons[name].exists, "\(name) is missing")
         }
     }

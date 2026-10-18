@@ -3,7 +3,7 @@
 ## Project overview
 
 Headroom is a native Android app that shows how much of your AI subscription quotas you have
-left (Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go, JetBrains AI, Muse).
+left (Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code, OpenCode Go, JetBrains AI, Muse, Gemini).
 It has Material 3 Expressive UI, adaptive layouts, Remote Compose widgets for the home and lock
 screens, a notification when a weekly limit resets, and an experimental Jetpack Compose Glimmer
 view for display glasses.

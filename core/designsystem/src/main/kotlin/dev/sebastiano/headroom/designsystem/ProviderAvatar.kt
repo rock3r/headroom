@@ -70,6 +70,7 @@ fun providerShape(provider: Provider): RoundedPolygon =
         Provider.OpenCodeGo -> MaterialShapes.SoftBurst
         Provider.JetBrains -> MaterialShapes.Gem
         Provider.Muse -> MaterialShapes.Cookie6Sided
+        Provider.Gemini -> MaterialShapes.Cookie4Sided
     }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

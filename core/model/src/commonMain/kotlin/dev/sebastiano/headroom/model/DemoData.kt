@@ -107,6 +107,20 @@ public object DemoData {
                     weekly("weekly", "Weekly", 41.0, now.plus(4968.minutes)),
                     session("five_hour", 57.0, now.plus(96.minutes)),
                 ),
+                state(
+                    Account("demo-gemini", Provider.Gemini, "sam@example.com"),
+                    "Standard",
+                    now,
+                    QuotaWindow(
+                        id = "daily",
+                        label = "Daily",
+                        kind = WindowKind.Daily,
+                        usedPercent = 48.0,
+                        resetsAt = now.plus(720.minutes),
+                        length = 1.days,
+                    ),
+                    session("session", 22.0, now.plus(110.minutes)),
+                ),
             )
 
     /**
