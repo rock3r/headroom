@@ -10,6 +10,7 @@ import dev.sebastiano.headroom.model.ResetAttemptMemory
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
+import dev.sebastiano.headroom.quota.QuotaFetchers
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.SignInController
@@ -42,6 +43,7 @@ internal class HeadroomParts(
     val resetEvents: ResetEventLog = ResetEventLog.None,
     val resetProvider: ResetProvider = NoResets,
     val resetMemory: ResetAttemptMemory = ResetAttemptMemory(),
+    val quotaFetchers: QuotaFetchers? = null,
     val startZCode: suspend () -> DeviceSession = { error("No ZCode sign-in here") },
     val clock: () -> Instant = Clock.System::now,
     val zone: () -> TimeZone = TimeZone::currentSystemDefault,
@@ -63,7 +65,8 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
     private val clock = parts.clock
     private val sources =
         Sources(parts.repository, parts.resetEvents, clock, parts.zone, parts.settings)
-    private val signInManager = SignInManager(parts.tokenStore, parts.repository)
+    private val signInManager =
+        SignInManager(parts.tokenStore, parts.repository, fetchers = parts.quotaFetchers)
     private val alertPreferences = parts.alerts
     private val settingsRepository = parts.settings
     private val onClose = parts.onClose

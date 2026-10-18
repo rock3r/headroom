@@ -122,26 +122,32 @@ Normal reset alerts use the quota windows' reset times.
 ## Expired sign-in
 
 A sync failure with `QuotaErrorKind.Auth` sets `AccountState.isSignInExpired`.
-`RoomQuotaRepository` retains the stale snapshot and Auth error through later failures, including network errors.
+`QuotaResult.Failure` and `AccountState` also carry an optional `AuthFailureReason`, such as `KeyExpired` when a provider reports that an API key itself has expired (for example OpenCode Go's `error.code == "api_key_expired"` on HTTP 401).
+`RoomQuotaRepository` stores that reason alongside `Auth` in `lastError` (`"Auth:KeyExpired"`) and retains the stale snapshot and Auth error through later failures, including network errors.
 Only a successful sync clears the Auth error.
 
 - `Modifier.stale` and `StaleStyle` in `:core:designsystem` fade usage values towards grey.
   Stale indicators stay flat. Pace uses the last successful sync time.
   `Age` rounds labels such as "Last updated 2 hours ago" to the nearest unit.
-- Cards and account details keep the "Sign in" action fully visible.
+- Cards and account details keep the action fully visible.
+  OAuth and device-code providers show "Sign-in expired" and a "Sign in" action.
+  API-key providers (`Provider.usesApiKey`) show "API key expired" (when `authReason` is `KeyExpired`, with instructions to create a new key in the provider's console) or "API key rejected", and a "Replace API key" action.
   Bars, single-ring and single-shape widgets show a fully visible "Sign in" label.
   Ring grids, lock screen widgets and Shape grids replace the number with a red "!" badge.
-  Rings retain the account name below them. Content descriptions announce sign-in expiry and the last usage values.
+  Rings retain the account name below them. Content descriptions announce the expiry and the last usage values.
   Tapping a stale widget account opens sign-in.
 - Expired accounts cannot supply the next reset, receive reset alarms or appear under upcoming resets.
 - After every refresh, `SignInAlertingRepository` in `:core:data` runs `SignInAlertPolicy`.
-  The first expiry posts a warning on "Sign-in problems".
+  The first expiry posts a warning on "Sign-in problems", worded for either an expired sign-in or an expired/rejected API key.
   A successful sync or account removal clears the warning. Tapping the warning or receiving a network error leaves it in place.
-- "Sign in" immediately starts the provider's normal flow at `SignInState.Starting`.
+- "Sign in" / "Replace API key" starts the provider's normal flow (`SignInState.Starting` for OAuth and device code, `SignInState.ApiKey` for API keys).
   `SignInManager.reauthenticate` saves new tokens under the same account ID, preserving history, name and alert switches.
   It updates the label if the provider returns a new email.
   It rejects a different provider account ID when both credentials have one; otherwise it compares email addresses.
   Copilot and API-key providers supply no account identity, so Headroom accepts any sign-in for them.
+- For API-key providers, `SignInManager` validates a submitted key with one quota fetch before saving it.
+  When the provider rejects the key with `QuotaErrorKind.Auth`, `SignInManager` throws `InvalidApiKeyException`, leaving any stored credential untouched, and `RealSignInController` returns to `SignInState.ApiKey` with an inline error (`ApiKeyRejection.Expired` or `ApiKeyRejection.Unauthorized`).
+  When validation fails with a network error, nothing is saved and the flow moves to `SignInState.Failed(SignInError.Network)` so the user can retry.
 - Debug builds preview it with demo data:
   `adb shell am broadcast -n dev.sebastiano.headroom/.DemoSignInExpiredReceiver`
   (add `--ez clear true` to undo).

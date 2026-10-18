@@ -1,11 +1,13 @@
 package dev.sebastiano.headroom.shared
 
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.model.logo
+import dev.sebastiano.headroom.signin.ApiKeyRejection
 import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.signin.SignInKind
 import dev.sebastiano.headroom.signin.SignInState
@@ -127,8 +129,25 @@ class UiMappingTest {
         val account = UiMapping.account(expired, now)
 
         assertTrue(account.signInExpired)
+        assertFalse(account.usesApiKey)
         assertEquals("auth", account.error)
+        assertNull(account.authReason)
         assertEquals(now.minus(2.hours).epochSeconds, account.updatedAtEpochSeconds)
+    }
+
+    @Test
+    fun `an expired API key carries its auth reason while keeping error id backward compatible`() {
+        val opencode =
+            DemoData.manyAccounts(now)
+                .first { it.account.provider == Provider.OpenCodeGo }
+                .copy(lastError = QuotaErrorKind.Auth, authReason = AuthFailureReason.KeyExpired)
+
+        val account = UiMapping.account(opencode, now)
+
+        assertTrue(account.signInExpired)
+        assertTrue(account.usesApiKey)
+        assertEquals("auth", account.error)
+        assertEquals("keyExpired", account.authReason)
     }
 
     @Test
@@ -205,6 +224,21 @@ class UiMappingTest {
         assertEquals(
             SignInUi.Failed("codex", "ChatGPT Codex", "differentAccount"),
             UiMapping.signIn(SignInState.Failed(Provider.Codex, SignInError.DifferentAccount)),
+        )
+        assertEquals(
+            SignInUi.ApiKey(
+                "opencode-go",
+                "OpenCode Go",
+                keyRejected = true,
+                rejection = "expired",
+            ),
+            UiMapping.signIn(
+                SignInState.ApiKey(
+                    Provider.OpenCodeGo,
+                    keyRejected = true,
+                    rejection = ApiKeyRejection.Expired,
+                )
+            ),
         )
     }
 

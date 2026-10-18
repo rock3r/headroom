@@ -24,6 +24,8 @@ public data class AccountState(
     val snapshot: QuotaSnapshot?,
     val lastError: QuotaErrorKind? = null,
     val isRefreshing: Boolean = false,
+    /** Why an [QuotaErrorKind.Auth] sync failed, when the provider gave a specific reason. */
+    val authReason: AuthFailureReason? = null,
 ) {
     /**
      * The weekly window if there is one, otherwise the longest window. The UI leads with it. Never

@@ -7,7 +7,9 @@ import dev.sebastiano.headroom.auth.BrowserSignIn
 import dev.sebastiano.headroom.auth.DeviceCodePrompt
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.data.account.DifferentAccountException
+import dev.sebastiano.headroom.data.account.InvalidApiKeyException
 import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.Provider
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -171,13 +173,30 @@ public class RealSignInController(
             try {
                 steps.apiKeyTokens(current, key)
             } catch (_: AuthException.SignInFailed) {
-                mutableState.value = SignInState.ApiKey(current, keyRejected = true)
+                mutableState.value =
+                    SignInState.ApiKey(
+                        current,
+                        keyRejected = true,
+                        rejection = ApiKeyRejection.Malformed,
+                    )
                 return
             }
         finishing(current)
         job = scope.launch {
             try {
                 finish(current, tokens)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (rejected: InvalidApiKeyException) {
+                val rejection =
+                    when (rejected.reason) {
+                        AuthFailureReason.KeyExpired -> ApiKeyRejection.Expired
+                        null -> ApiKeyRejection.Unauthorized
+                    }
+                mutableState.value =
+                    SignInState.ApiKey(current, keyRejected = true, rejection = rejection)
+            } catch (failure: AuthException) {
+                mutableState.value = SignInState.Failed(current, failure.toSignInError())
             } catch (_: IOException) {
                 mutableState.value = SignInState.Failed(current, SignInError.Unknown)
             } catch (_: DifferentAccountException) {

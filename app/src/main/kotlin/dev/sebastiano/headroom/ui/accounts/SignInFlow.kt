@@ -40,8 +40,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
+import dev.sebastiano.headroom.signin.ApiKeyRejection
 import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.signin.SignInState
+import dev.sebastiano.headroom.ui.components.apiKeyConsoleName
+import dev.sebastiano.headroom.ui.components.apiKeyProviderShortName
 
 const val SIGN_IN_CODE_FIELD_TAG: String = "sign-in-code"
 const val SIGN_IN_KEY_FIELD_TAG: String = "sign-in-key"
@@ -211,7 +214,7 @@ private fun ApiKeyStep(state: SignInState.ApiKey, actions: AccountsActions) {
             isError = state.keyRejected,
             supportingText =
                 if (state.keyRejected) {
-                    { Text(stringResource(R.string.signin_key_rejected)) }
+                    { Text(apiKeyErrorText(state)) }
                 } else {
                     null
                 },
@@ -223,6 +226,21 @@ private fun ApiKeyStep(state: SignInState.ApiKey, actions: AccountsActions) {
         }
     }
 }
+
+@Composable
+private fun apiKeyErrorText(state: SignInState.ApiKey): String =
+    when (state.rejection) {
+        ApiKeyRejection.Expired ->
+            stringResource(
+                R.string.signin_key_expired,
+                apiKeyProviderShortName(state.provider),
+                apiKeyConsoleName(state.provider),
+            )
+        ApiKeyRejection.Unauthorized ->
+            stringResource(R.string.signin_key_unauthorized, state.provider.displayName)
+        ApiKeyRejection.Malformed,
+        null -> stringResource(R.string.signin_key_rejected)
+    }
 
 /** Nothing is left for the user to do: the header shows the work, and this says what it is. */
 @Composable

@@ -1,5 +1,6 @@
 package dev.sebastiano.headroom.quota
 
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import kotlin.time.Instant
@@ -34,6 +35,7 @@ internal sealed interface HttpOutcome {
 internal suspend fun QuotaHttpClient.fetchBody(
     request: QuotaHttpRequest,
     providerName: String,
+    authReason: (body: String) -> AuthFailureReason? = { null },
 ): HttpOutcome {
     val response =
         try {
@@ -44,7 +46,9 @@ internal suspend fun QuotaHttpClient.fetchBody(
     return if (response.statusCode == HTTP_OK) {
         HttpOutcome.Ok(response.body)
     } else {
-        HttpOutcome.Failed(failureForStatus(providerName, response.statusCode))
+        val reason =
+            if (response.statusCode == HTTP_UNAUTHORIZED) authReason(response.body) else null
+        HttpOutcome.Failed(failureForStatus(providerName, response.statusCode, authReason = reason))
     }
 }
 
@@ -56,6 +60,7 @@ internal fun failureForStatus(
     providerName: String,
     statusCode: Int,
     detail: String? = null,
+    authReason: AuthFailureReason? = null,
 ): QuotaResult.Failure {
     val kind =
         when (statusCode) {
@@ -65,7 +70,11 @@ internal fun failureForStatus(
             else -> QuotaErrorKind.Unknown
         }
     val message = "$providerName usage fetch failed ($statusCode)"
-    return QuotaResult.Failure(kind, if (detail == null) message else "$message: $detail")
+    return QuotaResult.Failure(
+        kind = kind,
+        message = if (detail == null) message else "$message: $detail",
+        authReason = if (kind == QuotaErrorKind.Auth) authReason else null,
+    )
 }
 
 internal fun networkFailure(providerName: String, cause: IOException): QuotaResult.Failure =

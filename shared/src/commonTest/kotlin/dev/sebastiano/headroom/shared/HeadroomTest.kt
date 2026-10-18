@@ -8,12 +8,15 @@ import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.RedeemOutcome
@@ -25,6 +28,9 @@ import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.quota.ProviderCredentials
+import dev.sebastiano.headroom.quota.QuotaFetcher
+import dev.sebastiano.headroom.quota.QuotaFetchers
 import dev.sebastiano.headroom.signin.BrowserSession
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.SignInKind
@@ -110,6 +116,81 @@ class HeadroomTest {
         val overview = latestOverview()
         assertFalse(overview.isDemo)
         assertEquals(listOf("zai"), overview.accounts.map { it.providerId })
+    }
+
+    @Test
+    fun `an expired API key is rejected inline and keeps the previous key untouched`() {
+        val store = InMemoryTokenStore()
+        var result: QuotaResult =
+            QuotaResult.Failure(
+                QuotaErrorKind.Auth,
+                "expired",
+                authReason = AuthFailureReason.KeyExpired,
+            )
+        val fetchers =
+            QuotaFetchers(
+                listOf(
+                    object : QuotaFetcher {
+                        override val provider = Provider.OpenCodeGo
+
+                        override suspend fun fetch(credentials: ProviderCredentials): QuotaResult =
+                            result
+                    }
+                )
+            )
+        val validated =
+            Headroom(
+                HeadroomParts(
+                    repository = repository,
+                    tokenStore = store,
+                    signInSteps = ApiKeySteps,
+                    settings = settings,
+                    alerts = alerts,
+                    quotaFetchers = fetchers,
+                    clock = { now },
+                    zone = { TimeZone.UTC },
+                    compute = StandardTestDispatcher(scope.testScheduler),
+                ),
+                scope,
+            )
+        repository.add(Account("oc-1", Provider.OpenCodeGo, "OpenCode Go"))
+        scope.runTestResult {
+            store.save(
+                TokenSet(Provider.OpenCodeGo, CredentialKind.ApiKey, "old-key", null, null)
+                    .toCredential("oc-1"),
+                expectedRevision = null,
+            )
+        }
+
+        var signIn: SignInUi = SignInUi.Idle
+        val watch = validated.signIn.watch { signIn = it }
+        validated.signIn.start("opencode-go", accountId = "oc-1")
+        scope.runCurrent()
+
+        validated.signIn.submitApiKey("expired-key")
+        scope.runCurrent()
+
+        assertEquals(
+            SignInUi.ApiKey(
+                "opencode-go",
+                "OpenCode Go",
+                keyRejected = true,
+                rejection = "expired",
+            ),
+            signIn,
+        )
+        assertEquals("old-key", scope.runTestResult { store.load("oc-1")?.accessToken })
+
+        result =
+            QuotaResult.Success(
+                QuotaSnapshot(Provider.OpenCodeGo, "oc-1", "OpenCode Go", emptyList(), now)
+            )
+        validated.signIn.submitApiKey("fresh-key")
+        scope.runCurrent()
+        watch.cancel()
+
+        assertEquals(SignInUi.Success("opencode-go", "OpenCode Go", "OpenCode Go"), signIn)
+        assertEquals("fresh-key", scope.runTestResult { store.load("oc-1")?.accessToken })
     }
 
     @Test

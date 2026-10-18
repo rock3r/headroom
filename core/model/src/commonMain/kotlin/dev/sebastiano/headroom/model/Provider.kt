@@ -19,6 +19,10 @@ public enum class Provider(public val id: String, public val displayName: String
     public val windowsAreSeparateAllowances: Boolean
         get() = this == JetBrains
 
+    /** True when the user signs in by pasting an API key rather than through OAuth. */
+    public val usesApiKey: Boolean
+        get() = this == ZAi || this == OpenCodeGo
+
     public companion object {
         public fun fromId(id: String): Provider? = entries.firstOrNull { it.id == id }
     }

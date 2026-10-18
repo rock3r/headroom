@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.data.db
 
 import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.HistoryRetention
 import dev.sebastiano.headroom.model.Provider
@@ -194,6 +195,48 @@ class RoomQuotaRepositoryTest {
             result = QuotaResult.Success(claude.snapshot!!)
             repo.refresh()
             assertNull(repo.current().single().lastError)
+        }
+
+    @Test
+    fun `an expired API key reason survives storage and later network errors`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var result: QuotaResult =
+                QuotaResult.Failure(
+                    QuotaErrorKind.Auth,
+                    "expired",
+                    authReason = AuthFailureReason.KeyExpired,
+                )
+            val repo = repo({ result }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.refresh()
+
+            val afterAuth = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, afterAuth.lastError)
+            assertEquals(AuthFailureReason.KeyExpired, afterAuth.authReason)
+
+            result = QuotaResult.Failure(QuotaErrorKind.Network, "offline")
+            repo.refresh()
+            val afterNetwork = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, afterNetwork.lastError)
+            assertEquals(AuthFailureReason.KeyExpired, afterNetwork.authReason)
+
+            result = QuotaResult.Failure(QuotaErrorKind.Auth, "unauthorized", authReason = null)
+            repo.refresh()
+            val afterGenericAuth = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, afterGenericAuth.lastError)
+            assertEquals(AuthFailureReason.KeyExpired, afterGenericAuth.authReason)
+
+            // A row stored by an older build as plain "Auth" still loads as Auth with no reason.
+            db.quotaDao().updateError(claude.account.id, "Auth")
+            val legacy = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, legacy.lastError)
+            assertNull(legacy.authReason)
+
+            result = QuotaResult.Success(claude.snapshot!!)
+            repo.refresh()
+            val recovered = repo.current().single()
+            assertNull(recovered.lastError)
+            assertNull(recovered.authReason)
         }
 
     @Test

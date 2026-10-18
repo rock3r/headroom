@@ -1,11 +1,19 @@
 package dev.sebastiano.headroom.data.account
 
+import dev.sebastiano.headroom.auth.AuthException
+import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.auth.TokenStore
 import dev.sebastiano.headroom.auth.ZCodeCredential
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AuthFailureReason
+import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.quota.ProviderCredentials
+import dev.sebastiano.headroom.quota.QuotaFetchers
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -17,16 +25,27 @@ import kotlinx.io.IOException
 public class DifferentAccountException(accountId: String) :
     Exception("The sign-in is not for account $accountId")
 
+/**
+ * An API key was rejected by [provider] before it could be saved. [reason] carries the specific
+ * auth failure reason when the provider gave one, such as [AuthFailureReason.KeyExpired].
+ */
+public class InvalidApiKeyException(
+    public val provider: Provider,
+    public val reason: AuthFailureReason? = null,
+) : Exception("The API key for $provider was rejected (${reason ?: "unauthorized"})")
+
 /** Turns the tokens of a finished sign-in into an account, and signs accounts out. */
 public class SignInManager(
     private val store: TokenStore,
     private val accounts: AccountsRepository,
+    private val fetchers: QuotaFetchers? = null,
     private val newAccountId: () -> String = { Uuid.random().toString() },
 ) {
     /** Keeps a ZCode sign-in from saving while a sign-out runs. */
     private val zCodeLock = Mutex()
 
     public suspend fun complete(tokens: TokenSet): Account {
+        validateApiKey(tokens)
         val account =
             Account(newAccountId(), tokens.provider, tokens.label ?: tokens.provider.displayName)
         store.save(tokens.toCredential(account.id), expectedRevision = null)
@@ -42,12 +61,18 @@ public class SignInManager(
      *
      * @throws DifferentAccountException when the provider says the tokens belong to another of its
      *   accounts. The stored credential is left as it was.
+     * @throws InvalidApiKeyException when [tokens] is an API key and the provider rejects it.
+     * @throws AuthException when validating an API key fails because of a network or fetch error.
      * @throws IOException when the token store keeps refusing the save.
      */
     public suspend fun reauthenticate(accountId: String, tokens: TokenSet): Account {
         val account =
             accounts.current().firstOrNull { it.account.id == accountId }?.account
                 ?: return complete(tokens)
+        if (account.provider != tokens.provider) {
+            throw DifferentAccountException(accountId)
+        }
+        validateApiKey(tokens)
         val credential = tokens.toCredential(accountId)
         // A concurrent refresh can bump the revision between the load and the save: try again.
         repeat(SAVE_ATTEMPTS) {
@@ -63,6 +88,24 @@ public class SignInManager(
             }
         }
         throw IOException("Could not save the new sign-in of account $accountId")
+    }
+
+    /**
+     * Runs one fetch with an API key before storing it, so an expired or unauthorized key never
+     * replaces a stored credential or reports a successful sign-in.
+     */
+    private suspend fun validateApiKey(tokens: TokenSet) {
+        if (tokens.kind != CredentialKind.ApiKey) return
+        val fetcher = fetchers?.getOrNull(tokens.provider) ?: return
+        val result = fetcher.fetch(ProviderCredentials(accessToken = tokens.accessToken))
+        if (result is QuotaResult.Failure) {
+            when (result.kind) {
+                QuotaErrorKind.Auth ->
+                    throw InvalidApiKeyException(tokens.provider, result.authReason)
+                QuotaErrorKind.Network -> throw AuthException.Network(result.message)
+                else -> throw AuthException.SignInFailed(result.message)
+            }
+        }
     }
 
     /**

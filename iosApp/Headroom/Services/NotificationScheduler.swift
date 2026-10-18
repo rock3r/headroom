@@ -10,6 +10,7 @@ import UserNotifications
 @MainActor
 final class NotificationScheduler {
     static let signInCategory = "signIn"
+    static let apiKeyCategory = "apiKey"
     static let reminderCategory = "reminder"
     static let openAction = "open"
     static let muteAction = "mute"
@@ -35,6 +36,11 @@ final class NotificationScheduler {
             UNNotificationCategory(
                 identifier: Self.signInCategory,
                 actions: [UNNotificationAction(identifier: Self.signInAction, title: String(localized: "Sign in"), options: .foreground)],
+                intentIdentifiers: []
+            ),
+            UNNotificationCategory(
+                identifier: Self.apiKeyCategory,
+                actions: [UNNotificationAction(identifier: Self.signInAction, title: String(localized: "Replace API key"), options: .foreground)],
                 intentIdentifiers: []
             ),
             UNNotificationCategory(identifier: Self.reminderCategory, actions: [open], intentIdentifiers: []),
@@ -133,16 +139,38 @@ final class NotificationScheduler {
 
     private func request(_ alert: SignInAlertUi) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
-        content.title = alert.label.map { String(localized: "Sign in to \(alert.providerName) again · \($0)") }
-            ?? String(localized: "Sign in to \(alert.providerName) again")
-        if let synced = alert.syncedAtEpochSeconds?.int64Value {
-            let date = Date(epochSeconds: synced).formatted(date: .abbreviated, time: .shortened)
-            content.body = String(localized: "Headroom can't update this account until you sign in. The numbers you see are from \(date).")
+        let keyExpired = alert.authReason == "keyExpired"
+        let usesApiKey = alert.usesApiKey
+        if keyExpired {
+            content.title = alert.label.map { String(localized: "\(alert.providerName) API key expired · \($0)") }
+                ?? String(localized: "\(alert.providerName) API key expired")
+            if let synced = alert.syncedAtEpochSeconds?.int64Value {
+                let date = Date(epochSeconds: synced).formatted(date: .abbreviated, time: .shortened)
+                content.body = String(localized: "This API key has expired. Create a new key and replace it in Headroom. The numbers you see are from \(date).")
+            } else {
+                content.body = String(localized: "This API key has expired. Create a new key and replace it in Headroom.")
+            }
+        } else if usesApiKey {
+            content.title = alert.label.map { String(localized: "\(alert.providerName) API key rejected · \($0)") }
+                ?? String(localized: "\(alert.providerName) API key rejected")
+            if let synced = alert.syncedAtEpochSeconds?.int64Value {
+                let date = Date(epochSeconds: synced).formatted(date: .abbreviated, time: .shortened)
+                content.body = String(localized: "This API key was rejected. Replace it in Headroom to update this account. The numbers you see are from \(date).")
+            } else {
+                content.body = String(localized: "This API key was rejected. Replace it in Headroom to update this account.")
+            }
         } else {
-            content.body = String(localized: "Headroom can't update this account until you sign in.")
+            content.title = alert.label.map { String(localized: "Sign in to \(alert.providerName) again · \($0)") }
+                ?? String(localized: "Sign in to \(alert.providerName) again")
+            if let synced = alert.syncedAtEpochSeconds?.int64Value {
+                let date = Date(epochSeconds: synced).formatted(date: .abbreviated, time: .shortened)
+                content.body = String(localized: "Headroom can't update this account until you sign in. The numbers you see are from \(date).")
+            } else {
+                content.body = String(localized: "Headroom can't update this account until you sign in.")
+            }
         }
         content.sound = .default
-        content.categoryIdentifier = Self.signInCategory
+        content.categoryIdentifier = (usesApiKey || keyExpired) ? Self.apiKeyCategory : Self.signInCategory
         content.userInfo = ["accountId": alert.accountId, "signIn": true]
         return UNNotificationRequest(identifier: "signIn:\(alert.accountId)", content: content, trigger: nil)
     }
