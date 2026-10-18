@@ -37,13 +37,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
-import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.island.ResetIslandAccess
 import dev.sebastiano.headroom.model.TileSubtitleMode
@@ -67,7 +65,6 @@ import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
 import dev.sebastiano.headroom.ui.stats.StatsScreen
 import dev.sebastiano.headroom.ui.stats.StatsViewModel
-import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
@@ -96,6 +93,8 @@ fun HeadroomApp(
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
     val resets = collectResets(graph)
     val formatter = rememberResetFormatter(graph.zone)
+    val cursorConnect = rememberCursorConnect(graph, homeViewModel, live.isDemo)
+    OpenSignInPage(graph.cursorSignIn)
     val snackbar = remember { SnackbarHostState() }
     val addWidget = rememberWidgetAdder(graph.widgetPinner, snackbar)
     var page by rememberSaveable { mutableStateOf(Page.Home) }
@@ -123,12 +122,7 @@ fun HeadroomApp(
     }
     val tileScroll =
         rememberTileScroll(openTileSettingsRequest, onConsumeOpenTileSettings, requests, openPage)
-    // Made once: this composable recomposes whenever the pages settle, for example as Settings'
-    // reveal ends. New callbacks then would compose every row of Settings again.
-    val settingsActions =
-        remember(settingsViewModel, addWidget, graph.resetIsland) {
-            settingsActions(settingsViewModel, addWidget, graph.resetIsland, openPage)
-        }
+    val settingsActions = rememberSettingsActions(settingsViewModel, addWidget, graph, openPage)
     val accountsActions =
         accountsActions(accountsViewModel) {
                 page = if (accountsFromSettings) Page.Settings else Page.Home
@@ -182,6 +176,7 @@ fun HeadroomApp(
                         },
                         resets = resets,
                         resetHandlers = sheet.handlers(),
+                        cursor = cursorConnect,
                         stats = { bottomPadding ->
                             // Collected only while the tab shows: no stats work off screen.
                             val stats by statsViewModel.state.collectAsStateWithLifecycle()
@@ -366,21 +361,6 @@ private fun ResetIslandAccess.collectUi(): ResetIslandUi {
     return ResetIslandUi(ready, enabled, overlay)
 }
 
-/** Asks [pinner] for a widget, and says so in [snackbar] when the launcher cannot add it. */
-@Composable
-private fun rememberWidgetAdder(
-    pinner: WidgetPinner,
-    snackbar: SnackbarHostState,
-): (WidgetStyle) -> Unit {
-    val scope = rememberCoroutineScope()
-    val unavailable = stringResource(R.string.widget_add_unavailable)
-    return remember(pinner, snackbar, unavailable) {
-        { style ->
-            if (!pinner.requestPin(style)) scope.launch { snackbar.showSnackbar(unavailable) }
-        }
-    }
-}
-
 /**
  * The pages, one over the other. Settings opens from the overview with a circular reveal from the
  * settings button (see [SettingsReveal]); every other page fades and scales in. With motion reduced
@@ -452,7 +432,7 @@ private fun AppSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modif
  * The settings screen's callbacks, wired to [viewModel]; [onAddWidget] pins a widget and
  * [onNavigate] goes to another page.
  */
-private fun settingsActions(
+internal fun settingsActions(
     viewModel: SettingsViewModel,
     onAddWidget: (WidgetStyle) -> Unit,
     resetIsland: ResetIslandAccess,
@@ -472,6 +452,7 @@ private fun settingsActions(
         onResetConfettiChange = viewModel::setResetConfetti,
         onResetIslandChange = viewModel::setResetIsland,
         onResetExpiryRemindersChange = viewModel::setResetExpiryReminders,
+        onKeepLongHistoryChange = viewModel::setKeepLongHistory,
         onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
         onRefreshResetIsland = resetIsland::refresh,
         onOpenPrototypes = { onNavigate(Page.Prototypes) },
@@ -539,7 +520,7 @@ private fun rememberPageTransition(
 }
 
 /** The home scaffold, or a page drawn over it. Back from a page goes to [back]. */
-private enum class Page {
+internal enum class Page {
     Home,
     Accounts,
     Settings,

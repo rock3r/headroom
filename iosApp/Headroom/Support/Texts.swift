@@ -81,4 +81,36 @@ enum Texts {
         default: "Limit"
         }
     }
+
+    /// What a provider calls its console where API keys are created.
+    static func apiKeyConsoleName(providerId: String?, providerName: String) -> String {
+        switch providerId {
+        case "opencode-go": String(localized: "the OpenCode Console")
+        case "zai": String(localized: "the Z.AI console")
+        default: providerName
+        }
+    }
+
+    /// The short provider name used in inline API key errors.
+    static func apiKeyShortProviderName(providerId: String?, providerName: String) -> String {
+        providerId == "opencode-go" ? "OpenCode" : providerName
+    }
+
+    static func apiKeyExpiredBody(providerId: String?, providerName: String) -> String {
+        let console = apiKeyConsoleName(providerId: providerId, providerName: providerName)
+        return String(localized: "This API key has expired. Create a new key in \(console), then replace it here.")
+    }
+
+    static func apiKeyRejection(providerId: String, providerName: String, rejection: String?) -> String {
+        switch rejection {
+        case "expired":
+            let short = apiKeyShortProviderName(providerId: providerId, providerName: providerName)
+            let console = apiKeyConsoleName(providerId: providerId, providerName: providerName)
+            return String(localized: "\(short) says this key has expired — create a new one in \(console).")
+        case "unauthorized":
+            return String(localized: "\(providerName) rejected this API key. Check that you copied all of it.")
+        default:
+            return String(localized: "This key does not look right. Check that you copied all of it.")
+        }
+    }
 }

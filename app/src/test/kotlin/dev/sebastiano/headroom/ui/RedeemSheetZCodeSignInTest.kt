@@ -30,8 +30,8 @@ import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.prototype.ResetScenarios
 import dev.sebastiano.headroom.prototype.ScenarioAccounts
 import dev.sebastiano.headroom.signin.DeviceSession
-import dev.sebastiano.headroom.signin.ZCodeSignIn
-import dev.sebastiano.headroom.signin.ZCodeSignInState
+import dev.sebastiano.headroom.signin.ServiceSignIn
+import dev.sebastiano.headroom.signin.ServiceSignInState
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.home.toSummary
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
@@ -69,7 +69,7 @@ class RedeemSheetZCodeSignInTest {
     fun `a finished sign-in shows the resets instead of closing the sheet`() {
         var dismissed = 0
         var availability by mutableStateOf(signedOut)
-        var signIn by mutableStateOf<ZCodeSignInState>(ZCodeSignInState.Idle)
+        var signIn by mutableStateOf<ServiceSignInState>(ServiceSignInState.Idle)
         val provider =
             object : ResetProvider {
                 override suspend fun availability(account: Account): ResetAvailability =
@@ -102,7 +102,7 @@ class RedeemSheetZCodeSignInTest {
         rule.onNode(SIGN_IN_BUTTON and hasAnyAncestor(isDialog())).assertExists()
 
         // The sign-in finishes, and the account's fresh resets flow in.
-        signIn = ZCodeSignInState.Done(state.account.id)
+        signIn = ServiceSignInState.Done(state.account.id)
         availability = signedIn
         rule.waitForIdle()
 
@@ -145,7 +145,7 @@ class RedeemSheetZCodeSignInTest {
         assertEquals(2, sessions)
     }
 
-    private fun launchApp(zCode: ZCodeSignIn) {
+    private fun launchApp(zCode: ServiceSignIn) {
         val provider =
             object : ResetProvider {
                 override suspend fun availability(account: Account): ResetAvailability? =
@@ -195,8 +195,8 @@ class RedeemSheetZCodeSignInTest {
     private fun newZCodeSignIn(
         scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
         onStart: () -> Unit,
-    ): ZCodeSignIn =
-        ZCodeSignIn(
+    ): ServiceSignIn =
+        ServiceSignIn(
             start = {
                 onStart()
                 NeverEndingSession

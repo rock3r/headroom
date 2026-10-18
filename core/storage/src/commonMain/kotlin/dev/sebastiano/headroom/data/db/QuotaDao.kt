@@ -6,10 +6,12 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
+import dev.sebastiano.headroom.model.HistoryRetention
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-internal interface QuotaDao : ResetEventQueries {
+internal interface QuotaDao : UsageHistoryQueries, ResetEventQueries {
     @Transaction
     @Query("SELECT * FROM accounts ORDER BY position, rowid")
     fun observeAccounts(): Flow<List<AccountWithWindows>>
@@ -34,6 +36,50 @@ internal interface QuotaDao : ResetEventQueries {
 
     @Upsert suspend fun upsertWindows(windows: List<WindowEntity>)
 
+    @Transaction
+    @Query("SELECT * FROM accounts ORDER BY position, rowid")
+    suspend fun accountsWithWindows(): List<AccountWithWindows>
+
+    @Query("UPDATE accounts SET lastError = :error WHERE id = :id")
+    suspend fun updateError(id: String, error: String)
+
+    /**
+     * Stores a fetch result, unless the account was removed while the fetch was running. In the
+     * same transaction, [resetEvents] compares the account as stored before with this result, and
+     * the redeems that no sync has settled yet, and says which resets were used or expired. When
+     * [compactAtEpochMs] is set, points of [account] older than
+     * [HistoryRetention.FULL_RESOLUTION_SPAN] are thinned into [HistoryRetention.LongTerm] buckets.
+     */
+    @Transaction
+    suspend fun storeSnapshot(
+        account: AccountEntity,
+        windows: List<WindowEntity>,
+        points: List<UsagePointEntity>,
+        pruneBeforeEpochMs: Long,
+        resetEvents: ResetEventFinder = ResetEventFinder.None,
+        compactAtEpochMs: Long? = null,
+    ) {
+        val previous = accountWithWindows(account.id) ?: return
+        val found = resetEvents.find(previous, pendingRedeems(account.id))
+        upsertAccount(account)
+        deleteWindows(account.id)
+        upsertWindows(windows)
+        upsertPoints(points)
+        pruneHistory(pruneBeforeEpochMs)
+        if (compactAtEpochMs != null) {
+            compactAccountHistory(account.id, Instant.fromEpochMilliseconds(compactAtEpochMs))
+        }
+        if (found.settledIds.isNotEmpty()) settleRedeems(found.settledIds)
+        if (found.events.isNotEmpty()) insertResetEvents(found.events)
+        pruneResetEvents(resetEvents.pruneBeforeEpochMs)
+    }
+}
+
+/**
+ * The usage history's queries and compaction. [QuotaDao] extends them, so a sync stores and
+ * compacts points in one transaction.
+ */
+internal interface UsageHistoryQueries {
     @Upsert suspend fun upsertPoints(points: List<UsagePointEntity>)
 
     @Query(
@@ -45,38 +91,37 @@ internal interface QuotaDao : ResetEventQueries {
     @Query("DELETE FROM usage_points WHERE atEpochMs < :beforeEpochMs")
     suspend fun pruneHistory(beforeEpochMs: Long)
 
-    @Transaction
-    @Query("SELECT * FROM accounts ORDER BY position, rowid")
-    suspend fun accountsWithWindows(): List<AccountWithWindows>
+    @Query(
+        "SELECT * FROM usage_points WHERE accountId = :accountId " +
+            "AND atEpochMs < :beforeEpochMs ORDER BY windowId, atEpochMs"
+    )
+    suspend fun pointsBefore(accountId: String, beforeEpochMs: Long): List<UsagePointEntity>
 
-    @Query("UPDATE accounts SET lastError = :error WHERE id = :id")
-    suspend fun updateError(id: String, error: String)
+    @Query(
+        "DELETE FROM usage_points WHERE accountId = :accountId AND windowId = :windowId " +
+            "AND atEpochMs IN (:atEpochMs)"
+    )
+    suspend fun deletePoints(accountId: String, windowId: String, atEpochMs: List<Long>)
 
-    /**
-     * Stores a fetch result, unless the account was removed while the fetch was running. In the
-     * same transaction, [resetEvents] compares the account as stored before with this result, and
-     * the redeems that no sync has settled yet, and says which resets were used or expired.
-     */
-    @Transaction
-    suspend fun storeSnapshot(
-        account: AccountEntity,
-        windows: List<WindowEntity>,
-        points: List<UsagePointEntity>,
-        pruneBeforeEpochMs: Long,
-        resetEvents: ResetEventFinder = ResetEventFinder.None,
-    ) {
-        val previous = accountWithWindows(account.id) ?: return
-        val found = resetEvents.find(previous, pendingRedeems(account.id))
-        upsertAccount(account)
-        deleteWindows(account.id)
-        upsertWindows(windows)
-        upsertPoints(points)
-        pruneHistory(pruneBeforeEpochMs)
-        if (found.settledIds.isNotEmpty()) settleRedeems(found.settledIds)
-        if (found.events.isNotEmpty()) insertResetEvents(found.events)
-        pruneResetEvents(resetEvents.pruneBeforeEpochMs)
+    suspend fun compactAccountHistory(accountId: String, now: Instant) {
+        val beforeEpochMs = now.minus(HistoryRetention.FULL_RESOLUTION_SPAN).toEpochMilliseconds()
+        pointsBefore(accountId, beforeEpochMs)
+            .groupBy { it.windowId }
+            .forEach { (windowId, windowPoints) ->
+                val toDelete =
+                    HistoryRetention.LongTerm.toDelete(
+                            windowPoints.map { it.toDomain() },
+                            now,
+                        )
+                        .map { it.at.toEpochMilliseconds() }
+                toDelete.chunked(DELETE_CHUNK_SIZE).forEach { chunk ->
+                    deletePoints(accountId, windowId, chunk)
+                }
+            }
     }
 }
+
+private const val DELETE_CHUNK_SIZE = 500
 
 /** What a sync stores in the reset history: see [QuotaDao.storeSnapshot]. */
 internal interface ResetEventFinder {

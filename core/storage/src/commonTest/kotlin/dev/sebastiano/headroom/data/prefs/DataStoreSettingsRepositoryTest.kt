@@ -51,6 +51,7 @@ class DataStoreSettingsRepositoryTest {
         settings.setResetConfetti(false)
         settings.setResetIsland(true)
         settings.setResetExpiryReminders(false)
+        settings.setKeepLongHistory(false)
         assertEquals(
             AppSettings(
                 QuotaDisplay.Left,
@@ -63,9 +64,19 @@ class DataStoreSettingsRepositoryTest {
                 resetConfetti = false,
                 resetIsland = true,
                 resetExpiryReminders = false,
+                keepLongHistory = false,
             ),
             DataStoreSettingsRepository(store).settings.first(),
         )
+    }
+
+    @Test
+    fun `long-term history is on by default and stays off once turned off`() = runTest {
+        val store = store()
+        val settings = DataStoreSettingsRepository(store)
+        assertEquals(true, settings.settings.first().keepLongHistory)
+        settings.setKeepLongHistory(false)
+        assertEquals(false, DataStoreSettingsRepository(store).settings.first().keepLongHistory)
     }
 
     @Test
@@ -113,6 +124,7 @@ class DataStoreSettingsRepositoryTest {
             it[stringPreferencesKey("refresh_shimmer")] = "Sometimes"
             it[stringPreferencesKey("reset_confetti")] = "Maybe"
             it[stringPreferencesKey("reset_island")] = "Perhaps"
+            it[stringPreferencesKey("keep_long_history")] = "Mostly"
         }
         assertEquals(AppSettings(), DataStoreSettingsRepository(store).settings.first())
     }

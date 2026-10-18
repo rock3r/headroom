@@ -4,18 +4,20 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
+import dev.sebastiano.headroom.appdata.RepositoryUsageHistory
 import dev.sebastiano.headroom.appdata.ResetHistory
+import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.OverviewSort
+import dev.sebastiano.headroom.model.PromptDismissals
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaRepository
-import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.ResetTracker
-import dev.sebastiano.headroom.model.WindowKind
-import dev.sebastiano.headroom.model.chartSummary
+import dev.sebastiano.headroom.ui.detail.buildUsageHistoryModel
+import dev.sebastiano.headroom.ui.detail.isChartableHistoryWindow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -48,6 +50,8 @@ class HomeViewModel(
     private val alertPreferences: AlertPreferences,
     private val clock: () -> Instant,
     private val isDemo: StateFlow<Boolean>,
+    /** The prompts the user dismissed, so a dismissed Cursor prompt does not come back. */
+    private val promptDismissals: PromptDismissals = PromptDismissals.None,
     /** True once the stored accounts have been read; see [DemoModeQuotaRepository.isLoaded]. */
     private val accountsLoaded: StateFlow<Boolean>,
     resetHistory: ResetHistory,
@@ -59,6 +63,10 @@ class HomeViewModel(
     overviewSort: Flow<OverviewSort> = flowOf(OverviewSort.YourOrder),
     /** Stores a new overview sort; [overviewSort] then emits it. */
     private val saveOverviewSort: suspend (OverviewSort) -> Unit = {},
+    /** Recorded or demo usage history for each long window of the selected account. */
+    usageHistory: UsageHistory = RepositoryUsageHistory(repository),
+    /** Whether long-term history (1 year) is enabled in settings. */
+    keepLongHistory: Flow<Boolean> = flowOf(true),
 ) : ViewModel() {
     private val refreshing = MutableStateFlow(false)
     /** Saved, so the detail pane shows the same account after the process is recreated. */
@@ -123,14 +131,26 @@ class HomeViewModel(
     private val choices: Flow<Pair<QuotaDisplay, OverviewSort>> =
         combine(quotaDisplay, overviewSort) { display, sort -> display to sort }
 
+    /** The accounts whose Cursor prompt the user dismissed, as it changes. */
+    private val cursorDismissed: Flow<Set<String>> =
+        repository.accounts.flatMapLatest { accounts ->
+            val dismissals = accounts.map { state ->
+                promptDismissals.cursorDismissed(state.account.id).map { state.account.id to it }
+            }
+            if (dismissals.isEmpty()) flowOf(emptySet())
+            else
+                combine(dismissals) { pairs -> pairs.filter { it.second }.map { it.first }.toSet() }
+        }
+
     private val environment =
-        combine(isDemo, accountsLoaded, refreshing, ticks, choices) {
-            demo,
-            loaded,
-            busy,
-            now,
-            (display, sort) ->
-            Environment(demo, loaded, busy, now, display, sort)
+        combine(
+            isDemo,
+            accountsLoaded,
+            refreshing,
+            ticks,
+            combine(choices, cursorDismissed) { a, b -> a to b },
+        ) { demo, loaded, busy, now, (choice, dismissed) ->
+            Environment(demo, loaded, busy, now, choice.first, choice.second, dismissed)
         }
 
     val state: StateFlow<HomeUiState> =
@@ -149,6 +169,7 @@ class HomeViewModel(
                         accountsLoaded = env.accountsLoaded,
                         isRefreshing = env.isRefreshing,
                         justReset = justReset,
+                        cursorDismissed = env.cursorDismissed,
                     )
                     .let { home ->
                         home.copy(
@@ -162,54 +183,128 @@ class HomeViewModel(
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), initialState())
 
-    /** The window the chart shows, as account id to window id, when the user picked one. */
-    private val chartWindow = MutableStateFlow<Pair<String, String>?>(null)
+    /** Which long windows the user toggled off per account id. Empty means all are shown. */
+    private val hiddenChartWindows = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
 
-    /** The selected account's detail. Without a selection it shows the first account. */
-    val detail: StateFlow<DetailUiState?> =
-        combine(state, selectedId, chartWindow) { home, id, picked ->
-                val account =
-                    home.accounts.firstOrNull { it.id == id } ?: home.accounts.firstOrNull()
-                account?.let {
-                    DetailSelection(
-                        now = home.now,
-                        account = it,
-                        pickedWindowId = picked?.takeIf { p -> p.first == it.id }?.second,
-                        display = home.display,
+    private val selectedAccountWindows: Flow<AccountWindowsSelection?> =
+        combine(
+                repository.accounts,
+                selectedId,
+                state.map { home -> home.accounts.map { it.id } }.distinctUntilChanged(),
+            ) { accounts, id, orderedIds ->
+                val targetId = id ?: orderedIds.firstOrNull()
+                val accountState =
+                    accounts.firstOrNull { it.account.id == targetId } ?: accounts.firstOrNull()
+                accountState?.let {
+                    val primaryId = it.primaryWindow?.id
+                    val options =
+                        it.snapshot
+                            ?.windows
+                            .orEmpty()
+                            .filter { w -> w.isChartableHistoryWindow }
+                            .sortedByDescending { w -> w.id == primaryId }
+                    AccountWindowsSelection(
+                        accountId = it.account.id,
+                        primaryWindowId = primaryId,
+                        options = options,
                     )
                 }
             }
             .distinctUntilChanged()
-            .flatMapLatest { selection ->
-                if (selection == null) return@flatMapLatest flowOf(null)
-                val (now, account, picked) = selection
-                val display = selection.display
-                val state = repository.accounts.value.firstOrNull { it.account.id == account.id }
-                val options = state?.snapshot?.windows.orEmpty().filter { it.isChartable }
-                val window = options.firstOrNull { it.id == picked } ?: state?.primaryWindow
-                val chartWindows =
-                    account.windows.filter { summary -> options.any { it.id == summary.id } }
-                if (window == null) {
-                    flowOf(DetailUiState(now, account, chart = null, display = display))
-                } else {
-                    repository.history(account.id, window.id).map { points ->
-                        DetailUiState(
-                            now = now,
-                            account = account,
-                            chart = chartSummary(window, points, account.asOf(now)),
-                            chartWindows = chartWindows,
-                            chartWindowId = window.id,
-                            display = display,
-                        )
+
+    private val selectedAccountHistories:
+        Flow<
+            Pair<
+                AccountWindowsSelection?,
+                Map<String, List<dev.sebastiano.headroom.model.UsagePoint>>,
+            >
+        > =
+        selectedAccountWindows.flatMapLatest { selection ->
+            if (selection == null || selection.options.isEmpty()) {
+                flowOf(selection to emptyMap())
+            } else {
+                combine(
+                    selection.options.map { window ->
+                        usageHistory.points(selection.accountId, window).map { window.id to it }
                     }
+                ) { pairs ->
+                    selection to pairs.toMap()
+                }
+            }
+        }
+
+    /** The selected account's detail. Without a selection it shows the first account. */
+    val detail: StateFlow<DetailUiState?> =
+        combine(state, hiddenChartWindows, keepLongHistory, selectedAccountHistories) {
+                home,
+                hiddenByAccount,
+                longHistory,
+                (selection, histories) ->
+                if (selection == null) return@combine null
+                val account =
+                    home.accounts.firstOrNull { it.id == selection.accountId }
+                        ?: home.accounts.firstOrNull()
+                        ?: return@combine null
+                val options = selection.options
+                val chartWindows = options.mapNotNull { option ->
+                    account.windows.firstOrNull { it.id == option.id }
+                }
+                if (options.isEmpty()) {
+                    DetailUiState(home.now, account, chart = null, display = home.display)
+                } else {
+                    val allIds = options.map { it.id }.toSet()
+                    val hiddenIds = hiddenByAccount[account.id].orEmpty()
+                    val selectedIds = (allIds - hiddenIds).ifEmpty { setOf(options.first().id) }
+                    val historyModel =
+                        buildUsageHistoryModel(
+                            accountId = account.id,
+                            windows = options,
+                            primaryWindowId = selection.primaryWindowId,
+                            histories = histories,
+                            selectedWindowIds = selectedIds,
+                            now = account.asOf(home.now),
+                            keepLongHistory = longHistory,
+                            dataFrom = account.dataFrom,
+                        )
+                    val primaryShown = historyModel?.primaryShownWindow
+                    DetailUiState(
+                        now = home.now,
+                        account = account,
+                        chart = primaryShown?.summary,
+                        chartWindows = chartWindows,
+                        chartWindowId = primaryShown?.id,
+                        display = home.display,
+                        history = historyModel,
+                    )
                 }
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), null)
 
-    /** Shows [windowId] of the selected account in the chart. */
+    /**
+     * Toggles [windowId] on or off in the selected account's usage history chart, keeping at least
+     * one long window selected.
+     */
+    fun toggleChartWindow(windowId: String) {
+        val current = detail.value ?: return
+        val accountId = current.account.id
+        val allIds = current.history?.windows?.map { it.id }?.toSet() ?: return
+        if (windowId !in allIds) return
+        hiddenChartWindows.update { byAccount ->
+            val currentHidden = byAccount[accountId].orEmpty().intersect(allIds)
+            val currentSelected = (allIds - currentHidden).ifEmpty { setOf(allIds.first()) }
+            val nextHidden =
+                if (windowId in currentSelected) {
+                    if (currentSelected.size <= 1) currentHidden else currentHidden + windowId
+                } else {
+                    currentHidden - windowId
+                }
+            byAccount + (accountId to nextHidden)
+        }
+    }
+
+    /** Alias for [toggleChartWindow]. */
     fun selectChartWindow(windowId: String) {
-        val accountId = detail.value?.account?.id ?: return
-        chartWindow.value = accountId to windowId
+        toggleChartWindow(windowId)
     }
 
     fun select(accountId: String) {
@@ -250,6 +345,11 @@ class HomeViewModel(
         viewModelScope.launch { alertPreferences.setEnabled(accountId, windowId, enabled) }
     }
 
+    /** The user does not want to connect Cursor to [accountId]; the prompt does not come back. */
+    fun dismissCursorPrompt(accountId: String) {
+        viewModelScope.launch { promptDismissals.dismissCursor(accountId) }
+    }
+
     private fun initialState(): HomeUiState =
         homeUiState(
                 accounts = repository.accounts.value,
@@ -262,18 +362,6 @@ class HomeViewModel(
             )
             .copy(sortLoaded = false)
 
-    /**
-     * Weekly and monthly windows with a known start can be drawn against even pace. Credits and
-     * unknown windows have no pace.
-     */
-    private val QuotaWindow.isChartable: Boolean
-        get() =
-            (kind == WindowKind.Weekly || kind == WindowKind.Monthly) &&
-                resetsAt != null &&
-                length != null &&
-                !isUnlimited &&
-                !isInformational
-
     private data class Environment(
         val isDemo: Boolean,
         val accountsLoaded: Boolean,
@@ -281,13 +369,13 @@ class HomeViewModel(
         val now: Instant,
         val display: QuotaDisplay,
         val sort: OverviewSort,
+        val cursorDismissed: Set<String> = emptySet(),
     )
 
-    private data class DetailSelection(
-        val now: Instant,
-        val account: AccountSummary,
-        val pickedWindowId: String?,
-        val display: QuotaDisplay,
+    private data class AccountWindowsSelection(
+        val accountId: String,
+        val primaryWindowId: String?,
+        val options: List<dev.sebastiano.headroom.model.QuotaWindow>,
     )
 
     private companion object {

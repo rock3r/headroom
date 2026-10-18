@@ -1,7 +1,9 @@
 package dev.sebastiano.headroom.data.db
 
 import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.HistoryRetention
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
@@ -10,13 +12,17 @@ import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetPoolStatus
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.ResetTiming
+import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -71,7 +77,8 @@ class RoomQuotaRepositoryTest {
             assertEquals(claude.snapshot!!.windows.toSet(), state.snapshot!!.windows.toSet())
             assertEquals("Max 20x", state.snapshot!!.planLabel)
             val history = repo.history(claude.account.id, "seven_day").first()
-            assertEquals(listOf(71.0), history.map { it.usedPercent })
+            val expectedReset = claude.snapshot!!.windows.first { it.id == "seven_day" }.resetsAt
+            assertEquals(listOf(UsagePoint(now, 71.0, expectedReset)), history)
         }
 
     private val resets =
@@ -191,6 +198,48 @@ class RoomQuotaRepositoryTest {
         }
 
     @Test
+    fun `an expired API key reason survives storage and later network errors`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var result: QuotaResult =
+                QuotaResult.Failure(
+                    QuotaErrorKind.Auth,
+                    "expired",
+                    authReason = AuthFailureReason.KeyExpired,
+                )
+            val repo = repo({ result }, backgroundScope)
+            repo.addAccount(claude.account)
+            repo.refresh()
+
+            val afterAuth = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, afterAuth.lastError)
+            assertEquals(AuthFailureReason.KeyExpired, afterAuth.authReason)
+
+            result = QuotaResult.Failure(QuotaErrorKind.Network, "offline")
+            repo.refresh()
+            val afterNetwork = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, afterNetwork.lastError)
+            assertEquals(AuthFailureReason.KeyExpired, afterNetwork.authReason)
+
+            result = QuotaResult.Failure(QuotaErrorKind.Auth, "unauthorized", authReason = null)
+            repo.refresh()
+            val afterGenericAuth = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, afterGenericAuth.lastError)
+            assertEquals(AuthFailureReason.KeyExpired, afterGenericAuth.authReason)
+
+            // A row stored by an older build as plain "Auth" still loads as Auth with no reason.
+            db.quotaDao().updateError(claude.account.id, "Auth")
+            val legacy = repo.current().single()
+            assertEquals(QuotaErrorKind.Auth, legacy.lastError)
+            assertNull(legacy.authReason)
+
+            result = QuotaResult.Success(claude.snapshot!!)
+            repo.refresh()
+            val recovered = repo.current().single()
+            assertNull(recovered.lastError)
+            assertNull(recovered.authReason)
+        }
+
+    @Test
     fun `an account's label can be updated`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
@@ -270,7 +319,7 @@ class RoomQuotaRepositoryTest {
     @Test
     fun `history older than the retention period is pruned`() =
         runTest(UnconfinedTestDispatcher()) {
-            var clock = now.minus(90.days)
+            var clock = now.minus(400.days)
             val repo =
                 RoomQuotaRepository(
                     db.quotaDao(),
@@ -281,9 +330,166 @@ class RoomQuotaRepositoryTest {
                 )
             repo.addAccount(claude.account)
             repo.refresh()
+            clock = now.minus(90.days)
+            repo.refresh()
             clock = now
             repo.refresh()
-            assertEquals(1, repo.history(claude.account.id, "seven_day").first().size)
+            assertEquals(
+                listOf(now.minus(90.days), now),
+                repo.history(claude.account.id, "seven_day").first().map { it.at },
+            )
+        }
+
+    @Test
+    fun `turning off long-term history prunes points older than sixty days on the next sync`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var clock = now.minus(90.days)
+            var retention = HistoryRetention.LongTerm
+            val repo =
+                RoomQuotaRepository(
+                    db.quotaDao(),
+                    db.accountOrderDao(),
+                    { QuotaResult.Success(claude.snapshot!!) },
+                    { clock },
+                    backgroundScope,
+                    retention = { retention },
+                )
+            repo.addAccount(claude.account)
+            repo.refresh()
+            clock = now.minus(30.days)
+            repo.refresh()
+            assertEquals(2, repo.history(claude.account.id, "seven_day").first().size)
+
+            retention = HistoryRetention.ShortTerm
+            clock = now
+            repo.refresh()
+
+            assertEquals(
+                listOf(now.minus(30.days), now),
+                repo.history(claude.account.id, "seven_day").first().map { it.at },
+            )
+        }
+
+    @Test
+    fun `sync compacts older history into buckets and leaves the last seven days untouched`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = repo({ QuotaResult.Success(claude.snapshot!!) }, backgroundScope)
+            repo.addAccount(claude.account)
+            // Seed 4 points in the same 1-hour bucket 14 days ago, and 4 points 2 days ago.
+            val oldHour = Instant.parse("2026-09-13T10:00:00Z")
+            val recentHour = now.minus(2.days)
+            val reset = claude.primaryWindow!!.resetsAt!!.toEpochMilliseconds()
+            val seeded =
+                (0 until 4).map { step ->
+                    UsagePointEntity(
+                        accountId = claude.account.id,
+                        windowId = "seven_day",
+                        atEpochMs = oldHour.plus((step * 15).minutes).toEpochMilliseconds(),
+                        usedPercent = 10.0 + step,
+                        resetsAtEpochMs = reset,
+                    )
+                } +
+                    (0 until 4).map { step ->
+                        UsagePointEntity(
+                            accountId = claude.account.id,
+                            windowId = "seven_day",
+                            atEpochMs = recentHour.plus((step * 15).minutes).toEpochMilliseconds(),
+                            usedPercent = 40.0 + step,
+                            resetsAtEpochMs = reset,
+                        )
+                    }
+            db.quotaDao().upsertPoints(seeded)
+
+            repo.refresh()
+
+            val kept = repo.history(claude.account.id, "seven_day").first()
+            // Old hour keeps the period's first sample (step 0) and the bucket's last sample
+            // (step 3); all 4 recent samples and the new sync point stay.
+            assertEquals(2 + 4 + 1, kept.size)
+            assertEquals(oldHour, kept[0].at)
+            assertEquals(oldHour.plus(45.minutes), kept[1].at)
+        }
+
+    @Test
+    fun `compaction runs at most once per hour per account and keeps a year of syncs small`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var clock = now
+            val repo =
+                RoomQuotaRepository(
+                    db.quotaDao(),
+                    db.accountOrderDao(),
+                    { QuotaResult.Success(claude.snapshot!!) },
+                    { clock },
+                    backgroundScope,
+                )
+            repo.addAccount(claude.account)
+            // Seed a full year of 15-minute syncs (35,040 points) across 52 weekly periods.
+            val yearStart = now.minus(365.days)
+            val rawPoints = ArrayList<UsagePointEntity>(365 * 96)
+            for (step in 0 until 365 * 96) {
+                val at = yearStart.plus((step * 15).minutes)
+                val week = step / (7 * 96)
+                val inWeek = step % (7 * 96)
+                val used = (inWeek.toDouble() / (7 * 96) * 85.0)
+                val resetAt = yearStart.plus(((week + 1) * 7).days).toEpochMilliseconds()
+                rawPoints +=
+                    UsagePointEntity(
+                        accountId = claude.account.id,
+                        windowId = "seven_day",
+                        atEpochMs = at.toEpochMilliseconds(),
+                        usedPercent = used,
+                        resetsAtEpochMs = resetAt,
+                    )
+            }
+            db.quotaDao().upsertPoints(rawPoints)
+
+            // First refresh compacts the year of 35,040 points down to 2,388 kept points
+            // (673 in the last 7 days + 1,715 in the 1h/3h/12h tiers older than 7 days).
+            repo.refresh()
+            val afterFirst = repo.history(claude.account.id, "seven_day").first()
+            val olderThan7d =
+                db.quotaDao()
+                    .pointsBefore(
+                        claude.account.id,
+                        now.minus(HistoryRetention.FULL_RESOLUTION_SPAN).toEpochMilliseconds(),
+                    )
+            assertEquals(2_388, afterFirst.size)
+            assertEquals(1_715, olderThan7d.size)
+
+            // Seed extra uncompacted points 10 days ago and refresh 15 minutes later: throttled,
+            // so compaction does not scan again until a full hour has passed.
+            val tenDaysAgo = Instant.parse("2026-09-17T08:00:00Z")
+            val extraReset = tenDaysAgo.plus(7.days).toEpochMilliseconds()
+            val extra =
+                listOf(5, 20, 35, 50).map { minute ->
+                    UsagePointEntity(
+                        accountId = claude.account.id,
+                        windowId = "seven_day",
+                        atEpochMs = tenDaysAgo.plus(minute.minutes).toEpochMilliseconds(),
+                        usedPercent = minute.toDouble(),
+                        resetsAtEpochMs = extraReset,
+                    )
+                }
+            db.quotaDao().upsertPoints(extra)
+
+            clock = now.plus(15.minutes)
+            repo.refresh()
+            val withinHour =
+                repo.history(claude.account.id, "seven_day").first().count {
+                    it.at in tenDaysAgo..tenDaysAgo.plus(55.minutes)
+                }
+            assertEquals(5, withinHour)
+
+            clock = now.plus(1.hours)
+            repo.refresh()
+            val afterHour =
+                repo.history(claude.account.id, "seven_day").first().count {
+                    it.at in tenDaysAgo..tenDaysAgo.plus(55.minutes)
+                }
+            assertTrue(
+                afterHour < withinHour,
+                "Expected extra bucket points to be compacted after an hour",
+            )
         }
 
     @Test

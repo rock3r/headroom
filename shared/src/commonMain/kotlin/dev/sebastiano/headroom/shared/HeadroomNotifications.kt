@@ -70,7 +70,18 @@ public data class SignInAlertUi(
     /** The account's label when the user has several of the same provider. */
     val label: String?,
     val syncedAtEpochSeconds: Long?,
-)
+    /** True when the account signs in with an API key rather than OAuth. */
+    val usesApiKey: Boolean = false,
+    /** Why an auth sync failed, such as `keyExpired`, or null for a generic auth failure. */
+    val authReason: String? = null,
+) {
+    public constructor(
+        accountId: String,
+        providerName: String,
+        label: String?,
+        syncedAtEpochSeconds: Long?,
+    ) : this(accountId, providerName, label, syncedAtEpochSeconds, false, null)
+}
 
 /** Plans the reset alerts, the reset expiry reminders and the sign-in warnings. */
 public class HeadroomNotifications
@@ -129,6 +140,8 @@ internal object NotificationPlanner {
                         providerName = state.account.provider.displayName,
                         label = state.account.label.takeIf { accounts.hasSeveral(state) },
                         syncedAtEpochSeconds = state.snapshot?.fetchedAt?.epochSeconds,
+                        usesApiKey = state.account.provider.usesApiKey,
+                        authReason = state.authReason?.id(),
                     )
                 },
             signInCancels = signIn.cancel.toList(),

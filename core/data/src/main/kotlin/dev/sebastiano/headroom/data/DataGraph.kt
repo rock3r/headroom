@@ -34,6 +34,7 @@ import dev.sebastiano.headroom.data.reset.SharedPreferencesResetReminderLedger
 import dev.sebastiano.headroom.data.sync.HeadroomWorkerFactory
 import dev.sebastiano.headroom.data.sync.SyncWorker
 import dev.sebastiano.headroom.model.AlertPreferences
+import dev.sebastiano.headroom.model.PromptDismissals
 import dev.sebastiano.headroom.model.ResetAttemptStore
 import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
@@ -94,7 +95,16 @@ public class DataGraph(
     private val accountFetcher =
         AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers, resetClients)
 
-    private val roomRepository = storage.accounts(accountFetcher::fetch, clock, scope)
+    /** The user's app settings: used or left, and how often to sync in the background. */
+    public val settings: SettingsRepository = storage.settings
+
+    /** The prompts the user dismissed, one per account. */
+    public val promptDismissals: PromptDismissals = storage.promptDismissals
+
+    private val roomRepository =
+        storage.accounts(accountFetcher::fetch, clock, scope) {
+            settings.settings.first().historyRetention
+        }
 
     /** Shows and removes the warning that an account's sign-in expired. */
     public val signInNotifier: SignInNotifier = AndroidSignInNotifier(appContext)
@@ -104,9 +114,6 @@ public class DataGraph(
             roomRepository,
             SignInAlerts(signInNotifier, SharedPreferencesSignInAlertLedger(appContext)),
         )
-
-    /** The user's app settings: used or left, and how often to sync in the background. */
-    public val settings: SettingsRepository = storage.settings
 
     /**
      * The resets of the signed-in accounts: read by each sync and stored with the snapshot, and
@@ -134,7 +141,8 @@ public class DataGraph(
     public val alertPreferences: AlertPreferences = storage.alertPreferences
 
     /** Turns finished sign-ins into accounts, and signs accounts out. */
-    public val signInManager: SignInManager = SignInManager(tokenStore, repository)
+    public val signInManager: SignInManager =
+        SignInManager(tokenStore, repository, fetchers = quotaFetchers)
 
     private val scheduler =
         AlarmResetScheduler(appContext) { overdue ->

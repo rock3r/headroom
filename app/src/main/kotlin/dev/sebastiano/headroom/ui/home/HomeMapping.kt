@@ -24,6 +24,8 @@ internal fun homeUiState(
     isRefreshing: Boolean,
     justReset: Set<String> = emptySet(),
     accountsLoaded: Boolean = true,
+    /** The accounts whose Cursor prompt the user dismissed; they show none. */
+    cursorDismissed: Set<String> = emptySet(),
 ): HomeUiState {
     val nextReset =
         NextReset.find(accounts, now)?.let { next ->
@@ -46,6 +48,7 @@ internal fun homeUiState(
                     alerts = alerts,
                     pastResets = pastResets,
                     justReset = it.account.id in justReset,
+                    cursorDismissed = it.account.id in cursorDismissed,
                 )
             },
         isDemo = isDemo,
@@ -61,6 +64,7 @@ internal fun AccountState.toSummary(
     alerts: AlertSwitches,
     pastResets: ResetHistories,
     justReset: Boolean = false,
+    cursorDismissed: Boolean = false,
 ): AccountSummary {
     val primary = primaryWindow
     // Stale numbers are compared with the pace of when they were fetched, not with today's.
@@ -105,7 +109,11 @@ internal fun AccountState.toSummary(
                 emptyList()
             },
         signInExpired = isSignInExpired,
+        cursorPrompt = cursorPrompt,
+        // A dismissed prompt stays away until the account is removed, even on the next launch.
+        cursorPromptDismissed = cursorDismissed,
         dataFrom = snapshot?.fetchedAt,
+        authReason = authReason,
     )
 }
 

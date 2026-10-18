@@ -11,10 +11,11 @@
 | `:core:data` | Android library | Encrypted token store, sync worker, reset alarms, notifications, the Android wiring (`DataGraph`) |
 | `:shared` | Kotlin Multiplatform (JVM, iOS) | The `HeadroomKit` framework for the iOS app: wiring, Keychain-backed token store, Swift-friendly view models |
 | `:core:designsystem` | Android library, Compose | Theme, quota indicators, provider avatars, shapes and motion specs |
+| `:third-party:compose-charts` | Android library, Compose (vendored) | Declarative Compose charts (`charts-core` and `charts-compose` from `c5inco/compose-charts`) for the account detail usage history chart |
 | `:widget` | Android library | Remote Compose widgets for the home screen and the lock screen |
 | `:app` | Android application | Screens, navigation, adaptive layouts, dependency wiring |
 
-`:app` depends on `:widget`, `:core:designsystem` and `:core:data`.
+`:app` depends on `:widget`, `:core:designsystem`, `:third-party:compose-charts` and `:core:data`.
 `:core:data` depends on `:core:storage`, which depends on `:core:quota` and `:core:auth`.
 Those modules depend on `:core:model`.
 `:widget` uses `:core:designsystem` to share the app's colour palettes.
@@ -58,7 +59,13 @@ The app, widgets and reset scheduler read those snapshots without making their o
 
 1. A WorkManager job, app start, pull-to-refresh action or widget tap requests a refresh for one or all accounts.
 2. Sync gets an access token from the token store and refreshes it if needed. It then calls the provider's fetcher.
-3. Sync saves the latest snapshot and one history point per window.
+3. Sync saves the latest snapshot and one history point per window, including when the window resets.
+   When long-term history is on (`HistoryRetention.LongTerm`, the default), sync keeps a year of history:
+   every point for 7 days, then one per 1-hour bucket up to 31 days, per 3-hour bucket up to 92 days, and
+   per 12-hour bucket up to 365 days, always keeping each reset period's first and peak points.
+   Compaction runs at most once an hour for the synced account and scans only points older than 7 days.
+   When long-term history is off (`HistoryRetention.ShortTerm`), sync keeps 60 days at full resolution and
+   deletes older points on the next sync.
 4. The UI and widgets observe the repository through a `Flow`.
 5. The reset scheduler sets an alarm for each weekly window, 10 seconds after `resets_at`.
    The alarm fetches the account again. It posts an alert after usage drops or `resets_at` advances by about a week.
@@ -115,26 +122,32 @@ Normal reset alerts use the quota windows' reset times.
 ## Expired sign-in
 
 A sync failure with `QuotaErrorKind.Auth` sets `AccountState.isSignInExpired`.
-`RoomQuotaRepository` retains the stale snapshot and Auth error through later failures, including network errors.
+`QuotaResult.Failure` and `AccountState` also carry an optional `AuthFailureReason`, such as `KeyExpired` when a provider reports that an API key itself has expired (for example OpenCode Go's `error.code == "api_key_expired"` on HTTP 401).
+`RoomQuotaRepository` stores that reason alongside `Auth` in `lastError` (`"Auth:KeyExpired"`) and retains the stale snapshot and Auth error through later failures, including network errors.
 Only a successful sync clears the Auth error.
 
 - `Modifier.stale` and `StaleStyle` in `:core:designsystem` fade usage values towards grey.
   Stale indicators stay flat. Pace uses the last successful sync time.
   `Age` rounds labels such as "Last updated 2 hours ago" to the nearest unit.
-- Cards and account details keep the "Sign in" action fully visible.
+- Cards and account details keep the action fully visible.
+  OAuth and device-code providers show "Sign-in expired" and a "Sign in" action.
+  API-key providers (`Provider.usesApiKey`) show "API key expired" (when `authReason` is `KeyExpired`, with instructions to create a new key in the provider's console) or "API key rejected", and a "Replace API key" action.
   Bars, single-ring and single-shape widgets show a fully visible "Sign in" label.
   Ring grids, lock screen widgets and Shape grids replace the number with a red "!" badge.
-  Rings retain the account name below them. Content descriptions announce sign-in expiry and the last usage values.
+  Rings retain the account name below them. Content descriptions announce the expiry and the last usage values.
   Tapping a stale widget account opens sign-in.
 - Expired accounts cannot supply the next reset, receive reset alarms or appear under upcoming resets.
 - After every refresh, `SignInAlertingRepository` in `:core:data` runs `SignInAlertPolicy`.
-  The first expiry posts a warning on "Sign-in problems".
+  The first expiry posts a warning on "Sign-in problems", worded for either an expired sign-in or an expired/rejected API key.
   A successful sync or account removal clears the warning. Tapping the warning or receiving a network error leaves it in place.
-- "Sign in" immediately starts the provider's normal flow at `SignInState.Starting`.
+- "Sign in" / "Replace API key" starts the provider's normal flow (`SignInState.Starting` for OAuth and device code, `SignInState.ApiKey` for API keys).
   `SignInManager.reauthenticate` saves new tokens under the same account ID, preserving history, name and alert switches.
   It updates the label if the provider returns a new email.
   It rejects a different provider account ID when both credentials have one; otherwise it compares email addresses.
   Copilot and API-key providers supply no account identity, so Headroom accepts any sign-in for them.
+- For API-key providers, `SignInManager` validates a submitted key with one quota fetch before saving it.
+  When the provider rejects the key with `QuotaErrorKind.Auth`, `SignInManager` throws `InvalidApiKeyException`, leaving any stored credential untouched, and `RealSignInController` returns to `SignInState.ApiKey` with an inline error (`ApiKeyRejection.Expired` or `ApiKeyRejection.Unauthorized`).
+  When validation fails with a network error, nothing is saved and the flow moves to `SignInState.Failed(SignInError.Network)` so the user can retry.
 - Debug builds preview it with demo data:
   `adb shell am broadcast -n dev.sebastiano.headroom/.DemoSignInExpiredReceiver`
   (add `--ez clear true` to undo).
@@ -142,16 +155,18 @@ Only a successful sync clears the Auth error.
 ## Usage-limit resets
 
 Sync reads Codex, Grok, Claude and Z.AI resets alongside usage. Room saves them with the snapshot.
-Users can redeem Codex, Grok and Z.AI resets. Claude redemption requires the experimental setting; otherwise Claude resets remain read-only.
+Users can redeem Codex, Grok, Claude and Z.AI resets and request more Z.AI cards. Claude's confirmation step marks redemption as experimental because Claude has not published this API.
 Z.AI requires a separate ZCode sign-in. `:core:auth` stores that credential alongside the account's API key.
 Headroom reminds users about usable resets about a day before expiry.
 Sync records used and expired resets for Stats.
-Reset clients live in `:core:quota`, sync and storage integration in `:core:data`, and screens in `:app`.
+Reset clients live in `:core:quota`, storage in `:core:storage`, sync and reminder scheduling in `:core:data`, and screens in `:app`.
 [RESETS.md](RESETS.md) describes redemption, history and logging.
 
 ## Demo mode
 
 `FakeQuotaRepository` in `:core:model` supplies demo accounts when no account has signed in.
+`DemoUsage` generates hourly demo history across the retention horizon (a year when long-term history is on,
+60 days when off) and compacts it with `HistoryRetention`.
 UI tests, end-to-end tests and README screenshots use the same repository.
 
 ## Reset island (experimental)

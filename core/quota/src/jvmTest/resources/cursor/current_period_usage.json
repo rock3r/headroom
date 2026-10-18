@@ -1,0 +1,17 @@
+{
+  "billingCycleStart": "1792180027000",
+  "billingCycleEnd": "1794858427000",
+  "planUsage": {
+    "totalSpend": 2339,
+    "includedSpend": 2339,
+    "remaining": 37661,
+    "limit": 40000,
+    "remainingBonus": false,
+    "autoPercentUsed": 0.7796666666666667,
+    "apiPercentUsed": 25.5,
+    "totalPercentUsed": 0.7545161290322581
+  },
+  "spendLimitUsage": { "limitType": "user" },
+  "enabled": true,
+  "autoBucketModels": ["composer-2.5", "cursor-grok-4.5"]
+}

@@ -29,8 +29,14 @@ struct AccountCard: View {
                 .opacity(account.signInExpired ? 0.55 : 1)
                 .saturation(account.signInExpired ? 0.2 : 1)
             if account.signInExpired {
-                SignInExpiredRow(dataFrom: account.updatedAtEpochSeconds.map { Date(epochSeconds: $0.int64Value) },
-                                 onSignIn: onSignIn)
+                SignInExpiredRow(
+                    dataFrom: account.updatedAtEpochSeconds.map { Date(epochSeconds: $0.int64Value) },
+                    providerId: account.providerId,
+                    providerName: account.providerName,
+                    usesApiKey: account.usesApiKey,
+                    authReason: account.authReason,
+                    onSignIn: onSignIn
+                )
             } else if let error = account.error {
                 Text(Texts.syncError(error))
                     .font(.footnote)

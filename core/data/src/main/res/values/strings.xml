@@ -32,4 +32,13 @@
     <string name="sign_in_expired_body">Headroom can\'t update this account until you sign in.</string>
     <string name="sign_in_expired_body_with_time">Headroom can\'t update this account until you sign in. The numbers you see are from %1$s.</string>
     <string name="sign_in_expired_action">Sign in</string>
+    <string name="sign_in_key_expired_title">%1$s API key expired</string>
+    <string name="sign_in_key_expired_title_named">%1$s API key expired · %2$s</string>
+    <string name="sign_in_key_expired_body">This API key has expired. Create a new key and replace it in Headroom.</string>
+    <string name="sign_in_key_expired_body_with_time">This API key has expired. Create a new key and replace it in Headroom. The numbers you see are from %1$s.</string>
+    <string name="sign_in_key_rejected_title">%1$s API key rejected</string>
+    <string name="sign_in_key_rejected_title_named">%1$s API key rejected · %2$s</string>
+    <string name="sign_in_key_rejected_body">This API key was rejected. Replace it in Headroom to update this account.</string>
+    <string name="sign_in_key_rejected_body_with_time">This API key was rejected. Replace it in Headroom to update this account. The numbers you see are from %1$s.</string>
+    <string name="sign_in_api_key_action">Replace API key</string>
 </resources>

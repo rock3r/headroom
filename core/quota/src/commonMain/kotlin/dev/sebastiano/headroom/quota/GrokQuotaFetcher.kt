@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.quota
 
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
@@ -23,12 +24,16 @@ import kotlinx.serialization.json.jsonObject
  * `X-XAI-Token-Auth` header the proxy expects). API keys are not supported.
  *
  * The weekly credit pool comes first. Accounts on unified billing have no weekly period, so the
- * monthly included budget is the fallback. The plan is often missing from billing; the user profile
- * fills it in, best effort.
+ * monthly included budget is the fallback. The plan is often missing from billing; the CLI settings
+ * (`subscription_tier_display`) or the user profile fill it in, best effort.
+ *
+ * When the account has a Cursor sign-in, the Cursor model pools and the Grok Bot pool join the
+ * snapshot. A Cursor read that fails never fails the Grok fetch: the snapshot flags it instead.
  */
 public class GrokQuotaFetcher(
     private val httpClient: QuotaHttpClient,
     private val clock: Clock = Clock.System,
+    private val cursorReader: CursorQuotaReader = CursorQuotaReader(httpClient),
 ) : QuotaFetcher {
     override val provider: Provider = Provider.Grok
 
@@ -55,20 +60,83 @@ public class GrokQuotaFetcher(
                             ?: return parseFailure(PROVIDER_NAME)
                     is HttpOutcome.Failed -> return outcome.failure
                 }
-        val planLabel = usage.planLabel ?: fetchUserPlanLabel(baseUrl, headers)
+        val planLabel =
+            usage.planLabel
+                ?: fetchSettingsPlanLabel(baseUrl, headers)
+                ?: fetchUserPlanLabel(baseUrl, headers)
+        val cursor = readCursorWindows(credentials)
         return QuotaResult.Success(
             QuotaSnapshot(
                 provider = provider,
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = planLabel,
-                windows = listOf(usage.window),
+                windows = listOf(usage.window) + cursor.windows,
                 fetchedAt = clock.now(),
+                cursorLinked = cursor.linked,
+                cursorReadFailed = cursor.readFailed,
             )
         )
     }
 
+    /**
+     * The Cursor windows the account's second sign-in reports, and how the read went. A signed-out
+     * account is not linked; a linked sign-in that fails at this moment keeps [linked] true, so the
+     * app asks to try again rather than to connect again. Cursor refusing the token is the one
+     * failure a retry cannot mend: the token has not expired, so the same one is sent again and
+     * refused again. That one asks for a sign-in, which is the only thing that replaces it.
+     */
+    private suspend fun readCursorWindows(credentials: ProviderCredentials): CursorReading {
+        return when (val signIn = credentials.cursor) {
+            is CursorSignIn.Ready ->
+                when (val read = cursorReader.read(signIn.accessToken, credentials.baseUrl)) {
+                    is CursorRead.Known ->
+                        CursorReading(read.windows, linked = true, readFailed = false)
+                    is CursorRead.Failed ->
+                        if (read.kind == QuotaErrorKind.Auth) {
+                            CursorReading(emptyList(), linked = false, readFailed = false)
+                        } else {
+                            CursorReading(emptyList(), linked = true, readFailed = true)
+                        }
+                }
+            CursorSignIn.Unavailable -> CursorReading(emptyList(), linked = true, readFailed = true)
+            CursorSignIn.Missing,
+            null -> CursorReading(emptyList(), linked = false, readFailed = false)
+        }
+    }
+
+    /** The Cursor windows of one read, with the account's linked state. */
+    private data class CursorReading(
+        val windows: List<QuotaWindow>,
+        val linked: Boolean,
+        val readFailed: Boolean,
+    )
+
     private suspend fun get(url: String, headers: Map<String, String>): HttpOutcome =
         httpClient.fetchBody(QuotaHttpRequest(url = url, headers = headers), PROVIDER_NAME)
+
+    /**
+     * The plan name the Grok CLI itself shows: `subscription_tier_display` in its remote settings,
+     * already a display string such as "SuperGrok Heavy".
+     */
+    private suspend fun fetchSettingsPlanLabel(
+        baseUrl: String,
+        headers: Map<String, String>,
+    ): String? {
+        val body =
+            httpClient.fetchBodyOrNull(
+                QuotaHttpRequest(
+                    url = "$baseUrl$SETTINGS_PATH",
+                    headers = headers,
+                    timeout = USER_TIMEOUT,
+                )
+            ) ?: return null
+        return parseOrNull {
+            quotaJson
+                .parseToJsonElement(body)
+                .jsonObject
+                .nonBlankStringOrNull("subscription_tier_display")
+        }
+    }
 
     private suspend fun fetchUserPlanLabel(baseUrl: String, headers: Map<String, String>): String? {
         val body =
@@ -170,6 +238,7 @@ public class GrokQuotaFetcher(
         const val WEEKLY_PATH = "/v1/billing?format=credits"
         const val MONTHLY_PATH = "/v1/billing"
         const val USER_PATH = "/v1/user"
+        const val SETTINGS_PATH = "/v1/settings"
         const val TOKEN_AUTH_HEADER = "X-XAI-Token-Auth"
         const val TOKEN_AUTH_VALUE = "xai-grok-cli"
         val USER_TIMEOUT: Duration = 5.seconds

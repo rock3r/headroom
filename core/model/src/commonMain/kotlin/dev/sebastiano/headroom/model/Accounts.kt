@@ -24,6 +24,8 @@ public data class AccountState(
     val snapshot: QuotaSnapshot?,
     val lastError: QuotaErrorKind? = null,
     val isRefreshing: Boolean = false,
+    /** Why an [QuotaErrorKind.Auth] sync failed, when the provider gave a specific reason. */
+    val authReason: AuthFailureReason? = null,
 ) {
     /**
      * The weekly window if there is one, otherwise the longest window. The UI leads with it. Never
@@ -33,9 +35,12 @@ public data class AccountState(
         get() {
             val windows =
                 snapshot?.windows.orEmpty().filterNot { it.isUnlimited || it.isInformational }
-            return windows.firstOrNull { it.kind == WindowKind.Weekly }
-                ?: windows.firstOrNull { it.kind == WindowKind.Monthly }
-                ?: windows.maxByOrNull { it.length?.inWholeMilliseconds ?: 0L }
+            // A window a second sign-in added never leads: the account's own limit does, even when
+            // the added one is weekly and the account's is monthly.
+            val own = windows.filterNot { it.isSecondary }.ifEmpty { windows }
+            return own.firstOrNull { it.kind == WindowKind.Weekly }
+                ?: own.firstOrNull { it.kind == WindowKind.Monthly }
+                ?: own.maxByOrNull { it.length?.inWholeMilliseconds ?: 0L }
         }
 
     /**
@@ -49,10 +54,50 @@ public data class AccountState(
     val sessionWindow: QuotaWindow?
         get() =
             snapshot?.windows?.firstOrNull { it.kind == WindowKind.Session && !it.isInformational }
+
+    /**
+     * True when a second Cursor sign-in is linked to this account. Only Grok accounts can link one,
+     * and only that sign-in reads their Cursor model pools and Grok Bot pool.
+     */
+    val cursorLinked: Boolean
+        get() = snapshot?.cursorLinked == true
+
+    /** True when a linked Cursor sign-in could not be read in the last sync that worked. */
+    val cursorReadFailed: Boolean
+        get() = snapshot?.cursorReadFailed == true
+
+    /**
+     * The account the user could connect Cursor to: a Grok account with no working Cursor sign-in,
+     * or one whose sign-in could not be read. Null for every other account.
+     */
+    val cursorPrompt: CursorPrompt?
+        get() =
+            when {
+                account.provider != Provider.Grok -> null
+                !cursorLinked -> CursorPrompt.NotLinked
+                cursorReadFailed -> CursorPrompt.ReadFailed
+                else -> null
+            }
 }
 
-/** One point of a window's usage history, for the pace chart. */
-public data class UsagePoint(val at: Instant, val usedPercent: Double)
+/** What the app asks the user to do about a Grok account's second Cursor sign-in. */
+public enum class CursorPrompt {
+    /** The account has no Cursor sign-in: the user can connect one to see its Cursor windows. */
+    NotLinked,
+
+    /** A Cursor sign-in is linked, but the last sync could not read it: the user can retry. */
+    ReadFailed,
+}
+
+/**
+ * One point of a window's usage history, for the pace chart. [resetsAt] is when the window was due
+ * to reset when the point was recorded, or null for points saved before that was stored.
+ */
+public data class UsagePoint(
+    val at: Instant,
+    val usedPercent: Double,
+    val resetsAt: Instant? = null,
+)
 
 /** The single source of quota data for the app and the widgets. */
 public interface QuotaRepository {

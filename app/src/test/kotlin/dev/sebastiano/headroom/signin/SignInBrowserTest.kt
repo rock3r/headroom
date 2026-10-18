@@ -94,6 +94,15 @@ class SignInBrowserTest {
         assertEquals(Intent.ACTION_VIEW, tab.intent.action)
     }
 
+    @Test
+    fun `the tab stays in the app's task so coming back to the app takes it away`() {
+        installBrowser(BROWSER, customTabs = true)
+
+        // With FLAG_ACTIVITY_NEW_TASK the tab would go into the browser's own task, and would still
+        // be open there after the sign-in brought the app back in front.
+        assertEquals(0, signInTabIntent(context).intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
     private companion object {
         const val BROWSER = "com.example.browser"
         const val TAB_BROWSER = "com.example.tabbrowser"

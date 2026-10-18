@@ -21,6 +21,7 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.model.stats.GivenBack
 import dev.sebastiano.headroom.model.stats.ProviderResetUsage
 import dev.sebastiano.headroom.model.stats.ResetPeriod
+import dev.sebastiano.headroom.model.stats.ResetScore
 import dev.sebastiano.headroom.model.stats.ResetUsage
 import dev.sebastiano.headroom.model.stats.ResetUsageStats
 import dev.sebastiano.headroom.model.stats.Stats
@@ -70,12 +71,43 @@ class StatsTest {
     fun `demo mode shows demo stats, labelled as demo data`() {
         openStats()
         rule.onNodeWithText("Example stats from demo data", substring = true).assertIsDisplayed()
-        scrollToDescription("of 17 resets came without hitting the limit")
+        scrollToDescription("of 168 resets came without hitting the limit")
+        rule
+            .onNodeWithText(
+                "Your latest 40 resets, oldest first. Squares hit the limit.",
+                useUnmergedTree = true,
+            )
+            .assertIsDisplayed()
         scrollToDescription("Share of quota use: ")
         scrollToDescription("Quota use by day and hour")
         scrollTo("Grok reached 99%")
         scrollToDescription("was left unused at reset")
         scrollToDescription("Claude over the last 7 days")
+    }
+
+    @Test
+    fun `when all resets fit in two rows the legend says one mark per reset`() {
+        val score =
+            ResetScore(
+                total = 10,
+                clean = 8,
+                streak = 3,
+                timeline = List(10) { it == 2 || it == 6 },
+            )
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                StatsScreen(
+                    StatsUiState(loading = false, stats = Stats(resets = score)),
+                    formatter,
+                )
+            }
+        }
+        rule
+            .onNodeWithText(
+                "One mark per reset, oldest first. Squares hit the limit.",
+                useUnmergedTree = true,
+            )
+            .assertIsDisplayed()
     }
 
     @Test

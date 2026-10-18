@@ -2,11 +2,13 @@ package dev.sebastiano.headroom.data.db
 
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaBalance
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -29,15 +31,36 @@ internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
                 },
             resets = account.resetsJson?.let(ResetsCodec::decode),
             resetsReadFailed = account.resetsReadFailed,
+            cursorLinked = account.cursorLinked,
+            cursorReadFailed = account.cursorReadFailed,
         )
     }
     return AccountState(
         account = domainAccount,
         snapshot = snapshot,
-        lastError =
-            account.lastError?.let { runCatching { QuotaErrorKind.valueOf(it) }.getOrNull() },
+        lastError = decodeErrorKind(account.lastError),
         isRefreshing = refreshing,
+        authReason = decodeAuthReason(account.lastError),
     )
+}
+
+internal fun encodeLastError(
+    kind: QuotaErrorKind,
+    authReason: AuthFailureReason? = null,
+): String =
+    if (kind == QuotaErrorKind.Auth && authReason != null) {
+        "${kind.name}:${authReason.name}"
+    } else {
+        kind.name
+    }
+
+internal fun decodeErrorKind(raw: String?): QuotaErrorKind? =
+    raw?.substringBefore(':')?.let { runCatching { QuotaErrorKind.valueOf(it) }.getOrNull() }
+
+internal fun decodeAuthReason(raw: String?): AuthFailureReason? {
+    if (raw == null || ':' !in raw) return null
+    if (decodeErrorKind(raw) != QuotaErrorKind.Auth) return null
+    return raw.substringAfter(':').let { runCatching { AuthFailureReason.valueOf(it) }.getOrNull() }
 }
 
 internal fun WindowEntity.toDomain() =
@@ -55,6 +78,7 @@ internal fun WindowEntity.toDomain() =
         amountUnit = amountUnit,
         expiresAt = expiresAtEpochMs?.let(Instant::fromEpochMilliseconds),
         isRecognised = isRecognised,
+        isSecondary = isSecondary,
     )
 
 internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
@@ -74,4 +98,12 @@ internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
         amountUnit = amountUnit,
         expiresAtEpochMs = expiresAt?.toEpochMilliseconds(),
         isRecognised = isRecognised,
+        isSecondary = isSecondary,
+    )
+
+internal fun UsagePointEntity.toDomain() =
+    UsagePoint(
+        at = Instant.fromEpochMilliseconds(atEpochMs),
+        usedPercent = usedPercent,
+        resetsAt = resetsAtEpochMs?.let(Instant::fromEpochMilliseconds),
     )

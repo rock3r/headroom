@@ -42,14 +42,14 @@ Widgets hide the counter for zero resets or expired sign-ins. Screen readers ann
 ## Endpoints
 
 Reset clients in `:core:quota` follow the providers' client request formats.
-The owner checked the following operations with real accounts on 2026-10-04, using the phone's `HeadroomResets` log:
+The owner checked the following operations with real accounts using the phone's `HeadroomResets` log:
 
 | Provider | Checked with a real account |
 |---|---|
 | ChatGPT Codex | List and consume: the consume answered `reset`, and the list then had one credit fewer (3 to 2). |
 | Z.AI | Sign-in, status, ask and use: see [Z.AI](#zai). |
 | Grok | Not yet: the account had no reset token. |
-| Claude | Reading the grants only. Using a grant was never tried: see [Claude](#claude). |
+| Claude | List and use: see [Claude](#claude). |
 
 | Provider | Call | Request | Headers |
 |---|---|---|---|
@@ -101,8 +101,7 @@ The owner checked the following operations with real accounts on 2026-10-04, usi
   `surface` and `cli_version` mean the version is too old. Run the update script for those reasons.
   Headroom replaces any reason beyond a short code with `other`, excluding server text from logs.
 
-Claude grant redemption remains experimental. Research identified the endpoint and expected responses.
-Nobody has tested redemption with a real account.
+Claude grant redemption passed a real-account check. The confirmation step still labels it experimental because Claude has not published this API.
 
 - Redemption requires the `next_grant_id` grant, `usable_now`, an unpaused state and a future `ends_at`.
   The sheet offers only that grant as `ResetPoolStatus.Ready`.
@@ -193,8 +192,11 @@ It resolves credentials during reset reads, concurrently with API-key usage fetc
 ZCode failures never fail usage fetching. `ZCODE_SIGN_IN_WAIT` limits credential resolution, including refresh, to 5 seconds.
 After timeout, sync retains stored resets and continues without reading new ones.
 
-`ZCodeSignIn` allows one sign-in at a time from the redemption sheet.
-The sheet displays browser waiting status or failure reasons. Successful sign-in closes the sheet and refreshes the account to display resets.
+`ServiceSignIn` runs this sign-in, and a Grok account's Cursor sign-in with it: one at a time, from the
+redemption sheet or the account. The sheet displays browser waiting status or failure reasons.
+The page is readied while the user reads, so the tap opens it at once, and a page readied for a
+sheet that is gone is forgotten: it expires a few minutes after it is made.
+Successful sign-in keeps the sheet open and shows the account's resets.
 
 ## Using a reset
 

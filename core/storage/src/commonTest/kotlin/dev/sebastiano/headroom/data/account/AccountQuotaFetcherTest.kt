@@ -4,6 +4,7 @@ import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialExtras
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.CredentialProvider
+import dev.sebastiano.headroom.auth.CursorCredential
 import dev.sebastiano.headroom.auth.InMemoryTokenStore
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.TokenRefresher
@@ -19,6 +20,7 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.quota.CursorSignIn
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetcher
 import dev.sebastiano.headroom.quota.QuotaFetchers
@@ -298,6 +300,108 @@ class AccountQuotaFetcherTest {
         assertNull(snapshot.resets)
         assertEquals(false, snapshot.resetsReadFailed)
     }
+
+    private suspend fun saveCursor(accountId: String, expiresAt: Instant?) {
+        store.save(
+            StoredCredential(
+                Provider.Grok,
+                CursorCredential.idFor(accountId),
+                CredentialKind.OAuth,
+                "cursor-access",
+                "cursor-refresh",
+                expiresAt,
+            ),
+            expectedRevision = null,
+        )
+    }
+
+    private val grokAccount = Account("g1", Provider.Grok, "me")
+
+    @Test
+    fun `Grok usage runs with the account's Cursor sign-in`() = runTest {
+        val grok = RecordingFetcher(Provider.Grok)
+        saveCredential("g1", Provider.Grok)
+        saveCursor("g1", expiresAt = null)
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(grok)),
+            )
+
+        fetcher.fetch(grokAccount)
+
+        val seen = grok.seen.single()
+        assertEquals("access-g1", seen.accessToken)
+        assertEquals(CursorSignIn.Ready("cursor-access"), seen.cursor)
+    }
+
+    @Test
+    fun `a redeem's credentials never wait on the Cursor sign-in`() = runTest {
+        saveCredential("g1", Provider.Grok)
+        // An expired Cursor sign-in is refreshed on demand. A redeem uses the xAI token alone and
+        // is racing a clock, so it must not spend its time on Cursor.
+        saveCursor("g1", expiresAt = Instant.fromEpochSeconds(0))
+        var refreshes = 0
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(
+                    store,
+                    mapOf(
+                        Provider.Grok to
+                            TokenRefresher { old ->
+                                refreshes++
+                                TokenSet(
+                                    Provider.Grok,
+                                    CredentialKind.OAuth,
+                                    "cursor-refreshed",
+                                    old.refreshToken,
+                                    null,
+                                )
+                            }
+                    ),
+                ),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Grok))),
+            )
+
+        val credentials = fetcher.providerCredentials(grokAccount)
+
+        assertEquals("access-g1", credentials.accessToken)
+        assertNull(credentials.cursor)
+        assertEquals(0, refreshes)
+    }
+
+    @Test
+    fun `Grok usage reports a missing Cursor sign-in when there is none`() = runTest {
+        val grok = RecordingFetcher(Provider.Grok)
+        saveCredential("g1", Provider.Grok)
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(store, emptyMap()),
+                QuotaFetchers(listOf(grok)),
+            )
+
+        fetcher.fetch(grokAccount)
+
+        assertEquals(CursorSignIn.Missing, grok.seen.single().cursor)
+    }
+
+    @Test
+    fun `a Cursor sign-in that expired for good reads as missing and never fails the fetch`() =
+        runTest {
+            val grok = RecordingFetcher(Provider.Grok)
+            saveCredential("g1", Provider.Grok)
+            saveCursor("g1", expiresAt = Instant.fromEpochSeconds(0))
+            val fetcher =
+                AccountQuotaFetcher(
+                    CredentialProvider(store, emptyMap()),
+                    QuotaFetchers(listOf(grok)),
+                )
+
+            val result = fetcher.fetch(grokAccount)
+
+            assertIs<QuotaResult.Success>(result)
+            assertEquals(CursorSignIn.Missing, grok.seen.single().cursor)
+        }
 
     private suspend fun saveZCode(accountId: String, expiresAt: Instant?) {
         store.save(

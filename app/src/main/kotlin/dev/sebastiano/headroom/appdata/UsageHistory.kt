@@ -1,14 +1,19 @@
 package dev.sebastiano.headroom.appdata
 
 import dev.sebastiano.headroom.model.DemoUsage
+import dev.sebastiano.headroom.model.HistoryRetention
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.model.UsagePoint
 import java.time.ZoneId
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.toKotlinTimeZone
@@ -25,17 +30,22 @@ class RepositoryUsageHistory(private val repository: QuotaRepository) : UsageHis
 }
 
 /**
- * Plausible history for the demo accounts: one cycle for each of the [resets] of the window, then
- * the current one, with most of the use on weekday working hours in [zone].
+ * Plausible history for the demo accounts: past cycles that repeat the [resets] of the window back
+ * to the retention horizon from [settings], then the current cycle, with most of the use on weekday
+ * working hours in [zone].
  */
 class DemoUsageHistory(
     private val resets: ResetHistory,
     private val clock: () -> Instant,
     private val zone: ZoneId,
+    private val settings: SettingsRepository = InMemorySettingsRepository(),
 ) : UsageHistory {
     override fun points(accountId: String, window: QuotaWindow): Flow<List<UsagePoint>> =
-        resets.usedAtReset(accountId, window.id).map { peaks ->
-            demoUsage(window, peaks, clock(), zone)
+        combine(
+            resets.usedAtReset(accountId, window.id),
+            settings.settings.map { it.historyRetention }.distinctUntilChanged(),
+        ) { peaks, retention ->
+            demoUsage(window, peaks, clock(), zone, retention)
         }
 }
 
@@ -61,4 +71,25 @@ internal fun demoUsage(
     peaks: List<Double>,
     now: Instant,
     zone: ZoneId,
-): List<UsagePoint> = DemoUsage.points(window, peaks, now, zone.toKotlinTimeZone())
+    retention: HistoryRetention = HistoryRetention.LongTerm,
+): List<UsagePoint> =
+    DemoUsage.points(
+        window = window,
+        peaks = peaks.ifEmpty { fallbackDemoPeaks(window.usedPercent) },
+        now = now,
+        zone = zone.toKotlinTimeZone(),
+        retention = retention,
+    )
+
+private fun fallbackDemoPeaks(usedPercent: Double): List<Double> {
+    val base = usedPercent.coerceIn(MIN_FALLBACK_BASE, MAX_FALLBACK_BASE)
+    return FALLBACK_PEAK_OFFSETS.map { offset ->
+        (base + offset).coerceIn(MIN_FALLBACK_PEAK, MAX_FALLBACK_PEAK)
+    }
+}
+
+private val FALLBACK_PEAK_OFFSETS = listOf(12.0, -8.0, 19.0, -4.0, 9.0)
+private const val MIN_FALLBACK_BASE = 25.0
+private const val MAX_FALLBACK_BASE = 80.0
+private const val MIN_FALLBACK_PEAK = 15.0
+private const val MAX_FALLBACK_PEAK = 96.0

@@ -74,6 +74,10 @@ struct SettingsForm: View {
             } footer: {
                 Text("iOS decides when background updates run, no sooner than this. Reset alerts arrive on time whatever you choose here.")
             }
+            Section("Usage history") {
+                switchRow("keepLongHistory", "Keep long-term history", settings.keepLongHistory,
+                          body: "Keeps a year of usage for the charts, in less detail as it gets older. Turn off to keep only the last 60 days.")
+            }
             WidgetsSettings()
             Section {
                 Picker("Control Center", selection: $controlMode) {

@@ -1,11 +1,13 @@
 package dev.sebastiano.headroom.quota
 
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
@@ -100,6 +102,27 @@ class OpenCodeGoQuotaFetcherTest {
         val failure = assertIs<QuotaResult.Failure>(fetcher.fetch(credentials()))
 
         assertEquals(QuotaErrorKind.Auth, failure.kind)
+        assertNull(failure.authReason)
+    }
+
+    @Test
+    fun `maps an expired API key 401 body to Auth with KeyExpired`() = runTest {
+        server.enqueueJson(fixture("opencodego/api_key_expired.json"), code = 401)
+
+        val failure = assertIs<QuotaResult.Failure>(fetcher.fetch(credentials()))
+
+        assertEquals(QuotaErrorKind.Auth, failure.kind)
+        assertEquals(AuthFailureReason.KeyExpired, failure.authReason)
+    }
+
+    @Test
+    fun `maps a plain unauthorized 401 body to Auth without a reason`() = runTest {
+        server.enqueueJson(fixture("opencodego/unauthorized.json"), code = 401)
+
+        val failure = assertIs<QuotaResult.Failure>(fetcher.fetch(credentials()))
+
+        assertEquals(QuotaErrorKind.Auth, failure.kind)
+        assertNull(failure.authReason)
     }
 
     @Test

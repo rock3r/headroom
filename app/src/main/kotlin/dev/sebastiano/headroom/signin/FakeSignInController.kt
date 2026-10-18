@@ -31,8 +31,17 @@ class FakeSignInController(initial: SignInState = SignInState.Idle) : SignInCont
     override fun submitApiKey(key: String) {
         val current = mutableState.value as? SignInState.ApiKey ?: return
         mutableState.value =
-            if (key.trim().length < MIN_KEY_LENGTH) current.copy(keyRejected = true)
-            else SignInState.Success(current.provider, DEMO_ACCOUNT)
+            if (key.trim().length < MIN_KEY_LENGTH) {
+                current.copy(keyRejected = true, rejection = ApiKeyRejection.Malformed)
+            } else {
+                SignInState.Success(current.provider, DEMO_ACCOUNT)
+            }
+    }
+
+    /** Pretends the provider rejected the API key with [rejection]. */
+    fun rejectApiKey(rejection: ApiKeyRejection) {
+        val current = provider ?: return
+        mutableState.value = SignInState.ApiKey(current, keyRejected = true, rejection = rejection)
     }
 
     override fun retry() {
