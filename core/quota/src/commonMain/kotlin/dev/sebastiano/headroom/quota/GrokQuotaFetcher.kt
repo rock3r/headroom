@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.quota
 
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
@@ -79,8 +80,10 @@ public class GrokQuotaFetcher(
 
     /**
      * The Cursor windows the account's second sign-in reports, and how the read went. A signed-out
-     * account is not linked; a linked sign-in that fails this time keeps [linked] true, so the app
-     * asks to retry rather than to connect again.
+     * account is not linked; a linked sign-in that fails at this moment keeps [linked] true, so the
+     * app asks to try again rather than to connect again. Cursor refusing the token is the one
+     * failure a retry cannot mend: the token has not expired, so the same one is sent again and
+     * refused again. That one asks for a sign-in, which is the only thing that replaces it.
      */
     private suspend fun readCursorWindows(credentials: ProviderCredentials): CursorReading {
         return when (val signIn = credentials.cursor) {
@@ -89,7 +92,11 @@ public class GrokQuotaFetcher(
                     is CursorRead.Known ->
                         CursorReading(read.windows, linked = true, readFailed = false)
                     is CursorRead.Failed ->
-                        CursorReading(emptyList(), linked = true, readFailed = true)
+                        if (read.kind == QuotaErrorKind.Auth) {
+                            CursorReading(emptyList(), linked = false, readFailed = false)
+                        } else {
+                            CursorReading(emptyList(), linked = true, readFailed = true)
+                        }
                 }
             CursorSignIn.Unavailable -> CursorReading(emptyList(), linked = true, readFailed = true)
             CursorSignIn.Missing,

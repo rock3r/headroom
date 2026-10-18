@@ -293,7 +293,7 @@ class GrokQuotaFetcherTest {
     fun `keeps the Grok window and flags the sync when the Cursor read fails`() = runTest {
         respond(
             weekly = jsonResponse(fixture("grok/billing_weekly.json")),
-            cursorPeriod = MockResponse(code = 401),
+            cursorPeriod = MockResponse(code = 500),
         )
 
         val snapshot =
@@ -304,6 +304,26 @@ class GrokQuotaFetcherTest {
 
         assertEquals(listOf("weekly"), snapshot.windows.map { it.id })
         assertEquals(true, snapshot.cursorReadFailed)
+    }
+
+    @Test
+    fun `asks to sign in again when Cursor refuses the token`() = runTest {
+        respond(
+            weekly = jsonResponse(fixture("grok/billing_weekly.json")),
+            cursorPeriod = MockResponse(code = 401),
+        )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(
+                    fetcher.fetch(credentials(CursorSignIn.Ready("cursor-token")))
+                )
+                .snapshot
+
+        // The token has not expired, so a refresh hands the same one back and Cursor refuses it
+        // again: asking to try again would loop for as long as the token lives.
+        assertEquals(listOf("weekly"), snapshot.windows.map { it.id })
+        assertEquals(false, snapshot.cursorReadFailed)
+        assertEquals(false, snapshot.cursorLinked)
     }
 
     @Test
