@@ -78,6 +78,7 @@ internal fun WindowEntity.toDomain() =
         amountUnit = amountUnit,
         expiresAt = expiresAtEpochMs?.let(Instant::fromEpochMilliseconds),
         isRecognised = isRecognised,
+        isSecondary = isSecondary,
     )
 
 internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
@@ -97,6 +98,7 @@ internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
         amountUnit = amountUnit,
         expiresAtEpochMs = expiresAt?.toEpochMilliseconds(),
         isRecognised = isRecognised,
+        isSecondary = isSecondary,
     )
 
 internal fun UsagePointEntity.toDomain() =

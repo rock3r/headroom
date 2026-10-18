@@ -66,8 +66,10 @@ public class CursorQuotaReader(private val httpClient: QuotaHttpClient) {
 
     private fun parseModelWindows(body: String): List<QuotaWindow>? {
         val root = quotaJson.parseToJsonElement(body).jsonObject
-        val plan = root.objectOrNull("planUsage") ?: return null
+        // A plan with no usage is a valid answer that holds no windows, and Cursor sends it without
+        // a planUsage object: reading the flag first keeps it from looking like a broken response.
         if (root.booleanOrNull("enabled") == false) return emptyList()
+        val plan = root.objectOrNull("planUsage") ?: return null
         val start = root.epochMillisOrNull("billingCycleStart")
         val end = root.epochMillisOrNull("billingCycleEnd")
         val auto = plan.percentOrNull("autoPercentUsed") ?: return null

@@ -142,11 +142,12 @@ class CursorQuotaReaderTest {
 
     @Test
     fun `reads no windows when the plan usage is disabled`() = runTest {
-        respond(period = jsonResponse("""{"enabled":false,"planUsage":{}}"""))
+        // Cursor sends the two shapes; without a planUsage object the answer is not a broken one.
+        listOf("""{"enabled":false,"planUsage":{}}""", """{"enabled":false}""").forEach { period ->
+            respond(period = jsonResponse(period))
 
-        val windows = readKnown().windows
-
-        assertEquals(emptyList(), windows)
+            assertEquals(emptyList(), readKnown().windows)
+        }
     }
 
     private companion object {

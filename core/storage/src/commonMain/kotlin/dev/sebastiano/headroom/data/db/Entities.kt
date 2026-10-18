@@ -71,6 +71,8 @@ internal data class WindowEntity(
     val expiresAtEpochMs: Long? = null,
     /** False for a window the provider sent that the app does not know. */
     @ColumnInfo(defaultValue = "1") val isRecognised: Boolean = true,
+    /** True for a window a second sign-in added; see [QuotaWindow.isSecondary]. */
+    @ColumnInfo(defaultValue = "0") val isSecondary: Boolean = false,
 )
 
 @Entity(

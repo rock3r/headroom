@@ -16,7 +16,7 @@ import androidx.sqlite.execSQL
             UsagePointEntity::class,
             ResetEventEntity::class,
         ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 @ConstructedBy(HeadroomDatabaseConstructor::class)
@@ -163,6 +163,16 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 }
             }
 
+        /** Version 11 remembers which windows a second sign-in added. */
+        val MIGRATION_10_11: Migration =
+            object : Migration(10, 11) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL(
+                        "ALTER TABLE windows ADD COLUMN isSecondary INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+            }
+
         /** Every migration, oldest first. */
         val MIGRATIONS: List<Migration> =
             listOf(
@@ -175,6 +185,7 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 MIGRATION_7_8,
                 MIGRATION_8_9,
                 MIGRATION_9_10,
+                MIGRATION_10_11,
             )
 
         /** The database file's name, the same on every platform. */
