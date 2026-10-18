@@ -36,7 +36,11 @@ internal fun rememberCursorConnect(
     if (isDemo) null
     else
         remember(graph.cursorSignIn, viewModel) {
-            CursorConnect(graph.cursorSignIn, viewModel::dismissCursorPrompt)
+            CursorConnect(
+                signIn = graph.cursorSignIn,
+                onDismiss = viewModel::dismissCursorPrompt,
+                onRetry = viewModel::refresh,
+            )
         }
 
 /**

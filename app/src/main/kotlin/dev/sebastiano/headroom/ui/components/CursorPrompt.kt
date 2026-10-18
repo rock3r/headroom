@@ -50,6 +50,7 @@ const val CURSOR_PROMPT_BANNER_TAG: String = "cursor-prompt-banner"
 class CursorConnect(
     private val signIn: ServiceSignIn?,
     private val onDismiss: (accountId: String) -> Unit,
+    private val onRetry: () -> Unit = {},
 ) {
     private val idle = MutableStateFlow<ServiceSignInState>(ServiceSignInState.Idle)
 
@@ -60,6 +61,15 @@ class CursorConnect(
 
     fun connect(accountId: String) {
         signIn?.start(accountId)
+    }
+
+    /**
+     * Reads the account again. A linked sign-in whose read failed keeps its credential — the read
+     * may simply have been a bad moment — so this asks for the numbers again rather than for a new
+     * sign-in, which would replace a credential that still works.
+     */
+    fun retry() {
+        onRetry()
     }
 
     fun dismiss(accountId: String) {
@@ -98,7 +108,7 @@ fun CursorPromptRow(
         action = stringResource(cursorAction(prompt)),
         dismissLabel = stringResource(R.string.cursor_prompt_dismiss),
         waiting = stringResource(R.string.cursor_prompt_waiting),
-        onAction = { connect.connect(summary.id) },
+        onAction = { prompt.action(connect, summary.id) },
         onDismiss = { connect.dismiss(summary.id) },
         modifier = modifier.testTag(cursorPromptRowTag(summary.id)),
         banner = false,
@@ -122,7 +132,7 @@ fun CursorPromptBanner(
         action = stringResource(cursorAction(prompt)),
         dismissLabel = stringResource(R.string.cursor_prompt_dismiss),
         waiting = stringResource(R.string.cursor_prompt_waiting),
-        onAction = { connect.connect(summary.id) },
+        onAction = { prompt.action(connect, summary.id) },
         onDismiss = { connect.dismiss(summary.id) },
         modifier = modifier.testTag(CURSOR_PROMPT_BANNER_TAG),
         banner = true,
@@ -198,6 +208,17 @@ private fun CursorPromptSurface(
                 Icon(painter = painterResource(HeadroomIcons.Close), contentDescription = null)
             }
         }
+    }
+}
+
+/**
+ * What the prompt's button does. Asking to connect opens the Cursor sign-in; a read that failed
+ * only needs the numbers read again, so it does not ask the user to sign in a second time.
+ */
+private fun CursorPrompt.action(connect: CursorConnect, accountId: String) {
+    when (this) {
+        CursorPrompt.NotLinked -> connect.connect(accountId)
+        CursorPrompt.ReadFailed -> connect.retry()
     }
 }
 
