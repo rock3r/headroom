@@ -256,6 +256,87 @@ class ServiceSignInTest {
         }
 
     @Test
+    fun `a prepared page opens at once when the sign-in starts`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val session = FakeSession()
+            var starts = 0
+            val signIn =
+                ServiceSignIn(
+                    start = {
+                        starts++
+                        session
+                    },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                )
+
+            signIn.prepare("z1")
+
+            // The page is readied before the tap, and nothing shows yet.
+            assertEquals(1, starts)
+            assertEquals(ServiceSignInState.Idle, signIn.state.value)
+
+            signIn.start("z1")
+
+            // No second round trip: the page opens at once.
+            assertEquals(1, starts)
+            assertEquals(
+                ServiceSignInState.Waiting("z1", "https://chat.z.ai/a"),
+                signIn.state.value,
+            )
+        }
+
+    @Test
+    fun `a page whose prepare failed starts again on tap`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val session = FakeSession()
+            var failures = 1
+            val signIn =
+                ServiceSignIn(
+                    start = {
+                        if (failures-- > 0) throw AuthException.Network("offline") else session
+                    },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                )
+
+            signIn.prepare("z1")
+            signIn.start("z1")
+
+            assertEquals(
+                ServiceSignInState.Waiting("z1", "https://chat.z.ai/a"),
+                signIn.state.value,
+            )
+        }
+
+    @Test
+    fun `a forgotten prepare readies a new page on the next ask`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var starts = 0
+            val signIn =
+                ServiceSignIn(
+                    start = {
+                        starts++
+                        FakeSession("https://chat.z.ai/$starts")
+                    },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                )
+
+            signIn.prepare("z1")
+            signIn.forgetPrepared("z1")
+            signIn.start("z1")
+
+            // The forgotten page is not reused: a ZCode page expires a few minutes after it is
+            // made, so a stale one would fail the moment it is used.
+            assertEquals(2, starts)
+            assertEquals(
+                ServiceSignInState.Waiting("z1", "https://chat.z.ai/2"),
+                signIn.state.value,
+            )
+        }
+
+    @Test
     fun `logs each step and why it failed without tokens`() =
         runTest(UnconfinedTestDispatcher()) {
             val lines = mutableListOf<String>()

@@ -4,7 +4,9 @@ import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.TokenSet
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,7 +56,8 @@ public sealed interface ServiceSignInState {
  * The page itself, [ServiceSignInState.Waiting.url], is the screens' to open: a browser tab has to
  * start from the running activity, so that it belongs to this app's task and coming back to the app
  * takes the tab away. [watch] keeps the app out of Android's frozen state while the flow runs, so
- * the poll that ends it can still work while the user is in the browser.
+ * the poll that ends it can still work while the user is in the browser. [prepare] readies the page
+ * ahead of the tap, so the tap opens it at once.
  */
 public class ServiceSignIn(
     private val label: String = "Sign-in",
@@ -69,6 +72,52 @@ public class ServiceSignIn(
     public val state: StateFlow<ServiceSignInState> = mutableState.asStateFlow()
 
     private var job: Job? = null
+
+    /** The page being readied by [prepare], and the account it is for. */
+    private var prepared: Pair<String, Deferred<DeviceSession?>>? = null
+
+    /**
+     * Readies the page of [accountId] before [start] is asked for it, so the tap opens the page at
+     * once instead of waiting for the round trip that makes it. A sign-in already running for the
+     * account is left alone; a failed prepare is tried again on the tap.
+     */
+    public fun prepare(accountId: String) {
+        val current = mutableState.value
+        val running =
+            current.accountId == accountId &&
+                current !is ServiceSignInState.Idle &&
+                current !is ServiceSignInState.Failed
+        if (running) return
+        val ready = prepared
+        if (ready?.first == accountId && !ready.second.isCancelled) return
+        ready?.second?.cancel()
+        prepared = accountId to scope.async { readyPage() }
+    }
+
+    /**
+     * Forgets the page [prepare] readied for [accountId], when whoever asked for it is gone. A
+     * readied page expires a few minutes after it is made, so it must not be kept for later.
+     */
+    public fun forgetPrepared(accountId: String) {
+        val ready = prepared
+        if (ready?.first != accountId) return
+        ready.second.cancel()
+        prepared = null
+    }
+
+    /** The sign-in page, or null when making it failed: a failed prepare is not a failed tap. */
+    private suspend fun readyPage(): DeviceSession? =
+        try {
+            start()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: AuthException) {
+            log("$label sign-in: readying the page failed: ${failure.message}")
+            null
+        } catch (failure: IOException) {
+            log("$label sign-in: readying the page failed: ${failure::class.simpleName}")
+            null
+        }
 
     /**
      * Starts signing [accountId] in. While its page already waits, this opens the same page again:
@@ -87,13 +136,16 @@ public class ServiceSignIn(
         // moment with no watch and the app stays awake across it.
         val watching = watch.start(label)
         job?.cancel()
+        val ready = prepared
+        prepared = null
+        if (ready != null && ready.first != accountId) ready.second.cancel()
         mutableState.value = ServiceSignInState.Starting(accountId)
         job = scope.launch {
             // The app must stay out of the frozen state for the whole flow: it is the poll that
             // notices the sign-in, and the app only comes back in front once it did.
             mutableState.value =
                 try {
-                    val session = start()
+                    val session = ready?.let { awaitPrepared(accountId, it) } ?: start()
                     mutableState.value =
                         ServiceSignInState.Waiting(accountId, session.verificationUrl)
                     log("$label sign-in: waiting for the browser")
@@ -122,8 +174,19 @@ public class ServiceSignIn(
     public fun cancel() {
         job?.cancel()
         job = null
+        prepared?.second?.cancel()
+        prepared = null
         mutableState.value = ServiceSignInState.Idle
     }
+
+    /**
+     * The page [prepare] readied for [accountId], or null when it is for another account or it
+     * failed: a failed prepare is not a failed sign-in, so the tap starts again.
+     */
+    private suspend fun awaitPrepared(
+        accountId: String,
+        ready: Pair<String, Deferred<DeviceSession?>>,
+    ): DeviceSession? = ready.takeIf { it.first == accountId }?.second?.await()
 
     private fun AuthException.toSignInError(): SignInError =
         when (this) {

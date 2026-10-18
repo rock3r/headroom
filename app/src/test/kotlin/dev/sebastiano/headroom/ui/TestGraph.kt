@@ -76,6 +76,7 @@ fun testGraph(
     resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
     resetProvider: ResetProvider = NoResets,
     prototypes: PrototypeTools? = null,
+    zCodeSignIn: ServiceSignIn? = null,
     cursorSignIn: ServiceSignIn? = null,
 ): AppGraph {
     val clock = { FIXED_NOW }
@@ -111,13 +112,14 @@ fun testGraph(
         resetScope = scope,
         prototypes = prototypes,
         demoAccounts = demo,
-        cursorSignIn = cursorSignIn,
         resetEvents =
             DemoAwareResetEvents(
                 isDemo = repository.isDemo,
                 real = ResetEventLog.None,
                 demo = DemoResetEvents(clock),
             ),
+        zCodeSignIn = zCodeSignIn,
+        cursorSignIn = cursorSignIn,
     )
 }
 
