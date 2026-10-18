@@ -1,7 +1,9 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.sebastiano.headroom.auth.TokenSet
@@ -14,6 +16,7 @@ import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.ServiceSignIn
 import dev.sebastiano.headroom.signin.ServiceSignInState
 import dev.sebastiano.headroom.ui.components.CursorConnect
+import dev.sebastiano.headroom.ui.components.CursorPromptBanner
 import dev.sebastiano.headroom.ui.components.CursorPromptRow
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.homeUiState
@@ -103,6 +106,41 @@ class CursorPromptActionTest {
         assertEquals(1, retries)
         // The credential is still there and still good: a new sign-in would replace it.
         assertIs<ServiceSignInState.Idle>(signIn.state.value)
+    }
+
+    @Test
+    fun `the account's own prompt is for connecting, not for waving away`() {
+        val summary = grokSummary(CursorPrompt.NotLinked)
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                CursorPromptBanner(summary = summary, connect = connect)
+            }
+        }
+        rule.waitForIdle()
+
+        // The card's nudge is the user's to wave away; the account's prompt is where a waved-away
+        // card leaves them, so a close button there could only ever do nothing.
+        rule.onNodeWithContentDescription("Not now").assertDoesNotExist()
+        rule.onNodeWithText("Connect").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the card's nudge can be waved away`() {
+        val summary = grokSummary(CursorPrompt.NotLinked)
+        var dismissed: String? = null
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                CursorPromptRow(
+                    summary = summary,
+                    connect = CursorConnect(signIn, onDismiss = { dismissed = it }),
+                )
+            }
+        }
+        rule.waitForIdle()
+
+        rule.onNodeWithContentDescription("Not now").performClick()
+
+        assertEquals(summary.id, dismissed)
     }
 
     /** A sign-in whose browser page the user has not finished yet. */

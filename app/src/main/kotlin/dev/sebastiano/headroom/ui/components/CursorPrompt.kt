@@ -106,7 +106,6 @@ fun CursorPromptRow(
         title = stringResource(cursorTitle(prompt)),
         body = stringResource(cursorBody(prompt)),
         action = stringResource(cursorAction(prompt)),
-        dismissLabel = stringResource(R.string.cursor_prompt_dismiss),
         waiting = stringResource(R.string.cursor_prompt_waiting),
         onAction = { prompt.action(connect, summary.id) },
         onDismiss = { connect.dismiss(summary.id) },
@@ -115,7 +114,11 @@ fun CursorPromptRow(
     )
 }
 
-/** The same prompt as the detail screen's banner, with the provider named in the title. */
+/**
+ * The same prompt as the detail screen's banner, with the provider named in the title. It has no
+ * close button: it is the account's own entry point to the connection, the one a dismissed card
+ * leaves the user, so there is nothing to dismiss it to.
+ */
 @Composable
 fun CursorPromptBanner(
     summary: AccountSummary,
@@ -130,10 +133,9 @@ fun CursorPromptBanner(
         title = stringResource(cursorBannerTitle(prompt), summary.provider.displayName),
         body = stringResource(cursorBody(prompt)),
         action = stringResource(cursorAction(prompt)),
-        dismissLabel = stringResource(R.string.cursor_prompt_dismiss),
         waiting = stringResource(R.string.cursor_prompt_waiting),
         onAction = { prompt.action(connect, summary.id) },
-        onDismiss = { connect.dismiss(summary.id) },
+        onDismiss = null,
         modifier = modifier.testTag(CURSOR_PROMPT_BANNER_TAG),
         banner = true,
     )
@@ -146,11 +148,11 @@ private fun CursorPromptSurface(
     title: String,
     body: String,
     action: String,
-    dismissLabel: String,
     waiting: String,
     banner: Boolean,
     onAction: () -> Unit,
-    onDismiss: () -> Unit,
+    /** Closing the prompt, or null when this one is not the user's to dismiss. */
+    onDismiss: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val running = state is ServiceSignInState.Starting || state is ServiceSignInState.Waiting
@@ -201,11 +203,14 @@ private fun CursorPromptSurface(
                     Text(action)
                 }
             }
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.semantics { contentDescription = dismissLabel },
-            ) {
-                Icon(painter = painterResource(HeadroomIcons.Close), contentDescription = null)
+            if (onDismiss != null) {
+                val dismissLabel = stringResource(R.string.cursor_prompt_dismiss)
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.semantics { contentDescription = dismissLabel },
+                ) {
+                    Icon(painter = painterResource(HeadroomIcons.Close), contentDescription = null)
+                }
             }
         }
     }
