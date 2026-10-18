@@ -135,9 +135,13 @@ jobs:
         env:
           IMAGE: "system-images;android-37.0;google_apis;x86_64"
         run: |
+          # The runner's preinstalled command-line tools are too old to know the Pixel 9 device
+          # profile ("No device found matching --device pixel_9"), so use the latest ones.
+          yes | sdkmanager --install "cmdline-tools;latest" > /dev/null
+          tools="$ANDROID_HOME/cmdline-tools/latest/bin"
           # Installs only what the cache did not restore.
-          sdkmanager --install emulator "$IMAGE" > /dev/null
-          echo no | avdmanager create avd --force --name smoke --package "$IMAGE" --device pixel_9
+          "$tools/sdkmanager" --install emulator "$IMAGE" > /dev/null
+          echo no | "$tools/avdmanager" create avd --force --name smoke --package "$IMAGE" --device pixel_9
           nohup "$ANDROID_HOME/emulator/emulator" -avd smoke -no-window -no-audio -no-boot-anim \
             -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
           timeout 300 adb wait-for-device
