@@ -3,11 +3,12 @@ package dev.sebastiano.headroom.data.db
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.HistoryRetention
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.UsagePoint
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -36,8 +37,10 @@ internal class RoomQuotaRepository(
     private val fetch: suspend (Account) -> QuotaResult,
     private val clock: () -> Instant,
     scope: CoroutineScope,
+    private val retention: suspend () -> HistoryRetention = { HistoryRetention.LongTerm },
 ) : AccountsRepository {
     private val refreshing = MutableStateFlow<Set<String>>(emptySet())
+    private val lastCompactedAt = MutableStateFlow<Map<String, Instant>>(emptyMap())
     private val inFlight = mutableMapOf<String, CompletableDeferred<Unit>>()
     private val inFlightLock = Mutex()
 
@@ -76,6 +79,7 @@ internal class RoomQuotaRepository(
     }
 
     override suspend fun removeAccount(accountId: String) {
+        lastCompactedAt.update { it - accountId }
         dao.deleteAccount(accountId)
     }
 
@@ -120,6 +124,13 @@ internal class RoomQuotaRepository(
         when (result) {
             is QuotaResult.Success -> {
                 val snapshot = result.snapshot
+                val policy = retention()
+                val lastCompacted = lastCompactedAt.value[entity.id]
+                val shouldCompact =
+                    policy == HistoryRetention.LongTerm &&
+                        (lastCompacted == null ||
+                            now - lastCompacted >= COMPACT_INTERVAL ||
+                            now < lastCompacted)
                 dao.storeSnapshot(
                     account =
                         entity.copy(
@@ -141,13 +152,14 @@ internal class RoomQuotaRepository(
                     points =
                         snapshot.windows.map { window ->
                             UsagePointEntity(
-                                entity.id,
-                                window.id,
-                                now.toEpochMilliseconds(),
-                                window.usedPercent,
+                                accountId = entity.id,
+                                windowId = window.id,
+                                atEpochMs = now.toEpochMilliseconds(),
+                                usedPercent = window.usedPercent,
+                                resetsAtEpochMs = window.resetsAt?.toEpochMilliseconds(),
                             )
                         },
-                    pruneBeforeEpochMs = now.minus(HISTORY_RETENTION).toEpochMilliseconds(),
+                    pruneBeforeEpochMs = now.minus(policy.maxAge).toEpochMilliseconds(),
                     // Resets that could not be read are compared with nothing: they record no
                     // event.
                     resetEvents =
@@ -156,14 +168,25 @@ internal class RoomQuotaRepository(
                             current = snapshot.resets.takeUnless { snapshot.resetsReadFailed },
                             now = now,
                         ),
+                    compactAtEpochMs = if (shouldCompact) now.toEpochMilliseconds() else null,
                 )
+                if (shouldCompact) {
+                    lastCompactedAt.update { it + (entity.id to now) }
+                }
             }
             // An update, not an upsert: a removed account must stay removed. An expired sign-in
             // stays expired through later errors, such as a network error: only a sync that
             // works shows the user can stop worrying about it.
             is QuotaResult.Failure -> {
-                val expired = entity.lastError == QuotaErrorKind.Auth.name
-                dao.updateError(entity.id, if (expired) entity.lastError else result.kind.name)
+                val previous = entity.lastError
+                val keepExistingAuth =
+                    decodeErrorKind(previous) == QuotaErrorKind.Auth &&
+                        result.kind != QuotaErrorKind.Auth
+                val authReason = result.authReason ?: decodeAuthReason(previous)
+                val nextError =
+                    if (keepExistingAuth && previous != null) previous
+                    else encodeLastError(result.kind, authReason)
+                dao.updateError(entity.id, nextError)
             }
             null -> Unit
         }
@@ -177,11 +200,13 @@ internal class RoomQuotaRepository(
     }
 
     override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
-        dao.observeHistory(accountId, windowId).map { points ->
-            points.map { UsagePoint(Instant.fromEpochMilliseconds(it.atEpochMs), it.usedPercent) }
-        }
+        dao.observeHistory(accountId, windowId).map { points -> points.map { it.toDomain() } }
 
     private companion object {
-        val HISTORY_RETENTION: Duration = 60.days
+        /**
+         * The finest compaction bucket is one hour wide, so compacting an account at most once an
+         * hour avoids re-scanning its history on every 15-minute sync.
+         */
+        val COMPACT_INTERVAL: Duration = 1.hours
     }
 }

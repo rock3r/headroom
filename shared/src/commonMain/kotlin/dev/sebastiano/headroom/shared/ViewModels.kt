@@ -114,7 +114,51 @@ public data class AccountUi(
     val separateAllowances: Boolean,
     /** Its weekly limit reset while the app was open: "Just reset" for the rest of the session. */
     val justReset: Boolean,
-)
+    /** True when the account signs in with an API key rather than OAuth. */
+    val usesApiKey: Boolean = false,
+    /** Why an `auth` sync failed, such as `keyExpired`, or null for a generic auth failure. */
+    val authReason: String? = null,
+) {
+    public constructor(
+        id: String,
+        providerId: String,
+        providerName: String,
+        title: String,
+        label: String,
+        plan: String?,
+        primary: WindowUi?,
+        windows: List<WindowUi>,
+        isRefreshing: Boolean,
+        signInExpired: Boolean,
+        error: String?,
+        updatedAtEpochSeconds: Long?,
+        needsAttention: Boolean,
+        resets: AccountResetsUi?,
+        balance: BalanceUi?,
+        separateAllowances: Boolean,
+        justReset: Boolean,
+    ) : this(
+        id = id,
+        providerId = providerId,
+        providerName = providerName,
+        title = title,
+        label = label,
+        plan = plan,
+        primary = primary,
+        windows = windows,
+        isRefreshing = isRefreshing,
+        signInExpired = signInExpired,
+        error = error,
+        updatedAtEpochSeconds = updatedAtEpochSeconds,
+        needsAttention = needsAttention,
+        resets = resets,
+        balance = balance,
+        separateAllowances = separateAllowances,
+        justReset = justReset,
+        usesApiKey = false,
+        authReason = null,
+    )
+}
 
 /** An account's usage-limit resets. */
 public data class AccountResetsUi(
@@ -248,7 +292,15 @@ public sealed interface SignInUi {
         val providerId: String,
         val providerName: String,
         val keyRejected: Boolean,
-    ) : SignInUi
+        /** `malformed`, `unauthorized` or `expired` when [keyRejected] is true. */
+        val rejection: String? = if (keyRejected) "malformed" else null,
+    ) : SignInUi {
+        public constructor(
+            providerId: String,
+            providerName: String,
+            keyRejected: Boolean,
+        ) : this(providerId, providerName, keyRejected, if (keyRejected) "malformed" else null)
+    }
 
     public data class Finishing(val providerId: String, val providerName: String) : SignInUi
 
@@ -276,7 +328,7 @@ internal object UiMapping {
         OverviewUi(
             accounts =
                 accounts.sortedFor(settings.overviewSort).map {
-                    account(it, now, settings, alerts, it.account.id in justReset)
+                    account(it, now, alerts, it.account.id in justReset)
                 },
             yourOrder = accounts.map { it.account.id },
             nowEpochSeconds = now.epochSeconds,
@@ -309,7 +361,6 @@ internal object UiMapping {
     fun account(
         state: AccountState,
         now: Instant,
-        settings: AppSettings = AppSettings(),
         alerts: AlertStates = AlertStates.Defaults,
         justReset: Boolean = false,
     ): AccountUi {
@@ -348,17 +399,18 @@ internal object UiMapping {
             updatedAtEpochSeconds = snapshot?.fetchedAt?.epochSeconds,
             // As on Android: the primary window decides, and stale data never asks for attention.
             needsAttention = primaryUi?.needsAttention ?: false,
-            resets = snapshot?.resets?.let { resets(state, it, settings) },
+            resets = snapshot?.resets?.let { resets(state, it) },
             balance = snapshot?.balance?.let { BalanceUi(it.amount, it.unit) },
             separateAllowances = state.account.provider.windowsAreSeparateAllowances,
             justReset = justReset,
+            usesApiKey = state.account.provider.usesApiKey,
+            authReason = state.authReason?.id(),
         )
     }
 
     private fun resets(
         state: AccountState,
         resets: ResetAvailability,
-        settings: AppSettings,
     ): AccountResetsUi {
         val provider = state.account.provider
         val windows = state.snapshot?.windows.orEmpty()
@@ -368,7 +420,7 @@ internal object UiMapping {
             pools = resets.pools.map { pool(provider, windows, it) },
             canAskForMore = resets.canAskForMore,
             requiresSignIn = resets.requiresSignIn,
-            canRedeem = provider.canRedeemResets(settings),
+            canRedeem = provider.canRedeemResets(),
             ineligibleReason = resets.ineligibleReason,
             showsSummary = resets.showsSummary,
             holdsNone = resets.holdsNone,
@@ -508,7 +560,12 @@ internal object UiMapping {
                     state.verificationUrl,
                 )
             is SignInState.ApiKey ->
-                SignInUi.ApiKey(state.provider.id, state.provider.displayName, state.keyRejected)
+                SignInUi.ApiKey(
+                    state.provider.id,
+                    state.provider.displayName,
+                    state.keyRejected,
+                    state.rejection?.id(),
+                )
             is SignInState.Finishing ->
                 SignInUi.Finishing(state.provider.id, state.provider.displayName)
             is SignInState.Success ->

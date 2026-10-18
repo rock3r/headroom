@@ -32,13 +32,17 @@ public fun openHeadroom(directory: String, secrets: SecureValueStore): Headroom 
             zAiReachedUse = FileAttemptTargetStore(folder / "zai-reached-use.json"),
             grokPinnedTokens = FileAttemptTargetStore(folder / "grok-pinned-tokens.json"),
         )
+    val fetchers = QuotaFetchers.create()
     val fetcher =
         AccountQuotaFetcher(
             authMethods.credentialProvider(tokenStore),
-            QuotaFetchers.create(),
+            fetchers,
             clients,
         )
-    val repository = storage.accounts(fetcher::fetch, Clock.System::now, scope)
+    val repository =
+        storage.accounts(fetcher::fetch, Clock.System::now, scope) {
+            storage.settings.settings.first().historyRetention
+        }
     val parts =
         HeadroomParts(
             repository = repository,
@@ -50,12 +54,12 @@ public fun openHeadroom(directory: String, secrets: SecureValueStore): Headroom 
             resetProvider =
                 SyncedResetProvider(
                     accounts = { repository.current() },
-                    settings = { storage.settings.settings.first() },
                     fetcher = fetcher,
                     clients = clients,
                 ),
             resetMemory =
                 ResetAttemptMemory(store = FileResetAttemptStore(folder / "reset-attempts.json")),
+            quotaFetchers = fetchers,
             startZCode = { AuthSignInSteps(authMethods).startZCode() },
             onClose = storage::close,
         )

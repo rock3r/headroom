@@ -81,8 +81,8 @@ class ResetReminderPolicyTest {
         val resets =
             ResetReminderPolicy.expiringResets(
                 listOf(
-                    // Claude's resets are shown only, until the user turns redeeming on.
-                    state(Provider.Claude, pool(tomorrow)),
+                    // Muse's resets are shown only: Headroom cannot use them.
+                    state(Provider.Muse, pool(tomorrow)),
                     // An expired sign-in cannot use its resets until the user signs in again.
                     state(Provider.Codex, pool(tomorrow), lastError = QuotaErrorKind.Auth),
                     state(
@@ -101,7 +101,7 @@ class ResetReminderPolicyTest {
     }
 
     @Test
-    fun `includes Claude's resets once the user turned redeeming on and resets that wait for a limit`() {
+    fun `includes Claude's resets and resets that wait for a limit`() {
         val resets =
             ResetReminderPolicy.expiringResets(
                 listOf(
@@ -110,7 +110,7 @@ class ResetReminderPolicyTest {
                         pool(tomorrow, status = ResetPoolStatus.WaitingForLimit),
                     )
                 ),
-                AppSettings(redeemClaudeResets = true),
+                AppSettings(),
                 now,
             )
 

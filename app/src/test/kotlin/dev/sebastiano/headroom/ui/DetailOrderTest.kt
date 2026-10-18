@@ -57,7 +57,7 @@ class DetailOrderTest {
         rule.onNodeWithTag(accountCardTag("demo-claude")).performClick()
         rule.waitForIdle()
 
-        val chart = rule.onNodeWithText("This week").getBoundsInRoot().top
+        val chart = rule.onNodeWithText("Usage history").getBoundsInRoot().top
         val resets = rule.onNodeWithTag(RESETS_CARD_TAG).getBoundsInRoot().top
         val alerts = rule.onNodeWithText("Reset alerts").getBoundsInRoot().top
         assertTrue(chart < resets, "chart $chart, resets $resets")

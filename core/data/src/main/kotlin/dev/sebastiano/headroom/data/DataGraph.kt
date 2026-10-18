@@ -94,7 +94,13 @@ public class DataGraph(
     private val accountFetcher =
         AccountQuotaFetcher(authMethods.credentialProvider(tokenStore), quotaFetchers, resetClients)
 
-    private val roomRepository = storage.accounts(accountFetcher::fetch, clock, scope)
+    /** The user's app settings: used or left, and how often to sync in the background. */
+    public val settings: SettingsRepository = storage.settings
+
+    private val roomRepository =
+        storage.accounts(accountFetcher::fetch, clock, scope) {
+            settings.settings.first().historyRetention
+        }
 
     /** Shows and removes the warning that an account's sign-in expired. */
     public val signInNotifier: SignInNotifier = AndroidSignInNotifier(appContext)
@@ -105,19 +111,15 @@ public class DataGraph(
             SignInAlerts(signInNotifier, SharedPreferencesSignInAlertLedger(appContext)),
         )
 
-    /** The user's app settings: used or left, and how often to sync in the background. */
-    public val settings: SettingsRepository = storage.settings
-
     /**
      * The resets of the signed-in accounts: read by each sync and stored with the snapshot, and
-     * used through the providers' reset clients, when the user's [settings] allow it.
+     * used through the providers' reset clients.
      */
     public val resetProvider: ResetProvider =
         SyncedResetProvider(
             // What storage holds now: right after a refresh, accounts.value may still be the old
             // one.
             accounts = { repository.current() },
-            settings = { settings.settings.first() },
             fetcher = accountFetcher,
             clients = resetClients,
             log = resetLog,
@@ -135,7 +137,8 @@ public class DataGraph(
     public val alertPreferences: AlertPreferences = storage.alertPreferences
 
     /** Turns finished sign-ins into accounts, and signs accounts out. */
-    public val signInManager: SignInManager = SignInManager(tokenStore, repository)
+    public val signInManager: SignInManager =
+        SignInManager(tokenStore, repository, fetchers = quotaFetchers)
 
     private val scheduler =
         AlarmResetScheduler(appContext) { overdue ->

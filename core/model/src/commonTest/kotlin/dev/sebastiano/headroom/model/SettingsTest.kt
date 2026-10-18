@@ -38,6 +38,12 @@ class SettingsTest {
     fun `the defaults keep today's behaviour`() {
         assertEquals(QuotaDisplay.Used, AppSettings().quotaDisplay)
         assertEquals(SyncFrequency.Minutes15, AppSettings().syncFrequency)
+        assertEquals(true, AppSettings().keepLongHistory)
+        assertEquals(HistoryRetention.LongTerm, AppSettings().historyRetention)
+        assertEquals(
+            HistoryRetention.ShortTerm,
+            AppSettings(keepLongHistory = false).historyRetention,
+        )
     }
 
     @Test
@@ -81,6 +87,7 @@ class SettingsTest {
             repository.setRefreshShimmer(false)
             repository.setResetConfetti(false)
             repository.setResetIsland(true)
+            repository.setKeepLongHistory(false)
             assertEquals(
                 AppSettings(
                     QuotaDisplay.Left,
@@ -92,6 +99,7 @@ class SettingsTest {
                     refreshShimmer = false,
                     resetConfetti = false,
                     resetIsland = true,
+                    keepLongHistory = false,
                 ),
                 repository.settings.value,
             )

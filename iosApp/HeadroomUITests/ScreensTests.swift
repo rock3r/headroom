@@ -23,7 +23,7 @@ final class ScreensTests: XCTestCase {
         app.tabBars.buttons["Stats"].tap()
 
         XCTAssertTrue(app.staticTexts["Example stats from demo data"].waitForExistence(timeout: 10))
-        XCTAssertTrue(scrollTo(app.staticTexts["Who works hardest"]))
+        XCTAssertTrue(scrollTo(app.staticTexts["Usage by provider"]))
     }
 
     func testTheDetailShowsWhereTheWindowIsHeading() {
@@ -64,6 +64,17 @@ final class ScreensTests: XCTestCase {
 
     func testSettingsListsTheOpenSourceLicences() {
         app.buttons["Settings"].tap()
+        let historyToggle = app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Keep long-term history'")).firstMatch
+        for _ in 0 ..< 6 where !historyToggle.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(historyToggle.waitForExistence(timeout: 5))
+        XCTAssertEqual("1", historyToggle.value as? String)
+        historyToggle.switches.firstMatch.tap()
+        XCTAssertEqual("0", historyToggle.value as? String)
+        historyToggle.switches.firstMatch.tap()
+        XCTAssertEqual("1", historyToggle.value as? String)
+
         let licences = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Open-source licences'")).firstMatch
         for _ in 0 ..< 6 where !licences.isHittable {
             app.swipeUp()

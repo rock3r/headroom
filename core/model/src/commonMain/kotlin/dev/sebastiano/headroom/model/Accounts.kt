@@ -24,6 +24,8 @@ public data class AccountState(
     val snapshot: QuotaSnapshot?,
     val lastError: QuotaErrorKind? = null,
     val isRefreshing: Boolean = false,
+    /** Why an [QuotaErrorKind.Auth] sync failed, when the provider gave a specific reason. */
+    val authReason: AuthFailureReason? = null,
 ) {
     /**
      * The weekly window if there is one, otherwise the longest window. The UI leads with it. Never
@@ -51,8 +53,15 @@ public data class AccountState(
             snapshot?.windows?.firstOrNull { it.kind == WindowKind.Session && !it.isInformational }
 }
 
-/** One point of a window's usage history, for the pace chart. */
-public data class UsagePoint(val at: Instant, val usedPercent: Double)
+/**
+ * One point of a window's usage history, for the pace chart. [resetsAt] is when the window was due
+ * to reset when the point was recorded, or null for points saved before that was stored.
+ */
+public data class UsagePoint(
+    val at: Instant,
+    val usedPercent: Double,
+    val resetsAt: Instant? = null,
+)
 
 /** The single source of quota data for the app and the widgets. */
 public interface QuotaRepository {

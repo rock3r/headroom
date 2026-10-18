@@ -60,8 +60,15 @@ public sealed interface SignInState {
         val verificationUrl: String,
     ) : SignInState
 
-    /** The provider signs in with an API key. [keyRejected] is true after a bad key. */
-    public data class ApiKey(val provider: Provider, val keyRejected: Boolean = false) : SignInState
+    /**
+     * The provider signs in with an API key. [keyRejected] is true after a bad key; [rejection]
+     * says whether the key was malformed, unauthorized, or expired.
+     */
+    public data class ApiKey(
+        val provider: Provider,
+        val keyRejected: Boolean = false,
+        val rejection: ApiKeyRejection? = if (keyRejected) ApiKeyRejection.Malformed else null,
+    ) : SignInState
 
     /**
      * The provider said yes: the app has the code, the tokens or the key, and is exchanging them,
@@ -72,6 +79,16 @@ public sealed interface SignInState {
     public data class Success(val provider: Provider, val accountLabel: String) : SignInState
 
     public data class Failed(val provider: Provider, val error: SignInError) : SignInState
+}
+
+/** Why an API key was not accepted on the key entry step. */
+public enum class ApiKeyRejection {
+    /** The pasted text is blank or contains spaces. */
+    Malformed,
+    /** The provider rejected the key as unauthorized. */
+    Unauthorized,
+    /** The provider reports that the key has expired and must be replaced. */
+    Expired,
 }
 
 /** Why a sign-in stopped. The UI shows a different message for each. */

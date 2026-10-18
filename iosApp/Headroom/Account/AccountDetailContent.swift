@@ -25,7 +25,12 @@ struct AccountDetailContent: View {
                     HeroRing(account: account, session: session)
                         .padding(.vertical, 8)
                     if account.signInExpired {
-                        SignInExpiredNotice(providerName: account.providerName) { signingInAgain = true }
+                        SignInExpiredNotice(
+                            providerName: account.providerName,
+                            providerId: account.providerId,
+                            usesApiKey: account.usesApiKey,
+                            authReason: account.authReason
+                        ) { signingInAgain = true }
                     } else if let error = account.error {
                         Label(Texts.syncError(error), systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.secondary)

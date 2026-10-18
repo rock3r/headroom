@@ -1,6 +1,6 @@
 # Static analysis
 
-Three tools run as part of `./gradlew check`, and all of them fail the build on any finding.
+`./gradlew check` runs the following analysis tools. Any finding fails the build.
 
 | Tool | What it checks | Config |
 |---|---|---|
@@ -9,8 +9,8 @@ Three tools run as part of `./gradlew check`, and all of them fail the build on 
 | ktfmt | Formatting, KotlinLang style | Applied by the convention plugins |
 | Android Lint | Android correctness, security, performance, accessibility | Warnings are errors |
 
-The convention plugins in `build-logic` apply all of them to every module, including the pure
-Kotlin modules, which get Android Lint through the `com.android.lint` plugin.
+Convention plugins in `build-logic` apply these checks to every module.
+Pure Kotlin modules use `com.android.lint` to run Android Lint.
 
 ## Commands
 
@@ -24,12 +24,12 @@ Kotlin modules, which get Android Lint through the `com.android.lint` plugin.
 
 ## Lint
 
-Every Lint warning is an error. Four checks are off, because they fail the build whenever a
-newer library or SDK is published, which says nothing about the code:
+Lint treats every warning as an error.
+The project disables four checks that report new library or SDK releases rather than code defects:
 `GradleDependency`, `NewerVersionAvailable`, `AndroidGradlePluginVersion` and `OldTargetApi`.
 
 ## Suppressions
 
-Fix the cause first. When a suppression is truly needed, put it on the smallest scope
-(one declaration, at most one file) and write the reason in a comment next to it. Do not add
-baselines.
+Fix the underlying problem before considering a suppression.
+Limit any necessary suppression to one declaration, or at most one file. Add a nearby comment explaining the reason.
+Do not add baselines.

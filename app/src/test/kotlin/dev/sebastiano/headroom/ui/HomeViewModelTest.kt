@@ -257,27 +257,46 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `the chart switches between the account's long windows`() =
+    fun `the chart overlays all long windows by default and toggles them while keeping at least one on`() =
         runTest(main.dispatcher) {
             observe()
             val claude = assertNotNull(viewModel.detail.value)
-            assertEquals(listOf("seven_day", "seven_day_opus"), claude.chartWindows.map { it.id })
-            assertEquals("seven_day", claude.chartWindowId)
+            val history = assertNotNull(claude.history)
+            assertEquals(listOf("seven_day", "seven_day_opus"), history.windows.map { it.id })
+            assertEquals(setOf("seven_day", "seven_day_opus"), history.selectedWindowIds)
+            assertEquals("seven_day", history.primaryShownWindow?.id)
 
-            viewModel.selectChartWindow("seven_day_opus")
+            // Toggling the primary window off leaves only the scoped window on.
+            viewModel.toggleChartWindow("seven_day")
             runCurrent()
-            val opus = assertNotNull(viewModel.detail.value)
-            assertEquals("seven_day_opus", opus.chartWindowId)
+            val opusOnly = assertNotNull(viewModel.detail.value)
+            assertEquals(setOf("seven_day_opus"), opusOnly.history?.selectedWindowIds)
             assertEquals(
                 claude.account.windows.first { it.id == "seven_day_opus" }.usedPercent,
-                opus.chart?.usedPercent,
+                opusOnly.chart?.usedPercent,
             )
 
-            // Another account starts from its own primary window.
+            // Toggling the last remaining window off is ignored so at least one stays on.
+            viewModel.toggleChartWindow("seven_day_opus")
+            runCurrent()
+            assertEquals(
+                setOf("seven_day_opus"),
+                viewModel.detail.value?.history?.selectedWindowIds,
+            )
+
+            // Toggling the primary window again turns it back on.
+            viewModel.toggleChartWindow("seven_day")
+            runCurrent()
+            assertEquals(
+                setOf("seven_day", "seven_day_opus"),
+                viewModel.detail.value?.history?.selectedWindowIds,
+            )
+
+            // Another account starts with its own primary window selected.
             viewModel.select("demo-codex")
             runCurrent()
             val codex = assertNotNull(viewModel.detail.value)
-            assertEquals(codex.account.primary?.id, codex.chartWindowId)
+            assertEquals(setOf(codex.account.primary!!.id), codex.history?.selectedWindowIds)
         }
 
     @Test

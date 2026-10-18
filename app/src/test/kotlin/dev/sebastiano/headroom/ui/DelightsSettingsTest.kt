@@ -78,4 +78,5 @@ class DelightsSettingsTest {
     }
 }
 
-private const val DELIGHTS_REDUCED_NOTE = "Neither plays while motion is reduced."
+private const val DELIGHTS_REDUCED_NOTE =
+    "Refresh shimmer and reset confetti do not play while motion is reduced."

@@ -4,11 +4,11 @@ import SwiftUI
 enum StatsTexts {
     static func persona(_ id: String) -> LocalizedStringKey {
         switch id {
-        case "earlyBird": "Early bird"
-        case "nineToFive": "Nine to five"
-        case "eveningHacker": "Evening hacker"
-        case "nightOwl": "Night owl"
-        default: "Weekend warrior"
+        case "earlyBird": "Early mornings"
+        case "nineToFive": "Workday hours"
+        case "eveningHacker": "Evenings"
+        case "nightOwl": "Late nights"
+        default: "Weekends"
         }
     }
 

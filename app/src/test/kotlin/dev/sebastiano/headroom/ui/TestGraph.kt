@@ -101,7 +101,7 @@ fun testGraph(
             DemoAwareUsageHistory(
                 isDemo = repository.isDemo,
                 real = RepositoryUsageHistory(real),
-                demo = DemoUsageHistory(DemoResetHistory, clock, ZoneOffset.UTC),
+                demo = DemoUsageHistory(DemoResetHistory, clock, ZoneOffset.UTC, settings),
             ),
         statsDispatcher = statsDispatcher,
         resetIsland = resetIsland,

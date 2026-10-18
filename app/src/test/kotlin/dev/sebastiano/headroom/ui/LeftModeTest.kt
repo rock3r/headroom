@@ -78,7 +78,10 @@ class LeftModeTest {
             .assertIsDisplayed()
         rule.onNodeWithContentDescription("29% left").performScrollTo().assertIsDisplayed()
         rule
-            .onNodeWithContentDescription("29% left, usage above the even-pace line.")
+            .onNodeWithContentDescription(
+                "29% left, usage above the even-pace line.",
+                substring = true,
+            )
             .performScrollTo()
             .assertIsDisplayed()
         rule

@@ -21,6 +21,7 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.model.stats.GivenBack
 import dev.sebastiano.headroom.model.stats.ProviderResetUsage
 import dev.sebastiano.headroom.model.stats.ResetPeriod
+import dev.sebastiano.headroom.model.stats.ResetScore
 import dev.sebastiano.headroom.model.stats.ResetUsage
 import dev.sebastiano.headroom.model.stats.ResetUsageStats
 import dev.sebastiano.headroom.model.stats.Stats
@@ -70,8 +71,14 @@ class StatsTest {
     fun `demo mode shows demo stats, labelled as demo data`() {
         openStats()
         rule.onNodeWithText("Example stats from demo data", substring = true).assertIsDisplayed()
-        scrollToDescription("of 17 resets came without hitting the limit")
-        scrollToDescription("Share of the quota burned: ")
+        scrollToDescription("of 168 resets came without hitting the limit")
+        rule
+            .onNodeWithText(
+                "Your latest 40 resets, oldest first. Squares hit the limit.",
+                useUnmergedTree = true,
+            )
+            .assertIsDisplayed()
+        scrollToDescription("Share of quota use: ")
         scrollToDescription("Quota use by day and hour")
         scrollTo("Grok reached 99%")
         scrollToDescription("was left unused at reset")
@@ -79,12 +86,37 @@ class StatsTest {
     }
 
     @Test
+    fun `when all resets fit in two rows the legend says one mark per reset`() {
+        val score =
+            ResetScore(
+                total = 10,
+                clean = 8,
+                streak = 3,
+                timeline = List(10) { it == 2 || it == 6 },
+            )
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                StatsScreen(
+                    StatsUiState(loading = false, stats = Stats(resets = score)),
+                    formatter,
+                )
+            }
+        }
+        rule
+            .onNodeWithText(
+                "One mark per reset, oldest first. Squares hit the limit.",
+                useUnmergedTree = true,
+            )
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun `with only this window's history, the reset stats wait for a reset`() {
         openStats(realAccounts = DemoData.accounts(FIXED_NOW))
-        scrollTo("No resets recorded yet")
+        scrollTo("No resets recorded yet. This fills in once a limit resets.")
         // The shares only need a few syncs, and this week has them.
-        scrollToDescription("Share of the quota burned")
-        scrollTo("No resets yet, so nothing was left on the table")
+        scrollToDescription("Share of quota use")
+        scrollTo("No resets recorded yet. Unused quota appears after the first reset.")
     }
 
     @Test
@@ -95,8 +127,8 @@ class StatsTest {
             }
         }
         rule.onNodeWithText("No history yet", substring = true).assertIsDisplayed()
-        scrollTo("No resets recorded yet")
-        scrollTo("Nothing burned yet")
+        scrollTo("No resets recorded yet. This fills in once a limit resets.")
+        scrollTo("No quota use recorded yet")
         scrollTo("Needs a week of history")
         scrollTo("Appears once a limit resets")
         scrollTo("No accounts to chart yet")
@@ -132,7 +164,7 @@ class StatsTest {
         scrollToDescription("in the last 4 weeks: 1 used, 0 expired unused")
         rule.onNodeWithText("12 months").performClick()
         scrollToDescription("in the last 12 months: 7 used, 2 expired unused")
-        scrollToDescription("Gave back about 1.5 times the weekly limit")
+        scrollToDescription("Restored quota equal to about 1.5 times the weekly limit")
         scrollTo("Codex")
     }
 

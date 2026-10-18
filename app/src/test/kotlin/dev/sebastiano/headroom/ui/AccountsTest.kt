@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.signin.ApiKeyRejection
 import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
@@ -94,6 +95,19 @@ class AccountsTest {
         rule.onNodeWithTag(SIGN_IN_KEY_FIELD_TAG).performTextInput("short")
         rule.onNodeWithText("Save key").performClick()
         rule.onNodeWithText("This key does not look right", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `api key sign-in explains when the provider says the key has expired`() {
+        openPicker()
+        pick(Provider.OpenCodeGo)
+        signIn.rejectApiKey(ApiKeyRejection.Expired)
+        rule
+            .onNodeWithText(
+                "OpenCode says this key has expired — create a new one in the OpenCode Console",
+                substring = true,
+            )
+            .assertIsDisplayed()
     }
 
     @Test

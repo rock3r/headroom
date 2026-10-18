@@ -84,12 +84,15 @@ data class SettingsAccounts(val providers: List<Provider>, val isDemo: Boolean)
 
 const val SETTINGS_LIST_TAG: String = "settings-list"
 
-const val REDEEM_CLAUDE_RESETS_TAG: String = "redeem-claude-resets"
-
 const val RESET_EXPIRY_REMINDERS_TAG: String = "reset-expiry-reminders"
 
-/** The rows of the Resets block: the reminders, and redeeming Claude's resets. */
-private const val RESET_ROWS = 2
+const val KEEP_LONG_HISTORY_TAG: String = "keep-long-history"
+
+/** The row of the Resets block: the reminders. */
+private const val RESET_ROWS = 1
+
+/** The switch row under the sync options: long-term history. */
+private const val HISTORY_ROWS = 1
 
 fun syncFrequencyTag(frequency: SyncFrequency): String = "sync-frequency-${frequency.name}"
 
@@ -113,10 +116,10 @@ data class SettingsActions(
     val onResetIslandChange: (Boolean) -> Unit = {},
     /** Shows the reset island now, with this provider's logo and these words. */
     val onTryResetIsland: (Provider, String) -> Unit = { _, _ -> },
-    /** Turns using Claude's resets on or off. Experimental. */
-    val onRedeemClaudeResetsChange: (Boolean) -> Unit = {},
     /** Turns the reminder before a reset expires on or off. */
     val onResetExpiryRemindersChange: (Boolean) -> Unit = {},
+    /** Turns keeping a year of compacted usage history on or off. */
+    val onKeepLongHistoryChange: (Boolean) -> Unit = {},
     /** Reads the accessibility settings again. Runs whenever the user comes back to the app. */
     val onRefreshResetIsland: () -> Unit = {},
     /** Asks the system to add Headroom's Quick Settings tile. */
@@ -305,17 +308,6 @@ private fun LazyListScope.settingsRows(
             modifier = block.testTag(RESET_EXPIRY_REMINDERS_TAG),
         )
     }
-    tracedItem("Settings: RedeemClaudeResetsRow") {
-        SettingsRow(
-            headline = stringResource(R.string.settings_redeem_claude_resets),
-            action = RowAction.Toggle(state.redeemClaudeResets, actions.onRedeemClaudeResetsChange),
-            index = 1,
-            count = RESET_ROWS,
-            supporting = stringResource(R.string.settings_redeem_claude_resets_body),
-            trailing = { Switch(checked = state.redeemClaudeResets, onCheckedChange = null) },
-            modifier = width.testTag(REDEEM_CLAUDE_RESETS_TAG),
-        )
-    }
     tracedItem("Settings: SectionLabel sync") {
         SectionLabel(stringResource(R.string.settings_sync), block)
     }
@@ -338,6 +330,20 @@ private fun LazyListScope.settingsRows(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = block.padding(horizontal = 6.dp),
+        )
+    }
+    tracedItem("Settings: SectionLabel usage history") {
+        SectionLabel(stringResource(R.string.settings_usage_history), block)
+    }
+    tracedItem("Settings: KeepLongHistoryRow") {
+        SettingsRow(
+            headline = stringResource(R.string.settings_keep_long_history),
+            action = RowAction.Toggle(state.keepLongHistory, actions.onKeepLongHistoryChange),
+            index = 0,
+            count = HISTORY_ROWS,
+            supporting = stringResource(R.string.settings_keep_long_history_body),
+            trailing = { Switch(checked = state.keepLongHistory, onCheckedChange = null) },
+            modifier = block.testTag(KEEP_LONG_HISTORY_TAG),
         )
     }
     if (showWidgets) {

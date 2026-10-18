@@ -88,8 +88,7 @@ public class ResetClients(
          * Codex, Grok, Claude and Z.AI resets are read and used, and Z.AI can be asked for more.
          * Z.AI resets need the account's ZCode sign-in ([ProviderCredentials.zCode]). Whether the
          * app offers a redeem is its own decision
-         * ([dev.sebastiano.headroom.model.canRedeemResets]): Claude's only once the user turns it
-         * on.
+         * ([dev.sebastiano.headroom.model.canRedeemResets]).
          */
         public fun create(
             httpClient: QuotaHttpClient = KtorQuotaHttpClient(),

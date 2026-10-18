@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
@@ -26,6 +28,7 @@ import dev.sebastiano.headroom.ui.accounts.ACCOUNTS_TAG
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
 import dev.sebastiano.headroom.ui.overview.accountCardTag
 import dev.sebastiano.headroom.ui.settings.ADD_TILE_TAG
+import dev.sebastiano.headroom.ui.settings.KEEP_LONG_HISTORY_TAG
 import dev.sebastiano.headroom.ui.settings.LICENCES_LIST_TAG
 import dev.sebastiano.headroom.ui.settings.LICENCES_TAG
 import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
@@ -37,6 +40,8 @@ import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -154,6 +159,31 @@ class SettingsTest {
     }
 
     @Test
+    fun `the long-term history switch is on by default and tapping the row turns it off`() {
+        openSettings()
+        rule
+            .onNodeWithTag(SETTINGS_LIST_TAG)
+            .performScrollToNode(hasText("Usage history") and isHeading())
+        rule.onNode(hasText("Usage history") and isHeading()).assertIsDisplayed()
+        rule.onNodeWithTag(SETTINGS_LIST_TAG).performScrollToNode(hasTestTag(KEEP_LONG_HISTORY_TAG))
+        rule.onNodeWithTag(KEEP_LONG_HISTORY_TAG).assertIsOn()
+        rule.onNodeWithText("Keep long-term history").assertIsDisplayed()
+        rule
+            .onNodeWithText(
+                "Keeps a year of usage for the charts, in less detail as it gets older. " +
+                    "Turn off to keep only the last 60 days."
+            )
+            .assertIsDisplayed()
+        assertTrue(settings.settings.value.keepLongHistory)
+
+        rule.onNodeWithTag(KEEP_LONG_HISTORY_TAG).performClick()
+        rule.waitForIdle()
+
+        rule.onNodeWithTag(KEEP_LONG_HISTORY_TAG).assertIsOff()
+        assertFalse(settings.settings.value.keepLongHistory)
+    }
+
+    @Test
     fun `the licences open from settings and back returns to settings`() {
         openSettings()
         rule.onNode(hasScrollAction()).performScrollToNode(hasText("Open-source licences"))
@@ -168,6 +198,9 @@ class SettingsTest {
                 .isSuccess
         }
         rule.onAllNodesWithText(material3).onFirst().assertIsDisplayed()
+        val composeCharts = "Compose Charts"
+        rule.onNodeWithTag(LICENCES_LIST_TAG).performScrollToNode(hasText(composeCharts))
+        rule.onAllNodesWithText(composeCharts).onFirst().assertIsDisplayed()
 
         rule.runOnUiThread { dispatcher.onBackPressed() }
         rule.waitForIdle()

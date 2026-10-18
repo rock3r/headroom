@@ -15,7 +15,13 @@ struct SignInStepView: View {
         case let device as SignInUiDeviceCode:
             DeviceCodeStep(userCode: device.userCode, verificationUrl: device.verificationUrl)
         case let apiKey as SignInUiApiKey:
-            ApiKeyStep(providerName: apiKey.providerName, keyRejected: apiKey.keyRejected, onSubmit: { model.headroom.signIn.submitApiKey(key: $0) })
+            ApiKeyStep(
+                providerId: apiKey.providerId,
+                providerName: apiKey.providerName,
+                keyRejected: apiKey.keyRejected,
+                rejection: apiKey.rejection,
+                onSubmit: { model.headroom.signIn.submitApiKey(key: $0) }
+            )
         case let starting as SignInUiStarting:
             WaitingStep(title: "Getting the sign-in ready", detail: Text(starting.providerName))
         case let finishing as SignInUiFinishing:

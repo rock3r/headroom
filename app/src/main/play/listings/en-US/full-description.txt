@@ -5,7 +5,7 @@ Headroom works with Claude, ChatGPT Codex, GitHub Copilot, Grok, Z.AI, Kimi Code
 <b>One overview for every subscription</b>
 Each account shows its weekly or monthly usage, its session usage, and when each limit resets. A big countdown at the top tells you which limit resets next.
 
-<b>Pace, not just percent</b>
+<b>Usage rate and forecasts</b>
 A tick on each bar shows where you would be if you spread the limit evenly over the week. Headroom tells you how many points you are over or under that pace, draws the week to scale, and says when you would reach 100% at your current rate. Bars turn wavy only when an account needs your attention.
 
 <b>Reset alerts and reminders</b>
@@ -18,7 +18,7 @@ Some providers hand out resets that refill a limit early. Headroom lists the one
 Four widget styles, Rings, Bars, Shape and Countdown, each with its own accounts, window and colours. A Quick Settings tile shows the next reset or the quota closest to its limit.
 
 <b>Stats from your own history</b>
-See how many resets came without hitting the limit, which service does most of your work, the hours you burn the most quota, and a 7-day line for each account.
+See how many resets came without reaching the limit, each provider's share of quota use, the hours you use the most quota, and a 7-day line for each account.
 
 <b>Made for Android 16</b>
 Material 3 Expressive design, colours from your wallpaper or one of eight palettes, light and dark themes, reduced motion, and adaptive layouts that put the list and the detail side by side on tablets and foldables.

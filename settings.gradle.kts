@@ -27,5 +27,6 @@ include(
     ":shared",
     ":core:designsystem",
     ":widget",
+    ":third-party:compose-charts",
 )
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")

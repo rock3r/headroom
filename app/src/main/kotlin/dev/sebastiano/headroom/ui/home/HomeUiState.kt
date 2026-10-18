@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.ui.home
 
 import androidx.compose.runtime.Immutable
 import dev.sebastiano.headroom.designsystem.PaceChipState
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
@@ -10,6 +11,7 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.ui.detail.UsageHistoryModel
 import kotlin.time.Instant
 
 /** Everything the overview, resets and detail screens show. */
@@ -74,6 +76,8 @@ data class AccountSummary(
     val signInExpired: Boolean = false,
     /** When the numbers were fetched, or null before the first good sync. */
     val dataFrom: Instant? = null,
+    /** Why an [QuotaErrorKind.Auth] sync failed, when the provider gave a specific reason. */
+    val authReason: AuthFailureReason? = null,
 ) {
     /**
      * The instant the numbers describe: now for fresh data, the last good sync for stale data. Pace
@@ -118,7 +122,7 @@ data class NextResetSummary(
     val name: String = provider.displayName,
 )
 
-/** The detail screen: one account plus the chart of its primary window. */
+/** The detail screen: one account plus the usage history chart of its long windows. */
 @Immutable
 data class DetailUiState(
     val now: Instant,
@@ -126,8 +130,10 @@ data class DetailUiState(
     val chart: ChartSummary?,
     /** The windows the chart can show, when there is more than one to pick from. */
     val chartWindows: List<WindowSummary> = emptyList(),
-    /** The window the chart shows. */
+    /** The primary shown window in the chart. */
     val chartWindowId: String? = null,
     /** Whether percentages, rings and chart text show how much is used or how much is left. */
     val display: QuotaDisplay = QuotaDisplay.Used,
+    /** Long-term usage history model across all long windows of the account. */
+    val history: UsageHistoryModel? = null,
 )

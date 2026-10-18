@@ -50,12 +50,12 @@ internal fun ResetMarks(timeline: List<Boolean>, modifier: Modifier = Modifier) 
     val hit = MaterialTheme.colorScheme.error
     FlowRow(
         modifier = modifier.clearAndSetSemantics {},
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(ResetMarkGap),
+        verticalArrangement = Arrangement.spacedBy(ResetMarkGap),
     ) {
         timeline.forEach { hitLimit ->
             Box(
-                Modifier.size(MarkSize)
+                Modifier.size(ResetMarkSize)
                     .background(
                         if (hitLimit) hit else clean,
                         if (hitLimit) RoundedCornerShape(3.dp) else CircleShape,
@@ -63,6 +63,18 @@ internal fun ResetMarks(timeline: List<Boolean>, modifier: Modifier = Modifier) 
             )
         }
     }
+}
+
+/** How many reset marks fit in [maxRows] rows of [widthPx] pixels. */
+internal fun maxResetMarks(
+    widthPx: Int,
+    markPx: Int,
+    gapPx: Int,
+    maxRows: Int = MAX_MARK_ROWS,
+): Int {
+    if (widthPx <= 0 || markPx <= 0) return maxRows
+    val perRow = maxOf(1, (widthPx + gapPx) / (markPx + gapPx))
+    return perRow * maxRows
 }
 
 /**
@@ -222,8 +234,10 @@ private const val MIN_STRENGTH = 0.18f
 /** The corner radius of a heatmap cell, as a share of its side. */
 private const val CELL_ROUNDNESS = 0.25f
 private const val AREA_ALPHA = 0.14f
+private const val MAX_MARK_ROWS = 2
 private val HOUR_TICKS = listOf(0, 6, 12, 18)
-private val MarkSize = 12.dp
+internal val ResetMarkSize = 12.dp
+internal val ResetMarkGap = 5.dp
 private val DonutStroke = 20.dp
 private val LabelGutter = 16.dp
 private val CellGap = 2.dp

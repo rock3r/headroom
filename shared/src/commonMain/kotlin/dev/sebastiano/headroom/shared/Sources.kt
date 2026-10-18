@@ -5,9 +5,11 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.DemoUsage
 import dev.sebastiano.headroom.model.FakeQuotaRepository
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.ResetEvent
 import dev.sebastiano.headroom.model.ResetEventLog
+import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.stats.ResetPeaks
 import kotlin.time.Instant
@@ -30,6 +32,7 @@ internal class Sources(
     private val events: ResetEventLog,
     private val clock: () -> Instant,
     private val zone: () -> TimeZone,
+    private val settings: SettingsRepository = InMemorySettingsRepository(),
 ) {
     private val demo = FakeQuotaRepository(clock)
 
@@ -52,20 +55,27 @@ internal class Sources(
 
     /** The usage history of [window], oldest point first. */
     fun history(accountId: String, window: QuotaWindow): Flow<List<UsagePoint>> =
-        isDemo.flatMapLatest { demoMode ->
-            if (demoMode) {
-                flowOf(
-                    DemoUsage.points(
-                        window,
-                        DemoData.resetPeaks(accountId, window.id),
-                        clock(),
-                        zone(),
-                    )
-                )
-            } else {
-                real.history(accountId, window.id)
+        combine(
+                isDemo,
+                settings.settings.map { it.historyRetention }.distinctUntilChanged(),
+            ) { demoMode, retention ->
+                demoMode to retention
             }
-        }
+            .flatMapLatest { (demoMode, retention) ->
+                if (demoMode) {
+                    flowOf(
+                        DemoUsage.points(
+                            window,
+                            DemoData.resetPeaks(accountId, window.id),
+                            clock(),
+                            zone(),
+                            retention,
+                        )
+                    )
+                } else {
+                    real.history(accountId, window.id)
+                }
+            }
 
     /** How much of the window was used when it reset, oldest first. */
     fun resetPeaks(accountId: String, windowId: String): Flow<List<Double>> =

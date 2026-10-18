@@ -6,7 +6,7 @@ struct ResetScoreCard: View {
     let score: ResetScoreUi?
 
     var body: some View {
-        StatCard(title: "Clean resets", empty: empty) {
+        StatCard(title: "Resets without reaching the limit", empty: empty) {
             if let score {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading) {

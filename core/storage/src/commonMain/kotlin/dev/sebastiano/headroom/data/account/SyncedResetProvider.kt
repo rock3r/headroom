@@ -3,7 +3,6 @@ package dev.sebastiano.headroom.data.account
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
-import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.AskOutcome
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.RedeemOutcome
@@ -11,7 +10,6 @@ import dev.sebastiano.headroom.model.ResetAttemptKey
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.canRedeemResets
-import dev.sebastiano.headroom.model.redeemsResetsExperimentally
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.ResetClients
 import dev.sebastiano.headroom.quota.ResetLog
@@ -24,7 +22,7 @@ import kotlinx.io.IOException
  * goes to the provider's [dev.sebastiano.headroom.quota.ResetRedeemer], and asking for another
  * reset to its [dev.sebastiano.headroom.quota.ResetAsker], with a credential that works now, and so
  * does a check of an unconfirmed redeem. They only run for the providers whose resets Headroom can
- * use with the user's [settings] ([dev.sebastiano.headroom.model.canRedeemResets]).
+ * use ([dev.sebastiano.headroom.model.canRedeemResets]).
  */
 public class SyncedResetProvider(
     /**
@@ -32,8 +30,6 @@ public class SyncedResetProvider(
      * [dev.sebastiano.headroom.model.QuotaRepository.current].
      */
     private val accounts: suspend () -> List<AccountState>,
-    /** The user's settings now: Claude's resets are only used once the user turns that on. */
-    private val settings: suspend () -> AppSettings = { AppSettings() },
     private val fetcher: AccountQuotaFetcher,
     private val clients: ResetClients,
     private val log: ResetLog = ResetLog.None,
@@ -105,21 +101,8 @@ public class SyncedResetProvider(
         return outcome
     }
 
-    /**
-     * Only an experimental redeem depends on the settings, so the other providers never read them.
-     * Settings that cannot be read count as off.
-     */
-    private suspend fun redeems(account: Account): Boolean {
-        val provider = account.provider
-        if (!provider.redeemsResetsExperimentally) return provider.canRedeemResets(AppSettings())
-        val current =
-            try {
-                settings()
-            } catch (_: IOException) {
-                return false
-            }
-        return provider.canRedeemResets(current)
-    }
+    /** Redeems, checks and asks only run for the providers whose resets Headroom can use. */
+    private fun redeems(account: Account): Boolean = account.provider.canRedeemResets()
 
     private suspend fun credentialsOf(account: Account): Credentials =
         try {

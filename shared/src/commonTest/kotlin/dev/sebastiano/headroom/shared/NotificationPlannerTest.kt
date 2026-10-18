@@ -2,14 +2,18 @@ package dev.sebastiano.headroom.shared
 
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetScope
 import dev.sebastiano.headroom.model.WindowKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
@@ -63,6 +67,25 @@ class NotificationPlannerTest {
 
         val fixed = plan(signInNotified = first.signInNotified.toSet())
         assertEquals(listOf("demo-claude"), fixed.signInCancels)
+    }
+
+    @Test
+    fun `an expired API key alert carries usesApiKey and its auth reason`() {
+        val opencode =
+            DemoData.manyAccounts(now)
+                .first { it.account.provider == Provider.OpenCodeGo }
+                .copy(lastError = QuotaErrorKind.Auth, authReason = AuthFailureReason.KeyExpired)
+
+        val alert = plan(accounts = listOf(opencode)).signInAlerts.single()
+
+        assertEquals("demo-opencode", alert.accountId)
+        assertTrue(alert.usesApiKey)
+        assertEquals("keyExpired", alert.authReason)
+
+        val oauthAlert =
+            plan(accounts = DemoData.accountsWithExpiredSignIn(now)).signInAlerts.single()
+        assertFalse(oauthAlert.usesApiKey)
+        assertNull(oauthAlert.authReason)
     }
 
     @Test

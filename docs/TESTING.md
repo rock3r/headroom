@@ -1,12 +1,12 @@
 # Testing
 
-## TDD flow
+## Test-driven development
 
 1. Write the test first.
-2. Run just that test and check it fails for the reason you expect.
+2. Run the targeted test. Check that it fails for the expected reason.
 3. Write the minimum production code to make it pass.
 4. Run the test again, then `./gradlew :module:check`.
-5. Refactor with the tests green.
+5. Refactor while keeping the tests passing.
 
 ## Test layers
 
@@ -24,26 +24,24 @@
 
 ### Multiplatform tests
 
-`commonTest` code runs on every target, so it uses `kotlin.test` only: no JUnit imports and no
-`java.*` APIs. Kotlin/Native does not allow commas in function names, so backticked test names
-leave them out. `./gradlew check` runs the iOS simulator tests on macOS and skips them elsewhere;
-CI runs them in a macOS job.
+`commonTest` runs on every target and must use `kotlin.test`. It cannot import JUnit or `java.*` APIs.
+Kotlin/Native forbids commas in function names, including backticked test names.
+`./gradlew check` runs iOS simulator tests on macOS and skips them on other hosts.
+Continuous integration (CI) runs those tests in a macOS job.
 
-### Fixtures, not live services
+### Provider tests use fixtures
 
-Provider parsing tests use recorded JSON fixtures in `src/test/resources` (`src/jvmTest/resources`
-in multiplatform modules). HTTP behaviour is tested against OkHttp's `MockWebServer`, which only
-runs on the JVM, so those tests live in `jvmTest`. No test talks to a real provider.
+Provider parsing tests read recorded JSON fixtures from `src/test/resources`, or `src/jvmTest/resources` in multiplatform modules.
+HTTP tests use OkHttp's JVM-only `MockWebServer` and belong in `jvmTest`.
+Tests never contact real providers.
 
 ### End-to-end tests
 
-The instrumented tests start the app in demo mode with a fixed clock, so the screens show the
-same numbers every run. They run on a Gradle Managed Device (`pixel9api37`), which Gradle
-creates and starts itself. Locally you need the Android 37 `google_apis` system image. In CI
-the same task runs with a software GPU.
+Instrumented tests start demo mode with a fixed clock to keep screen values repeatable.
+Gradle creates and starts the managed device `pixel9api37`.
+Local runs require the Android 37 `google_apis` system image. CI runs the same task with software graphics.
 
-To run the instrumented tests on an emulator or phone you already have running, without the
-managed device, install both APKs on it and start the runner:
+To use an existing emulator or phone, install both APKs and start the runner:
 
 ```bash
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
@@ -53,20 +51,17 @@ adb -s <serial> shell am instrument -w \
     dev.sebastiano.headroom.test/dev.sebastiano.headroom.HeadroomTestRunner
 ```
 
-The tests share one app process. A test that changes the demo accounts puts them back after it
-runs.
+Tests share one app process. Each test must restore any demo accounts it changes.
 
 ### Screenshots
 
-Roborazzi records screenshots of the main screens from Robolectric with
-`./gradlew :app:recordRoborazziDebug`. `./gradlew :widget:recordWidgetGallery` plays each widget
-in the Android 16 widget player and saves it. Both are used for the README. They are not compared
-in CI, because font rendering differs between machines.
+`./gradlew :app:recordRoborazziDebug` records main-screen screenshots through Roborazzi and Robolectric.
+`./gradlew :widget:recordWidgetGallery` saves each widget from the Android 16 widget player.
+The README uses both image sets. CI does not compare screenshots because machines render fonts differently.
 
-Robolectric draws only when a test asks. A test that draws frames just to move animations along
-calls `drawFrame()` on a node rather than dropping the result of `captureToImage()`. Under native
-graphics a picture's pixels live outside the Java heap and the garbage collector does not count
-them, so dropped pictures pile up: thousands of them ran CI runners out of memory (issue #6).
+Robolectric draws frames only on request. Use a node's `drawFrame()` to advance animations without saving images.
+Discarding `captureToImage()` results can exhaust CI memory, as reported in issue #6.
+Native graphics stores pixels outside the Java heap, so the garbage collector does not account for that memory.
 
 ### Widgets
 

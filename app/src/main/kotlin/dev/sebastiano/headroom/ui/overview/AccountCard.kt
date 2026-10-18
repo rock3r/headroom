@@ -113,7 +113,14 @@ fun AccountCard(
                 )
             }
             if (account.signInExpired) {
-                SignInExpiredRow(account.id, account.dataFrom, now, onSignIn)
+                SignInExpiredRow(
+                    accountId = account.id,
+                    dataFrom = account.dataFrom,
+                    now = now,
+                    onSignIn = onSignIn,
+                    provider = account.provider,
+                    authReason = account.authReason,
+                )
             } else {
                 account.error?.let {
                     Text(
