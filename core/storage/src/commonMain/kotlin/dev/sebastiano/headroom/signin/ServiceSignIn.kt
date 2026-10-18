@@ -83,12 +83,14 @@ public class ServiceSignIn(
             return
         }
         if (current is ServiceSignInState.Starting && current.accountId == accountId) return
+        // Take the new flow's watch before letting the old one go, so a replacement never leaves a
+        // moment with no watch and the app stays awake across it.
+        val watching = watch.start(label)
         job?.cancel()
         mutableState.value = ServiceSignInState.Starting(accountId)
         job = scope.launch {
             // The app must stay out of the frozen state for the whole flow: it is the poll that
             // notices the sign-in, and the app only comes back in front once it did.
-            watch.start(label)
             mutableState.value =
                 try {
                     val session = start()
@@ -111,7 +113,7 @@ public class ServiceSignIn(
                     log("$label sign-in could not be saved: ${failure::class.simpleName}")
                     ServiceSignInState.Failed(accountId, SignInError.Unknown)
                 } finally {
-                    watch.stop()
+                    watching.stop()
                 }
         }
     }

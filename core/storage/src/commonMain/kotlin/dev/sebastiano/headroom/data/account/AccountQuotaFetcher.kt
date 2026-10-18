@@ -38,7 +38,8 @@ import kotlinx.io.IOException
  * A Grok account's Cursor windows need its Cursor sign-in, saved next to its xAI sign-in under
  * [CursorCredential.idFor] its id. The usage fetch's credentials carry it as
  * [ProviderCredentials.cursor], refreshed when needed. A Cursor sign-in that does not work never
- * fails the Grok fetch, and a sync waits for it at most [SECOND_SIGN_IN_WAIT].
+ * fails the Grok fetch, and a sync waits for it at most [SECOND_SIGN_IN_WAIT]. The reset path does
+ * not carry it: a redeem uses the xAI token alone, and must not wait on Cursor.
  */
 public class AccountQuotaFetcher(
     private val credentials: CredentialProvider,
@@ -102,15 +103,16 @@ public class AccountQuotaFetcher(
     }
 
     /**
-     * The credential of [account] as the providers need it, refreshed when needed. The reset
-     * redeemers use it too.
+     * The credential of [account] as the reset redeemers need it, refreshed when needed. A reset
+     * only ever uses a provider's own token, so this does not resolve a second sign-in's: waiting
+     * on one that does not answer would hold up a redeem, which the user is racing a clock to make.
+     * The usage fetch asks for the Cursor sign-in on its own, where it is the point.
      *
      * @throws AuthException when there is no working sign-in.
      * @throws IOException when the token store cannot be read or written.
      */
     internal suspend fun providerCredentials(account: Account): ProviderCredentials =
-        validCredential(account)
-            .toProviderCredentials(zCode = zCodeSignIn(account), cursor = cursorSignIn(account))
+        validCredential(account).toProviderCredentials(zCode = zCodeSignIn(account), cursor = null)
 
     /** [zCodeSignIn] for a sync: unavailable when it takes longer than [SECOND_SIGN_IN_WAIT]. */
     private suspend fun syncZCodeSignIn(account: Account): ZCodeSignIn? {

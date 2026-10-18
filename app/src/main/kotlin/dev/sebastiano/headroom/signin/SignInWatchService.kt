@@ -16,10 +16,12 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.data.R as DataR
 
 /**
- * Watches one sign-in from the foreground, so Android does not freeze the app while the user is in
- * the browser. The app is the one that polls for the sign-in to be through, and only then brings
- * itself back in front of the browser tab; a frozen app would never notice and the tab would stay
- * open. The notification is the price of staying awake, and it is quiet.
+ * Keeps the app out of Android's frozen state from the foreground while a sign-in waits for the
+ * user in the browser. The app is the one that polls for the sign-in to be through, and only then
+ * brings itself back in front of the browser tab; a frozen app would never notice and the tab would
+ * stay open. The notification is the price of staying awake, and it is quiet.
+ * [ForegroundSignInWatch] starts it for the first sign-in that waits and stops it when the last one
+ * ends.
  */
 class SignInWatchService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null

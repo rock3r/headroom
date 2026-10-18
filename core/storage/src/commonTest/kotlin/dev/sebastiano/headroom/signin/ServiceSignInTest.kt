@@ -81,13 +81,18 @@ class ServiceSignInTest {
 
     private class FakeWatch : SignInWatch {
         val events = mutableListOf<String>()
+        private var opened = 0
 
-        override fun start(service: String) {
-            events += "watch $service"
+        override fun start(service: String): SignInWatch.Watch {
+            val flow = "watch $service#${opened++}"
+            events += flow
+            return SignInWatch.Watch { events += "let go $flow" }
         }
 
-        override fun stop() {
-            events += "unwatch"
+        /** Forgets everything, so a later flow starts at the first watch again. */
+        fun forget() {
+            events.clear()
+            opened = 0
         }
     }
 
@@ -107,10 +112,10 @@ class ServiceSignInTest {
 
             signIn.start("g1")
             // Android freezes a background app, which would stop the poll that ends the sign-in.
-            assertEquals(listOf("watch Cursor"), watch.events)
+            assertEquals(listOf("watch Cursor#0"), watch.events)
 
             session.result.complete(tokens)
-            assertEquals(listOf("watch Cursor", "unwatch"), watch.events)
+            assertEquals(listOf("watch Cursor#0", "let go watch Cursor#0"), watch.events)
         }
 
     @Test
@@ -128,12 +133,44 @@ class ServiceSignInTest {
             signIn.start("g1")
             failed.result.completeExceptionally(AuthException.Network("offline"))
             assertEquals(ServiceSignInState.Failed("g1", SignInError.Network), signIn.state.value)
-            assertEquals(listOf("watch Sign-in", "unwatch"), watch.events)
+            assertEquals(listOf("watch Sign-in#0", "let go watch Sign-in#0"), watch.events)
 
-            watch.events.clear()
+            watch.forget()
             signIn.start("g1")
             signIn.cancel()
-            assertEquals(listOf("watch Sign-in", "unwatch"), watch.events)
+            assertEquals(listOf("watch Sign-in#0", "let go watch Sign-in#0"), watch.events)
+        }
+
+    @Test
+    fun `a new sign-in takes over a watch of its own before the one it replaces lets go`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val first = FakeSession()
+            val second = FakeSession()
+            val sessions = ArrayDeque(listOf(first, second))
+            val watch = FakeWatch()
+            val signIn =
+                ServiceSignIn(
+                    start = { sessions.removeFirst() },
+                    save = { _, _ -> },
+                    scope = backgroundScope,
+                    label = "Cursor",
+                    watch = watch,
+                )
+
+            signIn.start("g1")
+            // A sign-in for another account replaces this one, as the app's two second sign-ins
+            // (ZCode's and Cursor's) share one watcher.
+            signIn.start("g2")
+
+            // The new flow takes a watch of its own before the one it replaces lets go, so the app
+            // is never left with nothing watching between the two.
+            assertEquals(
+                listOf("watch Cursor#0", "watch Cursor#1", "let go watch Cursor#0"),
+                watch.events,
+            )
+
+            second.result.complete(tokens)
+            assertEquals("let go watch Cursor#1", watch.events.last())
         }
 
     @Test

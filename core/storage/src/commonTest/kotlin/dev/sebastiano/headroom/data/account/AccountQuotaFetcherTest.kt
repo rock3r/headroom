@@ -336,6 +336,41 @@ class AccountQuotaFetcherTest {
     }
 
     @Test
+    fun `a redeem's credentials never wait on the Cursor sign-in`() = runTest {
+        saveCredential("g1", Provider.Grok)
+        // An expired Cursor sign-in is refreshed on demand. A redeem uses the xAI token alone and
+        // is racing a clock, so it must not spend its time on Cursor.
+        saveCursor("g1", expiresAt = Instant.fromEpochSeconds(0))
+        var refreshes = 0
+        val fetcher =
+            AccountQuotaFetcher(
+                CredentialProvider(
+                    store,
+                    mapOf(
+                        Provider.Grok to
+                            TokenRefresher { old ->
+                                refreshes++
+                                TokenSet(
+                                    Provider.Grok,
+                                    CredentialKind.OAuth,
+                                    "cursor-refreshed",
+                                    old.refreshToken,
+                                    null,
+                                )
+                            }
+                    ),
+                ),
+                QuotaFetchers(listOf(RecordingFetcher(Provider.Grok))),
+            )
+
+        val credentials = fetcher.providerCredentials(grokAccount)
+
+        assertEquals("access-g1", credentials.accessToken)
+        assertNull(credentials.cursor)
+        assertEquals(0, refreshes)
+    }
+
+    @Test
     fun `Grok usage reports a missing Cursor sign-in when there is none`() = runTest {
         val grok = RecordingFetcher(Provider.Grok)
         saveCredential("g1", Provider.Grok)
