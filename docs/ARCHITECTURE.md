@@ -212,6 +212,11 @@ a `GlimmerHorizontalPager` of one card at a time, a `Card` for the next reset an
 `LeadingImageCard` with the provider's logo for each account. The background is black, which the
 glasses' additive display draws as see-through. System back closes the activity.
 
+Each logo has the colour of its provider's avatar in the app's dark theme, with the palette chosen
+in the app's settings (`ProviderPalette`, harmonised with that palette's primary colour). The dark
+theme's light tones read best on the black background, so the glasses use them whatever the phone's
+theme is.
+
 `GlassesPreviews.kt` has Compose previews on Android Studio's "Display Glasses" device
 (`id:ai_glasses_device`, 450 x 450 px at mdpi). The Roborazzi screenshots in `docs/screenshots` use
 the same size.

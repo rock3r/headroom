@@ -21,7 +21,7 @@ class GlassesPagesTest {
                 provider = Provider.Grok,
                 windowId = "weekly",
                 kind = WindowKind.Weekly,
-                resetsAt = now + 1.hours,
+                resetsAt = now.plus(1.hours),
                 alertEnabled = true,
             )
         val grok = account("grok", Provider.Grok)

@@ -131,10 +131,10 @@ class AppGraph(
     val demoAccounts: FakeQuotaRepository? = null,
     /** The ZCode sign-in that Z.AI resets need; null without the data layer. */
     val zCodeSignIn: ZCodeSignIn? = null,
-    /** Whether display glasses are connected, and opens Headroom on them. */
-    val glassesLauncher: GlassesLauncher = GlassesLauncher.Unavailable,
     /** The resets used and expired, for the Stats tab; redeems in Headroom are recorded here. */
     val resetEvents: ResetEventLog = ResetEventLog.None,
+    /** Whether display glasses are connected, and opens Headroom on them. */
+    val glassesLauncher: GlassesLauncher = GlassesLauncher.Unavailable,
 ) {
     /** The resets of every account, read through the reset provider. */
     val resets: ResetCenter =

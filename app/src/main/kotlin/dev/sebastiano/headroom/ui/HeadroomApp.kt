@@ -66,7 +66,7 @@ import dev.sebastiano.headroom.ui.settings.SettingsActions
 import dev.sebastiano.headroom.ui.settings.SettingsScreen
 import dev.sebastiano.headroom.ui.settings.SettingsUiState
 import dev.sebastiano.headroom.ui.settings.SettingsViewModel
-import dev.sebastiano.headroom.ui.stats.StatsScreen
+import dev.sebastiano.headroom.ui.stats.StatsTab
 import dev.sebastiano.headroom.ui.stats.StatsViewModel
 import dev.sebastiano.headroom.widgets.WidgetPinner
 import dev.sebastiano.headroom.widgets.WidgetStyle
@@ -182,11 +182,7 @@ fun HeadroomApp(
                         },
                         resets = resets,
                         resetHandlers = sheet.handlers(),
-                        stats = { bottomPadding ->
-                            // Collected only while the tab shows: no stats work off screen.
-                            val stats by statsViewModel.state.collectAsStateWithLifecycle()
-                            StatsScreen(stats, formatter, bottomPadding = bottomPadding)
-                        },
+                        stats = { StatsTab(statsViewModel.state, formatter, bottomPadding = it) },
                     )
             }
         }

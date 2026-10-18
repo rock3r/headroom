@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -27,8 +28,12 @@ import androidx.xr.glimmer.Text
 import androidx.xr.glimmer.pager.GlimmerHorizontalPager
 import androidx.xr.glimmer.pager.rememberGlimmerPagerState
 import dev.sebastiano.headroom.R
+import dev.sebastiano.headroom.designsystem.ProviderPalette
+import dev.sebastiano.headroom.designsystem.headroomColorScheme
 import dev.sebastiano.headroom.designsystem.providerLogoVector
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.components.windowKindLabel
@@ -42,8 +47,8 @@ import kotlin.time.Instant
 
 /**
  * What the glasses show: one card at a time on a black background, which the additive display draws
- * as see-through. The first card is the next reset, then one card per account. Back closes the
- * glasses activity.
+ * as see-through. The first card is the next reset, then one card per account, whose logo has its
+ * provider's colour from [palette]. Back closes the glasses activity.
  */
 @Composable
 fun GlassesScreen(
@@ -51,6 +56,7 @@ fun GlassesScreen(
     formatter: ResetFormatter,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    palette: ThemePalette = ThemePalette.Wallpaper,
 ) {
     BackHandler(onBack = onBack)
     val pages by rememberUpdatedState(glassesPages(state))
@@ -75,6 +81,7 @@ fun GlassesScreen(
                         formatter,
                         state.display,
                         cardModifier,
+                        palette = palette,
                     )
             }
         }
@@ -140,13 +147,15 @@ internal fun AccountGlassesCard(
     formatter: ResetFormatter,
     display: QuotaDisplay,
     modifier: Modifier = Modifier,
+    /** The app's colour palette, which gives the logo its provider's colour. */
+    palette: ThemePalette = ThemePalette.Wallpaper,
 ) {
     LeadingImageCard(
         modifier = modifier.testTag(glassesAccountTag(account.id)),
         image = {
-            // The logos are drawn in one colour, so they take the card's content colour.
             Icon(
                 imageVector = providerLogoVector(account.provider),
+                tint = glassesLogoColor(account.provider, palette),
                 contentDescription = null,
                 modifier = Modifier.size(GlimmerTheme.iconSizes.large),
             )
@@ -159,6 +168,19 @@ internal fun AccountGlassesCard(
                 Text(text = line, style = GlimmerTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+/**
+ * The colour of [provider]'s logo: the colour of its avatar in the app's dark theme with [palette].
+ * The glasses always draw on black, where the dark theme's light tones read best.
+ */
+@Composable
+private fun glassesLogoColor(provider: Provider, palette: ThemePalette): Color {
+    val context = LocalContext.current
+    return remember(context, provider, palette) {
+        val primary = headroomColorScheme(context, palette, dark = true).primary
+        ProviderPalette.colors(provider, primary, dark = true).accent
     }
 }
 

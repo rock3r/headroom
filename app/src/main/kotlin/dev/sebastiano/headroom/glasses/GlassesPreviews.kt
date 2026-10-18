@@ -53,7 +53,7 @@ private const val GLASSES_PREVIEW_DEVICE = "id:ai_glasses_device"
 
 private val previewNow = Instant.parse("2026-10-10T12:00:00Z")
 
-private val previewReset = previewNow + 2.hours
+private val previewReset = previewNow.plus(2.hours)
 
 private val previewFormatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
 
