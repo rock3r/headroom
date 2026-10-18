@@ -11,17 +11,19 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.OverviewSort
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.home.HomeViewModel
-import dev.sebastiano.headroom.ui.home.ResetBurst
-import java.time.Duration
-import java.time.Instant
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -204,7 +206,7 @@ class HomeViewModelTest {
             observe()
             val next = assertNotNull(viewModel.state.value.nextReset)
             assertEquals(Provider.Grok, next.provider)
-            assertEquals(now.plus(Duration.ofMinutes(928)), next.resetsAt)
+            assertEquals(now.plus(928.minutes), next.resetsAt)
             assertTrue(next.alertEnabled)
         }
 
@@ -242,8 +244,8 @@ class HomeViewModelTest {
             val chart = assertNotNull(first.chart)
             assertTrue(chart.points.isNotEmpty())
             assertEquals(
-                now.plus(Duration.ofMinutes(2488)).epochSecond / 60,
-                chart.projectedLimitAt!!.epochSecond / 60,
+                now.plus(2488.minutes).epochSeconds / 60,
+                chart.projectedLimitAt!!.epochSeconds / 60,
             )
 
             viewModel.select("demo-codex")
@@ -255,27 +257,46 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `the chart switches between the account's long windows`() =
+    fun `the chart overlays all long windows by default and toggles them while keeping at least one on`() =
         runTest(main.dispatcher) {
             observe()
             val claude = assertNotNull(viewModel.detail.value)
-            assertEquals(listOf("seven_day", "seven_day_opus"), claude.chartWindows.map { it.id })
-            assertEquals("seven_day", claude.chartWindowId)
+            val history = assertNotNull(claude.history)
+            assertEquals(listOf("seven_day", "seven_day_opus"), history.windows.map { it.id })
+            assertEquals(setOf("seven_day", "seven_day_opus"), history.selectedWindowIds)
+            assertEquals("seven_day", history.primaryShownWindow?.id)
 
-            viewModel.selectChartWindow("seven_day_opus")
+            // Toggling the primary window off leaves only the scoped window on.
+            viewModel.toggleChartWindow("seven_day")
             runCurrent()
-            val opus = assertNotNull(viewModel.detail.value)
-            assertEquals("seven_day_opus", opus.chartWindowId)
+            val opusOnly = assertNotNull(viewModel.detail.value)
+            assertEquals(setOf("seven_day_opus"), opusOnly.history?.selectedWindowIds)
             assertEquals(
                 claude.account.windows.first { it.id == "seven_day_opus" }.usedPercent,
-                opus.chart?.usedPercent,
+                opusOnly.chart?.usedPercent,
             )
 
-            // Another account starts from its own primary window.
+            // Toggling the last remaining window off is ignored so at least one stays on.
+            viewModel.toggleChartWindow("seven_day_opus")
+            runCurrent()
+            assertEquals(
+                setOf("seven_day_opus"),
+                viewModel.detail.value?.history?.selectedWindowIds,
+            )
+
+            // Toggling the primary window again turns it back on.
+            viewModel.toggleChartWindow("seven_day")
+            runCurrent()
+            assertEquals(
+                setOf("seven_day", "seven_day_opus"),
+                viewModel.detail.value?.history?.selectedWindowIds,
+            )
+
+            // Another account starts with its own primary window selected.
             viewModel.select("demo-codex")
             runCurrent()
             val codex = assertNotNull(viewModel.detail.value)
-            assertEquals(codex.account.primary?.id, codex.chartWindowId)
+            assertEquals(setOf(codex.account.primary!!.id), codex.history?.selectedWindowIds)
         }
 
     @Test
@@ -331,7 +352,7 @@ class HomeViewModelTest {
                                     snapshot.windows.map {
                                         it.copy(
                                             usedPercent = 1.0,
-                                            resetsAt = it.resetsAt?.plus(Duration.ofDays(7)),
+                                            resetsAt = it.resetsAt?.plus(7.days),
                                         )
                                     }
                             )
@@ -367,7 +388,7 @@ class HomeViewModelTest {
     @Test
     fun `a reset found on a cold start, from data stored before the app opened, has no confetti`() =
         runTest(main.dispatcher) {
-            val stored = FakeQuotaRepository({ now }, DemoData.accounts(now.minusSeconds(3_600)))
+            val stored = FakeQuotaRepository({ now }, DemoData.accounts(now - 3_600.seconds))
             val coldStart =
                 HomeViewModel(
                     repository = stored,

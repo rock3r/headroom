@@ -5,7 +5,7 @@
 # Usage: scripts/update-claude-code-version.sh [version, default: the latest on npm]
 set -euo pipefail
 
-file="$(cd "$(dirname "$0")/.." && pwd)/core/quota/src/main/kotlin/dev/sebastiano/headroom/quota/ClaudeCodeIdentity.kt"
+file="$(cd "$(dirname "$0")/.." && pwd)/core/quota/src/commonMain/kotlin/dev/sebastiano/headroom/quota/ClaudeCodeIdentity.kt"
 pattern='^    const val VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"$'
 
 latest="${1:-$(npm view @anthropic-ai/claude-code version)}"

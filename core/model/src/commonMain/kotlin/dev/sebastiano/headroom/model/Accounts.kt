@@ -1,0 +1,121 @@
+package dev.sebastiano.headroom.model
+
+import kotlin.time.Instant
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+
+/** A signed-in subscription. One provider can have several accounts. */
+public data class Account(
+    val id: String,
+    val provider: Provider,
+    /** What the provider calls the account, for example an email address or a login. */
+    val label: String,
+    /** The name the user gave the account, or null when they did not name it. */
+    val nickname: String? = null,
+) {
+    /** The name to show: the user's name for the account, or the provider's name. */
+    val name: String
+        get() = nickname ?: provider.displayName
+}
+
+/** The latest known state of one account, as shown in the UI and the widgets. */
+public data class AccountState(
+    val account: Account,
+    val snapshot: QuotaSnapshot?,
+    val lastError: QuotaErrorKind? = null,
+    val isRefreshing: Boolean = false,
+    /** Why an [QuotaErrorKind.Auth] sync failed, when the provider gave a specific reason. */
+    val authReason: AuthFailureReason? = null,
+) {
+    /**
+     * The weekly window if there is one, otherwise the longest window. The UI leads with it. Never
+     * a credit or an unknown window ([QuotaWindow.isInformational]).
+     */
+    val primaryWindow: QuotaWindow?
+        get() {
+            val windows =
+                snapshot?.windows.orEmpty().filterNot { it.isUnlimited || it.isInformational }
+            return windows.firstOrNull { it.kind == WindowKind.Weekly }
+                ?: windows.firstOrNull { it.kind == WindowKind.Monthly }
+                ?: windows.maxByOrNull { it.length?.inWholeMilliseconds ?: 0L }
+        }
+
+    /**
+     * True when the last sync failed because the sign-in expired or was revoked. The user must sign
+     * in again. Until then [snapshot] is stale: it is the data of the last sync that worked.
+     */
+    val isSignInExpired: Boolean
+        get() = lastError == QuotaErrorKind.Auth
+
+    /** The session (5-hour and similar) window, when the provider has one. */
+    val sessionWindow: QuotaWindow?
+        get() =
+            snapshot?.windows?.firstOrNull { it.kind == WindowKind.Session && !it.isInformational }
+}
+
+/**
+ * One point of a window's usage history, for the pace chart. [resetsAt] is when the window was due
+ * to reset when the point was recorded, or null for points saved before that was stored.
+ */
+public data class UsagePoint(
+    val at: Instant,
+    val usedPercent: Double,
+    val resetsAt: Instant? = null,
+)
+
+/** The single source of quota data for the app and the widgets. */
+public interface QuotaRepository {
+    public val accounts: StateFlow<List<AccountState>>
+
+    /** Fetches fresh data for one account, or for all accounts when [accountId] is null. */
+    public suspend fun refresh(accountId: String? = null)
+
+    public fun history(accountId: String, windowId: String): Flow<List<UsagePoint>>
+
+    /**
+     * The committed state, read directly from storage. Use it right after [refresh] when the result
+     * must reflect that refresh: [accounts] may publish it a moment later.
+     */
+    public suspend fun current(): List<AccountState> = accounts.value
+}
+
+/** Per-window reset alert switches. */
+public interface AlertPreferences {
+    public fun isEnabled(accountId: String, window: QuotaWindow): Flow<Boolean>
+
+    public suspend fun setEnabled(accountId: String, windowId: String, enabled: Boolean)
+}
+
+/**
+ * The next reset the user cares about: the soonest weekly one, else the soonest of any kind.
+ * Accounts whose sign-in expired are left out.
+ */
+public data class NextReset(val account: Account, val window: QuotaWindow) {
+    public companion object {
+        public fun find(accounts: List<AccountState>, now: Instant): NextReset? {
+            // A stale account's reset times are last known, not confirmed: they lead nothing.
+            val candidates =
+                accounts
+                    .filterNot { it.isSignInExpired }
+                    .flatMap { state ->
+                        state.snapshot?.windows.orEmpty().mapNotNull { window ->
+                            val resetsAt = window.resetsAt
+                            if (
+                                resetsAt != null && resetsAt > now && ResetPolicy.canAlert(window)
+                            ) {
+                                Candidate(NextReset(state.account, window), resetsAt)
+                            } else {
+                                null
+                            }
+                        }
+                    }
+            val soonestWeekly =
+                candidates
+                    .filter { it.reset.window.kind == WindowKind.Weekly }
+                    .minByOrNull { it.at }
+            return (soonestWeekly ?: candidates.minByOrNull { it.at })?.reset
+        }
+
+        private data class Candidate(val reset: NextReset, val at: Instant)
+    }
+}

@@ -16,11 +16,11 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.detail.DetailScreen
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.homeUiState
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,8 +39,8 @@ class CreditsTest {
             label = label,
             kind = WindowKind.Monthly,
             usedPercent = used / limit * 100,
-            resetsAt = now.plus(Duration.ofDays(8)),
-            length = Duration.ofDays(30),
+            resetsAt = now.plus(8.days),
+            length = 30.days,
             usedAmount = used,
             limitAmount = limit,
             amountUnit = "credits",

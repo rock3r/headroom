@@ -1,0 +1,212 @@
+package dev.sebastiano.headroom.data.db
+
+import dev.sebastiano.headroom.data.AccountsRepository
+import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.HistoryRetention
+import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.model.UsagePoint
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/**
+ * The real repository: accounts, their latest windows and the usage history live in Room. A refresh
+ * calls [fetch] for each account; a second refresh of an account that is already refreshing waits
+ * for the first one instead of calling the provider again.
+ */
+internal class RoomQuotaRepository(
+    private val dao: QuotaDao,
+    private val order: AccountOrderDao,
+    private val fetch: suspend (Account) -> QuotaResult,
+    private val clock: () -> Instant,
+    scope: CoroutineScope,
+    private val retention: suspend () -> HistoryRetention = { HistoryRetention.LongTerm },
+) : AccountsRepository {
+    private val refreshing = MutableStateFlow<Set<String>>(emptySet())
+    private val lastCompactedAt = MutableStateFlow<Map<String, Instant>>(emptyMap())
+    private val inFlight = mutableMapOf<String, CompletableDeferred<Unit>>()
+    private val inFlightLock = Mutex()
+
+    override val accounts: StateFlow<List<AccountState>> =
+        combine(dao.observeAccounts(), refreshing) { rows, busy ->
+                rows.mapNotNull { it.toState(refreshing = it.account.id in busy) }
+            }
+            .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    override suspend fun addAccount(account: Account) {
+        order.insertAccountLast(
+            AccountEntity(
+                id = account.id,
+                provider = account.provider.id,
+                label = account.label,
+                planLabel = null,
+                fetchedAtEpochMs = null,
+                lastError = null,
+            )
+        )
+    }
+
+    /** Names the account. A blank [nickname] removes the name, so the provider's name shows. */
+    override suspend fun renameAccount(accountId: String, nickname: String?) {
+        dao.setNickname(accountId, nickname?.trim()?.ifEmpty { null })
+    }
+
+    /** Stores what the provider now calls the account, for example a changed email address. */
+    override suspend fun relabelAccount(accountId: String, label: String) {
+        dao.setLabel(accountId, label)
+    }
+
+    /** Stores the order the user put the accounts in, in one transaction. */
+    override suspend fun reorderAccounts(orderedIds: List<String>) {
+        order.reorderAccounts(orderedIds)
+    }
+
+    override suspend fun removeAccount(accountId: String) {
+        lastCompactedAt.update { it - accountId }
+        dao.deleteAccount(accountId)
+    }
+
+    override suspend fun refresh(accountId: String?) {
+        val targets = if (accountId != null) listOf(accountId) else dao.accounts().map { it.id }
+        coroutineScope { targets.map { async { refreshOne(it) } }.awaitAll() }
+    }
+
+    /** Claims the account's in-flight slot before touching the database, so callers coalesce. */
+    private suspend fun refreshOne(accountId: String) {
+        val (job, owner) =
+            inFlightLock.withLock {
+                val existing = inFlight[accountId]
+                if (existing != null) {
+                    existing to false
+                } else {
+                    CompletableDeferred<Unit>().also { inFlight[accountId] = it } to true
+                }
+            }
+        if (!owner) {
+            job.await()
+            return
+        }
+        refreshing.update { it + accountId }
+        try {
+            val entity = dao.account(accountId) ?: return
+            store(entity, fetchAccount(entity))
+        } finally {
+            refreshing.update { it - accountId }
+            inFlightLock.withLock { inFlight.remove(accountId) }
+            job.complete(Unit)
+        }
+    }
+
+    private suspend fun fetchAccount(entity: AccountEntity): QuotaResult? {
+        val provider = dev.sebastiano.headroom.model.Provider.fromId(entity.provider) ?: return null
+        return fetch(Account(entity.id, provider, entity.label))
+    }
+
+    private suspend fun store(entity: AccountEntity, result: QuotaResult?) {
+        val now = clock()
+        when (result) {
+            is QuotaResult.Success -> {
+                val snapshot = result.snapshot
+                val policy = retention()
+                val lastCompacted = lastCompactedAt.value[entity.id]
+                val shouldCompact =
+                    policy == HistoryRetention.LongTerm &&
+                        (lastCompacted == null ||
+                            now - lastCompacted >= COMPACT_INTERVAL ||
+                            now < lastCompacted)
+                dao.storeSnapshot(
+                    account =
+                        entity.copy(
+                            planLabel = snapshot.planLabel ?: entity.planLabel,
+                            fetchedAtEpochMs = snapshot.fetchedAt.toEpochMilliseconds(),
+                            lastError = null,
+                            balanceAmount = snapshot.balance?.amount,
+                            balanceUnit = snapshot.balance?.unit,
+                            // Resets that could not be read keep the ones read last.
+                            resetsJson =
+                                if (snapshot.resetsReadFailed) entity.resetsJson
+                                else snapshot.resets?.let(ResetsCodec::encode),
+                            resetsReadFailed = snapshot.resetsReadFailed,
+                        ),
+                    windows =
+                        snapshot.windows.mapIndexed { index, window ->
+                            window.toEntity(entity.id, index)
+                        },
+                    points =
+                        snapshot.windows.map { window ->
+                            UsagePointEntity(
+                                accountId = entity.id,
+                                windowId = window.id,
+                                atEpochMs = now.toEpochMilliseconds(),
+                                usedPercent = window.usedPercent,
+                                resetsAtEpochMs = window.resetsAt?.toEpochMilliseconds(),
+                            )
+                        },
+                    pruneBeforeEpochMs = now.minus(policy.maxAge).toEpochMilliseconds(),
+                    // Resets that could not be read are compared with nothing: they record no
+                    // event.
+                    resetEvents =
+                        RoomResetEventLog.finder(
+                            provider = snapshot.provider,
+                            current = snapshot.resets.takeUnless { snapshot.resetsReadFailed },
+                            now = now,
+                        ),
+                    compactAtEpochMs = if (shouldCompact) now.toEpochMilliseconds() else null,
+                )
+                if (shouldCompact) {
+                    lastCompactedAt.update { it + (entity.id to now) }
+                }
+            }
+            // An update, not an upsert: a removed account must stay removed. An expired sign-in
+            // stays expired through later errors, such as a network error: only a sync that
+            // works shows the user can stop worrying about it.
+            is QuotaResult.Failure -> {
+                val previous = entity.lastError
+                val keepExistingAuth =
+                    decodeErrorKind(previous) == QuotaErrorKind.Auth &&
+                        result.kind != QuotaErrorKind.Auth
+                val authReason = result.authReason ?: decodeAuthReason(previous)
+                val nextError =
+                    if (keepExistingAuth && previous != null) previous
+                    else encodeLastError(result.kind, authReason)
+                dao.updateError(entity.id, nextError)
+            }
+            null -> Unit
+        }
+    }
+
+    override suspend fun current(): List<AccountState> {
+        val busy = refreshing.value
+        return dao.accountsWithWindows().mapNotNull {
+            it.toState(refreshing = it.account.id in busy)
+        }
+    }
+
+    override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
+        dao.observeHistory(accountId, windowId).map { points -> points.map { it.toDomain() } }
+
+    private companion object {
+        /**
+         * The finest compaction bucket is one hour wide, so compacting an account at most once an
+         * hour avoids re-scanning its history on every 15-minute sync.
+         */
+        val COMPACT_INTERVAL: Duration = 1.hours
+    }
+}

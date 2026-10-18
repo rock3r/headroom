@@ -1,7 +1,7 @@
 package dev.sebastiano.headroom.ui.home
 
 import dev.sebastiano.headroom.model.OverviewSort
-import java.time.Instant
+import kotlin.time.Instant
 
 /**
  * The accounts in the order the overview shows them for [sort].

@@ -17,9 +17,10 @@ import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.NextResetSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
-import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 // Android Studio's "Display Glasses" device. The preview's black background stands in for the
 // see-through display.
@@ -52,7 +53,7 @@ private const val GLASSES_PREVIEW_DEVICE = "id:ai_glasses_device"
 
 private val previewNow = Instant.parse("2026-10-10T12:00:00Z")
 
-private val previewReset = previewNow.plusSeconds(2 * 3_600)
+private val previewReset = previewNow + 2.hours
 
 private val previewFormatter = ResetFormatter(ZoneOffset.UTC, Locale.UK, is24Hour = true)
 

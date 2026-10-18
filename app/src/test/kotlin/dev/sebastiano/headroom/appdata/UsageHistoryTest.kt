@@ -2,15 +2,19 @@ package dev.sebastiano.headroom.appdata
 
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.FakeQuotaRepository
+import dev.sebastiano.headroom.model.HistoryRetention
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
+import dev.sebastiano.headroom.model.stats.ResetPeaks
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -25,16 +29,18 @@ class UsageHistoryTest {
             label = "Weekly",
             kind = WindowKind.Weekly,
             usedPercent = used,
-            resetsAt = now.plus(Duration.ofDays(3)),
-            length = Duration.ofDays(7),
+            resetsAt = now.plus(3.days),
+            length = 7.days,
         )
 
     @Test
     fun `demo history resets at the given peaks and ends at the current usage`() {
         val peaks = listOf(82.0, 95.0, 100.0, 88.0, 100.0)
-        val points = demoUsage(weekly(71.0), peaks, now, ZoneOffset.UTC)
-        assertEquals(peaks, ResetPeaks.usedAtResets(points))
-        assertEquals(UsagePoint(now, 71.0), points.last())
+        val window = weekly(71.0)
+        val points = demoUsage(window, peaks, now, ZoneOffset.UTC)
+        val resets = ResetPeaks.usedAtResets(points)
+        assertEquals(peaks, resets.takeLast(peaks.size))
+        assertEquals(UsagePoint(now, 71.0, window.resetsAt), points.last())
         assertEquals(points.sortedBy { it.at }, points)
         assertTrue(points.all { it.usedPercent in 0.0..100.0 })
     }
@@ -42,17 +48,30 @@ class UsageHistoryTest {
     @Test
     fun `demo history stays inside the retention period`() {
         val peaks = List(20) { 50.0 }
-        val points = demoUsage(weekly(10.0), peaks, now, ZoneOffset.UTC)
-        assertTrue(points.first().at >= now.minus(Duration.ofDays(60)))
-        assertEquals(List(8) { 50.0 }, ResetPeaks.usedAtResets(points))
+        val longTerm =
+            demoUsage(weekly(10.0), peaks, now, ZoneOffset.UTC, HistoryRetention.LongTerm)
+        assertTrue(longTerm.first().at >= now.minus(365.days))
+        assertEquals(List(52) { 50.0 }, ResetPeaks.usedAtResets(longTerm))
+
+        val shortTerm =
+            demoUsage(weekly(10.0), peaks, now, ZoneOffset.UTC, HistoryRetention.ShortTerm)
+        assertTrue(shortTerm.first().at >= now.minus(60.days))
+        assertEquals(List(8) { 50.0 }, ResetPeaks.usedAtResets(shortTerm))
     }
 
     @Test
     fun `usage mostly happens in working hours on weekdays`() {
-        val points = demoUsage(weekly(40.0), listOf(80.0, 70.0), now, ZoneOffset.UTC)
+        val points =
+            demoUsage(
+                weekly(40.0),
+                listOf(80.0, 70.0),
+                now,
+                ZoneOffset.UTC,
+                HistoryRetention.ShortTerm,
+            )
         val daytime =
             points.zipWithNext().sumOf { (a, b) ->
-                val hour = b.at.atZone(ZoneOffset.UTC).hour
+                val hour = b.at.toJavaInstant().atZone(ZoneOffset.UTC).hour
                 if (hour in 9..18) (b.usedPercent - a.usedPercent).coerceAtLeast(0.0) else 0.0
             }
         val total =
@@ -69,11 +88,41 @@ class UsageHistoryTest {
     }
 
     @Test
-    fun `the demo history follows the demo reset history`() = runTest {
+    fun `the demo history follows the demo reset history and the retention setting`() = runTest {
         val window = DemoData.accounts(now).first().primaryWindow!!
-        val history = DemoUsageHistory(DemoResetHistory, { now }, ZoneOffset.UTC)
-        val points = history.points("demo-claude", window).first()
-        assertEquals(listOf(82.0, 95.0, 100.0, 88.0, 100.0), ResetPeaks.usedAtResets(points))
+        val settings = InMemorySettingsRepository()
+        val history = DemoUsageHistory(DemoResetHistory, { now }, ZoneOffset.UTC, settings)
+
+        val longTerm = history.points("demo-claude", window).first()
+        assertEquals(52, ResetPeaks.usedAtResets(longTerm).size)
+        assertEquals(
+            listOf(82.0, 95.0, 100.0, 88.0, 100.0),
+            ResetPeaks.usedAtResets(longTerm).takeLast(5),
+        )
+
+        settings.setKeepLongHistory(false)
+        val shortTerm = history.points("demo-claude", window).first()
+        assertEquals(8, ResetPeaks.usedAtResets(shortTerm).size)
+        assertEquals(
+            listOf(82.0, 95.0, 100.0, 88.0, 100.0),
+            ResetPeaks.usedAtResets(shortTerm).takeLast(5),
+        )
+    }
+
+    @Test
+    fun `demo windows without explicit reset peaks still get a full year of history`() = runTest {
+        val opus =
+            DemoData.accounts(now).first().snapshot!!.windows.first { it.id == "seven_day_opus" }
+        val settings = InMemorySettingsRepository()
+        val history = DemoUsageHistory(DemoResetHistory, { now }, ZoneOffset.UTC, settings)
+
+        val longTerm = history.points("demo-claude", opus).first()
+        assertTrue(longTerm.first().at <= now.minus(364.days))
+        assertEquals(52, ResetPeaks.usedAtResets(longTerm).size)
+
+        settings.setKeepLongHistory(false)
+        val shortTerm = history.points("demo-claude", opus).first()
+        assertEquals(8, ResetPeaks.usedAtResets(shortTerm).size)
     }
 
     @Test

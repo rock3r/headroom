@@ -4,15 +4,26 @@ import dev.sebastiano.headroom.MainDispatcherRule
 import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.UsageHistory
+import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.FakeQuotaRepository
 import dev.sebastiano.headroom.model.Provider
-import java.time.Instant
+import dev.sebastiano.headroom.model.ResetAttemptKey
+import dev.sebastiano.headroom.model.ResetEvent
+import dev.sebastiano.headroom.model.ResetEventKind
+import dev.sebastiano.headroom.model.ResetEventLog
+import dev.sebastiano.headroom.model.ResetUseSource
+import dev.sebastiano.headroom.model.stats.ResetPeriod
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlin.time.measureTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -26,7 +37,11 @@ class StatsViewModelTest {
 
     private val now = Instant.parse("2026-09-27T12:32:00Z")
 
-    private fun viewModel(history: UsageHistory, isDemo: Boolean = true) =
+    private fun viewModel(
+        history: UsageHistory,
+        isDemo: Boolean = true,
+        resetEvents: ResetEventLog = ResetEventLog.None,
+    ) =
         StatsViewModel(
             repository = FakeQuotaRepository({ now }),
             history = history,
@@ -34,7 +49,47 @@ class StatsViewModelTest {
             clock = { now },
             zone = ZoneOffset.UTC,
             computeDispatcher = main.dispatcher,
+            resetEvents = resetEvents,
         )
+
+    /** Answers with [events], and remembers since when it was asked. */
+    private class FakeResetEvents(private val events: List<ResetEvent>) : ResetEventLog {
+        var askedSince: Instant? = null
+
+        override fun events(since: Instant): Flow<List<ResetEvent>> {
+            askedSince = since
+            return flowOf(events)
+        }
+
+        override suspend fun redeemed(
+            account: Account,
+            poolId: String,
+            attemptKey: ResetAttemptKey,
+        ) = Unit
+    }
+
+    @Test
+    fun `the reset stat comes from the reset history of the last year`() =
+        runTest(main.dispatcher) {
+            val event =
+                ResetEvent(
+                    accountId = "c1",
+                    provider = Provider.Codex,
+                    poolId = "credits",
+                    poolLabel = "Reset credits",
+                    kind = ResetEventKind.Used,
+                    at = now - 60.seconds,
+                    source = ResetUseSource.Headroom,
+                )
+            val log = FakeResetEvents(listOf(event))
+            val stats = viewModel(UsageHistory { _, _ -> flowOf(emptyList()) }, resetEvents = log)
+            backgroundScope.launch { stats.state.collect {} }
+            runCurrent()
+
+            val usage = stats.state.value.stats.resetUsage
+            assertEquals(1, usage?.of(ResetPeriod.FourWeeks)?.used)
+            assertEquals(now.minus(365.days), log.askedSince)
+        }
 
     @Test
     fun `the state is loading until the history is read`() =
@@ -55,9 +110,9 @@ class StatsViewModelTest {
 
             val state = stats.state.value
             assertTrue(state.isDemo)
-            // Five past weeks each for Claude, Codex and Grok, and two months for Copilot.
-            assertEquals(17, state.stats.resets?.total)
-            assertEquals(4, state.stats.resets?.hits)
+            // Fifty-two past weeks each for Claude, Codex and Grok, and twelve months for Copilot.
+            assertEquals(168, state.stats.resets?.total)
+            assertEquals(42, state.stats.resets?.hits)
             assertEquals(99.0, state.stats.closestCall?.peak)
             assertEquals(Provider.Grok, state.stats.closestCall?.account?.provider)
             assertEquals(4, state.stats.sparklines.size)
@@ -76,5 +131,21 @@ class StatsViewModelTest {
             assertFalse(state.loading)
             assertEquals(null, state.stats.resets)
             assertEquals(null, state.stats.coverage)
+        }
+
+    @Test
+    fun `computing stats for four accounts with a year of history covers all resets`() =
+        runTest(main.dispatcher) {
+            val demoHistory = DemoUsageHistory(DemoResetHistory, { now }, ZoneOffset.UTC)
+            val elapsed = measureTime {
+                val vm = viewModel(demoHistory)
+                val job = backgroundScope.launch { vm.state.collect {} }
+                runCurrent()
+                assertFalse(vm.state.value.loading)
+                assertEquals(364, vm.state.value.stats.coverage?.days)
+                assertEquals(168, vm.state.value.stats.resets?.total)
+                job.cancel()
+            }
+            println("StatsViewModel year computation for 4 accounts: $elapsed")
         }
 }

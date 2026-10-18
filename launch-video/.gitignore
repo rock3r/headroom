@@ -1,0 +1,28 @@
+# Keep only what is needed to rebuild and re-render the launch video. See README.md.
+
+# The repo ignores every build/ folder; this one holds the scene scripts, so keep it.
+!build/
+build/*previz*
+build/_*
+build/block/
+build/grid*.json
+build/mids.txt
+
+# Renders, scratch, review data and cav's spool and cache
+renders/
+out/
+.cav/
+
+# Cavalry scenes: build.sh recreates them from the scripts
+scenes/
+
+# Music: only the final mix is kept
+music/*
+!music/headroom-edm2-v3.flac
+
+# Pre-production material
+board/
+moodboard/
+
+# Written by build/run.sh with this machine's path
+build/.root.js

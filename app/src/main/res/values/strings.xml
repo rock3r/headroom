@@ -80,7 +80,10 @@
     <string name="account_no_data">No usage data yet.</string>
     <!-- The compact call to action on an overview card whose sign-in expired. -->
     <string name="stale_card_title">Sign-in expired</string>
+    <string name="stale_card_title_key_expired">API key expired</string>
+    <string name="stale_card_title_key_rejected">API key rejected</string>
     <string name="stale_card_action">Sign in</string>
+    <string name="stale_card_action_api_key">Replace API key</string>
     <!-- When a stale account's numbers are from, such as "Last updated 2 hours ago". -->
     <string name="stale_last_updated">Last updated %1$s</string>
     <string name="stale_never_updated">Not updated yet</string>
@@ -101,9 +104,20 @@
     <!-- What a screen reader says about a stale account, such as "Sign-in expired, data from 2 hours ago". -->
     <string name="stale_description">Sign-in expired, data from %1$s</string>
     <string name="stale_description_no_data">Sign-in expired, no data yet</string>
+    <string name="stale_description_key_expired">API key expired, data from %1$s</string>
+    <string name="stale_description_key_expired_no_data">API key expired, no data yet</string>
+    <string name="stale_description_key_rejected">API key rejected, data from %1$s</string>
+    <string name="stale_description_key_rejected_no_data">API key rejected, no data yet</string>
     <string name="stale_banner_title">Your %1$s sign-in expired</string>
     <string name="stale_banner_body">Headroom can\'t update this account until you sign in again. The numbers below are the last it saw.</string>
     <string name="stale_banner_action">Sign in again</string>
+    <string name="stale_banner_title_key_expired">Your %1$s API key expired</string>
+    <string name="stale_banner_body_key_expired">This API key has expired. Create a new key in %1$s, then replace it here.</string>
+    <string name="stale_banner_title_key_rejected">Your %1$s API key was rejected</string>
+    <string name="stale_banner_body_key_rejected">%1$s rejected this API key. Replace it with a working key to update this account.</string>
+    <string name="stale_banner_action_api_key">Replace API key</string>
+    <string name="api_key_console_opencode">the OpenCode Console</string>
+    <string name="api_key_console_zai">the Z.AI console</string>
     <!-- A stale window whose reset time has passed: its numbers are from before the reset. -->
     <string name="stale_window_reset">Has reset</string>
     <string name="stale_window_reset_long">Has reset since the last update</string>
@@ -126,11 +140,23 @@
     <!-- The content description of the info button next to a quota Headroom does not know. -->
     <string name="detail_unknown_quota_info">About this quota</string>
     <string name="detail_unknown_quota_explanation">This is a new quota we don\'t recognise yet. Headroom shows it for your information, but doesn\'t know what it\'s for.</string>
-    <string name="detail_chart_week">This week</string>
-    <string name="detail_chart_month">This month</string>
-    <string name="detail_chart_window">This window</string>
+    <string name="detail_chart_title">Usage history</string>
     <string name="detail_chart_legend">dashed = even pace</string>
     <string name="detail_chart_limit">limit</string>
+    <string name="detail_chart_range_period">Period</string>
+    <string name="detail_chart_range_1m">1M</string>
+    <string name="detail_chart_range_3m">3M</string>
+    <string name="detail_chart_range_1y">1Y</string>
+    <string name="detail_chart_scroll_back">Scroll back</string>
+    <string name="detail_chart_scroll_forward">Scroll forward</string>
+    <string name="detail_chart_zoom_in">Zoom in</string>
+    <string name="detail_chart_zoom_out">Zoom out</string>
+    <string name="detail_chart_visible_description">%1$s, %2$s to %3$s. %4$s %5$s.</string>
+    <plurals name="detail_chart_resets_in_view">
+        <item quantity="one">%d reset in view</item>
+        <item quantity="other">%d resets in view</item>
+    </plurals>
+    <string name="detail_chart_no_resets_in_view">No resets in view</string>
     <string name="detail_chart_description_above">Usage so far: %1$d%%, above the even-pace line.</string>
     <string name="detail_chart_description_below">Usage so far: %1$d%%, at or below the even-pace line.</string>
     <string name="detail_projection_hit">At this rate you reach 100%% in about %1$s, %2$s before the reset.</string>
@@ -188,24 +214,28 @@
     <string name="stats_subtitle_none">No history yet. It builds up with every sync.</string>
     <string name="stats_subtitle_demo">Example stats from demo data</string>
     <string name="stats_loading">Reading your history</string>
-    <string name="stats_scope_note">Each account counts its main limit: the weekly one, or the longest.</string>
-    <string name="stats_resets_title">Clean resets</string>
+    <string name="stats_scope_note">Statistics use each account\'s weekly limit, or its longest limit period if it has no weekly limit.</string>
+    <string name="stats_resets_title">Resets without reaching the limit</string>
     <string name="stats_resets_count">%1$d of %2$d</string>
     <string name="stats_resets_body">resets came without hitting the limit</string>
     <string name="stats_resets_streak">in a row</string>
     <string name="stats_resets_legend">One mark per reset, oldest first. Squares hit the limit.</string>
+    <plurals name="stats_resets_legend_latest">
+        <item quantity="one">Your latest %1$d reset, oldest first. Squares hit the limit.</item>
+        <item quantity="other">Your latest %1$d resets, oldest first. Squares hit the limit.</item>
+    </plurals>
     <plurals name="stats_resets_description">
         <item quantity="one">%1$d of %2$d reset came without hitting the limit. Current streak: %3$d.</item>
         <item quantity="other">%1$d of %2$d resets came without hitting the limit. Current streak: %3$d.</item>
     </plurals>
     <string name="stats_resets_empty">No resets recorded yet. This fills in once a limit resets.</string>
-    <string name="stats_shares_title">Who works hardest</string>
-    <string name="stats_shares_headline">%1$s does %2$d%% of the work</string>
-    <string name="stats_shares_note">Share of all the quota burned, in percentage points of each limit.</string>
-    <string name="stats_shares_description">Share of the quota burned: %1$s</string>
-    <string name="stats_shares_empty">Nothing burned yet. This fills in after a few syncs.</string>
+    <string name="stats_shares_title">Usage by provider</string>
+    <string name="stats_shares_headline">%1$s accounts for %2$d%% of quota use</string>
+    <string name="stats_shares_note">Share of quota use, in percentage points of each limit.</string>
+    <string name="stats_shares_description">Share of quota use: %1$s</string>
+    <string name="stats_shares_empty">No quota use recorded yet. Usage appears after a few updates.</string>
     <string name="stats_share_item">%1$s %2$d%%</string>
-    <string name="stats_heatmap_title">When you burn quota</string>
+    <string name="stats_heatmap_title">When you use quota</string>
     <string name="stats_heatmap_busiest">Busiest on %1$s around %2$s</string>
     <string name="stats_heatmap_note">Local time, all accounts together. Darker means more quota used.</string>
     <string name="stats_heatmap_description">Quota use by day and hour, in local time. Busiest on %1$s around %2$s. By day: %3$s.</string>
@@ -214,30 +244,68 @@
         <item quantity="one">Needs a week of history. %d day so far.</item>
         <item quantity="other">Needs a week of history. %d days so far.</item>
     </plurals>
-    <string name="stats_persona_early_bird">Early bird</string>
-    <string name="stats_persona_nine_to_five">Nine to five</string>
-    <string name="stats_persona_evening">Evening hacker</string>
-    <string name="stats_persona_night_owl">Night owl</string>
-    <string name="stats_persona_weekend">Weekend warrior</string>
-    <string name="stats_closest_title">Closest call</string>
+    <string name="stats_persona_early_bird">Early mornings</string>
+    <string name="stats_persona_nine_to_five">Workday hours</string>
+    <string name="stats_persona_evening">Evenings</string>
+    <string name="stats_persona_night_owl">Late nights</string>
+    <string name="stats_persona_weekend">Weekends</string>
+    <string name="stats_closest_title">Highest use below the limit</string>
     <string name="stats_closest_body">%1$s reached %2$d%% on %3$s, then the limit reset.</string>
     <string name="stats_closest_empty">Appears once a limit resets.</string>
-    <string name="stats_closest_all_hits">Every recorded reset hit the limit. No close calls, only direct hits.</string>
+    <string name="stats_closest_all_hits">Usage reached the limit before every recorded reset.</string>
     <string name="stats_biggest_title">Biggest day</string>
     <string name="stats_biggest_body">%1$s used %2$d%% of its limit in one day, on %3$s.</string>
     <string name="stats_biggest_empty">No busy days yet. This fills in after a few syncs.</string>
-    <string name="stats_leftover_title">Left on the table</string>
+    <string name="stats_leftover_title">Unused quota at reset</string>
     <plurals name="stats_leftover_body">
         <item quantity="one">left unused, on average, when a limit reset. From %d reset.</item>
         <item quantity="other">left unused, on average, when a limit reset. From %d resets.</item>
     </plurals>
     <string name="stats_leftover_description">On average, %1$d%% of each limit was left unused at reset. %2$s.</string>
-    <string name="stats_leftover_empty">No resets yet, so nothing was left on the table.</string>
+    <string name="stats_leftover_empty">No resets recorded yet. Unused quota appears after the first reset.</string>
     <string name="stats_sparklines_title">Last 7 days</string>
     <string name="stats_sparklines_note">Drops are resets.</string>
     <string name="stats_sparkline_description">%1$s over the last 7 days: lowest %2$d%%, highest %3$d%%, %4$d%% now</string>
     <string name="stats_sparkline_empty">No history in the last 7 days</string>
     <string name="stats_sparklines_empty">No accounts to chart yet.</string>
+    <string name="stats_reset_usage_title">Usage limit resets</string>
+    <string name="stats_reset_usage_four_weeks">4 weeks</string>
+    <string name="stats_reset_usage_three_months">3 months</string>
+    <string name="stats_reset_usage_twelve_months">12 months</string>
+    <string name="stats_reset_usage_used">used</string>
+    <string name="stats_reset_usage_expired">expired unused</string>
+    <string name="stats_reset_usage_sources">%1$s, %2$s.</string>
+    <plurals name="stats_reset_usage_in_headroom">
+        <item quantity="one">%d in Headroom</item>
+        <item quantity="other">%d in Headroom</item>
+    </plurals>
+    <plurals name="stats_reset_usage_elsewhere">
+        <item quantity="one">%d elsewhere</item>
+        <item quantity="other">%d elsewhere</item>
+    </plurals>
+    <string name="stats_reset_usage_given_back">Restored quota equal to %1$s.</string>
+    <string name="stats_reset_usage_given_back_estimated">Restored quota equal to about %1$s.</string>
+    <string name="stats_reset_usage_and">" and "</string>
+    <string name="stats_reset_usage_limit_session">%1$s times the session limit</string>
+    <string name="stats_reset_usage_limit_daily">%1$s times the daily limit</string>
+    <string name="stats_reset_usage_limit_weekly">%1$s times the weekly limit</string>
+    <string name="stats_reset_usage_limit_monthly">%1$s times the monthly limit</string>
+    <string name="stats_reset_usage_provider">%1$s, %2$s</string>
+    <plurals name="stats_reset_usage_used_count">
+        <item quantity="one">%d used</item>
+        <item quantity="other">%d used</item>
+    </plurals>
+    <plurals name="stats_reset_usage_expired_count">
+        <item quantity="one">%d expired</item>
+        <item quantity="other">%d expired</item>
+    </plurals>
+    <plurals name="stats_reset_usage_expired_unused_count">
+        <item quantity="one">%d expired unused</item>
+        <item quantity="other">%d expired unused</item>
+    </plurals>
+    <string name="stats_reset_usage_description">Usage limit resets in the last %1$s: %2$s, %3$s.</string>
+    <string name="stats_reset_usage_empty">No resets were used or expired in this period.</string>
+    <string name="stats_reset_usage_note">A reset counts as used when it is gone before its expiry date. Restored quota adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.</string>
 
     <!-- Widgets -->
     <string name="widget_rings_title">Rings · 2×2</string>
@@ -285,12 +353,12 @@
     <string name="settings_try_reset_confetti">Try the reset confetti</string>
     <string name="settings_reset_confetti">Reset confetti</string>
     <string name="settings_reset_confetti_body">Confetti bursts from an account when its limit resets while the app is open.</string>
-    <string name="settings_delights_reduced">Neither plays while motion is reduced.</string>
+    <string name="settings_delights_reduced">Refresh shimmer and reset confetti do not play while motion is reduced.</string>
     <string name="settings_reset_island">Reset island (experimental)</string>
     <string name="settings_reset_island_body">A small black pill grows out of your camera cutout when a limit resets while Headroom is in the background.</string>
     <string name="settings_resets">Resets</string>
-    <string name="settings_redeem_claude_resets">Redeem Claude resets (experimental)</string>
-    <string name="settings_redeem_claude_resets_body">Use Claude\'s saved resets from Headroom. Claude has not published this API, so it may fail or stop working.</string>
+    <string name="settings_reset_expiry_reminders">Remind me before a reset expires</string>
+    <string name="settings_reset_expiry_reminders_body">A notification about a day before a reset you can use expires. At most one a day, for every reset that expires soon.</string>
     <string name="settings_reset_island_off">Off</string>
     <string name="settings_reset_island_needs_permission">Needs permission</string>
     <string name="settings_reset_island_ready_accessibility">Ready (accessibility)</string>
@@ -320,6 +388,9 @@
     <string name="island_setup_overlay_limit_place">The status bar icons can show on top of the pill where they meet it.</string>
     <string name="island_setup_overlay_limit_lock">It does not show on the lock screen. A reset that arrives while the phone is locked uses a normal pop-up notification.</string>
     <string name="island_setup_overlay_limit_tap">You can tap it to open Headroom, or swipe it up to hide it.</string>
+    <string name="island_setup_overlay_only_why_title">Why it needs a permission</string>
+    <string name="island_setup_overlay_only_why_body">Headroom draws the pill with the Display over other apps permission, and uses it for nothing else.</string>
+    <string name="island_setup_overlay_only_not_body">It does not read your screen. It does not read other apps. It only draws the pill when a limit resets.</string>
     <string name="island_setup_overlay_button">Allow display over other apps</string>
     <string name="island_setup_done_body">It will show up when a limit resets and Headroom is in the background. You can turn the service off in accessibility settings at any time.</string>
     <string name="island_setup_done_body_overlay">It grows out of the camera when a limit resets and Headroom is in the background. It does not show on the lock screen. You can take the permission away in Settings at any time.</string>
@@ -333,6 +404,9 @@
     <string name="settings_sync_hours_6">Every 6 hours</string>
     <string name="settings_sync_on_open">Only when I open the app</string>
     <string name="settings_sync_note">Reset alerts arrive on time whatever you choose here.</string>
+    <string name="settings_usage_history">Usage history</string>
+    <string name="settings_keep_long_history">Keep long-term history</string>
+    <string name="settings_keep_long_history_body">Keeps a year of usage for the charts, in less detail as it gets older. Turn off to keep only the last 60 days.</string>
     <string name="settings_widgets">Home screen widgets</string>
     <string name="settings_widgets_note">Tap a style to add it. You can also add widgets from your home screen\'s widget list.</string>
     <string name="settings_about">About</string>
@@ -388,6 +462,8 @@
     <string name="signin_key_label">API key</string>
     <string name="signin_key_submit">Save key</string>
     <string name="signin_key_rejected">This key does not look right. Check that you copied all of it.</string>
+    <string name="signin_key_expired">%1$s says this key has expired — create a new one in %2$s.</string>
+    <string name="signin_key_unauthorized">%1$s rejected this API key. Check that you copied all of it.</string>
     <string name="signin_starting">Getting the sign-in ready</string>
     <string name="signin_finishing_title">Finishing sign-in</string>
     <string name="signin_finishing_body">Getting your %1$s limits…</string>

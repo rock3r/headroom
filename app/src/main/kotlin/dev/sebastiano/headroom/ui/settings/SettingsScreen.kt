@@ -27,11 +27,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -57,16 +60,18 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.SyncFrequency
 import dev.sebastiano.headroom.model.ThemeMode
 import dev.sebastiano.headroom.model.ThemePalette
+import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.tile.TileAddResult
-import dev.sebastiano.headroom.tile.TileSubtitleMode
 import dev.sebastiano.headroom.tracing.tracedItem
 import dev.sebastiano.headroom.ui.CloseSettingsButton
 import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.SettingsTitle
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
+import dev.sebastiano.headroom.ui.components.scrollToKey
 import dev.sebastiano.headroom.ui.revealContentEntrance
 import dev.sebastiano.headroom.widgets.WidgetStyle
+import kotlinx.coroutines.flow.first
 
 const val SETTINGS_TAG: String = "settings"
 
@@ -77,7 +82,15 @@ data class SettingsAccounts(val providers: List<Provider>, val isDemo: Boolean)
 
 const val SETTINGS_LIST_TAG: String = "settings-list"
 
-const val REDEEM_CLAUDE_RESETS_TAG: String = "redeem-claude-resets"
+const val RESET_EXPIRY_REMINDERS_TAG: String = "reset-expiry-reminders"
+
+const val KEEP_LONG_HISTORY_TAG: String = "keep-long-history"
+
+/** The row of the Resets block: the reminders. */
+private const val RESET_ROWS = 1
+
+/** The switch row under the sync options: long-term history. */
+private const val HISTORY_ROWS = 1
 
 fun syncFrequencyTag(frequency: SyncFrequency): String = "sync-frequency-${frequency.name}"
 
@@ -101,8 +114,10 @@ data class SettingsActions(
     val onResetIslandChange: (Boolean) -> Unit = {},
     /** Shows the reset island now, with this provider's logo and these words. */
     val onTryResetIsland: (Provider, String) -> Unit = { _, _ -> },
-    /** Turns using Claude's resets on or off. Experimental. */
-    val onRedeemClaudeResetsChange: (Boolean) -> Unit = {},
+    /** Turns the reminder before a reset expires on or off. */
+    val onResetExpiryRemindersChange: (Boolean) -> Unit = {},
+    /** Turns keeping a year of compacted usage history on or off. */
+    val onKeepLongHistoryChange: (Boolean) -> Unit = {},
     /** Reads the accessibility settings again. Runs whenever the user comes back to the app. */
     val onRefreshResetIsland: () -> Unit = {},
     /** Asks the system to add Headroom's Quick Settings tile. */
@@ -130,10 +145,10 @@ data class ResetIslandUi(
 
 /**
  * The app settings: the accounts, used or left, the appearance (light or dark, the colours and
- * reduced motion), the delights, the experimental use of Claude's resets, how often to sync in the
- * background, the home screen widgets, the open-source licences and the app version. It closes with
- * the close button in its header, which the overview's settings button turns into. The caller
- * handles back, with the predictive back gesture.
+ * reduced motion), the delights, the reset reminders, how often to sync in the background, the home
+ * screen widgets, the open-source licences and the app version. It closes with the close button in
+ * its header, which the overview's settings button turns into. The caller handles back, with the
+ * predictive back gesture.
  */
 @Composable
 fun SettingsScreen(
@@ -149,6 +164,10 @@ fun SettingsScreen(
     tileSubtitle: TileSubtitleMode = TileSubtitleMode.NextReset,
     /** Debug builds' row that opens the prototypes page; null in release builds. */
     debugEntry: (@Composable (Modifier) -> Unit)? = null,
+    /** True to scroll to the Quick Settings tile's rows, after a long press on the tile. */
+    scrollToTile: Boolean = false,
+    /** Called once the list has scrolled to the tile's rows. */
+    onScrollToTileFinish: () -> Unit = {},
 ) {
     // The set-up opens when the island is switched on with no way to draw it. A return from
     // one of the settings pages reads the state again.
@@ -166,6 +185,9 @@ fun SettingsScreen(
         PageScaffold(
             onClose = actions.onClose,
             reveal = reveal,
+            scrollTo = TILE_SECTION_KEY.takeIf { scrollToTile },
+            animate = animate,
+            onScrollFinish = onScrollToTileFinish,
         ) {
             val width = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxWidth().then(entrance)
             settingsRows(
@@ -268,15 +290,16 @@ private fun LazyListScope.settingsRows(
     tracedItem("Settings: SectionLabel resets") {
         SectionLabel(stringResource(R.string.settings_resets), block)
     }
-    tracedItem("Settings: RedeemClaudeResetsRow") {
+    tracedItem("Settings: ResetExpiryRemindersRow") {
         SettingsRow(
-            headline = stringResource(R.string.settings_redeem_claude_resets),
-            action = RowAction.Toggle(state.redeemClaudeResets, actions.onRedeemClaudeResetsChange),
+            headline = stringResource(R.string.settings_reset_expiry_reminders),
+            action =
+                RowAction.Toggle(state.resetExpiryReminders, actions.onResetExpiryRemindersChange),
             index = 0,
-            count = 1,
-            supporting = stringResource(R.string.settings_redeem_claude_resets_body),
-            trailing = { Switch(checked = state.redeemClaudeResets, onCheckedChange = null) },
-            modifier = block.testTag(REDEEM_CLAUDE_RESETS_TAG),
+            count = RESET_ROWS,
+            supporting = stringResource(R.string.settings_reset_expiry_reminders_body),
+            trailing = { Switch(checked = state.resetExpiryReminders, onCheckedChange = null) },
+            modifier = block.testTag(RESET_EXPIRY_REMINDERS_TAG),
         )
     }
     tracedItem("Settings: SectionLabel sync") {
@@ -303,6 +326,20 @@ private fun LazyListScope.settingsRows(
             modifier = block.padding(horizontal = 6.dp),
         )
     }
+    tracedItem("Settings: SectionLabel usage history") {
+        SectionLabel(stringResource(R.string.settings_usage_history), block)
+    }
+    tracedItem("Settings: KeepLongHistoryRow") {
+        SettingsRow(
+            headline = stringResource(R.string.settings_keep_long_history),
+            action = RowAction.Toggle(state.keepLongHistory, actions.onKeepLongHistoryChange),
+            index = 0,
+            count = HISTORY_ROWS,
+            supporting = stringResource(R.string.settings_keep_long_history_body),
+            trailing = { Switch(checked = state.keepLongHistory, onCheckedChange = null) },
+            modifier = block.testTag(KEEP_LONG_HISTORY_TAG),
+        )
+    }
     tracedItem("Settings: SectionLabel widgets") {
         SectionLabel(stringResource(R.string.settings_widgets), block)
     }
@@ -326,7 +363,7 @@ private fun LazyListScope.settingsRows(
             modifier = block.padding(horizontal = 6.dp),
         )
     }
-    tracedItem("Settings: SectionLabel quick settings") {
+    tracedItem("Settings: SectionLabel quick settings", key = TILE_SECTION_KEY) {
         SectionLabel(stringResource(R.string.settings_quick_settings), block)
     }
     val subtitles = TileSubtitleMode.entries
@@ -366,6 +403,9 @@ private fun LazyListScope.settingsRows(
 /** The space between blocks of the settings list, on top of the gap between all its items. */
 private val BLOCK_GAP = 10.dp
 
+/** The list key of the Quick Settings section's label, where a long press on the tile lands. */
+private const val TILE_SECTION_KEY = "tile-section"
+
 /**
  * The settings header above a scrolling list, drawn edge to edge with the blur behind the status
  * bar. The list is centred and at most [MAX_CONTENT_WIDTH] wide on large screens.
@@ -375,10 +415,26 @@ private fun PageScaffold(
     onClose: () -> Unit,
     reveal: PageReveal?,
     modifier: Modifier = Modifier,
+    scrollTo: Any? = null,
+    animate: Boolean = true,
+    onScrollFinish: () -> Unit = {},
     content: LazyListScope.() -> Unit,
 ) {
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     val listState = rememberLazyListState()
+    val currentOnScrollFinish by rememberUpdatedState(onScrollFinish)
+    LaunchedEffect(listState, scrollTo) {
+        if (scrollTo == null) return@LaunchedEffect
+        // However the scroll stops (it lands, the user drags the list or leaves Settings), it is
+        // over: a later long press on the tile starts a new one.
+        try {
+            // Like the user's scroll below, this one waits for the reveal to end.
+            snapshotFlow { reveal?.revealing == true }.first { !it }
+            listState.scrollToKey(scrollTo, animate)
+        } finally {
+            currentOnScrollFinish()
+        }
+    }
     StatusBarBlurBox(scrollState = listState, modifier = modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,

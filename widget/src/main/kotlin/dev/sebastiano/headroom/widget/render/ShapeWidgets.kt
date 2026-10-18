@@ -97,14 +97,18 @@ private fun SmallShape(
             drawPolarShape(gauge.shape.polar, colors.shapeFill(gauge.provider).rc)
         }
         RemoteColumn(horizontalAlignment = RemoteAlignment.CenterHorizontally) {
-            WidgetText(
-                text = gauge.shownPercent.toString(),
-                color = colors.onShapeFill,
-                fontSize = render.sp(SMALL_NUMBER),
-                fontWeight = FontWeight.ExtraBold,
-            )
+            // A stale shape shows a "!" badge where its number would be, as the rings do.
+            if (gauge.stale) {
+                SignInBadge(render)
+            } else {
+                WidgetText(
+                    text = gauge.shownPercent.toString(),
+                    color = colors.onShapeFill,
+                    fontSize = render.sp(SMALL_NUMBER),
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
             ProviderLogoIcon(gauge.provider, render.pxValue(SMALL_LOGO), colors.onShapeFill)
-            if (gauge.stale) SignInLabel(render, render.sp(SMALL_SIGN_IN))
         }
     }
 }
@@ -113,4 +117,3 @@ private const val LABEL = 10f
 private const val BIG = 28f
 private const val SMALL_NUMBER = 15f
 private const val SMALL_LOGO = 13f
-private const val SMALL_SIGN_IN = 9f

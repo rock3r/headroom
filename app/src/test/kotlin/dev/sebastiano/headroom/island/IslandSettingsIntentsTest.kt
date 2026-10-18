@@ -99,4 +99,17 @@ class IslandSettingsIntentsTest {
         assertFalse(isRestrictedInstall(PackageInstaller.PACKAGE_SOURCE_STORE))
         assertFalse(isRestrictedInstall(PackageInstaller.PACKAGE_SOURCE_UNSPECIFIED))
     }
+
+    @Test
+    fun `the island service is found when the manifest declares it`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        assertTrue(context.hasIslandService())
+    }
+
+    @Test
+    fun `the island service is missing when the manifest leaves it out`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        shadowOf(context.packageManager).removeService(islandServiceComponent(context))
+        assertFalse(context.hasIslandService())
+    }
 }

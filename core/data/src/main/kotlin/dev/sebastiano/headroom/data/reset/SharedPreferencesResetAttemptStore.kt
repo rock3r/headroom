@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import dev.sebastiano.headroom.model.ResetAttempt
 import dev.sebastiano.headroom.model.ResetAttemptStore
-import java.time.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
@@ -27,7 +27,12 @@ public class SharedPreferencesResetAttemptStore(
         val text = prefs.getString(KEY, null) ?: return emptyList()
         return try {
             json.decodeFromString(serializer, text).map {
-                ResetAttempt(it.accountId, it.poolId, it.key, Instant.ofEpochMilli(it.atEpochMs))
+                ResetAttempt(
+                    it.accountId,
+                    it.poolId,
+                    it.key,
+                    Instant.fromEpochMilliseconds(it.atEpochMs),
+                )
             }
         } catch (_: SerializationException) {
             emptyList()
@@ -38,7 +43,7 @@ public class SharedPreferencesResetAttemptStore(
 
     override fun save(attempts: List<ResetAttempt>) {
         val stored = attempts.map {
-            StoredAttempt(it.accountId, it.poolId, it.key, it.at.toEpochMilli())
+            StoredAttempt(it.accountId, it.poolId, it.key, it.at.toEpochMilliseconds())
         }
         // Written at once: the key must be on disk before the redeem call goes out.
         prefs.edit(commit = true) { putString(KEY, json.encodeToString(serializer, stored)) }

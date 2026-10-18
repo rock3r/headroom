@@ -12,7 +12,7 @@ import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ThemePalette
 import dev.sebastiano.headroom.widget.render.WidgetRenderer
-import java.time.Instant
+import kotlin.time.Instant
 
 /**
  * Redraws the widgets. The app calls [updateAll] after every sync and whenever [HeadroomWidgetHost]

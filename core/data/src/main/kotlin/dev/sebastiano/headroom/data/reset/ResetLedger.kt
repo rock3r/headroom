@@ -17,10 +17,10 @@ internal class SharedPreferencesResetLedger(context: Context) : ResetLedger {
     private val store = context.getSharedPreferences("reset_ledger", Context.MODE_PRIVATE)
 
     override fun wasNotified(alarm: ResetAlarm): Boolean =
-        store.getLong(key(alarm), Long.MIN_VALUE) == alarm.expectedResetAt.toEpochMilli()
+        store.getLong(key(alarm), Long.MIN_VALUE) == alarm.expectedResetAt.toEpochMilliseconds()
 
     override fun markNotified(alarm: ResetAlarm) {
-        store.edit { putLong(key(alarm), alarm.expectedResetAt.toEpochMilli()) }
+        store.edit { putLong(key(alarm), alarm.expectedResetAt.toEpochMilliseconds()) }
     }
 
     private fun key(alarm: ResetAlarm) = "notified:${alarm.requestCode}"

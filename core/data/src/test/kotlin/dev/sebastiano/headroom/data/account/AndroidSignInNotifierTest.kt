@@ -6,14 +6,16 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.data.SignInIntents
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
-import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -114,5 +116,41 @@ class AndroidSignInNotifierTest {
             "Headroom can't update this account until you sign in.",
             shadowOf(posted()).contentText,
         )
+    }
+
+    @Test
+    fun `an expired API key notification explains that the key expired and offers to replace it`() {
+        val opencode =
+            DemoData.manyAccounts(syncedAt)
+                .first { it.account.provider == Provider.OpenCodeGo }
+                .copy(lastError = QuotaErrorKind.Auth, authReason = AuthFailureReason.KeyExpired)
+
+        notifier().notifyExpired(opencode, showAccountName = false)
+
+        assertEquals("OpenCode Go API key expired", shadowOf(posted()).contentTitle)
+        assertEquals(
+            "This API key has expired. Create a new key and replace it in Headroom. " +
+                "The numbers you see are from Sun 27 Sep, 10:32.",
+            shadowOf(posted()).contentText,
+        )
+        assertEquals("Replace API key", posted().actions.single().title)
+    }
+
+    @Test
+    fun `a rejected API key notification says the key was rejected and offers to replace it`() {
+        val opencode =
+            DemoData.manyAccounts(syncedAt)
+                .first { it.account.provider == Provider.OpenCodeGo }
+                .copy(lastError = QuotaErrorKind.Auth, authReason = null)
+
+        notifier().notifyExpired(opencode, showAccountName = false)
+
+        assertEquals("OpenCode Go API key rejected", shadowOf(posted()).contentTitle)
+        assertEquals(
+            "This API key was rejected. Replace it in Headroom to update this account. " +
+                "The numbers you see are from Sun 27 Sep, 10:32.",
+            shadowOf(posted()).contentText,
+        )
+        assertEquals("Replace API key", posted().actions.single().title)
     }
 }

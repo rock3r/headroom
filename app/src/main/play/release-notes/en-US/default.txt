@@ -1,0 +1,7 @@
+Headroom is now on Google Play.
+
+• See the weekly and session limits of all your AI subscriptions in one place.
+• New: a usage history chart with a year of history. Pan, zoom and see every reset.
+• Muse support, and Claude resets you can use straight away.
+• Clear messages when an API key expires, with a quick way to replace it.
+• Reset alerts, expiry reminders, widgets, a Quick Settings tile and usage stats.

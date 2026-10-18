@@ -6,25 +6,22 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -41,16 +38,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
-import dev.sebastiano.headroom.designsystem.PaceChart
-import dev.sebastiano.headroom.designsystem.PaceChartModel
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.QuotaRing
 import dev.sebastiano.headroom.designsystem.WorkingShimmer
 import dev.sebastiano.headroom.designsystem.stale
+import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.WindowKind
@@ -71,17 +66,15 @@ import dev.sebastiano.headroom.ui.formatAmount
 import dev.sebastiano.headroom.ui.formatBalance
 import dev.sebastiano.headroom.ui.formatMoney
 import dev.sebastiano.headroom.ui.home.AccountSummary
-import dev.sebastiano.headroom.ui.home.ChartSummary
 import dev.sebastiano.headroom.ui.home.DetailUiState
 import dev.sebastiano.headroom.ui.home.WindowSummary
 import dev.sebastiano.headroom.ui.overview.AnimatedPercent
 import dev.sebastiano.headroom.ui.resets.AccountResets
 import dev.sebastiano.headroom.ui.resets.ResetHandlers
 import dev.sebastiano.headroom.ui.resets.ResetsCard
-import java.time.Duration
-import java.time.Instant
-import java.time.format.TextStyle
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 const val DETAIL_TAG: String = "detail"
 
@@ -93,7 +86,8 @@ fun chartWindowTag(windowId: String): String = "chart-window-$windowId"
  * One account in depth: the hero ring (weekly outside, session inside), every window, the pace
  * chart drawn to scale, and the per-window reset alert switches. The ring, the numbers and the
  * chart text show how much is used or how much is left, as the state's display says; the chart
- * itself always plots usage against even pace.
+ * itself always plots usage against even pace. With [revealResets], it scrolls the Resets card into
+ * view once the card shows, then calls [onRevealResets].
  */
 @Composable
 fun DetailScreen(
@@ -107,6 +101,8 @@ fun DetailScreen(
     resets: AccountResets = AccountResets(),
     resetHandlers: ResetHandlers = ResetHandlers(),
     onSignInAgain: (accountId: String) -> Unit = {},
+    revealResets: Boolean = false,
+    onRevealResets: () -> Unit = {},
 ) {
     val account = state.account
     val container =
@@ -121,6 +117,7 @@ fun DetailScreen(
         // Not saved: the detail pane restores saved state from whichever account it showed last,
         // so a saved scroll would open the next account part way down. Details open at the top.
         val scrollState = remember(account.id) { ScrollState(initial = 0) }
+        val resetsRequester = remember { BringIntoViewRequester() }
         StatusBarBlurBox(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier =
@@ -139,16 +136,10 @@ fun DetailScreen(
                 DetailTopBar(account, onBack, sharedElements, content)
                 val stale = account.signInExpired
                 if (stale) {
-                    SignInExpiredBanner(
-                        provider = account.provider,
-                        dataFrom = account.dataFrom,
-                        now = state.now,
-                        onSignIn = { onSignInAgain(account.id) },
-                        modifier = content,
-                    )
+                    SignInExpiredBanner(account, state.now, { onSignInAgain(account.id) }, content)
                 }
                 // The ring, the windows and the chart are stale data: faded, and said so.
-                val staleText = if (stale) staleDescription(account.dataFrom, state.now) else null
+                val staleText = if (stale) staleDescription(account, state.now) else null
                 account.primary?.let {
                     HeroRing(
                         account,
@@ -179,14 +170,15 @@ fun DetailScreen(
                     content.stale(stale),
                 )
                 // The chart follows the windows it draws; the resets come after the usage.
-                state.chart?.let {
+                val chart = state.chart
+                val history = state.history
+                if (chart != null && history != null) {
                     ChartCard(
-                        chart = it,
+                        chart = chart,
+                        history = history,
                         now = account.asOf(state.now),
                         formatter = formatter,
-                        windows = state.chartWindows,
-                        selectedWindowId = state.chartWindowId,
-                        onWindowChange = onChartWindowChange,
+                        onWindowToggle = onChartWindowChange,
                         display = state.display,
                         modifier = content.stale(stale),
                     )
@@ -194,6 +186,7 @@ fun DetailScreen(
                 // A stale account's resets are as old as its usage: faded with it, and with no
                 // action until the user signs in again.
                 resets.of(account.id)?.let { availability ->
+                    RevealResetsEffect(revealResets, resetsRequester, onRevealResets)
                     ResetsCard(
                         provider = account.provider,
                         availability = availability,
@@ -202,7 +195,7 @@ fun DetailScreen(
                         onAsk = { resetHandlers.onAsk(account.id) },
                         redeemEnabled = resets.canRedeem(account.provider),
                         stale = stale,
-                        modifier = content,
+                        modifier = content.bringIntoViewRequester(resetsRequester),
                     )
                 }
                 AlertSection(account, formatter, onAlertChange, content)
@@ -365,7 +358,7 @@ private fun WindowList(
                                 expiresAt?.let {
                                     stringResource(R.string.detail_expires_at, formatter.date(it))
                                 }
-                            resetsAt != null && account.signInExpired && !resetsAt.isAfter(now) ->
+                            resetsAt != null && account.signInExpired && resetsAt <= now ->
                                 stringResource(R.string.stale_window_reset_long)
                             resetsAt != null -> resetLine(window, resetsAt, now, formatter)
                             else -> null
@@ -452,41 +445,18 @@ private fun resetLine(window: WindowSummary, at: Instant, now: Instant, formatte
     when {
         window.kind == WindowKind.Session || window.kind == WindowKind.Daily ->
             stringResource(R.string.detail_resets_in_no_alert, formatter.countdown(now, at))
-        Duration.between(now, at) < Duration.ofDays(1) ->
+        (at - now) < 1.days ->
             stringResource(R.string.detail_resets_in, formatter.countdown(now, at))
         else -> stringResource(R.string.detail_resets_at, formatter.long(at))
     }
 
-/** Picks which long window the chart draws, for accounts with more than one. */
-@Composable
-private fun ChartWindowPicker(
-    windows: List<WindowSummary>,
-    selectedWindowId: String?,
-    onWindowChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
-        windows.forEachIndexed { index, window ->
-            SegmentedButton(
-                selected = window.id == selectedWindowId,
-                onClick = { onWindowChange(window.id) },
-                shape = SegmentedButtonDefaults.itemShape(index, windows.size),
-                modifier = Modifier.testTag(chartWindowTag(window.id)),
-            ) {
-                Text(window.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
 @Composable
 private fun ChartCard(
     chart: ChartSummary,
+    history: UsageHistoryModel,
     now: Instant,
     formatter: ResetFormatter,
-    windows: List<WindowSummary>,
-    selectedWindowId: String?,
-    onWindowChange: (String) -> Unit,
+    onWindowToggle: (String) -> Unit,
     display: QuotaDisplay,
     modifier: Modifier = Modifier,
 ) {
@@ -498,14 +468,7 @@ private fun ChartCard(
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text =
-                        stringResource(
-                            when (chart.kind) {
-                                WindowKind.Weekly -> R.string.detail_chart_week
-                                WindowKind.Monthly -> R.string.detail_chart_month
-                                else -> R.string.detail_chart_window
-                            }
-                        ),
+                    text = stringResource(R.string.detail_chart_title),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
@@ -515,37 +478,11 @@ private fun ChartCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (windows.size > 1) {
-                Spacer(Modifier.height(8.dp))
-                ChartWindowPicker(windows, selectedWindowId, onWindowChange)
-            }
-            Spacer(Modifier.height(4.dp))
-            val shown = display.percent(chart.usedPercent).roundToInt()
-            val above = chart.usedPercent > chart.expectedPercent
-            PaceChart(
-                model =
-                    PaceChartModel(
-                        start = chart.start,
-                        end = chart.end,
-                        now = now,
-                        usedPercent = chart.usedPercent,
-                        points = chart.points,
-                        projectedLimitAt = chart.projectedLimitAt,
-                        tickLabels = tickLabels(chart, formatter),
-                    ),
-                limitLabel = stringResource(R.string.detail_chart_limit),
-                contentDescription =
-                    stringResource(
-                        when (display) {
-                            QuotaDisplay.Used ->
-                                if (above) R.string.detail_chart_description_above
-                                else R.string.detail_chart_description_below
-                            QuotaDisplay.Left ->
-                                if (above) R.string.detail_chart_description_above_left
-                                else R.string.detail_chart_description_below_left
-                        },
-                        shown,
-                    ),
+            UsageHistoryChart(
+                model = history,
+                formatter = formatter,
+                display = display,
+                onWindowToggle = onWindowToggle,
             )
             Text(
                 text = projectionText(chart, now, formatter, display),
@@ -557,36 +494,19 @@ private fun ChartCard(
     }
 }
 
-/** Below this, a window reads as just reset. */
-private const val FRESH_MAX_PERCENT = 0.5
-private const val WEEK_DAYS = 7
-private const val MONTH_SLICES = 4
-
-/** Weekday names for a weekly window (starting on its first day); "1" to "4" for longer ones. */
 @Composable
-private fun tickLabels(chart: ChartSummary, formatter: ResetFormatter): List<String> {
-    val locale = LocalLocale.current.platformLocale
-    return if (chart.kind == WindowKind.Weekly) {
-        val first = formatter.dayOfWeek(chart.start)
-        (0 until WEEK_DAYS).map { first.plus(it.toLong()).getDisplayName(TextStyle.SHORT, locale) }
-    } else {
-        (1..MONTH_SLICES).map { it.toString() }
-    }
-}
-
-@Composable
-private fun projectionText(
+internal fun projectionText(
     chart: ChartSummary,
     now: Instant,
     formatter: ResetFormatter,
     display: QuotaDisplay,
 ): String {
     val hit = chart.projectedLimitAt
-    val end = chart.projectedEndPercent
+    val end = chart.projectedEndPercent ?: if (hit != null) FULL_PERCENT else null
     val left = display == QuotaDisplay.Left
     return when {
         chart.usedPercent <= FRESH_MAX_PERCENT -> stringResource(R.string.detail_projection_fresh)
-        hit != null ->
+        hit != null && hit > now ->
             stringResource(
                 if (left) R.string.detail_projection_hit_left else R.string.detail_projection_hit,
                 formatter.countdown(now, hit),
@@ -610,6 +530,8 @@ private fun projectionText(
         else -> ""
     }
 }
+
+private const val FULL_PERCENT = 100.0
 
 @Composable
 private fun AlertSection(

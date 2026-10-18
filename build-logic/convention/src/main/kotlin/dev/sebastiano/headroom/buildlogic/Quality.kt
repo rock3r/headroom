@@ -10,8 +10,16 @@ import org.gradle.kotlin.dsl.withType
 
 private val generatedSources = arrayOf("**/build/**", "**/generated/**")
 
+/**
+ * Vendored modules under `:third-party` keep their upstream source verbatim so `update.sh` can
+ * refresh them without local formatting diffs or static-analysis suppressions.
+ */
+internal val Project.isThirdParty: Boolean
+    get() = path.startsWith(":third-party:")
+
 /** Detekt (with Compose Rules where Compose is used) and ktfmt, both wired into `check`. */
 internal fun Project.configureQuality() {
+    if (isThirdParty) return
     pluginManager.apply("dev.detekt")
     pluginManager.apply("com.ncorti.ktfmt.gradle")
 
@@ -28,6 +36,9 @@ internal fun Project.configureQuality() {
     tasks.withType<Detekt>().configureEach {
         jvmTarget.set(HeadroomSdk.JVM_TOOLCHAIN.toString())
         exclude(*generatedSources)
+        // In multiplatform modules KSP output is a source root of its own, so the relative
+        // patterns above never see `build/generated` in its path.
+        exclude { it.file.invariantSeparatorsPath.contains("/build/generated/") }
     }
 
     tasks

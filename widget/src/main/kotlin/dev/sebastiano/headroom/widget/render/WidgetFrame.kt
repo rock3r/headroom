@@ -76,7 +76,10 @@ internal fun WidgetText(
     )
 }
 
-/** A provider avatar: its shape in its hue, with its logo on top. */
+/**
+ * A provider avatar: its shape in its hue, with its logo on top. With [resets] above zero, the
+ * reset counter sits on its bottom-right corner, drawn in [counter].
+ */
 @RemoteComposable
 @Composable
 internal fun ProviderAvatar(
@@ -84,6 +87,8 @@ internal fun ProviderAvatar(
     render: RenderContext,
     sizeDp: Float,
     modifier: RemoteModifier = RemoteModifier,
+    resets: Int = 0,
+    counter: CounterStyle? = null,
 ) {
     val style = provider.style
     val side = render.fixedPx(sizeDp)
@@ -103,6 +108,13 @@ internal fun ProviderAvatar(
             sidePx = render.fixedPxValue(sizeDp) * AVATAR_LOGO_SHARE,
             color = render.colors.onAvatar,
         )
+        if (resets > 0 && counter != null) {
+            // Drawn after the logo, so the counter sits on top of it.
+            RemoteCanvas(RemoteModifier.fillMaxSize()) {
+                val inset = (counter.radiusPx + counter.haloPx).rf
+                drawCounter(counterLabel(resets), width - inset, height - inset, counter)
+            }
+        }
     }
 }
 

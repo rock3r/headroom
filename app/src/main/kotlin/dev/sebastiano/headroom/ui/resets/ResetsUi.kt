@@ -41,11 +41,13 @@ import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.ProviderAvatar
 import dev.sebastiano.headroom.designsystem.stale
-import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.canRedeemResets
+import dev.sebastiano.headroom.model.hasFooter
+import dev.sebastiano.headroom.model.holdsNone
+import dev.sebastiano.headroom.model.showsSummary
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.components.ListCard
@@ -57,8 +59,6 @@ data class AccountResets(
     val byAccount: Map<String, ResetAvailability> = emptyMap(),
     /** The accounts whose usage is being refreshed after a reset. */
     val refreshing: Set<String> = emptySet(),
-    /** The user's settings, which decide whether Claude's resets can be used. */
-    val settings: AppSettings = AppSettings(),
 ) {
     fun of(accountId: String): ResetAvailability? = byAccount[accountId]
 
@@ -66,7 +66,7 @@ data class AccountResets(
     fun isRefreshing(accountId: String): Boolean = accountId in refreshing
 
     /** True when Headroom can use [provider]'s resets. Others are shown for information only. */
-    fun canRedeem(provider: Provider): Boolean = provider.canRedeemResets(settings)
+    fun canRedeem(provider: Provider): Boolean = provider.canRedeemResets()
 }
 
 /** What the reset UI does: use a reset, or ask for one. */

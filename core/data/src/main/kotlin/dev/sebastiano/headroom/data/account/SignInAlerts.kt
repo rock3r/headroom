@@ -12,10 +12,12 @@ import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.data.R
 import dev.sebastiano.headroom.data.SignInIntents
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.SignInAlertPolicy
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.time.toJavaInstant
 
 /** Shows and removes the warning that an account's sign-in expired. */
 public interface SignInNotifier {
@@ -105,22 +107,8 @@ internal class AndroidSignInNotifier(
 
     override fun notifyExpired(account: AccountState, showAccountName: Boolean) {
         ensureChannel()
-        val provider = account.account.provider.displayName
-        val title =
-            if (showAccountName) {
-                val name = account.account.nickname ?: account.account.label
-                context.getString(R.string.sign_in_expired_title_named, provider, name)
-            } else {
-                context.getString(R.string.sign_in_expired_title, provider)
-            }
-        val body =
-            account.snapshot?.fetchedAt?.let { syncedAt ->
-                context.getString(
-                    R.string.sign_in_expired_body_with_time,
-                    DateTimeFormatter.ofPattern(timePattern(), locale)
-                        .format(syncedAt.atZone(zone)),
-                )
-            } ?: context.getString(R.string.sign_in_expired_body)
+        val title = title(account, showAccountName)
+        val body = body(account)
         val intent = pendingIntent(account.account.id)
         val notification =
             Notification.Builder(context, CHANNEL_ID)
@@ -134,13 +122,70 @@ internal class AndroidSignInNotifier(
                 .addAction(
                     Notification.Action.Builder(
                             null,
-                            context.getString(R.string.sign_in_expired_action),
+                            action(account),
                             intent,
                         )
                         .build()
                 )
                 .build()
         manager.notify(TAG, notificationId(account.account.id), notification)
+    }
+
+    private fun title(account: AccountState, showAccountName: Boolean): String {
+        val provider = account.account.provider.displayName
+        val keyExpired = account.authReason == AuthFailureReason.KeyExpired
+        val usesApiKey = account.account.provider.usesApiKey
+        if (showAccountName) {
+            val name = account.account.nickname ?: account.account.label
+            val res =
+                when {
+                    keyExpired -> R.string.sign_in_key_expired_title_named
+                    usesApiKey -> R.string.sign_in_key_rejected_title_named
+                    else -> R.string.sign_in_expired_title_named
+                }
+            return context.getString(res, provider, name)
+        }
+        val res =
+            when {
+                keyExpired -> R.string.sign_in_key_expired_title
+                usesApiKey -> R.string.sign_in_key_rejected_title
+                else -> R.string.sign_in_expired_title
+            }
+        return context.getString(res, provider)
+    }
+
+    private fun body(account: AccountState): String {
+        val keyExpired = account.authReason == AuthFailureReason.KeyExpired
+        val usesApiKey = account.account.provider.usesApiKey
+        val syncedAt = account.snapshot?.fetchedAt
+        if (syncedAt != null) {
+            val res =
+                when {
+                    keyExpired -> R.string.sign_in_key_expired_body_with_time
+                    usesApiKey -> R.string.sign_in_key_rejected_body_with_time
+                    else -> R.string.sign_in_expired_body_with_time
+                }
+            val formatted =
+                DateTimeFormatter.ofPattern(timePattern(), locale)
+                    .format(syncedAt.toJavaInstant().atZone(zone))
+            return context.getString(res, formatted)
+        }
+        val res =
+            when {
+                keyExpired -> R.string.sign_in_key_expired_body
+                usesApiKey -> R.string.sign_in_key_rejected_body
+                else -> R.string.sign_in_expired_body
+            }
+        return context.getString(res)
+    }
+
+    private fun action(account: AccountState): String {
+        val isApiKey =
+            account.account.provider.usesApiKey ||
+                account.authReason == AuthFailureReason.KeyExpired
+        return context.getString(
+            if (isApiKey) R.string.sign_in_api_key_action else R.string.sign_in_expired_action
+        )
     }
 
     /** "Sun 27 Sep, 10:32", or "Sun 27 Sep, 10:32 AM" on a 12-hour clock. */

@@ -10,8 +10,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import dev.sebastiano.headroom.AppGraph
+import dev.sebastiano.headroom.appdata.DemoAwareResetEvents
 import dev.sebastiano.headroom.appdata.DemoAwareUsageHistory
 import dev.sebastiano.headroom.appdata.DemoModeQuotaRepository
+import dev.sebastiano.headroom.appdata.DemoResetEvents
 import dev.sebastiano.headroom.appdata.DemoResetHistory
 import dev.sebastiano.headroom.appdata.DemoUsageHistory
 import dev.sebastiano.headroom.appdata.InMemoryAlertPreferences
@@ -25,6 +27,7 @@ import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.NoResets
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.ResetEventLog
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.prototype.PrototypeTools
@@ -32,9 +35,9 @@ import dev.sebastiano.headroom.signin.FakeSignInController
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
 import dev.sebastiano.headroom.widgets.WidgetPinner
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -98,7 +101,7 @@ fun testGraph(
             DemoAwareUsageHistory(
                 isDemo = repository.isDemo,
                 real = RepositoryUsageHistory(real),
-                demo = DemoUsageHistory(DemoResetHistory, clock, ZoneOffset.UTC),
+                demo = DemoUsageHistory(DemoResetHistory, clock, ZoneOffset.UTC, settings),
             ),
         statsDispatcher = statsDispatcher,
         resetIsland = resetIsland,
@@ -106,6 +109,12 @@ fun testGraph(
         resetScope = scope,
         prototypes = prototypes,
         demoAccounts = demo,
+        resetEvents =
+            DemoAwareResetEvents(
+                isDemo = repository.isDemo,
+                real = ResetEventLog.None,
+                demo = DemoResetEvents(clock),
+            ),
     )
 }
 

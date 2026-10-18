@@ -31,8 +31,17 @@ class FakeSignInController(initial: SignInState = SignInState.Idle) : SignInCont
     override fun submitApiKey(key: String) {
         val current = mutableState.value as? SignInState.ApiKey ?: return
         mutableState.value =
-            if (key.trim().length < MIN_KEY_LENGTH) current.copy(keyRejected = true)
-            else SignInState.Success(current.provider, DEMO_ACCOUNT)
+            if (key.trim().length < MIN_KEY_LENGTH) {
+                current.copy(keyRejected = true, rejection = ApiKeyRejection.Malformed)
+            } else {
+                SignInState.Success(current.provider, DEMO_ACCOUNT)
+            }
+    }
+
+    /** Pretends the provider rejected the API key with [rejection]. */
+    fun rejectApiKey(rejection: ApiKeyRejection) {
+        val current = provider ?: return
+        mutableState.value = SignInState.ApiKey(current, keyRejected = true, rejection = rejection)
     }
 
     override fun retry() {
@@ -61,7 +70,8 @@ class FakeSignInController(initial: SignInState = SignInState.Idle) : SignInCont
             Provider.Grok,
             Provider.JetBrains -> SignInState.Browser(provider, DEMO_AUTHORIZATION_URL)
             Provider.Copilot,
-            Provider.Kimi -> SignInState.DeviceCode(provider, DEMO_USER_CODE, DEMO_VERIFICATION_URL)
+            Provider.Kimi,
+            Provider.Muse -> SignInState.DeviceCode(provider, DEMO_USER_CODE, DEMO_VERIFICATION_URL)
             Provider.ZAi,
             Provider.OpenCodeGo -> SignInState.ApiKey(provider)
         }

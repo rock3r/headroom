@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.ui
 
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.window.core.layout.WindowSizeClass
 
@@ -13,6 +14,12 @@ enum class LayoutWidth {
     /** 840dp and up: navigation rail, list and detail side by side. */
     Expanded,
 }
+
+/** A navigation rail on wider screens; compact screens use the floating toolbar instead. */
+val LayoutWidth.navigationSuiteType: NavigationSuiteType
+    get() =
+        if (this == LayoutWidth.Compact) NavigationSuiteType.None
+        else NavigationSuiteType.WideNavigationRailCollapsed
 
 @Composable
 fun layoutWidth(): LayoutWidth {

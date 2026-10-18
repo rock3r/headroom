@@ -45,11 +45,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.sebastiano.headroom.AppGraph
 import dev.sebastiano.headroom.R
 import dev.sebastiano.headroom.designsystem.animationsEnabled
+import dev.sebastiano.headroom.glasses.openWhileConnected
 import dev.sebastiano.headroom.island.ResetIslandAccess
+import dev.sebastiano.headroom.model.TileSubtitleMode
 import dev.sebastiano.headroom.signin.SignInState
 import dev.sebastiano.headroom.signin.signInTabIntent
 import dev.sebastiano.headroom.tile.TileAddResult
-import dev.sebastiano.headroom.tile.TileSubtitleMode
 import dev.sebastiano.headroom.ui.accounts.AccountsActions
 import dev.sebastiano.headroom.ui.accounts.AccountsScreen
 import dev.sebastiano.headroom.ui.accounts.AccountsStep
@@ -83,6 +84,8 @@ fun HeadroomApp(
     modifier: Modifier = Modifier,
     openAccountRequest: OpenAccountRequest? = null,
     onConsumeOpenAccount: () -> Unit = {},
+    openTileSettingsRequest: Long? = null,
+    onConsumeOpenTileSettings: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(factory = graph.homeViewModelFactory),
     accountsViewModel: AccountsViewModel = viewModel(factory = graph.accountsViewModelFactory),
     settingsViewModel: SettingsViewModel = viewModel(factory = graph.settingsViewModelFactory),
@@ -92,8 +95,7 @@ fun HeadroomApp(
     val liveDetail by homeViewModel.detail.collectAsStateWithLifecycle()
     val accounts by accountsViewModel.state.collectAsStateWithLifecycle()
     val settings by settingsViewModel.state.collectAsStateWithLifecycle()
-    val glassesConnected by
-        graph.glassesLauncher.connected.collectAsStateWithLifecycle(initialValue = false)
+    val openOnGlasses = graph.glassesLauncher.openWhileConnected()
     val resets = collectResets(graph)
     val formatter = rememberResetFormatter(graph.zone)
     val snackbar = remember { SnackbarHostState() }
@@ -121,6 +123,8 @@ fun HeadroomApp(
         if (next == Page.Accounts) accountsFromSettings = true
         page = next
     }
+    val tileScroll =
+        rememberTileScroll(openTileSettingsRequest, onConsumeOpenTileSettings, requests, openPage)
     // Made once: this composable recomposes whenever the pages settle, for example as Settings'
     // reveal ends. New callbacks then would compose every row of Settings again.
     val settingsActions =
@@ -134,10 +138,7 @@ fun HeadroomApp(
             .withDeviceActions()
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Inside a sign-in, the accounts screen handles back itself, one step at a time.
-        val back =
-            (if (shown == Page.Accounts && accountsFromSettings) Page.Settings else shown.back)
-                .takeIf { shown != Page.Accounts || accounts.step == AccountsStep.List }
+        val back = shown.backFrom(accountsFromSettings, accounts.step)
         val pageTransition = rememberPageTransition(shown, back) { page = it }
         Pages(
             transition = rememberTransition(pageTransition.state, label = "page"),
@@ -145,7 +146,8 @@ fun HeadroomApp(
         ) { current, reveal ->
             when (current) {
                 Page.Accounts -> AccountsScreen(state = accounts, actions = accountsActions)
-                Page.Settings -> SettingsPage(graph, settings, home, settingsActions, reveal)
+                Page.Settings ->
+                    SettingsPage(graph, settings, home, settingsActions, reveal, tileScroll)
                 Page.Prototypes ->
                     PrototypesPage(graph, home, formatter, onBack = { page = Page.Settings })
                 Page.Licences -> LicencesScreen(onBack = { page = Page.Settings })
@@ -172,7 +174,7 @@ fun HeadroomApp(
                         playEntrance = !entrancePlayed,
                         onEntranceStart = { entrancePlayed = true },
                         onSignInAgain = signInAgain,
-                        onOpenOnGlasses = graph.glassesLauncher::open.takeIf { glassesConnected },
+                        onOpenOnGlasses = openOnGlasses,
                         openAccountRequest = openNow,
                         onConsumeOpenAccount = {
                             page = Page.Home
@@ -205,6 +207,7 @@ private fun SettingsPage(
     home: HomeUiState,
     actions: SettingsActions,
     reveal: PageReveal,
+    tileScroll: TileScroll,
 ) {
     var tileStatus by rememberSaveable { mutableStateOf<TileAddResult?>(null) }
     val tileSubtitle = graph.tileSettings?.subtitle?.collectAsStateWithLifecycle()?.value
@@ -227,7 +230,41 @@ private fun SettingsPage(
         tileStatus = tileStatus,
         tileSubtitle = tileSubtitle ?: TileSubtitleMode.NextReset,
         debugEntry = debugEntry,
+        scrollToTile = tileScroll.pending,
+        onScrollToTileFinish = { tileScroll.pending = false },
     )
+}
+
+/** Whether Settings still has to scroll to the Quick Settings tile's rows. */
+@Stable
+private class TileScroll {
+    var pending by mutableStateOf(false)
+}
+
+/**
+ * Handles a long press on the Quick Settings tile, by [request] serial: [onOpenPage] shows
+ * Settings, the returned [TileScroll] asks it to scroll to the tile's rows, and [onConsume] tells
+ * the host to clear the request. The long press wins over an earlier widget tap in [pending], like
+ * the user's own taps.
+ */
+@Composable
+private fun rememberTileScroll(
+    request: Long?,
+    onConsume: () -> Unit,
+    pending: PendingRequest,
+    onOpenPage: (Page) -> Unit,
+): TileScroll {
+    val scroll = remember { TileScroll() }
+    var handled by remember { mutableStateOf<Long?>(null) }
+    SideEffect {
+        if (request == null || request == handled) return@SideEffect
+        handled = request
+        pending.drop()
+        onOpenPage(Page.Settings)
+        scroll.pending = true
+        onConsume()
+    }
+    return scroll
 }
 
 private const val ENTER_SCALE = 0.96f
@@ -434,7 +471,8 @@ private fun settingsActions(
         onRefreshShimmerChange = viewModel::setRefreshShimmer,
         onResetConfettiChange = viewModel::setResetConfetti,
         onResetIslandChange = viewModel::setResetIsland,
-        onRedeemClaudeResetsChange = viewModel::setRedeemClaudeResets,
+        onResetExpiryRemindersChange = viewModel::setResetExpiryReminders,
+        onKeepLongHistoryChange = viewModel::setKeepLongHistory,
         onTryResetIsland = { provider, message -> resetIsland.showDemo(provider, message) },
         onRefreshResetIsland = resetIsland::refresh,
         onOpenPrototypes = { onNavigate(Page.Prototypes) },
@@ -519,6 +557,15 @@ private enum class Page {
                 Licences,
                 Prototypes -> Settings
             }
+
+    /**
+     * Where system back goes from this page. Inside a sign-in it is null: the accounts screen
+     * handles back itself, one step at a time.
+     */
+    fun backFrom(accountsFromSettings: Boolean, step: AccountsStep): Page? =
+        (if (this == Accounts && accountsFromSettings) Settings else back).takeIf {
+            this != Accounts || step == AccountsStep.List
+        }
 }
 
 private fun SignInState.isWaitingForUser() =

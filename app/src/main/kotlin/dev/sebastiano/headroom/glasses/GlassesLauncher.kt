@@ -2,6 +2,9 @@ package dev.sebastiano.headroom.glasses
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.xr.projected.ProjectedContext
 import androidx.xr.projected.experimental.ExperimentalProjectedApi
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,6 +29,13 @@ interface GlassesLauncher {
                 override fun open() = Unit
             }
     }
+}
+
+/** Opens Headroom on the display glasses; null while no glasses are connected. */
+@Composable
+fun GlassesLauncher.openWhileConnected(): (() -> Unit)? {
+    val connected by connected.collectAsStateWithLifecycle(initialValue = false)
+    return ::open.takeIf { connected }
 }
 
 /**

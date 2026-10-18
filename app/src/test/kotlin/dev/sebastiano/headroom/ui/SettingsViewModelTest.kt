@@ -115,16 +115,16 @@ class SettingsViewModelTest {
         }
 
     @Test
-    fun `redeeming Claude resets is off until the user turns it on, and then it is stored`() =
+    fun `reset reminders are on until the user turns them off, and then it is stored`() =
         runTest(main.dispatcher) {
             observe()
-            assertFalse(viewModel.state.value.redeemClaudeResets)
+            assertTrue(viewModel.state.value.resetExpiryReminders)
 
-            viewModel.setRedeemClaudeResets(true)
+            viewModel.setResetExpiryReminders(false)
             runCurrent()
 
-            assertTrue(repository.settings.value.redeemClaudeResets)
-            assertTrue(viewModel.state.value.redeemClaudeResets)
+            assertFalse(repository.settings.value.resetExpiryReminders)
+            assertFalse(viewModel.state.value.resetExpiryReminders)
         }
 
     @Test
@@ -135,5 +135,18 @@ class SettingsViewModelTest {
             runCurrent()
             assertEquals(SyncFrequency.OnOpen, repository.settings.value.syncFrequency)
             assertEquals(SyncFrequency.OnOpen, viewModel.state.value.syncFrequency)
+        }
+
+    @Test
+    fun `long-term history is on until the user turns it off, and then it is stored`() =
+        runTest(main.dispatcher) {
+            observe()
+            assertTrue(viewModel.state.value.keepLongHistory)
+
+            viewModel.setKeepLongHistory(false)
+            runCurrent()
+
+            assertFalse(repository.settings.value.keepLongHistory)
+            assertFalse(viewModel.state.value.keepLongHistory)
         }
 }

@@ -1,18 +1,22 @@
 package dev.sebastiano.headroom.appdata
 
+import dev.sebastiano.headroom.model.DemoUsage
+import dev.sebastiano.headroom.model.HistoryRetention
+import dev.sebastiano.headroom.model.InMemorySettingsRepository
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.model.UsagePoint
-import java.time.DayOfWeek
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
-import kotlin.math.sin
+import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.toKotlinTimeZone
 
 /** The recorded usage of an account's window, oldest point first, for the Stats tab. */
 fun interface UsageHistory {
@@ -26,17 +30,22 @@ class RepositoryUsageHistory(private val repository: QuotaRepository) : UsageHis
 }
 
 /**
- * Plausible history for the demo accounts: one cycle for each of the [resets] of the window, then
- * the current one, with most of the use on weekday working hours in [zone].
+ * Plausible history for the demo accounts: past cycles that repeat the [resets] of the window back
+ * to the retention horizon from [settings], then the current cycle, with most of the use on weekday
+ * working hours in [zone].
  */
 class DemoUsageHistory(
     private val resets: ResetHistory,
     private val clock: () -> Instant,
     private val zone: ZoneId,
+    private val settings: SettingsRepository = InMemorySettingsRepository(),
 ) : UsageHistory {
     override fun points(accountId: String, window: QuotaWindow): Flow<List<UsagePoint>> =
-        resets.usedAtReset(accountId, window.id).map { peaks ->
-            demoUsage(window, peaks, clock(), zone)
+        combine(
+            resets.usedAtReset(accountId, window.id),
+            settings.settings.map { it.historyRetention }.distinctUntilChanged(),
+        ) { peaks, retention ->
+            demoUsage(window, peaks, clock(), zone, retention)
         }
 }
 
@@ -53,90 +62,34 @@ class DemoAwareUsageHistory(
         }
 }
 
-/** The real history keeps this long, so the demo does too. */
-private val DEMO_RETENTION: Duration = Duration.ofDays(60)
-
-private const val LIMIT = 100.0
-
-/** A limit hit in the demo: the demand was this much more than the limit, so usage stops at 100. */
-private const val HIT_DEMAND = 1.15
-
 /**
- * Hourly usage of [window] for the past cycles, which peaked at [peaks] (oldest first), and for the
- * current cycle up to [now], where it ends at the window's usage. Each past cycle ends with a point
- * at its peak, a minute before it resets. Only the last [DEMO_RETENTION] is kept.
+ * Hourly usage of [window] for the past cycles, which peaked at [peaks], and for the current cycle,
+ * with most of the use on weekday working hours in [zone]. See [DemoUsage.points].
  */
 internal fun demoUsage(
     window: QuotaWindow,
     peaks: List<Double>,
     now: Instant,
     zone: ZoneId,
-): List<UsagePoint> {
-    val resetsAt = window.resetsAt ?: return emptyList()
-    val length = window.length ?: return emptyList()
-    val currentStart = resetsAt.minus(length)
-    val points = mutableListOf<UsagePoint>()
-    peaks.forEachIndexed { index, peak ->
-        val start = currentStart.minus(length.multipliedBy((peaks.size - index).toLong()))
-        val end = start.plus(length)
-        val demand = if (peak >= LIMIT) LIMIT * HIT_DEMAND else peak
-        points += cycle(start, end, zone) { share -> minOf(LIMIT, demand * share) }
-        points += UsagePoint(end.minusSeconds(SECONDS_PER_MINUTE), peak)
-    }
-    if (now.isAfter(currentStart)) {
-        points += cycle(currentStart, now, zone) { share -> window.usedPercent * share }
-        points += UsagePoint(now, window.usedPercent)
-    }
-    val cutoff = now.minus(DEMO_RETENTION)
-    return points.filter { !it.at.isBefore(cutoff) }
-}
+    retention: HistoryRetention = HistoryRetention.LongTerm,
+): List<UsagePoint> =
+    DemoUsage.points(
+        window = window,
+        peaks = peaks.ifEmpty { fallbackDemoPeaks(window.usedPercent) },
+        now = now,
+        zone = zone.toKotlinTimeZone(),
+        retention = retention,
+    )
 
-/**
- * One point per hour from [start] to before [end]. [usage] turns the share of the cycle's activity
- * that happened so far, from 0 to 1, into the usage at that point.
- */
-private fun cycle(
-    start: Instant,
-    end: Instant,
-    zone: ZoneId,
-    usage: (Double) -> Double,
-): List<UsagePoint> {
-    val hours = Duration.between(start, end).toHours()
-    if (hours <= 0) return emptyList()
-    val weights = (0 until hours).map { activity(start.plus(Duration.ofHours(it)), zone) }
-    val total = weights.sum()
-    var sofar = 0.0
-    return (0 until hours).map { hour ->
-        val point = UsagePoint(start.plus(Duration.ofHours(hour)), usage(sofar / total))
-        sofar += weights[hour.toInt()]
-        point
+private fun fallbackDemoPeaks(usedPercent: Double): List<Double> {
+    val base = usedPercent.coerceIn(MIN_FALLBACK_BASE, MAX_FALLBACK_BASE)
+    return FALLBACK_PEAK_OFFSETS.map { offset ->
+        (base + offset).coerceIn(MIN_FALLBACK_PEAK, MAX_FALLBACK_PEAK)
     }
 }
 
-/** How busy the hour starting at [at] is: mostly weekday working hours, a little in the evening. */
-private fun activity(at: Instant, zone: ZoneId): Double {
-    val local = at.atZone(zone)
-    val weekend = local.dayOfWeek == DayOfWeek.SATURDAY || local.dayOfWeek == DayOfWeek.SUNDAY
-    val base =
-        when (local.hour) {
-            in WORK_MORNING -> if (weekend) WEEKEND_DAY else MORNING
-            in WORK_AFTERNOON -> if (weekend) WEEKEND_DAY else AFTERNOON
-            in EVENING -> if (weekend) WEEKEND_DAY else EVENING_WEIGHT
-            else -> NIGHT
-        }
-    // Some days are busier than others; the sine keeps it the same on every run.
-    val day = local.toLocalDate().toEpochDay().toDouble()
-    return base * (1.0 + DAY_WOBBLE * sin(day * DAY_WOBBLE_FREQUENCY))
-}
-
-private const val SECONDS_PER_MINUTE = 60L
-private val WORK_MORNING = 9..12
-private val WORK_AFTERNOON = 13..18
-private val EVENING = 19..22
-private const val MORNING = 1.0
-private const val AFTERNOON = 1.4
-private const val EVENING_WEIGHT = 0.35
-private const val WEEKEND_DAY = 0.25
-private const val NIGHT = 0.0
-private const val DAY_WOBBLE = 0.4
-private const val DAY_WOBBLE_FREQUENCY = 2.3
+private val FALLBACK_PEAK_OFFSETS = listOf(12.0, -8.0, 19.0, -4.0, 9.0)
+private const val MIN_FALLBACK_BASE = 25.0
+private const val MAX_FALLBACK_BASE = 80.0
+private const val MIN_FALLBACK_PEAK = 15.0
+private const val MAX_FALLBACK_PEAK = 96.0

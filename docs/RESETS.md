@@ -1,41 +1,48 @@
 # Usage-limit resets
 
-Some providers give subscribers resets: a reset refills a usage limit before its normal reset time.
-Headroom shows the resets of Codex, Grok, Claude and Z.AI accounts. It can use Codex, Grok and Z.AI
-resets, and ask Z.AI for more. It can use Claude's resets only when the user turns on "Redeem Claude
-resets (experimental)" in Settings. Until then, Claude's resets are shown for information only.
+Provider-issued resets refill usage limits before their normal reset times.
+Headroom lists resets for Codex, Grok, Claude and Z.AI. Users can redeem Codex, Grok, Claude and Z.AI resets and request more Z.AI cards.
 
 | Provider | Shows resets | Can use a reset | Notes |
 |---|---|---|---|
 | ChatGPT Codex | Yes | Yes | |
 | Grok | Yes | Yes | |
-| Claude | Yes | Experimental, off by default | The user turns it on in Settings. Never tried with a real account. |
+| Claude | Yes | Experimental | Claude has not published this API, so it may fail or stop working. |
 | Z.AI | After a ZCode sign-in | Yes | Z.AI resets need a separate ZCode sign-in. |
+| Muse | No | No | Meta gives Muse subscriptions no banked resets to list or use. Its limits refill at their `resets_at` times, which the reset alerts already cover. |
 
-`Provider.canRedeemResets(settings)` in `:core:model` is the one place that says which providers can
-use resets. The UI and `SyncedResetProvider` both read it, with the user's current settings.
-`Provider.redeemsResetsExperimentally` says which redeems are experimental: Claude's. Its
-confirmation step shows an "Experimental" label.
+`Provider.canRedeemResets()` in `:core:model` defines redemption support.
+The UI and `SyncedResetProvider` call it.
+`Provider.redeemsResetsExperimentally` identifies Claude redemption as experimental. Claude's confirmation step displays an "Experimental" label.
 
 ## How the resets are read
 
-Each sync reads an account's resets together with its usage, with the same credential.
-`AccountQuotaFetcher` in `:core:data` starts the reset read in parallel with the usage fetch, and
-adds the result to the snapshot (`QuotaSnapshot.resets`).
+Sync reads resets alongside usage with the account's credentials.
+`AccountQuotaFetcher` in `:core:data` fetches resets and usage concurrently, then fills `QuotaSnapshot.resets`.
 
-- A reset read that fails never fails the sync. The snapshot sets `resetsReadFailed`, and Room
-  keeps the resets it stored last.
-- Room stores the resets as JSON on the account row (`accounts.resetsJson`, database version 6).
-- The screens read the resets from the stored snapshot. Opening a screen makes no network call.
-- A demo account never reaches a provider. Debug builds give the demo accounts fake resets
-  (`FakeResetProvider`); release builds give them none. `RealOrDemoResetProvider` in `:app` sends
-  each account to the right side.
+- Failed reset reads do not fail usage sync. The snapshot sets `resetsReadFailed`, and Room retains the previous resets.
+  Room saves this flag in `accounts.resetsReadFailed` from database version 8.
+  The flag identifies resets older than their usage snapshot. Each successful usage sync updates the flag; failed syncs leave it unchanged.
+- Room stores reset JSON in `accounts.resetsJson`, introduced in database version 6.
+- Screens read stored snapshots. Opening a screen makes no network request.
+- Demo accounts never contact providers. Debug builds use `FakeResetProvider`; release builds give demo accounts no resets.
+  `RealOrDemoResetProvider` in `:app` selects the provider for each account.
+
+## Widgets
+
+Home screen and lock screen Bars and Rings widgets show counters for currently usable resets.
+The counter displays the number, or "9+" above nine, in a disc matching the ring or bar colour.
+Rings place it outside the bottom-right edge to separate it from the arc endpoint.
+Bars place it on the avatar's bottom-right corner. Shape widgets omit the counter.
+
+Widgets and the app use `ResetAvailability.availableNow` for the count.
+Widgets hide the counter for zero resets or expired sign-ins. Screen readers announce text such as "2 resets available now."
+`docs/screenshots/widgets/widget-resets-*.png` contains the widget images.
 
 ## Endpoints
 
-These are the calls the reset clients in `:core:quota` make. The shapes come from the providers'
-own clients. On 2026-10-04 the owner used a reset with a real account, read from the phone's
-`HeadroomResets` log:
+Reset clients in `:core:quota` follow the providers' client request formats.
+The owner checked the following operations with real accounts on 2026-10-04, using the phone's `HeadroomResets` log:
 
 | Provider | Checked with a real account |
 |---|---|
@@ -60,190 +67,244 @@ own clients. On 2026-10-04 the owner used a reset with a real account, read from
 
 ### Codex
 
-- A pool holds the credits whose `status` is `available` and whose `expires_at` has not passed,
-  soonest expiry first. A reset refills the 5-hour and the weekly limits.
-- The consume call names the soonest-expiring credit. The credit is pinned to the attempt key, so
-  "Try again" addresses the same credit. When the list cannot be read, the call goes out without a
-  credit id and the server picks one.
-- Answers: `reset` is a success, `already_redeemed` is a success of an earlier try with the same
-  key, `nothing_to_reset` and `no_credit` end the attempt. An answer Headroom does not know keeps
-  the key, so "Try again" can send it again.
+- Pools contain unexpired credits with `status = available`, ordered by earliest expiry.
+  A reset refills the 5-hour and weekly limits.
+- The consume request names the earliest-expiring credit. Headroom associates that credit with the attempt key, so "Try again" targets it again.
+  If listing fails, the request omits the credit ID and lets the server choose.
+- `reset` reports success. `already_redeemed` confirms an earlier request with the same key.
+  `nothing_to_reset` and `no_credit` end the attempt. Unknown responses retain the key for "Try again".
 
 ### Grok
 
-- gRPC-web framing (`GrpcWeb`): each frame is a flag byte, a four-byte big-endian length and the
-  payload. A trailer frame (flag `0x80`) carries `grpc-status`. A trailers-only answer carries it
-  in the HTTP headers instead.
-- The protobuf messages (`GrokResetProto`) are read and written by hand: tokens are field 10, each
-  with `token_id` (10) and `validity_end` (30, a Timestamp).
-- The redeem call has no idempotency key of its own. Headroom pins the token to the attempt key.
-  When a retry finds its pinned token gone, the earlier try worked.
-- `SharedPreferencesAttemptTargetStore` writes the pin to disk before the redeem goes out, so a
-  retry after the app was stopped addresses the same token. It stores the latest 16 attempt keys
-  with their token ids, and no access token. When that write fails, the redeem is not sent and
-  fails, so it can be retried with the same key.
-- gRPC status 16 or 7, or HTTP 401 or 403, asks the user to sign in again. Status 8 or HTTP 429 is
-  rate limiting.
+- `GrpcWeb` frames contain a flag byte, a four-byte big-endian length and a payload.
+  Trailer frames use flag `0x80` and carry `grpc-status`. Trailers-only responses carry that status in HTTP headers.
+- `GrokResetProto` manually reads and writes protobuf messages.
+  Field 10 contains tokens. Each token has `token_id` in field 10 and `validity_end`, a Timestamp, in field 30.
+- Grok redemption accepts no idempotency key. Headroom associates a token with each attempt key.
+  If a retry finds that token missing, Headroom treats the earlier request as successful.
+- `SharedPreferencesAttemptTargetStore` saves the association before sending redemption. Restarts therefore preserve the retry target.
+  It saves the latest 16 attempt keys and token IDs, without access tokens.
+  A failed disk write blocks redemption and allows retry with the same key.
+- gRPC status 16 or 7, or HTTP 401 or 403, requires sign-in again.
+  gRPC status 8 or HTTP 429 reports rate limiting.
 
 ### Claude
 
-- The `cedar_ember` block of the usage answer lists the grants. Each grant with resets left and an
-  `ends_at` in the future becomes a pool that clears the windows in its `clears` list.
-- The grant named by `next_grant_id` is the one the server uses next. The other grants are shown as
-  queued, so the count reads "1 (+3)". A paused grant is paused.
-- An account outside the program shows no resets. The reasons `tier`, `seat` and `tenure` show a
-  short explanation instead.
-- The server fills the block only for recent Claude Code clients, so the call carries their
-  User-Agent. `ClaudeCodeIdentity.VERSION` in `:core:quota` holds the version for every Claude
-  request. `scripts/update-claude-code-version.sh` sets it to the latest published Claude Code,
-  and each release runs it (see [RELEASING.md](RELEASING.md)).
-- When the account is outside the program, the `HeadroomResets` log line names the server's
-  reason, for example `ineligible cli_version`. The reasons `surface` and `cli_version` mean the
-  version is too old: run the script. A reason that is not a short code is logged as `other`, so
-  the log never carries the server's text.
+- `cedar_ember` in the usage response lists grants.
+  Grants with remaining resets and future `ends_at` values become pools. Each pool clears the windows listed in `clears`.
+- `next_grant_id` identifies the next grant the server will use. Headroom labels other grants as queued, producing counts such as "1 (+3)".
+  Paused grants retain their paused status.
+- Accounts outside the program show no resets. Reasons `tier`, `seat` and `tenure` produce short explanations.
+- Claude returns grants only for recent Claude Code clients. Requests send the client User-Agent with `ClaudeCodeIdentity.VERSION` from `:core:quota`.
+  Run `scripts/update-claude-code-version.sh` for every release to use the latest published version. See [RELEASING.md](RELEASING.md).
+- `HeadroomResets` records eligibility reason codes, for example `ineligible cli_version`.
+  `surface` and `cli_version` mean the version is too old. Run the update script for those reasons.
+  Headroom replaces any reason beyond a short code with `other`, excluding server text from logs.
 
-Using a grant is experimental. The endpoint and its answers come from research; nobody has tried
-them with a real account yet, so this section describes what Headroom sends and expects, not what
-was measured.
+Claude grant redemption remains experimental. Research identified the endpoint and expected responses.
+Nobody has tested redemption with a real account.
 
-- Only the grant named by `next_grant_id` can be used, while it is `usable_now`, not `paused`, and
-  before `ends_at`. The sheet only offers that grant (`ResetPoolStatus.Ready`). A grant with
-  `use_requires_limit: true` that is not `usable_now` shows as "At a limit only": the confirm button
-  is off and the sheet says why. At a limit, the grant's `clears` must include the limit that was
-  hit; Headroom relies on the server's `usable_now` for that. Any other grant that is not
-  `usable_now`, or whose `starts_at` is still to come, shows as "Not yet" (`NotUsableYet`): the
-  button is off, and the sheet says that Claude does not allow it yet.
-- A grant with `use_requires_limit: false` can be used at any time. The confirmation says that
-  this cannot be undone.
-- A redeem reads the status first and notes the grant's `resets_left`, but only before the first
-  send of an attempt key. It then reads the organization from the profile. If either cannot be read,
-  nothing is sent and the redeem fails, so it can be tried again with the same key. A grant the
-  status no longer lists is ineligible, and nothing is sent.
-- `request_id` is the attempt key. Claude only accepts `^[A-Za-z0-9_-]{1,64}$`; the attempt keys are
-  UUIDs, which match. A key that does not match is sent as its SHA-256 in hex, so every try of one
-  attempt still sends the same id.
-- Answers (`result`): `reset` is a success, with `resets_left`. `already_used` is a success of an
-  earlier try with the same `request_id`. `not_limited` used nothing, because nothing was used yet.
-  `cooldown` and `ineligible` used nothing. `unavailable` is unconfirmed: Headroom keeps the key and
-  offers "Check again". A `result` Headroom does not know keeps the key, so "Try again" can send it
-  again. HTTP 429 is rate limiting, and HTTP 401 or 403 asks the user to sign in again.
-- "Check again" reads the status and never sends the reset again. The reset worked when the grant
-  now has fewer `resets_left` than before the first send. Anything else stays unconfirmed. The
-  `resets_left` noted before the send lives in memory only, so after a restart a check stays
-  unconfirmed; a new confirmation within 10 minutes sends the same `request_id`, and Claude then
-  answers `already_used` if the earlier try worked.
-- The log names the redeem path as `/api/organizations/{organization}/reset_rate_limits`: the
-  organization identifies the account, so it is never logged.
-  The answer's `result` and `reason` are logged only when they are short codes; any other text is
-  logged as `other`.
+- Redemption requires the `next_grant_id` grant, `usable_now`, an unpaused state and a future `ends_at`.
+  The sheet offers only that grant as `ResetPoolStatus.Ready`.
+  A grant with `use_requires_limit: true` and false `usable_now` displays "At a limit only", disables confirmation and explains why.
+  At a limit, `clears` must include the exhausted limit. Headroom relies on server `usable_now` to check that condition.
+  Other unusable grants or future `starts_at` values display "Not yet" (`NotUsableYet`). Confirmation stays disabled with an explanation.
+- `use_requires_limit: false` allows redemption at any time. Confirmation warns that redemption cannot be undone.
+- Before the first send for an attempt key, Headroom reads status and remembers `resets_left`.
+  It then reads the profile's organization. Failure to read either blocks redemption and allows retry with the same key.
+  A grant missing from status becomes ineligible without sending redemption.
+- `request_id` uses the attempt key. Claude accepts `^[A-Za-z0-9_-]{1,64}$`, which includes Headroom's UUID keys.
+  Headroom converts other keys to hexadecimal SHA-256, preserving the same ID across retries.
+- `reset` reports success and `resets_left`. `already_used` confirms earlier success with the same `request_id`.
+  `not_limited`, `cooldown` and `ineligible` consume no reset.
+  `unavailable` retains the key and offers "Check again". Unknown results retain the key for "Try again".
+  HTTP 429 reports rate limiting. HTTP 401 or 403 requires sign-in again.
+- "Check again" reads status without resending redemption. A lower `resets_left` than before the first send confirms success.
+  Other results remain unconfirmed. The original count lives only in memory, so a check after restart cannot confirm success.
+  A new confirmation within 10 minutes reuses `request_id`. Claude returns `already_used` if the earlier request succeeded.
+- Logs replace the organization identifier with `{organization}` in `/api/organizations/{organization}/reset_rate_limits`.
+  Logs include `result` and `reason` only as short codes. Other text becomes `other`.
 
 ### Z.AI
 
-- Z.AI serves its reset cards from `zcode.z.ai`, which refuses the API key that Headroom reads the
-  usage with. So a Z.AI account needs a second sign-in, to ZCode. Until it has one, the account
-  detail's Resets card shows "Want to see your resets?" and a "Sign in to ZCode" button. The
-  Resets tab leaves the account out.
-- Every answer is a `{code, msg, data}` envelope. Only a numeric `code` of 0 is a success. The
-  server sends the envelope with its business code on HTTP errors too, so Headroom reads it first.
-  HTTP 401, 403 and 429 keep their HTTP meaning, except that code 3301 is always a decline.
-- The status lists two pools: `five_hour` (the 5-hour limit) and `week` (the weekly limit). Each
-  card has an `expire_at` in epoch milliseconds; Headroom also reads seconds. Expired cards are
-  left out. HTTP 401 or 403 means the ZCode sign-in no longer works, and the card asks for it
-  again.
-- A redeem reads the status first, so an empty pool answers "no credit" and uses nothing. That
-  check is skipped for an attempt key that already reached `use`: when the answer to the last
-  card's `use` was lost, the pool is empty, and only the server can say whether the key worked.
-  Such a key is forgotten only on a definite "no" to its first `use`: a JSON `used: false`, or
-  HTTP 401 or 403. `SharedPreferencesAttemptTargetStore` writes these keys to disk before `use`
-  goes out, so a retry after the app was stopped still reaches `use`. It stores the latest 16 keys
-  with their pools, and no token. When that write fails, `use` is not sent and the redeem fails, so
-  it can be retried with the same key.
-- After a card is used, `history/read` clears ZCode's "unread" mark. It is best effort: a failure
-  is logged and the reset still counts as done. The mark is shared by all of the user's plans, so
-  the call sends no body and no target scope.
-- Asking for a card runs only when the user taps "Ask for a reset card". It is never polled,
-  because Z.AI rate limits it per account and ZCode already polls it. Each ask sends its own
-  `idempotency_key`; only an ask that failed in a way that may pass (no connection, or business code
-  2007) sends the same key again. Business code 3301 is a "not now" with `next_try_at`. HTTP 429
-  (or code 429) means the account asked too often. As ZCode does, Headroom then holds asks per
-  ZCode sign-in: until `next_try_at` but at least 5 minutes, 10 minutes when no time is named, and
-  10 minutes after a 429. An ask before then is answered without a call. A failure holds nothing.
-  HTTP 401 or 403 means the ZCode sign-in no longer works: the sheet then offers "Sign in again",
-  which starts the ZCode sign-in, as it does for a refused `use`.
-- Team plans are not supported. The scoped calls send `Bigmodel-Target-Type: PERSONAL`; a team
-  plan sends `TEAM` with `Bigmodel-Organization` and `Bigmodel-Project`, which Headroom does not
-  look up.
-- The calls follow ZCode's own source (github.com/zai-org/ZCode,
-  `packages/services/src/usage-stats/providers/bigmodelUsageQuotaProvider.ts` and
-  `packages/ui/src/lib/codingPlanQuotaResetCoordinator.ts`), read on 2026-10-04. Every call was
-  checked with a real personal Coding Plan account on the same day, from the phone's
-  `HeadroomResets` log: the sign-in, the status, an ask that was granted (the status then went
-  from 0 to 5 cards per limit), an ask declined with 3301, and a `use` of a weekly card (`used:
-  true`, one weekly card fewer). `history/read` answers `{code, msg}` with no `data`.
-- After a granted ask, `ResetCenter` refreshes the account before the sheet shows the answer,
-  because the resets come from the stored snapshot. "Use it now" then finds the new card.
+- `zcode.z.ai` rejects the API key used for usage reads. Reset cards therefore require a separate ZCode sign-in.
+  Without it, the detail card shows "Want to see your resets?" and "Sign in to ZCode".
+  The Resets tab omits the account.
+- Responses use `{code, msg, data}` envelopes. Only numeric `code` 0 reports success.
+  Headroom reads the business code before HTTP status because error responses also include envelopes.
+  HTTP 401, 403 and 429 retain their meaning, except business code 3301 always reports a decline.
+- Status contains `five_hour` and `week` pools for the 5-hour and weekly limits.
+  `expire_at` uses epoch milliseconds; Headroom also accepts seconds. Headroom omits expired cards.
+  HTTP 401 or 403 requires another ZCode sign-in.
+- Before redemption, Headroom checks status. An empty pool returns "no credit" without using a card.
+  Retries skip that check if their attempt key already reached `use`.
+  A lost response for the last card leaves an empty pool; only the server can confirm whether the attempt succeeded.
+  Headroom forgets such keys only after a definite rejection of the first `use`: JSON `used: false`, HTTP 401 or HTTP 403.
+  `SharedPreferencesAttemptTargetStore` saves keys before `use`, preserving retries after restart.
+  It stores the latest 16 keys and pools, without tokens. Disk-write failure blocks `use` and permits retry with the same key.
+- After redemption, `history/read` clears ZCode's shared "unread" flag across the user's plans.
+  The request sends no body or target scope. Headroom logs failures without changing the successful redemption result.
+- Only tapping "Ask for a reset card" requests new cards. Headroom never polls this operation because Z.AI rate-limits accounts and ZCode already polls.
+  Each request uses its own `idempotency_key`. Connection failures and business code 2007 allow retry with that key.
+  Business code 3301 declines the request and supplies `next_try_at`. HTTP 429 or business code 429 reports excessive requests.
+  Headroom delays further requests per ZCode sign-in, following ZCode's rules:
+  - A supplied `next_try_at` delays requests until that time, with a minimum of 5 minutes.
+  - A decline without a time delays requests for 10 minutes.
+  - A 429 delays requests for 10 minutes.
+  Early requests receive a local answer without a server call. Failures create no delay.
+  HTTP 401 or 403 makes the sheet offer "Sign in again" for ZCode, matching rejected `use` requests.
+- Headroom supports personal plans only and sends `Bigmodel-Target-Type: PERSONAL`.
+  Team plans require `TEAM`, `Bigmodel-Organization` and `Bigmodel-Project`. Headroom does not look up those identifiers.
+- The implementation follows github.com/zai-org/ZCode, read on 2026-10-04:
+  `packages/services/src/usage-stats/providers/bigmodelUsageQuotaProvider.ts` and `packages/ui/src/lib/codingPlanQuotaResetCoordinator.ts`.
+  Real-account checks that day used a personal Coding Plan account and the phone's `HeadroomResets` log.
+  Checks covered sign-in, status, a granted request increasing each pool from 0 to 5 cards, and a request declined with 3301.
+  A weekly redemption returned `used: true` and reduced the weekly card count by one.
+  `history/read` returned `{code, msg}` without `data`.
+- After a granted request, `ResetCenter` refreshes the stored account snapshot before displaying the result.
+  "Use it now" can then find the new card.
 
 ### The ZCode sign-in
 
-`ZCodeAuth` in `:core:auth` is the sign-in of ZCode's own CLI. `AuthMethods.zCodeSignIn` runs it as
-a device-code flow with no code to show:
+`ZCodeAuth` in `:core:auth` follows ZCode's CLI sign-in.
+`AuthMethods.zCodeSignIn` uses a device-code flow without a displayed code:
 
-1. `POST https://zcode.z.ai/api/v1/oauth/cli/init` with `Authorization: Bearer <poll token>` (32
-   random bytes, in hex) and `{"provider":"zai"}`. The answer gives `flow_id`, the `chat.z.ai`
-   page to open (refused unless it is `https`), `expires_at`, `poll_interval_sec`, and maybe its
-   own `poll_token`, which then replaces the client's. An `expires_at` that has already passed
-   ends the sign-in at once, as timed out, without polling.
-2. The app opens that page in a browser tab and polls `GET …/oauth/cli/poll/{flow_id}`. `pending`
-   keeps polling, and so do HTTP 408, 429 and 5xx. `failed`, or another 4xx, ends the sign-in. A
-   `ready` answer carries the ZCode JWT (`token`) and a Z.AI OAuth token (`zai.access_token`).
-3. `POST https://api.z.ai/api/auth/z/login` with `{"token": <Z.AI OAuth token>}` gives the
-   short-lived business token and its `expires_in`.
+1. Send `POST https://zcode.z.ai/api/v1/oauth/cli/init` with `Authorization: Bearer <poll token>` and `{"provider":"zai"}`.
+   Generate the poll token from 32 random bytes encoded in hexadecimal.
+   The response supplies `flow_id`, a `chat.z.ai` page, `expires_at` and `poll_interval_sec`.
+   Reject pages without `https`. Replace the client's poll token if the response includes `poll_token`.
+   A past `expires_at` immediately times out sign-in without polling.
+2. Open the page in a browser tab and poll `GET …/oauth/cli/poll/{flow_id}`.
+   Continue on `pending`, HTTP 408, HTTP 429 or 5xx. Stop on `failed` or other 4xx responses.
+   `ready` supplies the ZCode JWT as `token` and a Z.AI OAuth token as `zai.access_token`.
+3. Send `POST https://api.z.ai/api/auth/z/login` with `{"token": <Z.AI OAuth token>}`.
+   The response supplies a short-lived business token and `expires_in`.
 
-The credential keeps the business token as its access token and both long-lived tokens, as JSON
-(`ZCodeTokens`), as its refresh token. `SignInManager.signInToZCode` saves it in the same token store
-as the account's API key, under `ZCodeCredential.idFor(accountId)` (the account id plus `#zcode`).
-Signing the account out removes both. A ZCode sign-in and a sign-out never run at the same time, so
-a ZCode sign-in that finishes during a sign-out cannot leave its credential behind. The Z.AI
-refresher in `AuthMethods.refreshers` mints a new business token when it expires; the API key
-itself never expires, so the refresher never sees it.
-When the login call refuses the Z.AI token, the user must sign in to ZCode again.
+The credential uses the business token as its access token.
+Its refresh-token field contains both long-lived tokens as `ZCodeTokens` JSON.
+`SignInManager.signInToZCode` saves it alongside the API key under `ZCodeCredential.idFor(accountId)`, the account ID plus `#zcode`.
+Sign-out removes both credentials. Sign-in and sign-out cannot run concurrently, preventing late sign-in completion from leaving credentials behind.
 
-`AccountQuotaFetcher` adds the ZCode sign-in to the credentials of a Z.AI account's reset read
-(`ProviderCredentials.zCode`): ready, missing, or unavailable (for example offline). It resolves
-the sign-in inside the reset read, in parallel with the usage fetch, which only needs the API key.
-A ZCode sign-in that does not work never fails the usage fetch. A sync waits at most 5 seconds for
-it (`ZCODE_SIGN_IN_WAIT`), refresh included; past that, the sync reads no resets and keeps the
-stored ones, so a token endpoint that does not answer never holds up the usage.
-In the app, `ZCodeSignIn` runs one sign-in at a time from the redeem sheet. The sheet says while it
-waits for the browser, says why it failed, and closes once the user signed in; the account is
-refreshed so its resets show.
+The Z.AI refresher in `AuthMethods.refreshers` renews expired business tokens. It never receives the non-expiring API key.
+A rejected Z.AI login token requires another ZCode sign-in.
+
+`AccountQuotaFetcher` supplies `ProviderCredentials.zCode` as ready, missing or unavailable, for example while offline.
+It resolves credentials during reset reads, concurrently with API-key usage fetching.
+ZCode failures never fail usage fetching. `ZCODE_SIGN_IN_WAIT` limits credential resolution, including refresh, to 5 seconds.
+After timeout, sync retains stored resets and continues without reading new ones.
+
+`ZCodeSignIn` allows one sign-in at a time from the redemption sheet.
+The sheet displays browser waiting status or failure reasons. Successful sign-in closes the sheet and refreshes the account to display resets.
 
 ## Using a reset
 
-- The sheet mints one attempt key per confirmation. "Try again" sends the same key.
-- `ResetAttemptMemory` keeps the key of an unsettled attempt for 10 minutes, per account and pool.
-  `SharedPreferencesResetAttemptStore` writes it to disk before the call goes out, so it survives
-  the app being stopped. It stores the account id, the pool, the key and the time. It stores no
-  token. Like every app file, it is excluded from backup and device transfer.
-- Codex pins its credit in memory only. After a restart, a retry of the same Codex key is still
-  safe, because the server answers `already_redeemed`. Grok pins its token on disk (see Grok
-  above), because its server has no idempotency key.
-- After a reset works, `ResetCenter` waits 2 seconds (`ResetRefresh.DELAY`), then refreshes the
-  account. The refill animation plays from the new usage.
-- An account whose sign-in expired shows its resets faded, with no action.
+- The sheet creates one attempt key per confirmation. "Try again" reuses that key.
+- `ResetAttemptMemory` retains unsettled keys for 10 minutes per account and pool.
+  `SharedPreferencesResetAttemptStore` saves the account ID, pool, key and time before sending requests, preserving them after restart.
+  It stores no tokens. All app files exclude backup and device transfer.
+- Codex keeps credit associations only in memory. Its server's `already_redeemed` response protects retries after restart.
+  Grok saves token associations to disk because its server accepts no idempotency key.
+- After success, `ResetCenter` waits 2 seconds (`ResetRefresh.DELAY`) and refreshes usage.
+  The refill animation uses the new values.
+- Accounts with expired sign-ins show faded resets without actions.
+
+## Reminders before a reset expires
+
+Headroom posts on "Reset reminders" about a day before an unused reset expires.
+For example, a notification says "Your ChatGPT Codex reset expires tomorrow at 06:18".
+"Remind me before a reset expires" in Settings defaults to on and lets users disable reminders.
+
+`ResetReminderPolicy` in `:core:model` applies these rules:
+
+- The sign-in must work, `Provider.canRedeemResets()` must return true, and the pool must be `Ready` or `WaitingForLimit`.
+  Each `ResetPool.expiries` entry represents one reset. Pools without expiry dates trigger no reminders.
+- Each reset receives one reminder, due `LEAD` (one day) before expiry.
+- Headroom sends at most one reminder daily. It lists that day's due resets in expiry order.
+  If a reminder already went out that day, new due resets move to 09:00 the next day (`DEFERRED_TIME`).
+  Headroom skips resets that expire before that deferred time.
+
+`ResetReminders` in `:core:data` schedules one inexact `ResetReminderAlarm` after each sync or settings change.
+Reboots, app updates and time zone changes reschedule it.
+The alarm starts `ResetReminderWorker`. The worker first refreshes accounts with due resets to exclude cards used on other devices.
+
+The worker has no network constraint, allowing reminders while offline.
+An account's due resets can remain stale after refresh in two cases:
+
+- The refresh fails with `QuotaErrorKind.Network`.
+- Usage refresh succeeds but reset reads fail (`QuotaSnapshot.resetsReadFailed`).
+  For example, Z.AI usage can succeed while the ZCode credential endpoint times out.
+
+For either case, `ResetReminderRetryPolicy` delays posting and retries after 5, 15, 30 and 60 minutes.
+After exhausting retries, the worker uses stored resets.
+It also uses stored resets if another wait would leave less than 12 hours (`MIN_NOTICE`) before the earliest stale due reset expires.
+Only accounts with stale resets affect that cutoff. Freshly read accounts do not affect it.
+Retries do not count as reminders. The daily limit still applies.
+
+`SharedPreferencesResetReminderLedger` records notified resets and the last reminder day.
+Its keys combine account ID, pool ID and expiry time. It stores no tokens.
+
+Tapping opens the account with the earliest-expiring reset and scrolls to its Resets card.
+`ResetReminderIntents` and `OpenAccountRequest.showResets` handle this navigation.
+
+## Reset history
+
+The Stats tab's "Usage limit resets" card shows used and expired resets from stored history.
+
+### Where it is stored
+
+- Room stores reset events in `headroom.db`'s `reset_events` table, introduced in database version 7.
+  All app files exclude backup and device transfer.
+- Rows contain account ID, provider, pool ID and label, used or expired status, observation time and expiry date.
+  Used events also record redemption location, restored quota and the Headroom attempt key where available. Rows contain no tokens.
+- Each sync deletes rows older than 365 days. Removing an account deletes its reset events and usage history.
+
+### How a reset is recorded
+
+`ResetEventDetector` in `:core:model` compares each pool's new resets with stored resets.
+Providers list one expiry date per reset. The detector matches resets by that date.
+
+- A reset missing after expiry counts as expired.
+- A reset missing before expiry counts as used. Without expiry dates, a lower count indicates use.
+- `ResetCenter` calls `RoomResetEventLog.redeemed` immediately after successful redemption, before refreshing usage.
+  A unique attempt key prevents duplicate records from retries, `already_used` responses or "Check again".
+  Later syncs match the missing reset to the pending redemption without adding another use.
+  Matching selects the missing reset with the earliest expiry after redemption, following provider redemption order.
+- A sync can save after provider redemption but before Headroom records success. That sync initially labels the use "elsewhere".
+  Redemption recording shares a transaction boundary with sync and replaces a same-pool external use recorded within the last 5 minutes.
+  The replacement preserves the expiry date and pre-reset usage estimate.
+  Matching uses the pool because stored resets no longer identify the redeemed card.
+  Separate external and Headroom redemptions within those 5 minutes still count separately, but their location labels can swap.
+- Pending redemptions wait for sync without a timeout. Sync after several offline days still counts each reset once.
+- Other uses receive the "elsewhere" label, including Claude Code and chatgpt.com redemptions.
+- The detector records no events after failed reads, missing ZCode sign-in, program ineligibility or an account's first reset read.
+
+Headroom cannot distinguish external use shortly before expiry from expiry itself.
+
+### What a reset gave back
+
+`ResetGivenBack` calculates cleared usage percentages by window kind for the "Gave back" value.
+For several limits of one kind, such as Claude weekly limits, it uses the highest percentage.
+It excludes limits that reset normally after the last usage read, then adds the values across kinds.
+
+| Reset | Measured from | Marked "about" |
+|---|---|---|
+| Used in Headroom | The usage stored at the moment of the redeem | When that usage is more than 30 minutes old |
+| Used elsewhere | The usage of the last sync before the reset was found gone | Always |
+
+External-use estimates can be too high or too low. Usage can increase after the last sync and resume after the reset.
+When sync detects several uses in one pool, only the first receives an estimate because the first reset left usage near zero.
+Unit tests and demo data cover these calculations. Real-account checks remain incomplete.
 
 ## Logs
 
-The reset clients write one line per request to logcat, under the tag `HeadroomResets`:
+Reset clients write one logcat line per request with the `HeadroomResets` tag:
 
 ```
 adb logcat -s HeadroomResets
 ```
 
-- Debug lines: the provider, the operation, the endpoint path without its query, the HTTP status,
-  the gRPC status, the provider's answer code, the counts, the attempt key and the time the call
-  took. A redeem also logs the pool and a short hash of the account id.
-- Warning lines: an answer Headroom could not read, with the fields it looked for and the body,
-  redacted and cut to 400 characters.
-- The lines never carry a token, a cookie, an `Authorization` header, an email or an account id.
-  `ResetLogRedaction` removes them from bodies; `ResetLogTest` checks it.
+- Debug lines include provider, operation, endpoint path without query, HTTP and gRPC statuses, provider response code, counts, attempt key and request duration.
+  Redemption lines also include pool and a short account-ID hash.
+- Warning lines identify unreadable responses and expected fields. They include a redacted body limited to 400 characters.
+- Logs exclude tokens, cookies, `Authorization` headers, emails and raw account IDs.
+  `ResetLogRedaction` removes those values from bodies. `ResetLogTest` checks redaction.

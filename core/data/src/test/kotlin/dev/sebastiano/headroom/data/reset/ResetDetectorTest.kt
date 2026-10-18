@@ -2,24 +2,24 @@ package dev.sebastiano.headroom.data.reset
 
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.WindowKind
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 class ResetDetectorTest {
     private val resetsAt = Instant.parse("2026-09-28T06:00:00Z")
 
     private fun weekly(used: Double, resetsAt: Instant = this.resetsAt) =
-        QuotaWindow("weekly", "Weekly", WindowKind.Weekly, used, resetsAt, Duration.ofDays(7))
+        QuotaWindow("weekly", "Weekly", WindowKind.Weekly, used, resetsAt, 7.days)
 
     @Test
     fun `usage dropping means the window reset`() {
         assertTrue(
             ResetDetector.hasReset(
                 before = weekly(88.0),
-                after = weekly(0.0, resetsAt.plus(Duration.ofDays(7))),
+                after = weekly(0.0, resetsAt.plus(7.days)),
             )
         )
     }
@@ -29,7 +29,7 @@ class ResetDetectorTest {
         assertTrue(
             ResetDetector.hasReset(
                 before = weekly(88.0),
-                after = weekly(91.0, resetsAt.plus(Duration.ofDays(7))),
+                after = weekly(91.0, resetsAt.plus(7.days)),
             )
         )
     }

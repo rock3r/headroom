@@ -12,8 +12,11 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import dev.sebastiano.headroom.data.reset.ResetCheckWorker
 import dev.sebastiano.headroom.data.reset.ResetChecker
+import dev.sebastiano.headroom.data.reset.ResetReminderWorker
+import dev.sebastiano.headroom.data.reset.ResetReminders
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.SyncFrequency
+import kotlin.time.toJavaDuration
 
 /**
  * Refreshes every account. Runs on the period the user picked in the settings, at least every 15
@@ -45,7 +48,7 @@ internal class SyncWorker(
                 return
             }
             val request =
-                PeriodicWorkRequestBuilder<SyncWorker>(period)
+                PeriodicWorkRequestBuilder<SyncWorker>(period.toJavaDuration())
                     .setConstraints(
                         Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                     )
@@ -62,6 +65,7 @@ internal class SyncWorker(
 internal class HeadroomWorkerFactory(
     private val resetChecker: ResetChecker,
     private val repository: QuotaRepository,
+    private val resetReminders: ResetReminders,
 ) : WorkerFactory() {
     override fun createWorker(
         appContext: Context,
@@ -72,6 +76,8 @@ internal class HeadroomWorkerFactory(
             ResetCheckWorker::class.java.name ->
                 ResetCheckWorker(appContext, workerParameters, resetChecker)
             SyncWorker::class.java.name -> SyncWorker(appContext, workerParameters, repository)
+            ResetReminderWorker::class.java.name ->
+                ResetReminderWorker(appContext, workerParameters, resetReminders)
             else -> null
         }
 }

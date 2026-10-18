@@ -26,14 +26,14 @@ import dev.sebastiano.headroom.widget.WidgetUiState
 import dev.sebastiano.headroom.widget.WidgetWindow
 import dev.sebastiano.headroom.widget.testing.PLAYER_MAX_VARIABLES
 import dev.sebastiano.headroom.widget.testing.RecordingHostApplication
+import dev.sebastiano.headroom.widget.testing.TwoCodexResets
 import dev.sebastiano.headroom.widget.testing.documentOperations
 import dev.sebastiano.headroom.widget.testing.hasNamedHostActions
 import dev.sebastiano.headroom.widget.testing.hostActionIds
 import dev.sebastiano.headroom.widget.testing.logoCommands
 import dev.sebastiano.headroom.widget.testing.maxVariableId
 import dev.sebastiano.headroom.widget.testing.pathCommands
-import java.time.Duration
-import java.time.Instant
+import dev.sebastiano.headroom.widget.testing.withResets
 import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.test.assertContains
@@ -43,6 +43,11 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlin.time.toJavaDuration
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -168,7 +173,7 @@ class WidgetRendererTest {
         val size = WidgetSize(280f, 110f)
         val doc = captureManyBars(size)
 
-        doc.assertText("Claude", "Codex", "+6 more", "6 more accounts. Open Headroom.")
+        doc.assertText("Claude", "Codex", "+7 more", "7 more accounts. Open Headroom.")
         doc.assertNoText("Grok")
         assertFalse(documentOperations(doc.bytes).contains(SCROLL_OPERATION))
         assertEquals(
@@ -198,6 +203,7 @@ class WidgetRendererTest {
             "Z.AI",
             "OpenCode",
             "JetBrains",
+            "Muse",
         )
         doc.assertNoText("more")
         assertContains(documentOperations(doc.bytes), SCROLL_OPERATION)
@@ -208,8 +214,8 @@ class WidgetRendererTest {
     }
 
     @Test
-    fun `sixteen bars stay within the variables the Android 16 player can hold`() = runTest {
-        // Tall enough for every row, so the document holds all sixteen.
+    fun `eighteen bars stay within the variables the Android 16 player can hold`() = runTest {
+        // Tall enough for every row, so the document holds all eighteen.
         val size = WidgetSize(280f, 600f)
         val accounts =
             DemoData.manyAccounts(now) +
@@ -227,7 +233,7 @@ class WidgetRendererTest {
         val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
 
         val operations = documentOperations(doc.bytes)
-        assertEquals(16, hostActionIds(operations).size - 1, "A tap per account and the refresh")
+        assertEquals(18, hostActionIds(operations).size - 1, "A tap per account and the refresh")
         val maxId = maxVariableId(operations)
         assertTrue(maxId < PLAYER_MAX_VARIABLES, "The document uses variable $maxId")
         WidgetRenderer.remoteViews(doc).playAt(size)
@@ -287,22 +293,89 @@ class WidgetRendererTest {
     }
 
     @Test
-    fun `lock screen uses the compact rings with a reset footer`() = runTest {
-        val doc =
-            capture(
-                WidgetConfig(WidgetStyle.Bars),
-                WidgetSize(300f, 120f),
-                WidgetHostCategory.Keyguard,
-            )
+    fun `lock screen uses compact rings with the number inside, the name below and a reset footer`() =
+        runTest {
+            val doc =
+                capture(
+                    WidgetConfig(WidgetStyle.Bars),
+                    WidgetSize(300f, 120f),
+                    WidgetHostCategory.Keyguard,
+                )
 
-        doc.assertText("71%", "34%", "88%", "Claude", "Codex", "Grok")
-        doc.assertText("Next weekly reset: Grok, Mon 03:28")
-        doc.assertNoText("Copilot")
-        doc.assertDrawsLogos(Provider.Claude, Provider.Codex, Provider.Grok)
+            listOf("71", "34", "88", "Claude", "Codex", "Grok").forEach {
+                assertTrue(doc.drawsText(it), "No \"$it\" on the lock screen")
+            }
+            doc.assertText("Next weekly reset: Grok, Mon 03:28")
+            doc.assertNoText("Copilot")
+            // Only the name goes under a ring: no percentage line, and no logo in the ring.
+            assertFalse(doc.drawsText("71%"))
+            val drawn = pathCommands(documentOperations(doc.bytes))
+            listOf(Provider.Claude, Provider.Codex, Provider.Grok).forEach {
+                assertFalse(logoCommands(it.logo.pathData) in drawn, "The $it logo is drawn")
+            }
+        }
+
+    @Test
+    fun `bars and rings show a counter on an account with resets it can use now`() = runTest {
+        val withResets = accounts.withResets()
+        val layouts =
+            listOf(
+                Triple(WidgetConfig(WidgetStyle.Bars), WidgetSize(320f, 140f), HOME),
+                Triple(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f), HOME),
+                Triple(
+                    WidgetConfig(WidgetStyle.Rings, listOf("demo-codex")),
+                    WidgetSize(160f, 160f),
+                    HOME,
+                ),
+                Triple(WidgetConfig(WidgetStyle.Rings), WidgetSize(160f, 160f), HOME),
+                Triple(WidgetConfig(WidgetStyle.Rings), WidgetSize(300f, 120f), LOCK),
+            )
+        layouts.forEach { (config, size, host) ->
+            val state = WidgetUiState.from(withResets, config, now, size, host)
+            val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+            val label = "$config $size $host"
+            assertTrue(doc.drawsText("2"), "No reset counter in $label")
+            assertContains(doc.text(), "2 resets available now.", message = label)
+            WidgetRenderer.remoteViews(doc).playAt(size)
+        }
     }
 
     @Test
-    fun `an expired account says Sign in in every layout, and its tap signs it in again`() =
+    fun `a counter shows at most 9+`() = runTest {
+        val many = TwoCodexResets.copy(pools = TwoCodexResets.pools.map { it.copy(available = 12) })
+        val size = WidgetSize(160f, 160f)
+        val state =
+            WidgetUiState.from(
+                accounts.withResets(resets = many),
+                WidgetConfig(WidgetStyle.Rings),
+                now,
+                size,
+                HOME,
+            )
+
+        val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+
+        assertTrue(doc.drawsText("9+"))
+        assertFalse(doc.drawsText("12"))
+        doc.assertText("12 resets available now.")
+    }
+
+    @Test
+    fun `no counter shows without resets`() = runTest {
+        listOf(
+                capture(WidgetConfig(WidgetStyle.Bars), WidgetSize(280f, 180f)),
+                capture(WidgetConfig(WidgetStyle.Rings)),
+                capture(WidgetConfig(WidgetStyle.Rings, listOf("demo-codex"))),
+                capture(WidgetConfig(WidgetStyle.Rings), WidgetSize(300f, 120f), LOCK),
+            )
+            .forEach {
+                it.assertNoText("available now")
+                assertFalse(it.drawsText("2"))
+            }
+    }
+
+    @Test
+    fun `an expired account asks to sign in in every layout, and its tap signs it in again`() =
         runTest {
             val expired = DemoData.accountsWithExpiredSignIn(now)
             val claudeOnly = listOf("demo-claude")
@@ -328,11 +401,38 @@ class WidgetRendererTest {
                 val state = WidgetUiState.from(expired, config, now, size, host)
                 val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
                 val label = "$config $size $host"
-                assertContains(doc.text(), "Sign in", message = label)
+                // Rings show a "!" badge instead of a "Sign in" label.
+                assertTrue(doc.text().contains("Sign in") || doc.drawsText("!"), label)
                 assertContains(doc.text(), "Sign-in expired", message = label)
                 assertTrue(Tap.SignIn("demo-claude") in doc.taps(), label)
                 assertFalse(Tap.Open("demo-claude") in doc.taps(), label)
             }
+        }
+
+    @Test
+    fun `an expired account's small ring or shape shows a centred badge instead of a Sign in line`() =
+        runTest {
+            val expired = DemoData.accountsWithExpiredSignIn(now)
+            listOf(
+                    WidgetConfig(WidgetStyle.Rings) to (WidgetSize(160f, 160f) to HOME),
+                    WidgetConfig(WidgetStyle.Rings) to (WidgetSize(300f, 120f) to LOCK),
+                    WidgetConfig(WidgetStyle.Shape) to (WidgetSize(160f, 160f) to HOME),
+                )
+                .forEach { (config, sizeAndHost) ->
+                    val (size, host) = sizeAndHost
+                    val state = WidgetUiState.from(expired, config, now, size, host)
+                    val doc = WidgetRenderer.capture(context, state, APP_WIDGET_ID, size, strings)
+                    assertTrue(doc.drawsText("!"), "No sign-in badge in $config $host")
+                    assertFalse(doc.drawsText("Sign in"), "A Sign in line in $config $host")
+                    // Small shapes carry the logo instead of a name.
+                    if (config.style == WidgetStyle.Rings) {
+                        assertTrue(
+                            doc.drawsText("Claude"),
+                            "No name under the ring in $config $host",
+                        )
+                    }
+                    WidgetRenderer.remoteViews(doc).playAt(size)
+                }
         }
 
     @Test
@@ -492,10 +592,10 @@ class WidgetRendererTest {
         widget.drag(xDp = 60f, fromYDp = 100f, toYDp = -100f)
         assertNull(shadowOf(app).nextStartedActivity, "A drag should not open an account")
 
-        // At the end of the list, the bottom row is JetBrains, the last account.
+        // At the end of the list, the bottom row is Muse, the last account.
         widget.tap(xDp = 60f, yDp = 86f)
         assertEquals(
-            "demo-jetbrains",
+            "demo-muse",
             shadowOf(app).nextStartedActivity?.getStringExtra(WidgetIntents.EXTRA_ACCOUNT_ID),
         )
 
@@ -516,14 +616,14 @@ class WidgetRendererTest {
 
         fun tap(xDp: Float, yDp: Float) {
             // Wait between gestures: the Android 17 player ignores a second tap that comes quickly.
-            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP)
+            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP.toJavaDuration())
             touch(MotionEvent.ACTION_DOWN, xDp, yDp)
             touch(MotionEvent.ACTION_UP, xDp, yDp)
             settle()
         }
 
         fun drag(xDp: Float, fromYDp: Float, toYDp: Float) {
-            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP)
+            shadowOf(Looper.getMainLooper()).idleFor(GESTURE_GAP.toJavaDuration())
             touch(MotionEvent.ACTION_DOWN, xDp, fromYDp)
             (1..DRAG_STEPS).forEach { step ->
                 touch(MotionEvent.ACTION_MOVE, xDp, fromYDp + (toYDp - fromYDp) * step / DRAG_STEPS)
@@ -533,7 +633,7 @@ class WidgetRendererTest {
         }
 
         private fun touch(action: Int, xDp: Float, yDp: Float) {
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(TOUCH_STEP_MS))
+            shadowOf(Looper.getMainLooper()).idleFor(TOUCH_STEP_MS.milliseconds.toJavaDuration())
             val time = SystemClock.uptimeMillis()
             val event = MotionEvent.obtain(time, time, action, xDp * density, yDp * density, 0)
             view.dispatchTouchEvent(event)
@@ -633,6 +733,11 @@ class WidgetRendererTest {
         expected.forEach { assertContains(text, it) }
     }
 
+    /** Whether the document holds the text [exact] on its own, as a counter is. */
+    private fun WidgetDocument.drawsText(exact: String): Boolean =
+        Regex("""TextData\[\d+] = "${Regex.escape(exact)}"""")
+            .containsMatchIn(documentOperations(bytes))
+
     private fun WidgetDocument.assertNoText(unexpected: String) {
         assertFalse(text().contains(unexpected), "Did not expect \"$unexpected\" in the document")
     }
@@ -655,7 +760,7 @@ class WidgetRendererTest {
         const val TAP_MS = 50L
         const val DRAG_STEPS = 10
         const val TOUCH_STEP_MS = 16L
-        val GESTURE_GAP: Duration = Duration.ofSeconds(1)
+        val GESTURE_GAP: Duration = 1.seconds
         const val SCROLL_OPERATION = "ScrollModifierOperation"
     }
 }

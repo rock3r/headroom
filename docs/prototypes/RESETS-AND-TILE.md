@@ -1,300 +1,256 @@
-# Prototype: usage limit resets and the Quick Settings tile
+# Reset and tile prototype
 
-This is a prototype for 1.1, for the owner to review. It runs on fake data only. It makes no
-network calls to any provider. Its screenshots are not kept in the repository: `./gradlew
-:app:recordRoborazziDebug` writes them to `app/build/outputs/roborazzi/prototypes`. The screen
-recordings and GIFs it mentions were made for the review and are not in the repository either.
+This page records the version 1.1 review prototype. It uses fake data and makes no provider network calls.
+`./gradlew :app:recordRoborazziDebug` writes prototype screenshots to `app/build/outputs/roborazzi/prototypes`.
+The repository excludes those screenshots and the review recordings and GIFs.
 
-> This page records the prototype. The feature that shipped is described in
-> [docs/RESETS.md](../RESETS.md). It differs from the prototype: Codex and Grok resets can be used,
-> and Claude's are shown for information only. Z.AI resets show after a ZCode sign-in and can be
-> used too. The experimental setting and its notes were removed, so the parts of this page about
-> them no longer apply.
+> [RESETS.md](../RESETS.md) describes the shipped feature and its current settings.
+> The prototype's combined Claude/Z.AI experimental switch no longer applies.
+> Codex, Grok and Z.AI support redemption. Z.AI requires ZCode sign-in.
+> Claude redemption no longer has a setting; the current app always offers it.
 
-## How to try it
+## Run the prototype
 
 1. Install a debug build.
-2. Open Settings. Near the end, **Reset prototypes** opens a page that plays every flow. Only
-   debug builds have that page.
-3. The demo accounts also have fake resets: Claude, ChatGPT Codex and Grok. They show in the
-   account detail and on the Resets tab. A redeem really changes the demo account's usage on the
-   next refresh, so the overview card animates too.
+2. Open Settings > **Reset prototypes** near the end of Settings. This debug-only page runs each flow.
+3. Open a demo Claude, ChatGPT Codex or Grok account, or the Resets tab, to view fake resets.
+   Redemption changes demo usage on the next refresh, which also animates the overview card.
 
 ## The Quick Settings tile
 
-- `HeadroomTileService` is a tile labelled "Headroom", with the launcher's monochrome ring as its
-  icon.
-- A tap opens `MainActivity` with `startActivityAndCollapse(PendingIntent)`. When the device is
-  locked, the tap first asks the user to unlock (`unlockAndRun`).
-- The tile always shows a subtitle (owner decision). Settings offers two choices under the "Add to
-  Quick Settings" row: "Show the next reset" ("Grok · in 15h 26m"), which is the default, and "Show
-  the tightest quota" ("Grok · 88% used"). The choice is stored in `TileSettings`. With no data
-  yet, the tile says "Open Headroom". The app asks the tile to update
-  (`TileService.requestListeningState`) when the data, the choice or the used/left setting changes.
-- The "Add to Quick Settings" row calls `StatusBarManager.requestAddTileService` and shows the
-  answer: "Added", "Already added", "Not added", or a failure.
+`HeadroomTileService` displays the "Headroom" tile with the launcher's monochrome ring icon.
+A tap opens `MainActivity` through `startActivityAndCollapse(PendingIntent)`.
+On a locked device, `unlockAndRun` asks the user to unlock first.
 
-Checked on the emulator: adding the tile, both subtitle choices, and opening the app from the tile.
-Not checked on a device: a tap while the device is locked (the emulator has no screen lock), and
-the "Open Headroom" fallback (demo mode always has accounts; a unit test covers the empty case).
+The owner selected a permanent subtitle. Settings stores the choice in `TileSettings`:
 
-## Resets: the owner's decisions
+| Choice | Example | Default |
+|---|---|---|
+| Show the next reset | Grok · in 15h 26m | Yes |
+| Show the tightest quota | Grok · 88% used | No |
+| No data | Open Headroom | Automatic fallback |
 
-- Headroom always shows the resets of every supported provider: the count, the expiry and the
-  scope. They show in the account detail's Resets card and on the Resets tab. The overview card
-  has no resets chip; its bars still animate after a reset.
-- A count shows the resets available now, with the queued ones in brackets: "1 (+3)". With nothing
-  queued it is just "2". Screen readers hear "1 reset available now, 3 more queued". The detail
-  card keeps each grant's own "1 of 2", with "Queued" on the others; how to count queued grants
-  is still open.
-- When something is queued, the count has a tooltip: "1 reset available now. 3 more are queued:
-  they should unlock after these are used." We have not confirmed when queued grants unlock, so
-  it says "should". It is Material's `TooltipBox` with a `PlainTooltip`. It shows on mouse hover
-  and on long press (the `TooltipBox` handles both; its source in this Material version handles
-  hover through `enableUserInput`), and on a plain tap, because the count is a button that calls
-  `show()`. The tooltip text is hidden from screen readers, so the count is not read twice.
-  Checked on the emulator by tapping; hover was read in the source, not tried with a mouse.
-- Redeeming ChatGPT Codex and Grok resets is on by default.
-- Redeeming Claude and Z.AI resets is experimental, because their redeem calls are not verified.
-  The Settings row "Redeem Claude and Z.AI resets" turns it on. Its supporting line says the calls
-  have not been tested with real accounts.
-  - When it is off, those providers still show their resets. In place of the "Use a reset" button,
-    a quiet line says "Redeeming is experimental. Turn it on in Settings.", with a link that opens
-    Settings at that row. The line sits in a footer band below all the grants, so it reads as
-    applying to the whole card. On the Resets tab those rows have no button, and one note in the
-    card's footer links to the setting.
-  - When it is on, the confirm step shows a small "Experimental" label.
-- Z.AI stays in 1.1. It needs a separate ZCode sign-in even to show its resets. Without it, the
-  detail card shows a notice, "Want to see your resets?", with a "Sign in to ZCode" button (a stub
-  in the prototype). The Resets tab leaves it out: that section lists only resets that can be used,
-  and a sign-in row there would be noise.
-- After every successful redeem, for every provider, the app waits two seconds
-  (`ResetRefresh.DELAY`, one shared constant), then refreshes the account. The bars shimmer during
-  the wait and the fetch, so it reads as part of the moment, not as a slow app.
+The app calls `TileService.requestListeningState` after data, subtitle choice or used/left settings change.
+"Add to Quick Settings" calls `StatusBarManager.requestAddTileService` and displays "Added", "Already added", "Not added" or a failure.
 
-## What each provider supplies
+Emulator checks covered adding the tile, both subtitles and opening Headroom.
+Locked-device tapping remained untested because the emulator had no screen lock.
+The empty-data fallback had unit-test coverage only because demo mode always supplied accounts.
 
-| Provider | Pools | Scope line | Status |
+## Reset display decisions
+
+The prototype shows each supported provider's reset count, expiry and scope in account details and the Resets tab.
+Overview cards omit a reset chip. Their bars still animate after redemption.
+
+Counts show currently available resets followed by queued resets, for example "1 (+3)" or "2" when none are queued.
+Screen readers announce "1 reset available now, 3 more queued".
+Details retain each grant's "1 of 2" count and label other grants "Queued". The queued-count presentation remains an open decision.
+
+Queued counts show this tooltip: "1 reset available now. 3 more are queued: they should unlock after these are used."
+The word "should" preserves uncertainty about when grants unlock.
+Material's `TooltipBox` and `PlainTooltip` support hover and long press. Tapping the count button calls `show()`.
+The tooltip hides its text from screen readers to avoid reading the count twice.
+Emulator checks covered taps. Source inspection confirmed hover through `enableUserInput`; nobody tested it with a mouse.
+
+Codex and Grok redemption defaults to on.
+The prototype's "Redeem Claude and Z.AI resets" setting enables their experimental calls, which lacked real-account tests.
+Its supporting text discloses that limit.
+
+- When disabled, those providers retain read-only resets.
+  A footer below all grants replaces "Use a reset" with "Redeeming is experimental. Turn it on in Settings."
+  Its link opens the setting. The Resets tab also omits redemption buttons and shows one linked footer note.
+- When enabled, confirmation displays "Experimental".
+- Z.AI remains in the prototype's 1.1 scope and requires separate ZCode sign-in even for listing cards.
+  Without sign-in, account details show "Want to see your resets?" and a stub "Sign in to ZCode" button.
+  The Resets tab omits the account because it lists usable resets.
+- After every successful redemption, the app waits two seconds (`ResetRefresh.DELAY`) and refreshes the account.
+  Bars shimmer throughout the wait and fetch.
+
+## Provider data
+
+| Provider | Pools | Scope line | Prototype support |
 |---|---|---|---|
-| ChatGPT Codex | One | "Resets your current 5-hour and weekly limits." Monthly on Free and Go. | Redeem on by default |
-| Grok | One | "Resets your current weekly usage pool." | Redeem on by default |
-| Z.AI | Two: 5-hour and weekly | One line per pool | Experimental. Needs a ZCode sign-in. Can ask for a reset card. |
-| Claude | One per grant | From the grant's `clears`, for example "Refills your 5-hour session and your weekly limit." | Experimental. Uses the existing Claude sign-in. Needs a live check of the User-Agent and the org id. |
+| ChatGPT Codex | One | "Resets your current 5-hour and weekly limits." Free and Go use monthly limits. | Redemption defaults to on. |
+| Grok | One | "Resets your current weekly usage pool." | Redemption defaults to on. |
+| Z.AI | Separate 5-hour and weekly pools | Each pool has its own line. | Experimental redemption requires ZCode sign-in. Users can request reset cards. |
+| Claude | One per grant | `clears` supplies text such as "Refills your 5-hour session and your weekly limit." | Experimental redemption requires live User-Agent and organization-ID checks. It uses the existing Claude sign-in. |
 
-GitHub Copilot, Kimi Code, OpenCode Go and JetBrains AI have no resets, so Headroom shows nothing
-for them.
+GitHub Copilot, Kimi Code, OpenCode Go and JetBrains AI supply no resets. Headroom omits reset controls for them.
 
-## The framework
+## Shared model and UI
 
-The types are in `:core:model` (`Resets.kt` and `RedeemSession.kt`). The UI is shared. Each
-provider only supplies its pools and its copy.
+`Resets.kt` and `RedeemSession.kt` in `:core:model` define shared types.
+Providers supply pools and text to the shared UI.
 
-- `ResetScope` says which limits a reset restores: by window id (Claude's `clears`), by kind of
-  window (Codex, Grok, Z.AI), or unknown. Unknown shows as "Resets your current usage limits".
-- `ResetPool` is one kind of reset: an id, a label, how many are left, the optional total, the
-  expiry dates (can be empty), the scope, a status and a timing.
-  - Status: ready, waiting for a limit, queued (Claude grants that are not next), or paused.
-  - Timing: at a limit only, or at any time. "At any time" makes the confirm step say that the
-    reset cannot be undone.
-- `ResetAvailability` is an account's pools, plus `requiresSignIn` (Z.AI), `canAskForMore` (Z.AI
-  reset cards) and `ineligibleReason` (Claude). An ineligible account shows only a quiet line in
-  the detail card.
-- `ResetProvider` has `availability(account)`, `redeem(account, poolId, attemptKey)`,
-  `check(account, poolId, attemptKey)` and `askForMore(account)`. `ResetProviders` sends each
-  account to its provider. `NoResets` is every other provider.
-- `RedeemOutcome` is shared by every provider: success (with the resets left, and whether the key
-  was a replay), nothing to reset, no credit, cooldown, ineligible, unconfirmed, rate limited,
-  sign in again, failed, and unsupported. A replayed key (Codex `already_redeemed`, Claude
-  `already_used`) counts as success.
-- `RedeemSession` is the state of one sheet. It is plain Kotlin with unit tests.
-- `ResetAttemptMemory` keeps the key of each unsettled attempt for ten minutes, per account and
-  pool. A new confirm within that time sends the same key. Claude's rule is ten minutes; the other
-  providers use the same until their rules are known.
-- In the app, `ResetCenter` reads the availability of every account and reads it again after each
-  redeem and each ask. After a success it waits `ResetRefresh.DELAY` and refreshes the account's
-  usage, as any refresh does; `refreshing` says which accounts are waiting. `ResetCopy` holds each
-  provider's words.
-- In debug builds a redeem calls `FakeQuotaRepository.resetOnServer`, which plays the provider's
-  side: the next refresh reads the cleared windows as empty. Nothing animates on a special path;
-  the screens animate because the data changed.
-- Debug builds get `FakeResetProvider` and the scenarios in `app/src/debug`. Release builds get
-  `NoResets`, so they show no resets until the real clients exist.
+| Type | Role |
+|---|---|
+| `ResetScope` | It identifies restored limits by window ID for Claude, window kind for Codex/Grok/Z.AI, or unknown scope. Unknown scope displays "Resets your current usage limits". |
+| `ResetPool` | It stores ID, label, remaining count, optional total, optional expiry dates, scope, status and timing. |
+| `ResetAvailability` | It stores account pools, Z.AI's `requiresSignIn` and `canAskForMore`, and Claude's `ineligibleReason`. Ineligible accounts show one detail-card explanation. |
+| `ResetProvider` | It defines `availability(account)`, `redeem(account, poolId, attemptKey)`, `check(account, poolId, attemptKey)` and `askForMore(account)`. |
+| `ResetProviders` | It selects the account's provider. Other providers use `NoResets`. |
+| `RedeemSession` | It holds one sheet's state in plain Kotlin with unit tests. |
 
-## Accounts whose sign-in expired
+Pool statuses are ready, waiting for a limit, queued and paused. Claude grants other than the next grant are queued.
+Timing allows redemption at a limit only or at any time. The latter adds an irreversible-action warning.
 
-An account whose sign-in expired shows its last good data, faded (from `main`). Its resets are as
-old as its usage, so the app offers none of them until the user signs in again:
+All providers use `RedeemOutcome`:
 
-- The detail's Resets card is faded like the rest of the account's data. It keeps its counts but
-  has no actions: no "Use a reset", no "Ask for a reset card", no experimental note and no ZCode
-  sign-in button.
-- The Resets tab does not list the account under the resets you can use, just as it does not list
-  its upcoming resets.
-- Its bars neither shimmer nor refill, on the overview card and in the detail ring.
+- Success includes remaining resets and whether the key repeated an earlier request.
+- Terminal outcomes include nothing to reset, no credit, cooldown and ineligible.
+- Other outcomes include unconfirmed, rate limited, sign in again, failed and unsupported.
+- Codex `already_redeemed` and Claude `already_used` count as success.
 
-`ExpiredAccountResetsTest` covers the first two.
+`ResetAttemptMemory` retains unsettled keys for ten minutes per account and pool.
+A confirmation within that interval reuses the key. This follows Claude's rule; other provider rules remained unknown during prototyping.
 
-## The flow, step by step
+`ResetCenter` reads availability for every account and rereads it after each redemption or card request.
+After success, it waits `ResetRefresh.DELAY` and refreshes usage. `refreshing` identifies waiting accounts.
+`ResetCopy` supplies provider text.
 
-The redeem sheet is a `ModalBottomSheet`. Its steps change with `AnimatedContent`: the new step
-fades and grows in, and the sheet resizes on the spatial spring. With reduced motion the steps
-only crossfade.
+Debug redemption calls `FakeQuotaRepository.resetOnServer`. The next refresh returns empty cleared windows and triggers normal data-change animations.
+Debug builds use `FakeResetProvider` and `app/src/debug` scenarios.
+Prototype release builds use `NoResets` until real clients exist.
 
-The sheet's height changes smoothly between steps, with no jumps (round 6 fix). Every part of the
-sheet changes its height on the same spring, starting on the same frame. Each gap belongs to the
-part below it, so a gap opens and closes with its part. Before this fix, the gap above the usage
-bars appeared or vanished in one frame, and the sheet's top edge jumped by 20 dp. The usage bars
-grow from their top and are not clipped, so both bars show whole from the first frame. While
-their space opens, they briefly overlap the incoming step's text, for about 150 ms.
-`RedeemSheetResizeTest` follows the sheet's top edge frame by frame through every flow, and fails
-if one frame moves it by more than a quarter of the whole way. On wide screens the sheet is at most 560 dp wide. Every step title is a heading
-and a polite live region, so screen readers announce each change.
+## Expired sign-ins
 
-1. **Choose a pool.** Only when more than one pool has resets (Z.AI). Two large cards, each with
-   the current usage of the limits it resets.
-2. **Confirm.** One bar per window of the account, in used or left mode. The windows the reset
-   restores are drawn in full, the others dimmed. "Use 1 of your 2 resets?", the scope line, and which reset is used (the one that expires first, with
-   its date). Claude adds "Your weekly limit still resets on its usual day." A reset that works at
-   any time adds a warning that it cannot be undone. A reset that needs a limit, when the user is
-   not at one, shows why and disables the button. Buttons: "Use a reset" and "Not now" (or "Back"
-   to the pool choice).
-3. **Resetting.** The bars being reset shimmer: a band of light sweeps along them. Below them, the
-   expressive loading indicator and "Resetting your usage…". "Checking again…" looks the same.
-   While either runs, and while "Updating your usage…" shows after a success, nothing closes the
-   sheet (owner decision): a swipe down, a drag on the handle, a tap on the scrim, back as a key
-   and the predictive back gesture all do nothing. Once the outcome shows, they work again.
-   `RedeemSheetDismissTest` tries back, a swipe down and a scrim tap in each busy state, and checks
-   that back closes the sheet afterwards. The recording `recording-dismiss-attempts.gif` tries all
-   five ways by hand, on the debug scenario "Claude · slow reset".
-4. **Outcome.**
-   - Success: "Usage reset. 1 reset left." and Done, at once. While the refresh brings in the new
-     usage, the bars keep shimmering and a line says "Updating your usage…". Then the cleared bars
-     refill one after the other, 160 ms apart: down to 0% in used mode, up to 100% in left mode.
-     The value moves on the critically damped reset spring, so the number never passes its new
-     value. The bars do not pop or grow.
-   - Confetti bursts from the bars as they start to refill, when the "Reset confetti" delight is
-     on.
-   - The gloss (`BarGloss`): once a bar settles, a narrow band of light sweeps it once from left
-     to right. The band leans a little and is clipped to the bar's rounded shape. As it passes, a
-     few four-pointed stars light up in and just around the bar, turn a little and fade. One sweep
-     takes 800 ms, and each bar starts its own after it settles, so the sweeps follow the refill's
-     stagger.
-   - The light is iridescent, like light on a holographic sticker (owner request, round 5). The
-     gloss and the refresh shimmer share it (`DelightLight.kt`), so they stay one family:
-     - A sweep carries a soft pastel spectrum across its width: pink, peach, butter yellow, mint,
-       sky blue and lavender, around a brighter core. Its hues drift as it moves.
-     - Each star takes its own hue from the same spectrum, which shifts a little as it twinkles,
-       and has a small bright core.
-     - The light never uses the theme's colours, so it is the same in every palette.
-     - Light themes: the colours are drawn normally at full strength, the cores keep some colour,
-       and each star has a soft halo of its own hue, deeper, that lifts it off pale surfaces.
-     - Dark themes: the light is added, as before. The sweeps are washed toward white, because
-       faint colour added to a dark surface reads as murky. The stars keep their full colour.
-     - The refresh shimmer keeps its approved strength, motion, timing and star life. Only its
-       colours changed.
-   - Which setting controls the gloss (my choice): the "Reset confetti" delight. The gloss is part
-     of the reset's celebration, so it plays exactly when the confetti would. The "Refresh
-     shimmer" delight does not affect it.
-   - After the sheet closes: the screens under it kept the old numbers while it was open. Now the
-     new usage flows in, so the detail ring and the overview card's bars animate to it where the
-     user looks. Overview cards also start from the value they last showed, so a card that comes
-     back on screen after a reset from the detail plays the change too. A weekly drop counts as a
-     reset for the overview, so the card drains on the reset spring and shows "Just reset".
-   - Only one confetti (owner decision): only the front-most surface plays a reset's confetti.
-     When the sheet plays it, it claims the reset for that account and each window it cleared
-     (`Delights.claimReset`). The overview then finds the claim and stays quiet, while the sheet is
-     open and after it closes. A reset that a normal sync brings, with no sheet, is not claimed, so
-     the overview plays its confetti as before. Delight hosts inside other hosts share the claims.
-     A claim is used once, and lapses after five minutes. `HomeDelightsTest` covers both cases.
-   - With reduced motion: the working bars only dim (no shimmer), the new values crossfade in with
-     no spring and no stagger, and there is no confetti and no gloss.
-   - Nothing to reset, no credit, cooldown, ineligible: a short explanation and Done. With no
-     credit, Z.AI also offers "Ask for a reset card".
-   - Failed or rate limited: Try again sends the same key.
-   - Unconfirmed: "Check again" reads the status with the same key. It never sends the reset again.
-   - Sign in again: opens the accounts screen.
-5. **Ask for a reset card** (Z.AI): "Asking Z.AI for a reset card…", then the answer: granted
-   (with "Use it now"), not yet (with the time to ask again), or throttled. It only runs when the
-   user asks. It is never polled.
-6. **ZCode sign-in missing** (Z.AI): explains the separate sign-in and offers "Sign in to ZCode".
+Expired accounts retain faded last-known usage and equally old reset data.
+The prototype disables reset actions until sign-in succeeds:
 
-## Open questions for the owner
+- The faded detail card retains counts but omits redemption, card requests, experimental notes and ZCode sign-in.
+- The Resets tab excludes the account from usable and upcoming resets.
+- Overview bars and the detail ring neither shimmer nor refill.
 
-1. Queued grants: the detail keeps "1 of 2" per grant next to the card's "1 (+3)". Keep both?
-2. Claude and Z.AI redeeming stays behind the experimental setting until someone checks it with
-   real accounts. Who checks it, and when does it leave the experimental group?
+`ExpiredAccountResetsTest` covers the detail card and Resets tab rules.
 
-## What the real implementation still needs
+## Sheet layout and motion
 
-- **Network clients per provider**, in `:core:quota`, next to the fetchers:
-  - Codex: `wham/usage` for the count, `rate-limit-reset-credits` for the credits, and `consume`
-    with `redeem_request_id` and the soonest-expiring `credit_id`.
-  - Grok: gRPC-web `GetRemainingResets` and `RedeemReset`, then a refetch after about two seconds.
-  - Z.AI: a ZCode sign-in in `:core:auth`, then `reset/status`, `reset/use` and
-    `reset/opportunity`.
-  - Claude: the grants with `next_grant_id`, and the redeem call, after a live check of the
-    User-Agent and the org id.
-- **Retry-key memory that survives the process.** Today `ResetAttemptMemory` is in memory only.
-- **Availability in the sync.** Store the resets next to each snapshot in Room, instead of reading
-  them from `ResetCenter`, so the widgets and the tile can show them too.
-- **A refresh that can fail.** The prototype's refresh always works. A real one can fail or come
-  back with unchanged usage; the sheet then needs a line for that.
-- **The ZCode sign-in** behind the stub button.
-- **Tests:** parsing tests with recorded fixtures and `MockWebServer` for each client; UI tests for
-  the sheet (dismissal blocked while busy, Try again, Check again); and tests for the experimental
-  setting. Today the model (`RedeemSessionTest`, `FakeQuotaRepositoryTest`), the tile subtitle
-  (`TileSubtitleTest`), the confetti claims (`HomeDelightsTest`) and the sheet's dismissal
-  (`RedeemSheetDismissTest`) have tests.
+The redemption UI uses `ModalBottomSheet`. `AnimatedContent` fades and expands incoming steps while the sheet resizes with a spatial spring.
+Reduced motion uses crossfades only. Wide screens limit the sheet to 560 dp.
+Each step title is a heading and polite live region for screen readers.
+
+All sheet sections start height animation on the same frame and use the same spring.
+Each gap belongs to the section below it and animates with that section.
+The earlier implementation changed the gap above usage bars in one frame, moving the top edge by 20 dp.
+The revised bars expand from their top without clipping. They remain fully visible and overlap incoming text for about 150 ms during expansion.
+`RedeemSheetResizeTest` follows the top edge frame by frame through every flow.
+It fails if one frame moves more than a quarter of the total distance.
+
+## Redemption steps
+
+1. Choose a pool when several pools have resets, as with Z.AI.
+   Two large cards show current usage for the limits each pool clears.
+2. Confirm using one bar per account window, in used or remaining mode.
+   Affected windows display at full opacity; other windows dim.
+   The sheet shows "Use 1 of your 2 resets?", scope and the earliest-expiring reset's date.
+   Claude adds "Your weekly limit still resets on its usual day."
+   Anytime redemption adds an irreversible-action warning. Limit-only redemption disables confirmation and explains why when no limit is reached.
+   Buttons show "Use a reset" and "Not now", or "Back" for pool selection.
+3. Wait while affected bars shimmer and the expressive loading indicator displays "Resetting your usage…" or "Checking again…".
+   The sheet also blocks dismissal during "Updating your usage…" after success.
+   Swipe-down, handle drag, scrim tap, Back key and predictive Back do nothing while busy, following the owner's decision.
+   Dismissal resumes after the busy states end.
+4. Read the outcome and use its available action, as listed below.
+5. For Z.AI card requests, the sheet shows "Asking Z.AI for a reset card…".
+   It then shows granted with "Use it now", not yet with the retry time, or throttled.
+   Requests run only on user action, without polling.
+6. Missing ZCode sign-in shows an explanation and "Sign in to ZCode".
+
+`RedeemSheetDismissTest` checks Back, swipe-down and scrim taps in every busy state, then confirms Back closes the completed sheet.
+`recording-dismiss-attempts.gif` manually checks all five dismissal methods with "Claude · slow reset".
+
+| Outcome | Sheet behaviour |
+|---|---|
+| Success | It immediately displays "Usage reset. 1 reset left." and Done. Bars keep shimmering during "Updating your usage…". |
+| Nothing to reset, no credit, cooldown, ineligible | It displays an explanation and Done. Z.AI also offers "Ask for a reset card" when credit is empty. |
+| Failed or rate limited | "Try again" reuses the attempt key. |
+| Unconfirmed | "Check again" reads status with the same key without resending redemption. |
+| Sign in again | It opens the accounts screen. |
+
+## Successful reset effects
+
+After fresh usage arrives, cleared bars animate 160 ms apart to 0% used or 100% remaining.
+A critically damped reset spring prevents overshoot. Bars keep their size without a scale effect.
+Enabled "Reset confetti" starts confetti from the bars when refill begins.
+
+`BarGloss` starts after each bar settles. A narrow, angled light band crosses left to right, clipped to the rounded bar.
+Four-pointed stars appear in and near the bar, rotate slightly and fade.
+Each sweep lasts 800 ms. Sweeps follow the bars' staggered settling times.
+
+`DelightLight.kt` supplies the same iridescent colours for gloss and refresh shimmer, following the owner's round-5 request:
+
+- Sweeps use pastel pink, peach, pale yellow, mint, sky blue and lavender around a brighter centre. Hues shift during movement.
+- Each star uses a shifting hue from that spectrum and a small bright centre.
+- Effect colours stay the same across app palettes.
+- Light themes draw full-strength colours with coloured centres. Stars use darker, same-hue halos to remain visible on pale surfaces.
+- Dark themes use additive light. Sweeps approach white to avoid low-contrast colour; stars retain full colour.
+- The refresh shimmer retains its approved intensity, motion, timing and star lifetime. The revision changes only its colours.
+
+"Reset confetti" also controls gloss. "Refresh shimmer" does not control gloss.
+Reduced motion dims busy bars and crossfades new values without springs or stagger. It disables shimmer, confetti and gloss.
+
+Underlying screens retain old values while the sheet stays open.
+After closing, the detail ring and overview bars animate to new usage.
+Overview cards start from their last displayed values, including cards returning on screen after detail-screen redemption.
+A weekly usage drop triggers the overview's reset spring and "Just reset" label.
+
+Only the frontmost surface plays confetti for a reset, following the owner's decision.
+The sheet calls `Delights.claimReset` for the account and cleared windows.
+The overview suppresses its confetti during and after that sheet. A normal sync without a sheet leaves the overview free to play confetti.
+Nested delight hosts share claims. Each claim applies once and expires after five minutes.
+`HomeDelightsTest` covers sheet claims and normal-sync effects.
+
+## Open prototype decisions
+
+1. Must details retain "1 of 2" per grant alongside the card's "1 (+3)" count?
+2. Who will test Claude and Z.AI redemption with real accounts before removing the prototype's experimental restriction?
+
+## Work required after the prototype
+
+The prototype still requires real clients and persistent state. These items describe the prototype's limits; [RESETS.md](../RESETS.md) records the shipped implementation.
+
+- Add clients in `:core:quota` beside quota fetchers.
+  Codex needs `wham/usage`, `rate-limit-reset-credits` and `consume`, using `redeem_request_id` and earliest-expiring `credit_id`.
+  Grok needs gRPC-web `GetRemainingResets` and `RedeemReset`, then a refresh after about two seconds.
+  Z.AI needs `:core:auth` ZCode sign-in, `reset/status`, `reset/use` and `reset/opportunity`.
+  Claude needs `next_grant_id` grants and redemption after live User-Agent and organization-ID checks.
+- Persist retry keys beyond the process. Prototype `ResetAttemptMemory` keeps them only in memory.
+- Save availability with Room snapshots during sync so widgets and the tile can read it.
+  The prototype reads availability through `ResetCenter`.
+- Handle failed refreshes and unchanged usage in the sheet. Prototype refresh always succeeds.
+- Replace the ZCode stub button with sign-in.
+- Add fixture parsing and `MockWebServer` tests for each client.
+  Add sheet retry, status-check, busy-dismissal and experimental-setting tests.
+  Existing tests cover `RedeemSessionTest`, `FakeQuotaRepositoryTest`, `TileSubtitleTest`, `HomeDelightsTest` and `RedeemSheetDismissTest`.
 
 ## Screenshots and recordings
 
-Roborazzi records them with `./gradlew :app:recordRoborazziDebug` into
-`app/build/outputs/roborazzi/prototypes`:
+`./gradlew :app:recordRoborazziDebug` writes screenshots to `app/build/outputs/roborazzi/prototypes`.
+Review artifacts cover these states:
 
-- `detail-*.png`, `resets-tab*.png`, `card-*.png`: where resets appear. This includes the Claude
-  card with no action (`card-claude.png`), the Z.AI sign-in notice in light and dark, and an overview card refreshing (`card-overview-refreshing*.png`, also with
-  reduced motion).
-- `sheet-*.png`: every step of every scenario, in light and dark, plus the Grape and Lagoon
-  palettes, left mode, an expanded width, "Updating your usage…", the resetting and updating
-  states with reduced motion, and the refill part-way through its stagger
-  (`sheet-*-refilling*.png`).
-- `settings-tile*.png` and `prototypes-page.png`: the Settings rows (the tile choice) and the
-  debug page.
-- `gloss-strip-{used,left}{,-dark}.png` and `gloss-strip-left-lemon.png`: the gloss on the Claude
-  sheet, 14 frames 112 ms apart, read down the first column and then the second. The last one uses
-  the Lemon palette. Roborazzi does not write these: the `gloss*` tests in
-  `RedeemSheetMomentsScreenshotTest` write the frames to `app/build/gloss`, and the strips are
-  made from them.
-- `shimmer-strip-{light,dark}.png`: the refresh shimmer over the overview, 12 frames 128 ms apart,
-  read along the first row and then the second. The `shimmerFrames*` tests in `ScreenshotTest`
-  write the frames to `app/build/shimmer`.
-- `delight-palettes.png`: the gloss on a full and an empty bar, and the shimmer on a card, in
-  every palette, light on the left and dark on the right (`DelightPalettesScreenshotTest`).
-- `emulator-*.png`: the add-tile prompt, the "Added" row, the tile choice in Settings, the tile
-  with each subtitle, and the count's tooltip (`emulator-count-tooltip.png`).
-  `emulator-gloss-used-frames.png` and `emulator-gloss-left-frames.png` are frames from the gloss
-  recordings, a quarter of a second apart, cropped to the sheet's bars. They are from round 4, so
-  they show the gloss in the theme's primary colour, before the iridescent light.
-- `recording-*.gif`:
-  - `gloss-claude-used` and `gloss-claude-left`: the Claude success in used and left mode, with
-    the confetti, the refill and the gloss on each bar. They are from round 4, so the gloss is
-    still in the theme's primary colour. The iridescent light has no emulator recording yet: see
-    the strips above.
-  - The recordings below were made before the gloss, so their refill still ends in the old pop and
-    glow.
-  - `success-claude-used`: the Claude success in used mode, with the sheet's refill and then the
-    detail ring and the overview card animating after the sheet closes.
-  - `success-codex-left`: the Codex success in left mode.
-  - `unconfirmed-check-again`: an unconfirmed attempt, then "Check again".
-  - `success-claude-reduced`: a success with reduced motion on.
-  - `dismiss-attempts`: every way to dismiss the sheet, tried while the reset runs and while the
-    new usage comes in, then back closing it once the outcome shows.
-  - `one-confetti-claude`: a Claude success, then the overview card draining with no second
-    confetti.
-  - `resize-zai`, `resize-codex`, `resize-grok`, `resize-claude`, `resize-zai-ask` and
-    `resize-zai-sign-in` (round 6): the sheet resizing through every step of each flow.
-    `slow-resize-zai` is the Z.AI flow with animations five times slower. The emulator draws in
-    software and drops frames, so the normal-speed recordings can show a stutter at the start of
-    a step. The slowed recording shows that the size itself changes continuously.
-  - From round 1: the Grok failure then Try again, the Z.AI pool choice and "Ask for a reset card"
-    (before this round's refill), and a tap on the tile from the home screen.
+| Files | Contents |
+|---|---|
+| `detail-*.png`, `resets-tab*.png`, `card-*.png` | Reset placements include read-only `card-claude.png`, light/dark ZCode sign-in, and `card-overview-refreshing*.png` with reduced motion. |
+| `sheet-*.png` | Every scenario step covers light/dark themes, Grape/Lagoon palettes, remaining mode and expanded width. Images include "Updating your usage…", reduced-motion busy states and staggered `sheet-*-refilling*.png`. |
+| `settings-tile*.png`, `prototypes-page.png` | Settings tile choices and the debug page appear here. |
+| `gloss-strip-{used,left}{,-dark}.png`, `gloss-strip-left-lemon.png` | Claude gloss strips contain 14 frames at 112 ms intervals, down column one then column two. The last uses Lemon. `RedeemSheetMomentsScreenshotTest`'s `gloss*` tests write source frames to `app/build/gloss`; separate processing builds strips. |
+| `shimmer-strip-{light,dark}.png` | Overview shimmer strips contain 12 frames at 128 ms intervals, along row one then row two. `ScreenshotTest`'s `shimmerFrames*` tests write frames to `app/build/shimmer`. |
+| `delight-palettes.png` | `DelightPalettesScreenshotTest` shows gloss on full/empty bars and shimmer on a card in every palette. Light appears left; dark appears right. |
+| `emulator-*.png` | Images cover adding the tile, "Added", subtitle settings, both subtitles and `emulator-count-tooltip.png`. |
+| `emulator-gloss-used-frames.png`, `emulator-gloss-left-frames.png` | Cropped bar frames use 250 ms intervals. Round-4 captures retain the earlier theme-primary gloss colour. |
+
+The `recording-*.gif` files record these flows:
+
+- `gloss-claude-used` and `gloss-claude-left` show success, confetti, refill and gloss in used and remaining modes.
+  These round-4 recordings use theme-primary gloss. Iridescent gloss has screenshot strips only.
+- Recordings made before gloss retain the earlier scale and glow ending.
+- `success-claude-used` shows sheet refill followed by detail-ring and overview animations after closing.
+- `success-codex-left` shows Codex success in remaining mode.
+- `unconfirmed-check-again` shows an unconfirmed attempt and status check.
+- `success-claude-reduced` shows success with reduced motion.
+- `dismiss-attempts` checks dismissal during redemption and updating, then closes the completed sheet with Back.
+- `one-confetti-claude` shows success followed by overview-bar reduction without duplicate confetti.
+- Round-6 `resize-zai`, `resize-codex`, `resize-grok`, `resize-claude`, `resize-zai-ask` and `resize-zai-sign-in` show every step's resizing.
+  `slow-resize-zai` slows animations fivefold. Emulator software rendering drops frames and can make normal-speed transitions stutter initially.
+  The slowed recording shows continuous size changes.
+- Round-1 recordings show Grok failure and retry, Z.AI pool selection and card requests before the revised refill, and a home-screen tile tap.

@@ -1,0 +1,16 @@
+{
+  "uniqueId": "dev.c5inco.charts:compose-charts",
+  "name": "Compose Charts",
+  "description": "Declarative charts for Jetpack Compose, vendored in third-party/compose-charts. Copyright 2026 Chris Sinco. Includes Kotlin ports of parts of D3 (Copyright 2010-2023 Mike Bostock, ISC License) and architecture following TanStack Charts (Copyright 2026-present Tanner Linsley, MIT License).",
+  "artifactVersion": "9aacb2b",
+  "website": "https://github.com/c5inco/compose-charts",
+  "developers": [
+    {
+      "name": "Chris Sinco"
+    }
+  ],
+  "licenses": [
+    "Apache-2.0"
+  ],
+  "tag": "vendored"
+}
