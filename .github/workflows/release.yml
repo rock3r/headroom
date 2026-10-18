@@ -137,8 +137,11 @@ jobs:
         run: |
           # The runner's preinstalled command-line tools are too old to know the Pixel 9 device
           # profile ("No device found matching --device pixel_9"), so use the latest ones.
-          yes | sdkmanager --install "cmdline-tools;latest" > /dev/null
-          tools="$ANDROID_HOME/cmdline-tools/latest/bin"
+          # sdkmanager installs into latest-2 when an older latest is already there, so take the
+          # newest latest* folder.
+          yes | sdkmanager --install "cmdline-tools;latest" > /dev/null || true
+          tools="$(ls -d "$ANDROID_HOME"/cmdline-tools/latest* | sort -V | tail -1)/bin"
+          echo "Using $tools"
           # Installs only what the cache did not restore.
           "$tools/sdkmanager" --install emulator "$IMAGE" > /dev/null
           echo no | "$tools/avdmanager" create avd --force --name smoke --package "$IMAGE" --device pixel_9
