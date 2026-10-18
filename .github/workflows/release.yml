@@ -142,6 +142,10 @@ jobs:
           yes | sdkmanager --install "cmdline-tools;latest" > /dev/null || true
           tools="$(ls -d "$ANDROID_HOME"/cmdline-tools/latest* | sort -V | tail -1)/bin"
           echo "Using $tools"
+          # The newest tools no longer create AVDs where the emulator looks for them by default
+          # ("Unknown AVD name [smoke]"), so pin one location for both.
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           # Installs only what the cache did not restore.
           "$tools/sdkmanager" --install emulator "$IMAGE" > /dev/null
           echo no | "$tools/avdmanager" create avd --force --name smoke --package "$IMAGE" --device pixel_9
