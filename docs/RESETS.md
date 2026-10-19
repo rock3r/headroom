@@ -198,6 +198,11 @@ The page is readied while the user reads, so the tap opens it at once, and a pag
 sheet that is gone is forgotten: it expires a few minutes after it is made.
 Successful sign-in keeps the sheet open and shows the account's resets.
 
+ZCode finishes on its own server and pins the `redirect_uri` to its CLI callback, so there is no
+redirect back to the app and the app polls for the result. Android freezes a background app, which
+pauses that poll, so the app waits for the user to come back before it can carry on; the waiting
+line says so. The page opens in this app's task, so the browser tab goes away when the user returns.
+
 ## Using a reset
 
 - The sheet creates one attempt key per confirmation. "Try again" reuses that key.

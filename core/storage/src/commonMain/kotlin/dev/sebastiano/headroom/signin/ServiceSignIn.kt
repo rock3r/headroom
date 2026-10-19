@@ -55,9 +55,11 @@ public sealed interface ServiceSignInState {
  *
  * The page itself, [ServiceSignInState.Waiting.url], is the screens' to open: a browser tab has to
  * start from the running activity, so that it belongs to this app's task and coming back to the app
- * takes the tab away. [watch] keeps the app out of Android's frozen state while the flow runs, so
- * the poll that ends it can still work while the user is in the browser. [prepare] readies the page
- * ahead of the tap, so the tap opens it at once.
+ * takes the tab away. [prepare] readies the page ahead of the tap, so the tap opens it at once.
+ *
+ * These providers finish on their own server, with no redirect back to the app, so the app polls
+ * for the sign-in. Android freezes a background app, which pauses that poll; it carries on by
+ * itself when the user returns to Headroom, which is why the waiting screen asks them to.
  */
 public class ServiceSignIn(
     private val label: String = "Sign-in",
@@ -65,7 +67,6 @@ public class ServiceSignIn(
     private val save: suspend (accountId: String, tokens: TokenSet) -> Unit,
     private val scope: CoroutineScope,
     private val returnToApp: () -> Unit = {},
-    private val watch: SignInWatch = SignInWatch.None,
     private val log: (String) -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow<ServiceSignInState>(ServiceSignInState.Idle)
@@ -132,17 +133,12 @@ public class ServiceSignIn(
             return
         }
         if (current is ServiceSignInState.Starting && current.accountId == accountId) return
-        // Take the new flow's watch before letting the old one go, so a replacement never leaves a
-        // moment with no watch and the app stays awake across it.
-        val watching = watch.start(label)
         job?.cancel()
         val ready = prepared
         prepared = null
         if (ready != null && ready.first != accountId) ready.second.cancel()
         mutableState.value = ServiceSignInState.Starting(accountId)
         job = scope.launch {
-            // The app must stay out of the frozen state for the whole flow: it is the poll that
-            // notices the sign-in, and the app only comes back in front once it did.
             mutableState.value =
                 try {
                     val session = ready?.let { awaitPrepared(accountId, it) } ?: start()
@@ -164,8 +160,6 @@ public class ServiceSignIn(
                     // The sign-in worked but storing it did not.
                     log("$label sign-in could not be saved: ${failure::class.simpleName}")
                     ServiceSignInState.Failed(accountId, SignInError.Unknown)
-                } finally {
-                    watching.stop()
                 }
         }
     }

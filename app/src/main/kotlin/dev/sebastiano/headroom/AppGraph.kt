@@ -41,11 +41,9 @@ import dev.sebastiano.headroom.prototype.prototypeTools
 import dev.sebastiano.headroom.signin.AuthSignInSteps
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.FakeSignInController
-import dev.sebastiano.headroom.signin.ForegroundSignInWatch
 import dev.sebastiano.headroom.signin.RealSignInController
 import dev.sebastiano.headroom.signin.ServiceSignIn
 import dev.sebastiano.headroom.signin.SignInController
-import dev.sebastiano.headroom.signin.SignInWatch
 import dev.sebastiano.headroom.tile.StatusBarTileAdder
 import dev.sebastiano.headroom.tile.TileAdder
 import dev.sebastiano.headroom.tile.TileSettings
@@ -272,14 +270,7 @@ class AppGraph(
                     }
                 }
             val settings = data?.settings ?: InMemorySettingsRepository()
-            val (zCodeSignIn, cursorSignIn) =
-                secondSignIns(
-                    data,
-                    steps,
-                    scope,
-                    bringAppToFront,
-                    ForegroundSignInWatch(context),
-                )
+            val (zCodeSignIn, cursorSignIn) = secondSignIns(data, steps, scope, bringAppToFront)
             return AppGraph(
                 quotaRepository = repository,
                 isDemo = repository.isDemo,
@@ -348,7 +339,6 @@ class AppGraph(
             steps: AuthSignInSteps?,
             scope: CoroutineScope,
             bringAppToFront: () -> Unit,
-            watch: SignInWatch,
         ): Pair<ServiceSignIn?, ServiceSignIn?> {
             if (data == null || steps == null) return null to null
             val zCode =
@@ -358,7 +348,6 @@ class AppGraph(
                     data.signInManager::signInToZCode,
                     scope,
                     bringAppToFront,
-                    watch,
                 )
             val cursor =
                 serviceSignIn(
@@ -367,7 +356,6 @@ class AppGraph(
                     data.signInManager::signInToCursor,
                     scope,
                     bringAppToFront,
-                    watch,
                 )
             return zCode to cursor
         }
@@ -382,7 +370,6 @@ class AppGraph(
             save: suspend (accountId: String, tokens: TokenSet) -> Unit,
             scope: CoroutineScope,
             bringAppToFront: () -> Unit,
-            watch: SignInWatch,
         ): ServiceSignIn =
             ServiceSignIn(
                 label = label,
@@ -390,7 +377,6 @@ class AppGraph(
                 save = save,
                 scope = scope,
                 returnToApp = bringAppToFront,
-                watch = watch,
                 log = AndroidResetLog::debug,
             )
 

@@ -20,14 +20,6 @@
     -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!--
-        A sign-in that ends on the provider's server is polled for from the app, which Android
-        freezes while the user is in the browser. The app watches the sign-in in the foreground
-        until it is through, so it can bring itself back and close the tab.
-    -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-
     <application
         android:name=".HeadroomApplication"
         android:allowBackup="false"
@@ -103,15 +95,6 @@
                 android:name="android.service.quicksettings.TOGGLEABLE_TILE"
                 android:value="false" />
         </service>
-
-        <!--
-            Keeps the app out of Android's frozen state while a sign-in waits for the user in the
-            browser. It shows a quiet notification for as long as the sign-in runs.
-        -->
-        <service
-            android:name=".signin.SignInWatchService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
 
         <!-- HeadroomApplication provides WorkManager's configuration, with the data layer's worker factory. -->
         <provider
