@@ -18,6 +18,7 @@ import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaDisplay
+import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.ui.detail.DETAIL_TAG
 import dev.sebastiano.headroom.ui.home.HomeUiState
 import dev.sebastiano.headroom.ui.home.homeUiState
@@ -159,6 +160,32 @@ class ResetsTest {
         rule.onNodeWithText("ChatGPT Codex (sam@example.com) · Weekly").assertExists()
         rule.onNodeWithText("ChatGPT Codex (work@example.com) · Weekly").assertExists()
         assertChartRow("ChatGPT Codex (work@example.com) · Weekly: no past resets yet, 34% now")
+    }
+
+    @Test
+    fun `reset history stays visible when there are no upcoming resets`() {
+        showScreen(
+            demoState(
+                accounts =
+                    DemoData.accounts(FIXED_NOW).map { it.copy(lastError = QuotaErrorKind.Auth) },
+                pastResets =
+                    mapOf(("demo-claude" to "seven_day") to listOf(82.0, 95.0, 100.0, 88.0, 100.0)),
+            )
+        )
+        rule.onNodeWithText("No weekly or monthly limits to show yet.").assertIsDisplayed()
+        rule.onNodeWithText("Upcoming").assertDoesNotExist()
+        rule.onNodeWithText("Used when each window reset").assertIsDisplayed()
+        assertChartRow(
+            "Claude · Weekly · all models: 82%, 95%, 100%, 88%, 100% at past resets, 71% now"
+        )
+        assertChartRow("ChatGPT Codex · Weekly: no past resets yet, 34% now")
+    }
+
+    @Test
+    fun `the history section is omitted when there are no windows to chart`() {
+        showScreen(demoState(accounts = emptyList()))
+        rule.onNodeWithText("No weekly or monthly limits to show yet.").assertIsDisplayed()
+        rule.onNodeWithText("Used when each window reset").assertDoesNotExist()
     }
 
     private fun assertChartRow(description: String) {

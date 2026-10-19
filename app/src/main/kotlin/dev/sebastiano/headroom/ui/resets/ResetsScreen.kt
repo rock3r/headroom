@@ -94,6 +94,7 @@ fun ResetsScreen(
             }
             .sortedBy { (_, window) -> window.resetsAt }
     val sharedNames = state.accounts.groupingBy { it.name }.eachCount().filterValues { it > 1 }.keys
+    val history = historyWindows(state.accountsInYourOrder, sharedNames)
     val insets = WindowInsets.safeDrawing.asPaddingValues()
     val listState = rememberLazyListState()
     StatusBarBlurBox(scrollState = listState, modifier = modifier.fillMaxSize()) {
@@ -145,32 +146,34 @@ fun ResetsScreen(
                         modifier = width,
                     )
                 }
-                return@LazyColumn
-            }
-            upcomingResets(
-                upcoming,
-                UpcomingContext(state, formatter, sharedNames, sharedElements),
-                onOpenAccount,
-                onAlertChange,
-                width,
-            )
-            item {
-                SectionLabel(
-                    stringResource(
-                        when (state.display) {
-                            QuotaDisplay.Used -> R.string.resets_history
-                            QuotaDisplay.Left -> R.string.resets_history_left
-                        }
-                    ),
+            } else {
+                upcomingResets(
+                    upcoming,
+                    UpcomingContext(state, formatter, sharedNames, sharedElements),
+                    onOpenAccount,
+                    onAlertChange,
                     width,
                 )
             }
-            item {
-                ResetHistoryCard(
-                    windows = historyWindows(state.accountsInYourOrder, sharedNames),
-                    display = state.display,
-                    modifier = width,
-                )
+            if (history.isNotEmpty()) {
+                item {
+                    SectionLabel(
+                        stringResource(
+                            when (state.display) {
+                                QuotaDisplay.Used -> R.string.resets_history
+                                QuotaDisplay.Left -> R.string.resets_history_left
+                            }
+                        ),
+                        width,
+                    )
+                }
+                item {
+                    ResetHistoryCard(
+                        windows = history,
+                        display = state.display,
+                        modifier = width,
+                    )
+                }
             }
         }
     }
