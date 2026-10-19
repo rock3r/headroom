@@ -22,10 +22,23 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.io.IOException
 
 /**
- * A sign-in to refresh an account finished as another account of the provider. Nothing was saved.
+ * A sign-in to refresh an account finished as another account of the provider, or a second sign-in
+ * finished as an account that is already linked to [otherAccount] or does not match
+ * [expectedAccount]. Nothing was saved.
  */
-public class DifferentAccountException(accountId: String) :
-    Exception("The sign-in is not for account $accountId")
+public class DifferentAccountException(
+    public val accountId: String,
+    /**
+     * The account in Headroom that already has this sign-in, when a second sign-in finished as an
+     * account already linked to another account of the same provider.
+     */
+    public val otherAccount: String? = null,
+    /**
+     * The label of the sign-in already linked to [accountId], when replacing it finished as another
+     * account of the second provider.
+     */
+    public val expectedAccount: String? = null,
+) : Exception("The sign-in is not for account $accountId")
 
 /**
  * An API key was rejected by [provider] before it could be saved. [reason] carries the specific
@@ -133,11 +146,13 @@ public class SignInManager(
      * It never runs at the same time as [signOut], so a sign-out cannot miss the credential it
      * saves.
      *
+     * @throws DifferentAccountException when the ZCode account is already linked to another Z.AI
+     *   account, or replaces an existing ZCode sign-in of [accountId] with another ZCode account.
      * @throws IOException when the token store keeps refusing the save.
      */
     public suspend fun signInToZCode(accountId: String, tokens: TokenSet) {
         val saved = secondaryLock.withLock {
-            saveSecondary(accountId, ZCodeCredential.idFor(accountId), tokens, "ZCode")
+            saveSecondary(accountId, ZCodeCredential::idFor, tokens, "ZCode")
         }
         if (saved) accounts.refresh(accountId)
     }
@@ -149,11 +164,13 @@ public class SignInManager(
      * was removed is dropped: nothing would sign it out. It never runs at the same time as
      * [signOut], so a sign-out cannot miss the credential it saves.
      *
+     * @throws DifferentAccountException when the Cursor account is already linked to another Grok
+     *   account, or replaces an existing Cursor sign-in of [accountId] with another Cursor account.
      * @throws IOException when the token store keeps refusing the save.
      */
     public suspend fun signInToCursor(accountId: String, tokens: TokenSet) {
         val saved = secondaryLock.withLock {
-            saveSecondary(accountId, CursorCredential.idFor(accountId), tokens, "Cursor")
+            saveSecondary(accountId, CursorCredential::idFor, tokens, "Cursor")
         }
         if (saved) accounts.refresh(accountId)
     }
@@ -161,17 +178,60 @@ public class SignInManager(
     /** Saves a second sign-in; false when the account is gone and nothing was saved. */
     private suspend fun saveSecondary(
         accountId: String,
-        credentialId: String,
+        credentialIdFor: (String) -> String,
         tokens: TokenSet,
         name: String,
     ): Boolean {
-        if (accounts.current().none { it.account.id == accountId }) return false
-        val credential = tokens.toCredential(credentialId)
+        val currentAccounts = accounts.current().map { it.account }
+        val account = currentAccounts.firstOrNull { it.id == accountId } ?: return false
+        if (account.provider != tokens.provider) {
+            throw DifferentAccountException(accountId)
+        }
+        findOtherLinkedAccount(account, currentAccounts, credentialIdFor, tokens)?.let { other ->
+            throw DifferentAccountException(accountId = accountId, otherAccount = other)
+        }
+        val credentialId = credentialIdFor(accountId)
         repeat(SAVE_ATTEMPTS) {
-            val current = store.load(credential.accountId)
+            val current = store.load(credentialId)
+            if (isAnotherAccount(account, current, tokens)) {
+                throw DifferentAccountException(
+                    accountId = accountId,
+                    expectedAccount = current?.label,
+                )
+            }
+            val credential =
+                tokens
+                    .copy(
+                        providerAccountId = tokens.providerAccountId ?: current?.providerAccountId,
+                        label = tokens.label ?: current?.label,
+                    )
+                    .toCredential(credentialId)
             if (store.save(credential, expectedRevision = current?.revision) != null) return true
         }
         throw IOException("Could not save the $name sign-in of account $accountId")
+    }
+
+    /**
+     * The name of another account of [account]'s provider that already has [tokens] stored under
+     * [credentialIdFor], or null when none does.
+     */
+    private suspend fun findOtherLinkedAccount(
+        account: Account,
+        currentAccounts: List<Account>,
+        credentialIdFor: (String) -> String,
+        tokens: TokenSet,
+    ): String? {
+        for (other in
+            currentAccounts.filter { it.id != account.id && it.provider == account.provider }) {
+            val otherCredential = store.load(credentialIdFor(other.id))
+            if (otherCredential != null && isSameAccount(otherCredential, tokens)) {
+                return other.nickname?.takeIf {
+                    it.isNotBlank() &&
+                        (it != account.nickname || other.label == other.provider.displayName)
+                } ?: other.label
+            }
+        }
+        return null
     }
 
     public suspend fun signOut(accountId: String) {
@@ -202,6 +262,15 @@ public class SignInManager(
         val storedLabel = current?.label ?: return false
         val signedInLabel = tokens.label ?: return false
         return !storedLabel.equals(signedInLabel, ignoreCase = true)
+    }
+
+    private fun isSameAccount(other: StoredCredential, tokens: TokenSet): Boolean {
+        val storedId = other.providerAccountId
+        val signedInId = tokens.providerAccountId
+        if (storedId != null && signedInId != null) return storedId == signedInId
+        val storedLabel = other.label ?: return false
+        val signedInLabel = tokens.label ?: return false
+        return storedLabel.equals(signedInLabel, ignoreCase = true)
     }
 
     private companion object {

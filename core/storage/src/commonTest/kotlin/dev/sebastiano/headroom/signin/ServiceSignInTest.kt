@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.signin
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.data.account.DifferentAccountException
 import dev.sebastiano.headroom.model.Provider
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -196,6 +197,31 @@ class ServiceSignInTest {
                 session.result.completeExceptionally(failure)
                 assertEquals(ServiceSignInState.Failed("z1", error), signIn.state.value)
             }
+
+            val session = FakeSession()
+            val signIn =
+                ServiceSignIn(
+                    start = { session },
+                    save = { id, _ ->
+                        throw DifferentAccountException(
+                            accountId = id,
+                            otherAccount = "Work",
+                            expectedAccount = "ada@example.com",
+                        )
+                    },
+                    scope = backgroundScope,
+                )
+            signIn.start("z1")
+            session.result.complete(tokens)
+            assertEquals(
+                ServiceSignInState.Failed(
+                    accountId = "z1",
+                    error = SignInError.DifferentAccount,
+                    otherAccount = "Work",
+                    expectedAccount = "ada@example.com",
+                ),
+                signIn.state.value,
+            )
         }
 
     @Test

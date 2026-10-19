@@ -248,6 +248,24 @@ private fun signInLine(state: ServiceSignInState, service: String): String? =
             when (state.error) {
                 SignInError.Network -> stringResource(R.string.redeem_sign_in_network, service)
                 SignInError.Expired -> stringResource(R.string.redeem_sign_in_expired, service)
+                SignInError.DifferentAccount -> {
+                    val other = state.otherAccount
+                    val expected = state.expectedAccount
+                    when {
+                        other != null ->
+                            stringResource(
+                                R.string.redeem_sign_in_already_linked,
+                                service,
+                                other,
+                            )
+                        expected != null ->
+                            stringResource(
+                                R.string.signin_error_different_account,
+                                expected,
+                            )
+                        else -> stringResource(R.string.redeem_sign_in_different_account, service)
+                    }
+                }
                 else -> stringResource(R.string.redeem_sign_in_failed, service)
             }
     }

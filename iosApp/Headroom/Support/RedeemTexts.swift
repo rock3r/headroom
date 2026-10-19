@@ -110,10 +110,22 @@ enum RedeemTexts {
         }
     }
 
-    static func zCodeError(_ id: String) -> LocalizedStringKey {
+    static func zCodeError(
+        _ id: String,
+        otherAccount: String? = nil,
+        expectedAccount: String? = nil
+    ) -> LocalizedStringKey {
         switch id {
         case "network": "Headroom could not reach ZCode. Check your connection and try again."
         case "expired": "The sign-in to ZCode took too long. Try again."
+        case "differentAccount":
+            if let otherAccount {
+                "That ZCode account is already connected to \(otherAccount). Sign in to the ZCode account for this one."
+            } else if let expectedAccount {
+                "You signed in to a different account. Sign in as \(expectedAccount) to update this one."
+            } else {
+                "You signed in to a different ZCode account. Try again with the one for this account."
+            }
         default: "The sign-in to ZCode did not work. Try again."
         }
     }

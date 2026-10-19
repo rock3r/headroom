@@ -154,6 +154,8 @@
     <string name="redeem_sign_in_failed">The sign-in to %1$s did not work. Try again.</string>
     <string name="redeem_sign_in_network">Headroom could not reach %1$s. Check your connection and try again.</string>
     <string name="redeem_sign_in_expired">The sign-in to %1$s took too long. Try again.</string>
+    <string name="redeem_sign_in_already_linked">That %1$s account is already connected to %2$s. Sign in to the %1$s account for this one.</string>
+    <string name="redeem_sign_in_different_account">You signed in to a different %1$s account. Try again with the one for this account.</string>
     <string name="redeem_usage_description">%1$s: %2$s</string>
 
     <!-- The Quick Settings tile -->

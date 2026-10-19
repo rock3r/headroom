@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.signin
 
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.data.account.DifferentAccountException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -41,8 +42,20 @@ public sealed interface ServiceSignInState {
     /** The user signed in. The tokens are stored and the account's quotas read again. */
     public data class Done(override val accountId: String) : ServiceSignInState
 
-    public data class Failed(override val accountId: String, val error: SignInError) :
-        ServiceSignInState
+    public data class Failed(
+        override val accountId: String,
+        val error: SignInError,
+        /**
+         * The other account in Headroom that already has this sign-in, when [error] is
+         * [SignInError.DifferentAccount].
+         */
+        val otherAccount: String? = null,
+        /**
+         * The label of the sign-in already linked to [accountId], when replacing it finished as
+         * another account of the service.
+         */
+        val expectedAccount: String? = null,
+    ) : ServiceSignInState
 }
 
 /**
@@ -160,6 +173,14 @@ public class ServiceSignIn(
                 } catch (failure: AuthException) {
                     log("$label sign-in failed: ${failure::class.simpleName}: ${failure.message}")
                     ServiceSignInState.Failed(accountId, failure.toSignInError())
+                } catch (failure: DifferentAccountException) {
+                    log("$label sign-in failed: ${failure.message}")
+                    ServiceSignInState.Failed(
+                        accountId = accountId,
+                        error = SignInError.DifferentAccount,
+                        otherAccount = failure.otherAccount,
+                        expectedAccount = failure.expectedAccount,
+                    )
                 } catch (failure: IOException) {
                     // The sign-in worked but storing it did not.
                     log("$label sign-in could not be saved: ${failure::class.simpleName}")

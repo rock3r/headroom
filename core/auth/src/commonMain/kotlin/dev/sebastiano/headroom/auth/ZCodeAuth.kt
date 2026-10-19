@@ -118,7 +118,7 @@ internal class ZCodeAuth(
                     null,
                     "The saved ZCode sign-in is incomplete",
                 )
-        return tokensFor(tokens, label = null)
+        return tokensFor(tokens, accountId = null, label = null)
     }
 
     private suspend fun ready(data: JsonObject): DevicePoll {
@@ -128,12 +128,19 @@ internal class ZCodeAuth(
             return DevicePoll.Denied("ZCode sign-in finished without the account's tokens")
         }
         val user = data.obj("user")
+        val accountId = user?.string("id") ?: jwtClaims(zCodeJwt)?.string("sub")
         val label = user?.string("email") ?: user?.string("name")
-        return DevicePoll.Authorized(tokensFor(ZCodeTokens(zAiToken, zCodeJwt), label))
+        return DevicePoll.Authorized(
+            tokensFor(ZCodeTokens(zAiToken, zCodeJwt), accountId = accountId, label = label)
+        )
     }
 
     /** Trades the Z.AI OAuth token of [tokens] for a business token. */
-    private suspend fun tokensFor(tokens: ZCodeTokens, label: String?): TokenSet {
+    private suspend fun tokensFor(
+        tokens: ZCodeTokens,
+        accountId: String?,
+        label: String?,
+    ): TokenSet {
         val context = "Z.AI account token exchange"
         val response = http.postJson(loginUrl, jsonOf(listOf("token" to tokens.zAiAccessToken)))
         val root = response.successJson(context)
@@ -160,6 +167,7 @@ internal class ZCodeAuth(
             refreshToken = tokens.encode(),
             // Refreshed a little early, and never kept past the lifetime Z.AI reports.
             expiresAt = expiryWithSkew(now, lifetime, EXPIRY_MARGIN),
+            providerAccountId = accountId,
             label = label,
         )
     }
