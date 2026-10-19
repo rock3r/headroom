@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.db
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
+import dev.sebastiano.headroom.model.HistoryRetention
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
@@ -144,5 +145,36 @@ class StoreSnapshotTest {
             val state = repo.current().single()
             assertNull(state.lastError)
             assertEquals(71.0, state.primaryWindow?.usedPercent)
+        }
+
+    @Test
+    fun `a refresh that starts while storeSnapshot is persisting coalesces without fetching`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var fetches = 0
+            val storeGate = CompletableDeferred<HistoryRetention>()
+            val repo =
+                RoomQuotaRepository(
+                    db.quotaDao(),
+                    db.accountOrderDao(),
+                    {
+                        fetches++
+                        QuotaResult.Failure(QuotaErrorKind.RateLimited, "throttled")
+                    },
+                    clock = { now },
+                    scope = backgroundScope,
+                    retention = { storeGate.await() },
+                )
+            repo.addAccount(claude.account)
+
+            val storing = async { repo.storeSnapshot(claude.snapshot!!) }
+            val refreshing = async { repo.refresh(claude.account.id) }
+
+            storeGate.complete(HistoryRetention.LongTerm)
+            storing.await()
+            refreshing.await()
+
+            assertEquals(0, fetches)
+            assertNull(repo.current().single().lastError)
+            assertEquals(71.0, repo.current().single().primaryWindow?.usedPercent)
         }
 }

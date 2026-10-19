@@ -67,26 +67,41 @@ internal class RoomQuotaRepository(
     }
 
     override suspend fun storeSnapshot(snapshot: QuotaSnapshot) {
-        while (true) {
-            val running = inFlightLock.withLock { inFlight[snapshot.accountId] } ?: break
-            running.await()
-        }
-        val entity = dao.account(snapshot.accountId) ?: return
-        val existingResets = entity.resetsJson?.let(ResetsCodec::decode)
-        // A validation snapshot comes from the usage fetcher, which does not read resets: an
-        // existing account keeps the ones it had, and a new Z.AI account starts with the ZCode
-        // sign-in prompt that a full sync would record before ZCode is signed in.
-        val merged =
-            if (snapshot.resets == null) {
-                snapshot.copy(
-                    resets = existingResets ?: initialResets(snapshot.provider),
-                    resetsReadFailed =
-                        if (existingResets != null) entity.resetsReadFailed else false,
-                )
-            } else {
-                snapshot
+        val accountId = snapshot.accountId
+        var job: CompletableDeferred<Unit>? = null
+        while (job == null) {
+            val running = inFlightLock.withLock {
+                val existing = inFlight[accountId]
+                if (existing != null) {
+                    existing
+                } else {
+                    job = CompletableDeferred<Unit>().also { inFlight[accountId] = it }
+                    null
+                }
             }
-        store(entity, QuotaResult.Success(merged))
+            running?.await()
+        }
+        try {
+            val entity = dao.account(accountId) ?: return
+            val existingResets = entity.resetsJson?.let(ResetsCodec::decode)
+            // A validation snapshot comes from the usage fetcher, which does not read resets: an
+            // existing account keeps the ones it had, and a new Z.AI account starts with the ZCode
+            // sign-in prompt that a full sync would record before ZCode is signed in.
+            val merged =
+                if (snapshot.resets == null) {
+                    snapshot.copy(
+                        resets = existingResets ?: initialResets(snapshot.provider),
+                        resetsReadFailed =
+                            if (existingResets != null) entity.resetsReadFailed else false,
+                    )
+                } else {
+                    snapshot
+                }
+            store(entity, QuotaResult.Success(merged))
+        } finally {
+            inFlightLock.withLock { inFlight.remove(accountId) }
+            job.complete(Unit)
+        }
     }
 
     private fun initialResets(provider: Provider): ResetAvailability? =
