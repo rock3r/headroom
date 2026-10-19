@@ -89,6 +89,37 @@ class NotificationPlannerTest {
     }
 
     @Test
+    fun `a sign-in alert is re-planned when an expired account's auth reason changes`() {
+        val opencode =
+            DemoData.manyAccounts(now).first { it.account.provider == Provider.OpenCodeGo }
+        val genericAuth = opencode.copy(lastError = QuotaErrorKind.Auth, authReason = null)
+        val keyExpired =
+            opencode.copy(
+                lastError = QuotaErrorKind.Auth,
+                authReason = AuthFailureReason.KeyExpired,
+            )
+
+        val first = plan(accounts = listOf(genericAuth))
+        assertNull(first.signInAlerts.single().authReason)
+        assertEquals(listOf("demo-opencode"), first.signInNotified)
+
+        val upgraded =
+            plan(accounts = listOf(keyExpired), signInNotified = first.signInNotified.toSet())
+        assertEquals("keyExpired", upgraded.signInAlerts.single().authReason)
+        assertTrue(upgraded.signInCancels.isEmpty())
+        assertEquals(listOf("demo-opencode:KeyExpired"), upgraded.signInNotified)
+
+        val repeated =
+            plan(accounts = listOf(keyExpired), signInNotified = upgraded.signInNotified.toSet())
+        assertTrue(repeated.signInAlerts.isEmpty())
+
+        val recovered =
+            plan(accounts = listOf(opencode), signInNotified = upgraded.signInNotified.toSet())
+        assertEquals(listOf("demo-opencode"), recovered.signInCancels)
+        assertTrue(recovered.signInNotified.isEmpty())
+    }
+
+    @Test
     fun `resets that expire soon get one reminder a day before`() {
         val expires = now + 3.days
         val withResets = accounts.map { state ->

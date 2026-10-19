@@ -28,5 +28,23 @@ struct ReminderDeliveryTests {
         #expect(keys == ["a", "b"])
     }
 
+    @Test func `unsent sign-in alerts are omitted including reason-suffixed keys`() {
+        let keys = NotificationScheduler.acceptedSignInKeys(
+            planned: ["claude", "oc:KeyExpired"],
+            previous: ["claude"],
+            unsentAccountIds: ["oc"]
+        )
+        #expect(keys == ["claude"])
+    }
+
+    @Test func `an unsent sign-in reason upgrade preserves the previously delivered key`() {
+        let keys = NotificationScheduler.acceptedSignInKeys(
+            planned: ["oc:KeyExpired"],
+            previous: ["oc"],
+            unsentAccountIds: ["oc"]
+        )
+        #expect(keys == ["oc"])
+    }
+
     private struct Refused: Error {}
 }

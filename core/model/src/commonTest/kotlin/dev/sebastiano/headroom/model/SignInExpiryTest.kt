@@ -87,4 +87,45 @@ class SignInExpiryTest {
         assertTrue(Provider.ZAi.usesApiKey)
         assertFalse(Provider.Claude.usesApiKey)
     }
+
+    @Test
+    fun `a change in auth reason re-posts the alert and keeps the account id for cancellation`() {
+        val opencode =
+            DemoData.manyAccounts(now).first { it.account.provider == Provider.OpenCodeGo }
+        val genericAuth = opencode.copy(lastError = QuotaErrorKind.Auth, authReason = null)
+        val keyExpired =
+            opencode.copy(
+                lastError = QuotaErrorKind.Auth,
+                authReason = AuthFailureReason.KeyExpired,
+            )
+
+        val first = SignInAlertPolicy.decide(listOf(genericAuth), notified = emptySet())
+        assertEquals(listOf("demo-opencode"), first.post.map { it.account.id })
+        assertEquals(setOf("demo-opencode"), first.notified)
+
+        val upgraded = SignInAlertPolicy.decide(listOf(keyExpired), first.notified)
+        assertEquals(listOf(AuthFailureReason.KeyExpired), upgraded.post.map { it.authReason })
+        assertEquals(emptySet(), upgraded.cancel)
+        assertEquals(setOf("demo-opencode:KeyExpired"), upgraded.notified)
+
+        val repeated = SignInAlertPolicy.decide(listOf(keyExpired), upgraded.notified)
+        assertEquals(emptyList(), repeated.post)
+        assertEquals(emptySet(), repeated.cancel)
+        assertEquals(setOf("demo-opencode:KeyExpired"), repeated.notified)
+
+        val offline = opencode.copy(lastError = QuotaErrorKind.Network)
+        val afterOffline = SignInAlertPolicy.decide(listOf(offline), upgraded.notified)
+        assertEquals(emptyList(), afterOffline.post)
+        assertEquals(emptySet(), afterOffline.cancel)
+        assertEquals(setOf("demo-opencode:KeyExpired"), afterOffline.notified)
+
+        val recovered = SignInAlertPolicy.decide(listOf(opencode), upgraded.notified)
+        assertEquals(emptyList(), recovered.post)
+        assertEquals(setOf("demo-opencode"), recovered.cancel)
+        assertEquals(emptySet(), recovered.notified)
+
+        val removed = SignInAlertPolicy.decide(emptyList(), upgraded.notified)
+        assertEquals(setOf("demo-opencode"), removed.cancel)
+        assertEquals(emptySet(), removed.notified)
+    }
 }

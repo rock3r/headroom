@@ -57,8 +57,9 @@ final class NotificationScheduler {
     }
 
     func reschedule() async {
+        let previousSignInNotified = defaults.stringArray(forKey: Keys.signInNotified) ?? []
         guard let plan = try? await headroom.notifications.plan(
-            signInNotified: defaults.stringArray(forKey: Keys.signInNotified) ?? [],
+            signInNotified: previousSignInNotified,
             reminded: defaults.stringArray(forKey: Keys.reminded) ?? []
         ) else { return }
 
@@ -91,8 +92,28 @@ final class NotificationScheduler {
         center.removeDeliveredNotifications(withIdentifiers: cancelled)
         center.removePendingNotificationRequests(withIdentifiers: cancelled)
 
-        defaults.set(plan.signInNotified.filter { !unsent.contains($0) }, forKey: Keys.signInNotified)
+        defaults.set(
+            Self.acceptedSignInKeys(
+                planned: plan.signInNotified,
+                previous: previousSignInNotified,
+                unsentAccountIds: unsent
+            ),
+            forKey: Keys.signInNotified
+        )
         defaults.set(reminded, forKey: Keys.reminded)
+    }
+
+    static func acceptedSignInKeys(
+        planned: [String], previous: [String] = [], unsentAccountIds: Set<String>
+    ) -> [String] {
+        guard !unsentAccountIds.isEmpty else { return planned }
+        let sent = planned.filter { !unsentAccountIds.contains(accountId(of: $0)) }
+        let kept = previous.filter { unsentAccountIds.contains(accountId(of: $0)) }
+        return sent + kept
+    }
+
+    private static func accountId(of notifiedKey: String) -> String {
+        String(notifiedKey.prefix { $0 != ":" })
     }
 
     private func request(_ alert: ResetAlertUi) -> UNNotificationRequest {

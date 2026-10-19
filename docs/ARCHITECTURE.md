@@ -138,7 +138,7 @@ Only a successful sync clears the Auth error.
   Tapping a stale widget account opens sign-in.
 - Expired accounts cannot supply the next reset, receive reset alarms or appear under upcoming resets.
 - After every refresh, `SignInAlertingRepository` in `:core:data` runs `SignInAlertPolicy`.
-  The first expiry posts a warning on "Sign-in problems", worded for either an expired sign-in or an expired/rejected API key.
+  The first expiry posts a warning on "Sign-in problems", worded for either an expired sign-in or an expired/rejected API key, and re-posts it if the account's `authReason` changes while expired.
   A successful sync or account removal clears the warning. Tapping the warning or receiving a network error leaves it in place.
 - "Sign in" / "Replace API key" starts the provider's normal flow (`SignInState.Starting` for OAuth and device code, `SignInState.ApiKey` for API keys).
   `SignInManager.reauthenticate` saves new tokens under the same account ID, preserving history, name and alert switches.
