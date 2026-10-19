@@ -119,6 +119,24 @@ class ResetCenterHistoryTest {
         }
 
     @Test
+    fun `a retry after rate limiting records the time of the retry that worked`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val firstTry = now
+            val retryTime = firstTry.plus(2.minutes)
+            val provider = FakeProvider(RedeemOutcome.RateLimited(retryAfter = null))
+            val center = center(provider, backgroundScope)
+
+            center.redeem(account, "credits", key)
+            now = retryTime
+            provider.redeemAnswer = RedeemOutcome.Success(resetsLeft = 1)
+            center.redeem(account, "credits", key)
+            advanceUntilIdle()
+
+            assertEquals(listOf("record c1 credits key-1", "refresh c1"), calls)
+            assertEquals(listOf(retryTime), recordedAt)
+        }
+
+    @Test
     fun `a redeem that used nothing records nothing`() =
         runTest(UnconfinedTestDispatcher()) {
             val center =

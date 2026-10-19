@@ -344,9 +344,9 @@ internal constructor(
             poolId: String,
             attemptKey: ResetAttemptKey,
         ): RedeemOutcome {
-            val attemptedAt = rememberAttempt(attemptKey)
+            val sentAt = clock()
             return inner.redeem(account, poolId, attemptKey).also {
-                settle(poolId, attemptKey, attemptedAt, it)
+                settle(poolId, attemptKey, sentAt, it)
             }
         }
 
@@ -355,9 +355,9 @@ internal constructor(
             poolId: String,
             attemptKey: ResetAttemptKey,
         ): RedeemOutcome {
-            val attemptedAt = rememberAttempt(attemptKey)
+            val sentAt = clock()
             return inner.check(account, poolId, attemptKey).also {
-                settle(poolId, attemptKey, attemptedAt, it)
+                settle(poolId, attemptKey, sentAt, it)
             }
         }
 
@@ -369,9 +369,11 @@ internal constructor(
         private suspend fun settle(
             poolId: String,
             attemptKey: ResetAttemptKey,
-            attemptedAt: Instant,
+            sentAt: Instant,
             outcome: RedeemOutcome,
         ) {
+            if (outcome is RedeemOutcome.RateLimited) return
+            val attemptedAt = rememberAttempt(attemptKey, sentAt)
             if (!outcome.isSettled) return
             forgetAttempt(attemptKey)
             if (outcome !is RedeemOutcome.Success) return
@@ -383,13 +385,13 @@ internal constructor(
         }
     }
 
-    private fun rememberAttempt(attemptKey: ResetAttemptKey): Instant =
+    private fun rememberAttempt(attemptKey: ResetAttemptKey, sentAt: Instant): Instant =
         synchronized(lock) {
             attemptTimes.getOrPut(attemptKey) {
                 while (attemptTimes.size >= MAX_ATTEMPTS) {
                     attemptTimes.remove(attemptTimes.keys.first())
                 }
-                clock()
+                sentAt
             }
         }
 

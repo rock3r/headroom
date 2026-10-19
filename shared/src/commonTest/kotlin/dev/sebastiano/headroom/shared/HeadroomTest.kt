@@ -527,6 +527,43 @@ class HeadroomTest {
 
         assertEquals<List<Instant?>>(listOf(firstTry), resetEvents.attemptedAt)
     }
+
+    @Test
+    fun `a redeem retry after rate limiting records the retry time`() {
+        val firstTry = now
+        val retryTime = firstTry + 2.minutes
+        repository.accounts.value =
+            DemoData.accounts(now).map { state ->
+                state.copy(
+                    snapshot =
+                        state.snapshot!!.copy(
+                            resets =
+                                ResetAvailability(
+                                    listOf(
+                                        ResetPool(
+                                            "weekly",
+                                            "Weekly",
+                                            1,
+                                            ResetScope.of(WindowKind.Weekly),
+                                        )
+                                    )
+                                )
+                        )
+                )
+            }
+        resetProvider.outcome = RedeemOutcome.RateLimited(retryAfter = null)
+        headroom.resets.redeem.start("demo-codex", askForMore = false)
+        scope.runCurrent()
+        headroom.resets.redeem.confirm()
+        scope.runCurrent()
+
+        now = retryTime
+        resetProvider.outcome = RedeemOutcome.Success(resetsLeft = 0)
+        headroom.resets.redeem.tryAgain()
+        scope.runCurrent()
+
+        assertEquals<List<Instant?>>(listOf(retryTime), resetEvents.attemptedAt)
+    }
 }
 
 private class CountingResetProvider : ResetProvider by NoResets {

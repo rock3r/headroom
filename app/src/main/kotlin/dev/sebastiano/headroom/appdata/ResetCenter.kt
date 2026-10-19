@@ -94,9 +94,9 @@ class ResetCenter(
         poolId: String,
         attemptKey: ResetAttemptKey,
     ): RedeemOutcome {
-        val attemptedAt = rememberAttempt(attemptKey)
+        val sentAt = clock()
         return provider.redeem(account, poolId, attemptKey).also {
-            settle(account, poolId, attemptKey, attemptedAt, it)
+            settle(account, poolId, attemptKey, sentAt, it)
         }
     }
 
@@ -105,19 +105,19 @@ class ResetCenter(
         poolId: String,
         attemptKey: ResetAttemptKey,
     ): RedeemOutcome {
-        val attemptedAt = rememberAttempt(attemptKey)
+        val sentAt = clock()
         return provider.check(account, poolId, attemptKey).also {
-            settle(account, poolId, attemptKey, attemptedAt, it)
+            settle(account, poolId, attemptKey, sentAt, it)
         }
     }
 
-    private fun rememberAttempt(attemptKey: ResetAttemptKey): Instant =
+    private fun rememberAttempt(attemptKey: ResetAttemptKey, sentAt: Instant): Instant =
         synchronized(lock) {
             attemptTimes.getOrPut(attemptKey) {
                 while (attemptTimes.size >= MAX_ATTEMPTS) {
                     attemptTimes.remove(attemptTimes.keys.first())
                 }
-                clock()
+                sentAt
             }
         }
 
@@ -133,9 +133,11 @@ class ResetCenter(
         account: Account,
         poolId: String,
         attemptKey: ResetAttemptKey,
-        attemptedAt: Instant,
+        sentAt: Instant,
         outcome: RedeemOutcome,
     ) {
+        if (outcome is RedeemOutcome.RateLimited) return
+        val attemptedAt = rememberAttempt(attemptKey, sentAt)
         if (!outcome.isSettled) return
         forgetAttempt(attemptKey)
         if (outcome is RedeemOutcome.Success) {

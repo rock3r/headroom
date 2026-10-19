@@ -271,8 +271,8 @@ Providers list one expiry date per reset. The detector matches resets by that da
   A unique attempt key prevents duplicate records from retries, `already_used` responses or "Check again", and the first-send time lets a retry confirmed after expiry still match the reset.
   Later syncs match the missing reset to the pending redemption without adding another use.
   Matching selects the missing reset with the earliest expiry after redemption, following provider redemption order.
-- A sync can save after provider redemption but before Headroom records success. That sync initially labels the use "elsewhere".
-  Redemption recording shares a transaction boundary with sync and replaces a same-pool external use recorded within the last 5 minutes.
+- A sync can save after provider redemption but before Headroom records success. That sync initially labels the use "elsewhere", or "expired" if confirmation comes after the reset's expiry.
+  Redemption recording shares a transaction boundary with sync and replaces an expired reset from the same pool whose expiry followed the first attempt, or a same-pool external use recorded within the last 5 minutes.
   The replacement preserves the expiry date and pre-reset usage estimate.
   Matching uses the pool because stored resets no longer identify the redeemed card.
   Separate external and Headroom redemptions within those 5 minutes still count separately, but their location labels can swap.
