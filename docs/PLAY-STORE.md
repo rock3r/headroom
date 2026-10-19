@@ -139,8 +139,23 @@ If Play rejects "No data collected", declare the locally stored provider email a
 | News app | No |
 | Advertising ID | No |
 | Exact alarm permission | Not needed: the Play build uses `SCHEDULE_EXACT_ALARM`, which has no declaration |
-| Foreground service permissions | Not needed: only WorkManager's plain `FOREGROUND_SERVICE`, with no typed foreground service |
+| Foreground service permissions | **Declared.** The Play build has WorkManager's plain `FOREGROUND_SERVICE` and Headroom's own typed one: the sign-in watch. See below. |
 | Accessibility API | Not needed: the Play build has no accessibility service |
+
+## Foreground service permissions
+
+Since 1.4 Headroom runs a `dataSync` foreground service while a second sign-in waits for the user.
+A sign-in that finishes on the provider's server (ZCode's, and a Grok account's Cursor one) has no page that calls back into the app: the app polls until the user is through, and only then brings itself back in front of the browser tab.
+Android freezes an app that has been in the background for a moment, which stops that poll, so the app would never come back and the tab would stay open.
+The service runs from the first sign-in that waits to the last, and shows a quiet, ongoing notification for that time.
+
+Play requires the **Foreground service permissions** declaration under **App content** for any app that declares a typed foreground service.
+Declare the `dataSync` type, which is what `app/src/main/AndroidManifest.xml` declares, and describe it as:
+
+> Headroom shows the usage limits of the user's AI subscriptions. Two of them need a second sign-in that the user completes in a browser, on the provider's own page: Z.AI's reset feature, and Cursor's usage for a Grok account. The app polls the provider while the user is in the browser, and only then returns to the front. Android freezes a background app within seconds, which stops that poll and leaves the user in the browser, so the app keeps a dataSync foreground service with a quiet ongoing notification for as long as a sign-in waits.
+
+To see it: add a Z.AI account, open its detail screen, tap **Sign in to ZCode**, and sign in on the page that opens.
+The notification appears while the page waits and goes when the sign-in is through, at which point the app returns to the front by itself.
 
 ## App signing
 
