@@ -218,6 +218,34 @@ class RoomResetEventLogTest {
         }
 
     @Test
+    fun `claiming after a use elsewhere and a later expiry picks the earlier reset`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            val firstTry = now.plus(1.minutes)
+
+            now = firstTry.plus(1.minutes)
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            now = later.plus(1.minutes)
+            snapshot = snapshot(resets(), weeklyUsed = 0.0)
+            repo.refresh()
+
+            now = later.plus(2.minutes)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"), attemptedAt = firstTry)
+
+            val recorded = events()
+            assertEquals(2, recorded.size)
+            assertEquals(ResetEventKind.Used, recorded[0].kind)
+            assertEquals(ResetUseSource.Headroom, recorded[0].source)
+            assertEquals(firstTry, recorded[0].at)
+            assertEquals(soon, recorded[0].expiresAt)
+            assertEquals(mapOf(WindowKind.Weekly to 90.0), recorded[0].givenBack)
+            assertEquals(ResetEventKind.Expired, recorded[1].kind)
+            assertEquals(later, recorded[1].expiresAt)
+        }
+
+    @Test
     fun `a redeem recorded after a sync already found its reset gone takes over that use`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)
