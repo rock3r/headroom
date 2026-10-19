@@ -24,3 +24,7 @@
 
 - Write plain, descriptive commit messages without conventional-commit prefixes.
 - Keep each branch to one topic. Run `./gradlew check` before every commit.
+- Track releases with milestones named for the version, such as `1.4` or `1.5`, and close a milestone
+  once its release is tagged. Put an issue in the milestone of the release it ships in: a fix merged
+  after a tag belongs to the next one. An issue with no milestone is backlog, so there is no
+  `backlog` milestone.
