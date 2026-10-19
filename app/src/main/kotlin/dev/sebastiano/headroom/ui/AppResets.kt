@@ -87,7 +87,7 @@ internal fun ResetSheetHost(
         refreshing = resets.isRefreshing(request.accountId),
         onSignIn = zCode?.let { { it.start(request.accountId) } },
         signIn = signIn,
-        onBusyChange = { sheet.busy = it },
+        onBusyChange = { sheet.busy = it || request.accountId in graph.resets.refreshing.value },
     )
 }
 
@@ -152,8 +152,14 @@ internal class ResetSheetState(request: ResetSheetRequest? = null) {
     /** Opens the sheet. */
     fun handlers() =
         ResetHandlers(
-            onUse = { request = ResetSheetRequest(it, RedeemIntent.Use) },
-            onAsk = { request = ResetSheetRequest(it, RedeemIntent.AskForMore) },
+            onUse = {
+                busy = false
+                request = ResetSheetRequest(it, RedeemIntent.Use)
+            },
+            onAsk = {
+                busy = true
+                request = ResetSheetRequest(it, RedeemIntent.AskForMore)
+            },
         )
 
     companion object {

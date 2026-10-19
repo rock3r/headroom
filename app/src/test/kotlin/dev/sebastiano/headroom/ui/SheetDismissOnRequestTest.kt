@@ -170,10 +170,11 @@ class SheetDismissOnRequestTest {
     @Test
     fun `while a reset runs an external request does not close the redeem sheet`() {
         openRedeemSheet()
+        rule.mainClock.autoAdvance = false
         rule.onNodeWithTag(REDEEM_CONFIRM_TAG).performClick()
-        rule.waitForIdle()
-
+        // Arrives before the next frame, right as the user confirms the reset.
         accountRequest = OpenAccountRequest("demo-grok", serial = 1)
+        rule.mainClock.autoAdvance = true
         rule.waitForIdle()
         accountRequest = OpenAccountRequest("demo-claude", serial = 2, signInAgain = true)
         rule.waitForIdle()
