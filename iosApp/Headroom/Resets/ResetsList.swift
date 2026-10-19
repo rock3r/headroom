@@ -32,16 +32,16 @@ struct ResetsList: View {
                         UpcomingResetRow(reset: reset, canToggle: !tab.isDemo)
                     }
                 }
-                if !tab.history.isEmpty {
-                    Section {
-                        ForEach(tab.history) { history in
-                            ResetHistoryRow(history: history, showsLeft: model.showsLeft)
-                        }
-                    } header: {
-                        Text(model.showsLeft ? "Left when each window reset" : "Used when each window reset")
-                    } footer: {
-                        ResetHistoryLegend(showsLeft: model.showsLeft)
+            }
+            if !tab.history.isEmpty {
+                Section {
+                    ForEach(tab.history) { history in
+                        ResetHistoryRow(history: history, showsLeft: model.showsLeft)
                     }
+                } header: {
+                    Text(model.showsLeft ? "Left when each window reset" : "Used when each window reset")
+                } footer: {
+                    ResetHistoryLegend(showsLeft: model.showsLeft)
                 }
             }
         }

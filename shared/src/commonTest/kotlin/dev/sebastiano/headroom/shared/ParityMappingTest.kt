@@ -286,6 +286,30 @@ class ParityMappingTest {
     }
 
     @Test
+    fun `reset history remains on the tab when all sign-ins have expired`() {
+        val expired = DemoData.accounts(now).map { it.copy(lastError = QuotaErrorKind.Auth) }
+        val view = UiMapping.overview(expired, isDemo = false, now)
+
+        val tab = ResetsMapping.tab(view) { id, window -> DemoData.resetPeaks(id, window) }
+
+        assertTrue(tab.upcoming.isEmpty())
+        assertEquals(0, tab.alertWindows)
+        assertEquals(0, tab.alertsOn)
+        assertTrue(tab.withResets.isEmpty())
+        assertEquals(
+            listOf(
+                "demo-claude/seven_day",
+                "demo-claude/seven_day_opus",
+                "demo-codex/secondary",
+                "demo-grok/weekly",
+                "demo-copilot/premium_interactions",
+            ),
+            tab.history.map { "${it.accountId}/${it.windowId}" },
+        )
+        assertEquals(listOf(82.0, 95.0, 100.0, 88.0, 100.0), tab.history.first().peaks)
+    }
+
+    @Test
     fun `two accounts with the same name are told apart by their labels`() {
         val view =
             UiMapping.overview(
