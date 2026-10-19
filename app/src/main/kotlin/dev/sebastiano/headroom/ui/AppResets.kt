@@ -49,7 +49,7 @@ internal fun ResetSheetHost(
     val account = accounts.firstOrNull { it.account.id == request.accountId }
     val availability = resets.of(request.accountId)
     if (summary == null || account == null || availability == null) {
-        SideEffect { sheet.request = null }
+        SideEffect { sheet.dismiss() }
         return
     }
     val isDemo by graph.isDemo.collectAsStateWithLifecycle()
@@ -79,14 +79,15 @@ internal fun ResetSheetHost(
         display = home.display,
         formatter = formatter,
         memory = graph.resetMemory,
-        onDismiss = { sheet.request = null },
+        onDismiss = sheet::dismiss,
         onSignInAgain = {
-            sheet.request = null
+            sheet.dismiss()
             onSignInAgain()
         },
         refreshing = resets.isRefreshing(request.accountId),
         onSignIn = zCode?.let { { it.start(request.accountId) } },
         signIn = signIn,
+        onBusyChange = { sheet.busy = it },
     )
 }
 
@@ -139,6 +140,14 @@ internal data class ResetSheetRequest(val accountId: String, val intent: RedeemI
 @Stable
 internal class ResetSheetState(request: ResetSheetRequest? = null) {
     var request by mutableStateOf(request)
+    /** True while the provider works or the new usage comes in: nothing closes the sheet then. */
+    var busy by mutableStateOf(false)
+
+    /** Closes the sheet. */
+    fun dismiss() {
+        busy = false
+        request = null
+    }
 
     /** Opens the sheet. */
     fun handlers() =

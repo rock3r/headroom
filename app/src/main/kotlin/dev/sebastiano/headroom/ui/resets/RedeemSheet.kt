@@ -23,8 +23,10 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -117,6 +119,8 @@ fun RedeemSheet(
     onSignIn: (() -> Unit)? = null,
     /** How that sign-in is going, once it started from this sheet. */
     signIn: ServiceSignInState = ServiceSignInState.Idle,
+    /** Called when the sheet starts or stops working on a reset. */
+    onBusyChange: (Boolean) -> Unit = {},
 ) {
     // A sign-in that finishes while the sheet is open refreshes the availability, and the new
     // session then picks the resets up: the sheet goes on to them instead of closing.
@@ -134,6 +138,9 @@ fun RedeemSheet(
                 (step as RedeemStep.Finished).outcome is RedeemOutcome.Success &&
                 refreshing)
     val currentBusy by rememberUpdatedState(busy)
+    val currentOnBusyChange by rememberUpdatedState(onBusyChange)
+    SideEffect { currentOnBusyChange(busy) }
+    DisposableEffect(Unit) { onDispose { currentOnBusyChange(false) } }
     val sheetState =
         rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
