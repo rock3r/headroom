@@ -150,6 +150,10 @@ internal class AndroidResetNotifier(
      */
     private fun ensureChannels() {
         manager.deleteNotificationChannel(OLD_CHANNEL_ID)
+        // 1.4.0 kept a sign-in awake with a foreground service and a channel for its notification.
+        // 1.4.1 dropped both; Android keeps a channel after the code that made it goes, and a
+        // channel named "Signing in" would sit in the user's notification settings for nothing.
+        manager.deleteNotificationChannel(SIGN_IN_WATCH_CHANNEL_ID)
         manager.createNotificationChannel(
             NotificationChannel(
                     CHANNEL_ID,
@@ -186,6 +190,9 @@ internal class AndroidResetNotifier(
 
         /** The quiet channel resets used before they popped up. */
         private const val OLD_CHANNEL_ID = "weekly_resets"
+
+        /** The channel 1.4.0's sign-in foreground service posted to, gone in 1.4.1. */
+        private const val SIGN_IN_WATCH_CHANNEL_ID = "sign_in_watch"
 
         fun notificationId(accountId: String, windowId: String): Int =
             "$accountId/$windowId".hashCode()

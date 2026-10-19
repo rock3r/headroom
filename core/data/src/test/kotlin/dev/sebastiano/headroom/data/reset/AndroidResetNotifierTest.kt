@@ -75,6 +75,24 @@ class AndroidResetNotifierTest {
         }
 
     @Test
+    fun `the channel the sign-in watch used to post to is removed`() = runTest {
+        manager.createNotificationChannel(
+            NotificationChannel(
+                "sign_in_watch",
+                "Signing in",
+                NotificationManager.IMPORTANCE_LOW,
+            )
+        )
+
+        AndroidResetNotifier(context, ZoneId.of("UTC"))
+            .notifyReset(grok, grok.primaryWindow!!, usedBefore = null, otherNames = emptyList())
+
+        // 1.4.1 dropped the sign-in's foreground service, so its channel would only linger in the
+        // user's notification settings with nothing to show.
+        assertNull(manager.getNotificationChannel("sign_in_watch"))
+    }
+
+    @Test
     fun `a named account is called by its name`() = runTest {
         val named = grok.copy(account = grok.account.copy(nickname = "Side project"))
 
