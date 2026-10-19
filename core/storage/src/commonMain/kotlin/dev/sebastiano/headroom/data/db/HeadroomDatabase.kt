@@ -16,7 +16,7 @@ import androidx.sqlite.execSQL
             UsagePointEntity::class,
             ResetEventEntity::class,
         ],
-    version = 9,
+    version = 11,
     exportSchema = false,
 )
 @ConstructedBy(HeadroomDatabaseConstructor::class)
@@ -146,6 +146,33 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 }
             }
 
+        /**
+         * Version 10 stores whether a second Cursor sign-in is linked to a Grok account, and
+         * whether the last sync could not read its usage. Existing accounts count as unlinked and
+         * as read.
+         */
+        val MIGRATION_9_10: Migration =
+            object : Migration(9, 10) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL(
+                        "ALTER TABLE accounts ADD COLUMN cursorLinked INTEGER NOT NULL DEFAULT 0"
+                    )
+                    connection.execSQL(
+                        "ALTER TABLE accounts ADD COLUMN cursorReadFailed INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+            }
+
+        /** Version 11 remembers which windows a second sign-in added. */
+        val MIGRATION_10_11: Migration =
+            object : Migration(10, 11) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL(
+                        "ALTER TABLE windows ADD COLUMN isSecondary INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+            }
+
         /** Every migration, oldest first. */
         val MIGRATIONS: List<Migration> =
             listOf(
@@ -157,6 +184,8 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 MIGRATION_6_7,
                 MIGRATION_7_8,
                 MIGRATION_8_9,
+                MIGRATION_9_10,
+                MIGRATION_10_11,
             )
 
         /** The database file's name, the same on every platform. */

@@ -52,6 +52,8 @@ import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SharedElements
 import dev.sebastiano.headroom.ui.asFraction
+import dev.sebastiano.headroom.ui.components.CursorConnect
+import dev.sebastiano.headroom.ui.components.CursorPromptBanner
 import dev.sebastiano.headroom.ui.components.ListCard
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.SignInExpiredBanner
@@ -103,6 +105,8 @@ fun DetailScreen(
     onSignInAgain: (accountId: String) -> Unit = {},
     revealResets: Boolean = false,
     onRevealResets: () -> Unit = {},
+    /** The Cursor sign-in of this Grok account, when the app can offer one. */
+    cursor: CursorConnect? = null,
 ) {
     val account = state.account
     val container =
@@ -137,6 +141,9 @@ fun DetailScreen(
                 val stale = account.signInExpired
                 if (stale) {
                     SignInExpiredBanner(account, state.now, { onSignInAgain(account.id) }, content)
+                }
+                if (cursor != null && !stale) {
+                    CursorPromptBanner(account, cursor, content)
                 }
                 // The ring, the windows and the chart are stale data: faded, and said so.
                 val staleText = if (stale) staleDescription(account, state.now) else null

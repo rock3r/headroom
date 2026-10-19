@@ -13,7 +13,7 @@ final class AppModel {
     private(set) var resetsTab: ResetsTabUi?
     private(set) var signInStep: any SignInUi = SignInUiIdle.shared
     private(set) var redeemStep: any RedeemUi = RedeemUiIdle.shared
-    private(set) var zCodeStep: any ZCodeUi = ZCodeUiIdle.shared
+    private(set) var zCodeStep: any ServiceSignInUi = ServiceSignInUiIdle.shared
     let providers: [ProviderUi]
     let delights = DelightCenter()
     /// Where a notification tap asked to go, until the overview goes there.

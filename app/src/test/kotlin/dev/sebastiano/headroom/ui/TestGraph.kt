@@ -32,6 +32,7 @@ import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.SettingsRepository
 import dev.sebastiano.headroom.prototype.PrototypeTools
 import dev.sebastiano.headroom.signin.FakeSignInController
+import dev.sebastiano.headroom.signin.ServiceSignIn
 import dev.sebastiano.headroom.signin.SignInController
 import dev.sebastiano.headroom.ui.settings.SETTINGS_ACCOUNTS_TAG
 import dev.sebastiano.headroom.widgets.WidgetPinner
@@ -75,6 +76,8 @@ fun testGraph(
     resetIsland: ResetIslandAccess = ResetIslandAccess.Unavailable,
     resetProvider: ResetProvider = NoResets,
     prototypes: PrototypeTools? = null,
+    zCodeSignIn: ServiceSignIn? = null,
+    cursorSignIn: ServiceSignIn? = null,
 ): AppGraph {
     val clock = { FIXED_NOW }
     val repository =
@@ -115,6 +118,8 @@ fun testGraph(
                 real = ResetEventLog.None,
                 demo = DemoResetEvents(clock),
             ),
+        zCodeSignIn = zCodeSignIn,
+        cursorSignIn = cursorSignIn,
     )
 }
 

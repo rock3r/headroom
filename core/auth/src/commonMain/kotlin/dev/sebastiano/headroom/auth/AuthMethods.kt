@@ -64,6 +64,7 @@ public class AuthMethods(
 ) {
     private val claude = ClaudeOAuth(http, clock)
     private val grok = GrokOAuth(http, clock)
+    private val cursor = CursorAuth(http, clock)
     private val jetBrains = JetBrainsOAuth(http, clock)
     private val codex = CodexOAuth(http, clock)
     private val copilot = CopilotDeviceAuth(http)
@@ -80,7 +81,16 @@ public class AuthMethods(
     public val refreshers: Map<Provider, TokenRefresher> =
         mapOf(
             Provider.Claude to claude,
-            Provider.Grok to grok,
+            // A Grok account's Cursor sign-in is also a Grok credential, saved under a derived id;
+            // it refreshes at Cursor, the account's own sign-in at xAI.
+            Provider.Grok to
+                TokenRefresher { credential ->
+                    if (CursorCredential.isCursorId(credential.accountId)) {
+                        cursor.refresh(credential)
+                    } else {
+                        grok.refresh(credential)
+                    }
+                },
             Provider.JetBrains to jetBrains,
             Provider.Codex to codex,
             Provider.Copilot to copilot,
@@ -95,6 +105,14 @@ public class AuthMethods(
      */
     public val zCodeSignIn: DeviceCodeFlow
         get() = DeviceCodeFlow(zCode, clock)
+
+    /**
+     * The Cursor sign-in of a Grok account, which its Cursor model pools and Grok Bot pool need. It
+     * shows no code: the user signs in on [DeviceCodePrompt.browserUri] and the flow polls until
+     * they did. Save its tokens under [CursorCredential.idFor] the account's id.
+     */
+    public val cursorSignIn: DeviceCodeFlow
+        get() = DeviceCodeFlow(cursor, clock)
 
     public fun forProvider(provider: Provider): AuthMethod =
         when (provider) {

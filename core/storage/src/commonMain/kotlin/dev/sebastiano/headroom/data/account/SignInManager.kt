@@ -2,6 +2,7 @@ package dev.sebastiano.headroom.data.account
 
 import dev.sebastiano.headroom.auth.AuthException
 import dev.sebastiano.headroom.auth.CredentialKind
+import dev.sebastiano.headroom.auth.CursorCredential
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.auth.TokenSet
 import dev.sebastiano.headroom.auth.TokenStore
@@ -41,8 +42,8 @@ public class SignInManager(
     private val fetchers: QuotaFetchers? = null,
     private val newAccountId: () -> String = { Uuid.random().toString() },
 ) {
-    /** Keeps a ZCode sign-in from saving while a sign-out runs. */
-    private val zCodeLock = Mutex()
+    /** Keeps a second sign-in (ZCode, Cursor) from saving while a sign-out runs. */
+    private val secondaryLock = Mutex()
 
     public suspend fun complete(tokens: TokenSet): Account {
         validateApiKey(tokens)
@@ -118,25 +119,49 @@ public class SignInManager(
      * @throws IOException when the token store keeps refusing the save.
      */
     public suspend fun signInToZCode(accountId: String, tokens: TokenSet) {
-        val saved = zCodeLock.withLock { saveZCode(accountId, tokens) }
+        val saved = secondaryLock.withLock {
+            saveSecondary(accountId, ZCodeCredential.idFor(accountId), tokens, "ZCode")
+        }
         if (saved) accounts.refresh(accountId)
     }
 
-    /** Saves the ZCode sign-in; false when the account is gone and nothing was saved. */
-    private suspend fun saveZCode(accountId: String, tokens: TokenSet): Boolean {
+    /**
+     * Stores the Cursor sign-in of the Grok account [accountId], which its Cursor model pools and
+     * Grok Bot pool need, next to its xAI sign-in. It replaces an earlier Cursor sign-in, then
+     * refreshes the account so its Cursor windows show. A sign-in that finishes after the account
+     * was removed is dropped: nothing would sign it out. It never runs at the same time as
+     * [signOut], so a sign-out cannot miss the credential it saves.
+     *
+     * @throws IOException when the token store keeps refusing the save.
+     */
+    public suspend fun signInToCursor(accountId: String, tokens: TokenSet) {
+        val saved = secondaryLock.withLock {
+            saveSecondary(accountId, CursorCredential.idFor(accountId), tokens, "Cursor")
+        }
+        if (saved) accounts.refresh(accountId)
+    }
+
+    /** Saves a second sign-in; false when the account is gone and nothing was saved. */
+    private suspend fun saveSecondary(
+        accountId: String,
+        credentialId: String,
+        tokens: TokenSet,
+        name: String,
+    ): Boolean {
         if (accounts.current().none { it.account.id == accountId }) return false
-        val credential = tokens.toCredential(ZCodeCredential.idFor(accountId))
+        val credential = tokens.toCredential(credentialId)
         repeat(SAVE_ATTEMPTS) {
             val current = store.load(credential.accountId)
             if (store.save(credential, expectedRevision = current?.revision) != null) return true
         }
-        throw IOException("Could not save the ZCode sign-in of account $accountId")
+        throw IOException("Could not save the $name sign-in of account $accountId")
     }
 
     public suspend fun signOut(accountId: String) {
-        zCodeLock.withLock {
+        secondaryLock.withLock {
             store.delete(accountId)
             store.delete(ZCodeCredential.idFor(accountId))
+            store.delete(CursorCredential.idFor(accountId))
             accounts.removeAccount(accountId)
         }
     }

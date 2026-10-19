@@ -192,8 +192,11 @@ It resolves credentials during reset reads, concurrently with API-key usage fetc
 ZCode failures never fail usage fetching. `ZCODE_SIGN_IN_WAIT` limits credential resolution, including refresh, to 5 seconds.
 After timeout, sync retains stored resets and continues without reading new ones.
 
-`ZCodeSignIn` allows one sign-in at a time from the redemption sheet.
-The sheet displays browser waiting status or failure reasons. Successful sign-in closes the sheet and refreshes the account to display resets.
+`ServiceSignIn` runs this sign-in, and a Grok account's Cursor sign-in with it: one at a time, from the
+redemption sheet or the account. The sheet displays browser waiting status or failure reasons.
+The page is readied while the user reads, so the tap opens it at once, and a page readied for a
+sheet that is gone is forgotten: it expires a few minutes after it is made.
+Successful sign-in keeps the sheet open and shows the account's resets.
 
 ## Using a reset
 

@@ -32,6 +32,8 @@ public interface QuotaFetcher {
  *   never stores a token that such a call returns. Null for all other providers.
  * @property zCode The ZCode sign-in of a Z.AI account, which only its resets use. Null for all
  *   other providers.
+ * @property cursor The Cursor sign-in of a Grok account, which its Cursor model pools and its Grok
+ *   Bot pool use. Null for all other providers.
  */
 public class ProviderCredentials(
     public val accessToken: String,
@@ -40,6 +42,7 @@ public class ProviderCredentials(
     public val idToken: String? = null,
     public val refreshToken: String? = null,
     public val zCode: ZCodeSignIn? = null,
+    public val cursor: CursorSignIn? = null,
 ) {
     override fun equals(other: Any?): Boolean =
         other is ProviderCredentials &&
@@ -48,7 +51,8 @@ public class ProviderCredentials(
             other.baseUrl == baseUrl &&
             other.idToken == idToken &&
             other.refreshToken == refreshToken &&
-            other.zCode == zCode
+            other.zCode == zCode &&
+            other.cursor == cursor
 
     override fun hashCode(): Int {
         var result = accessToken.hashCode()
@@ -57,13 +61,15 @@ public class ProviderCredentials(
         result = HASH_MULTIPLIER * result + (idToken?.hashCode() ?: 0)
         result = HASH_MULTIPLIER * result + (refreshToken?.hashCode() ?: 0)
         result = HASH_MULTIPLIER * result + (zCode?.hashCode() ?: 0)
+        result = HASH_MULTIPLIER * result + (cursor?.hashCode() ?: 0)
         return result
     }
 
     /** Never includes the tokens, so credentials can be logged safely. */
     override fun toString(): String =
         "ProviderCredentials(accessToken=<redacted>, accountId=$accountId, baseUrl=$baseUrl, " +
-            "idToken=${redacted(idToken)}, refreshToken=${redacted(refreshToken)}, zCode=$zCode)"
+            "idToken=${redacted(idToken)}, refreshToken=${redacted(refreshToken)}, " +
+            "zCode=$zCode, cursor=$cursor)"
 
     private fun redacted(token: String?): String = if (token == null) "null" else "<redacted>"
 
@@ -91,6 +97,29 @@ public sealed interface ZCodeSignIn {
         override fun hashCode(): Int = 31 * jwt.hashCode() + businessToken.hashCode()
 
         /** Never includes the tokens. */
+        override fun toString(): String = "Ready(<redacted>)"
+    }
+}
+
+/**
+ * The Cursor sign-in of a Grok account. Cursor serves its model pools and the Grok Bot pool from
+ * its own backend, which does not accept the xAI token, so those windows need this second sign-in.
+ */
+public sealed interface CursorSignIn {
+    /** There is no Cursor sign-in, or it no longer works: the user has to sign in. */
+    public data object Missing : CursorSignIn
+
+    /** There is one, but it could not be made usable now, for example offline. */
+    public data object Unavailable : CursorSignIn
+
+    /** The Cursor session token that every Cursor usage call sends. */
+    public class Ready(public val accessToken: String) : CursorSignIn {
+        override fun equals(other: Any?): Boolean =
+            other is Ready && other.accessToken == accessToken
+
+        override fun hashCode(): Int = accessToken.hashCode()
+
+        /** Never includes the token. */
         override fun toString(): String = "Ready(<redacted>)"
     }
 }

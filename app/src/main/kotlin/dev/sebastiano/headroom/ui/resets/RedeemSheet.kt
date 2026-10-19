@@ -23,7 +23,6 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
@@ -57,8 +56,8 @@ import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.signin.ServiceSignInState
 import dev.sebastiano.headroom.signin.SignInError
-import dev.sebastiano.headroom.signin.ZCodeSignInState
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.delights.DelightsHost
 import dev.sebastiano.headroom.ui.delights.LocalDelights
@@ -117,10 +116,12 @@ fun RedeemSheet(
      */
     onSignIn: (() -> Unit)? = null,
     /** How that sign-in is going, once it started from this sheet. */
-    signIn: ZCodeSignInState = ZCodeSignInState.Idle,
+    signIn: ServiceSignInState = ServiceSignInState.Idle,
 ) {
+    // A sign-in that finishes while the sheet is open refreshes the availability, and the new
+    // session then picks the resets up: the sheet goes on to them instead of closing.
     val session =
-        remember(account.id, intent) {
+        remember(account.id, intent, availability.requiresSignIn) {
             RedeemSession(account, availability, provider, intent, memory)
         }
     val step by session.step.collectAsStateWithLifecycle()
@@ -159,11 +160,6 @@ fun RedeemSheet(
                     .invokeOnCompletion { if (!sheetState.isVisible) onDismiss() }
             },
         )
-    // Signed in: the account's resets are read again, and the sheet has done its job.
-    DisposableEffect(signIn) {
-        if (signIn is ZCodeSignInState.Done) actions.onClose()
-        onDispose {}
-    }
     val signInNote =
         if (stubNote) stringResource(R.string.redeem_sign_in_stub)
         else signInLine(signIn, ResetCopy.signInService(account.provider))
@@ -195,13 +191,13 @@ fun RedeemSheet(
 /** The line that says how the sign-in to [service] is going, or null before it starts. */
 @Composable
 @ReadOnlyComposable
-private fun signInLine(state: ZCodeSignInState, service: String): String? =
+private fun signInLine(state: ServiceSignInState, service: String): String? =
     when (state) {
-        ZCodeSignInState.Idle,
-        is ZCodeSignInState.Done -> null
-        is ZCodeSignInState.Starting,
-        is ZCodeSignInState.Waiting -> stringResource(R.string.redeem_sign_in_waiting, service)
-        is ZCodeSignInState.Failed ->
+        ServiceSignInState.Idle,
+        is ServiceSignInState.Done -> null
+        is ServiceSignInState.Starting,
+        is ServiceSignInState.Waiting -> stringResource(R.string.redeem_sign_in_waiting, service)
+        is ServiceSignInState.Failed ->
             when (state.error) {
                 SignInError.Network -> stringResource(R.string.redeem_sign_in_network, service)
                 SignInError.Expired -> stringResource(R.string.redeem_sign_in_expired, service)

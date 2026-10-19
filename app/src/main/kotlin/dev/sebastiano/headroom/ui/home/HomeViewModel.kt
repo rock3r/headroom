@@ -10,6 +10,7 @@ import dev.sebastiano.headroom.appdata.UsageHistory
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AlertPreferences
 import dev.sebastiano.headroom.model.OverviewSort
+import dev.sebastiano.headroom.model.PromptDismissals
 import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetBurst
@@ -49,6 +50,8 @@ class HomeViewModel(
     private val alertPreferences: AlertPreferences,
     private val clock: () -> Instant,
     private val isDemo: StateFlow<Boolean>,
+    /** The prompts the user dismissed, so a dismissed Cursor prompt does not come back. */
+    private val promptDismissals: PromptDismissals = PromptDismissals.None,
     /** True once the stored accounts have been read; see [DemoModeQuotaRepository.isLoaded]. */
     private val accountsLoaded: StateFlow<Boolean>,
     resetHistory: ResetHistory,
@@ -128,14 +131,26 @@ class HomeViewModel(
     private val choices: Flow<Pair<QuotaDisplay, OverviewSort>> =
         combine(quotaDisplay, overviewSort) { display, sort -> display to sort }
 
+    /** The accounts whose Cursor prompt the user dismissed, as it changes. */
+    private val cursorDismissed: Flow<Set<String>> =
+        repository.accounts.flatMapLatest { accounts ->
+            val dismissals = accounts.map { state ->
+                promptDismissals.cursorDismissed(state.account.id).map { state.account.id to it }
+            }
+            if (dismissals.isEmpty()) flowOf(emptySet())
+            else
+                combine(dismissals) { pairs -> pairs.filter { it.second }.map { it.first }.toSet() }
+        }
+
     private val environment =
-        combine(isDemo, accountsLoaded, refreshing, ticks, choices) {
-            demo,
-            loaded,
-            busy,
-            now,
-            (display, sort) ->
-            Environment(demo, loaded, busy, now, display, sort)
+        combine(
+            isDemo,
+            accountsLoaded,
+            refreshing,
+            ticks,
+            combine(choices, cursorDismissed) { a, b -> a to b },
+        ) { demo, loaded, busy, now, (choice, dismissed) ->
+            Environment(demo, loaded, busy, now, choice.first, choice.second, dismissed)
         }
 
     val state: StateFlow<HomeUiState> =
@@ -154,6 +169,7 @@ class HomeViewModel(
                         accountsLoaded = env.accountsLoaded,
                         isRefreshing = env.isRefreshing,
                         justReset = justReset,
+                        cursorDismissed = env.cursorDismissed,
                     )
                     .let { home ->
                         home.copy(
@@ -329,6 +345,11 @@ class HomeViewModel(
         viewModelScope.launch { alertPreferences.setEnabled(accountId, windowId, enabled) }
     }
 
+    /** The user does not want to connect Cursor to [accountId]; the prompt does not come back. */
+    fun dismissCursorPrompt(accountId: String) {
+        viewModelScope.launch { promptDismissals.dismissCursor(accountId) }
+    }
+
     private fun initialState(): HomeUiState =
         homeUiState(
                 accounts = repository.accounts.value,
@@ -348,6 +369,7 @@ class HomeViewModel(
         val now: Instant,
         val display: QuotaDisplay,
         val sort: OverviewSort,
+        val cursorDismissed: Set<String> = emptySet(),
     )
 
     private data class AccountWindowsSelection(

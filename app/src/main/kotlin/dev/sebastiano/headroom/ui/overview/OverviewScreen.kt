@@ -51,6 +51,7 @@ import dev.sebastiano.headroom.ui.PageReveal
 import dev.sebastiano.headroom.ui.ResetFormatter
 import dev.sebastiano.headroom.ui.SettingsButton
 import dev.sebastiano.headroom.ui.SharedElements
+import dev.sebastiano.headroom.ui.components.CursorConnect
 import dev.sebastiano.headroom.ui.components.ScreenHeader
 import dev.sebastiano.headroom.ui.components.SectionLabel
 import dev.sebastiano.headroom.ui.components.StatusBarBlurBox
@@ -92,6 +93,8 @@ fun OverviewScreen(
     resets: AccountResets = AccountResets(),
     seen: SeenValues? = null,
     onSignInAgain: (accountId: String) -> Unit = {},
+    /** The Cursor sign-in of a Grok account, when the app can offer one. */
+    cursor: CursorConnect? = null,
 ) {
     // Cards composed from now on (on scroll, or on coming back) appear without an entrance.
     SideEffect { if (playEntrance) onEntranceStart() }
@@ -184,6 +187,7 @@ fun OverviewScreen(
                                 refreshing = resets.isRefreshing(account.id),
                                 seen = seen,
                                 onSignIn = { onSignInAgain(account.id) },
+                                cursor = cursor,
                             )
                         }
                     }

@@ -17,8 +17,8 @@ import dev.sebastiano.headroom.model.ResetPool
 import dev.sebastiano.headroom.model.ResetProvider
 import dev.sebastiano.headroom.model.ResetRefresh
 import dev.sebastiano.headroom.signin.DeviceSession
-import dev.sebastiano.headroom.signin.ZCodeSignIn
-import dev.sebastiano.headroom.signin.ZCodeSignInState
+import dev.sebastiano.headroom.signin.ServiceSignIn
+import dev.sebastiano.headroom.signin.ServiceSignInState
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -126,22 +126,22 @@ public sealed interface RedeemUi {
     public data object SignInRequired : RedeemUi
 }
 
-/** The ZCode sign-in a Z.AI account's resets need. */
-public sealed interface ZCodeUi {
-    public data object Idle : ZCodeUi
+/** Where a second sign-in is, for the sheet that shows it. */
+public sealed interface ServiceSignInUi {
+    public data object Idle : ServiceSignInUi
 
-    public data object Starting : ZCodeUi
+    public data object Starting : ServiceSignInUi
 
-    /** The ZCode page at [url] is open; [opened] grows each time the user asks for it again. */
-    public data class Waiting(val url: String, val opened: Int) : ZCodeUi
+    /** The sign-in page at [url] is open; [opened] grows each time the user asks for it again. */
+    public data class Waiting(val url: String, val opened: Int) : ServiceSignInUi
 
-    public data object Done : ZCodeUi
+    public data object Done : ServiceSignInUi
 
     /** [error] is `denied`, `expired`, `network` or `unknown`. */
-    public data class Failed(val error: String) : ZCodeUi
+    public data class Failed(val error: String) : ServiceSignInUi
 }
 
-/** The Resets tab, the redeem sheet and the ZCode sign-in. */
+/** The Resets tab, the redeem sheet and the second sign-ins. */
 @OptIn(ExperimentalCoroutinesApi::class)
 public class HeadroomResets
 internal constructor(
@@ -154,12 +154,17 @@ internal constructor(
     clock: () -> Instant = Clock.System::now,
     startZCode: suspend () -> DeviceSession,
     saveZCode: suspend (accountId: String, tokens: TokenSet) -> Unit,
+    startCursor: suspend () -> DeviceSession,
+    saveCursor: suspend (accountId: String, tokens: TokenSet) -> Unit,
 ) {
     public val redeem: HeadroomRedeem =
         HeadroomRedeem(sources, provider, memory, events, scope, clock)
 
-    public val zCode: HeadroomZCode =
-        HeadroomZCode(ZCodeSignIn(startZCode, saveZCode, scope), scope)
+    public val zCode: HeadroomServiceSignIn =
+        HeadroomServiceSignIn(ServiceSignIn("ZCode", startZCode, saveZCode, scope), scope)
+
+    public val cursor: HeadroomServiceSignIn =
+        HeadroomServiceSignIn(ServiceSignIn("Cursor", startCursor, saveCursor, scope), scope)
 
     /** Calls [onChange] with the Resets tab now and at every change, until [Watch.cancel]. */
     public fun watchTab(onChange: (ResetsTabUi) -> Unit): Watch = scope.watch(tab(), onChange)
@@ -181,14 +186,20 @@ internal constructor(
     }
 }
 
-/** The ZCode sign-in a Z.AI account's resets need. Its page opens in the sign-in sheet. */
-public class HeadroomZCode
-internal constructor(private val signIn: ZCodeSignIn, private val scope: CoroutineScope) {
+/**
+ * The ZCode sign-in a Z.AI account's resets need, and the Cursor sign-in a Grok account's Cursor
+ * windows need. A [ServiceSignIn] named "ZCode" or "Cursor".
+ */
+public class HeadroomServiceSignIn
+internal constructor(
+    private val signIn: ServiceSignIn,
+    private val scope: CoroutineScope,
+) {
     /** Calls [onChange] with the sign-in, until [Watch.cancel]. */
-    public fun watch(onChange: (ZCodeUi) -> Unit): Watch =
+    public fun watch(onChange: (ServiceSignInUi) -> Unit): Watch =
         scope.watch(signIn.state.map(::ui), onChange)
 
-    /** Starts the ZCode sign-in of a Z.AI account, or opens its page again. */
+    /** Starts the sign-in of an account, or opens its page again. */
     public fun start(accountId: String) {
         signIn.start(accountId)
     }
@@ -197,13 +208,13 @@ internal constructor(private val signIn: ZCodeSignIn, private val scope: Corouti
         signIn.cancel()
     }
 
-    private fun ui(state: ZCodeSignInState): ZCodeUi =
+    private fun ui(state: ServiceSignInState): ServiceSignInUi =
         when (state) {
-            ZCodeSignInState.Idle -> ZCodeUi.Idle
-            is ZCodeSignInState.Starting -> ZCodeUi.Starting
-            is ZCodeSignInState.Waiting -> ZCodeUi.Waiting(state.url, state.opened)
-            is ZCodeSignInState.Done -> ZCodeUi.Done
-            is ZCodeSignInState.Failed -> ZCodeUi.Failed(state.error.id())
+            ServiceSignInState.Idle -> ServiceSignInUi.Idle
+            is ServiceSignInState.Starting -> ServiceSignInUi.Starting
+            is ServiceSignInState.Waiting -> ServiceSignInUi.Waiting(state.url, state.opened)
+            is ServiceSignInState.Done -> ServiceSignInUi.Done
+            is ServiceSignInState.Failed -> ServiceSignInUi.Failed(state.error.id())
         }
 }
 

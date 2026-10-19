@@ -15,6 +15,11 @@ import androidx.core.net.toUri
  * The tab targets a browser that supports Custom Tabs, preferring the user's default. When there is
  * none, it targets the default browser. When no browser is found, the intent has no package and
  * Android picks the handler.
+ *
+ * It carries no [Intent.FLAG_ACTIVITY_NEW_TASK]: a tab started from the activity goes into this
+ * app's task, so the app coming back in front of it takes the tab away too. A tab started from the
+ * application context would need that flag, and would then stay behind in the browser's own task
+ * after the sign-in.
  */
 fun signInTabIntent(context: Context): CustomTabsIntent {
     val tab = CustomTabsIntent.Builder().build()

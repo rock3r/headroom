@@ -254,6 +254,79 @@ class HeadroomDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `accounts saved before the Cursor link existed count as unlinked and as read`() = runTest {
+        oldDatabase().use { v9 ->
+            VERSION_1_SCHEMA.forEach { v9.execSQL(it) }
+            v9.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+            v9.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+            v9.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+            v9.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+            v9.execSQL("ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+            v9.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
+            v9.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
+            v9.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
+            VERSION_7_RESET_EVENTS.forEach(v9::execSQL)
+            v9.execSQL(
+                "ALTER TABLE accounts ADD COLUMN resetsReadFailed INTEGER NOT NULL DEFAULT 0"
+            )
+            v9.execSQL("ALTER TABLE usage_points ADD COLUMN resetsAtEpochMs INTEGER")
+            v9.execSQL("INSERT INTO accounts (id, provider, label) VALUES ('a1', 'grok', 'a1')")
+            v9.execSQL("PRAGMA user_version = 9")
+        }
+
+        val db = openCurrent()
+        try {
+            val account = db.quotaDao().observeAccounts().first().single().account
+            assertEquals("a1", account.id)
+            assertEquals(false, account.cursorLinked)
+            assertEquals(false, account.cursorReadFailed)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun `windows saved before a second sign-in could add any are the account's own`() = runTest {
+        oldDatabase().use { v10 ->
+            VERSION_1_SCHEMA.forEach { v10.execSQL(it) }
+            v10.execSQL("ALTER TABLE accounts ADD COLUMN nickname TEXT")
+            v10.execSQL("ALTER TABLE windows ADD COLUMN usedAmount REAL")
+            v10.execSQL("ALTER TABLE windows ADD COLUMN limitAmount REAL")
+            v10.execSQL("ALTER TABLE windows ADD COLUMN amountUnit TEXT")
+            v10.execSQL("ALTER TABLE accounts ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+            v10.execSQL("ALTER TABLE windows ADD COLUMN expiresAtEpochMs INTEGER")
+            v10.execSQL("ALTER TABLE windows ADD COLUMN isRecognised INTEGER NOT NULL DEFAULT 1")
+            v10.execSQL("ALTER TABLE accounts ADD COLUMN resetsJson TEXT")
+            VERSION_7_RESET_EVENTS.forEach(v10::execSQL)
+            v10.execSQL(
+                "ALTER TABLE accounts ADD COLUMN resetsReadFailed INTEGER NOT NULL DEFAULT 0"
+            )
+            v10.execSQL("ALTER TABLE usage_points ADD COLUMN resetsAtEpochMs INTEGER")
+            v10.execSQL("ALTER TABLE accounts ADD COLUMN cursorLinked INTEGER NOT NULL DEFAULT 0")
+            v10.execSQL(
+                "ALTER TABLE accounts ADD COLUMN cursorReadFailed INTEGER NOT NULL DEFAULT 0"
+            )
+            v10.execSQL("INSERT INTO accounts (id, provider, label) VALUES ('a1', 'grok', 'a1')")
+            v10.execSQL(
+                "INSERT INTO windows (accountId, windowId, position, label, kind, " +
+                    "usedPercent, isUnlimited, isRecognised) " +
+                    "VALUES ('a1', 'monthly', 0, 'Monthly', 'Monthly', 30.0, 0, 1)"
+            )
+            v10.execSQL("PRAGMA user_version = 10")
+        }
+
+        val db = openCurrent()
+        try {
+            val window = db.quotaDao().observeAccounts().first().single().windows.single()
+            assertEquals("monthly", window.windowId)
+            // The account's own window: it stays the one its headline describes.
+            assertEquals(false, window.isSecondary)
+        } finally {
+            db.close()
+        }
+    }
+
     private fun openCurrent(): HeadroomDatabase = databaseAt(file)
 
     private companion object {
