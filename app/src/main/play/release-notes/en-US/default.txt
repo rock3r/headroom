@@ -3,4 +3,4 @@ Headroom 1.4 shows a Grok account's Cursor usage.
 • Cursor Models, Other Models and the Grok Bot pool appear beside the account's Grok limits, after a separate Cursor sign-in.
 • Signing in to ZCode or Cursor in the browser now brings you back to Headroom and closes the tab.
 • ZCode's sign-in from the reset sheet opens at once, and shows the resets when you are done.
-• Everything from 1.3: the usage history chart, Muse, Claude resets, reset alerts and widgets.
+• A reset used just before it expired is no longer counted twice in Stats.
