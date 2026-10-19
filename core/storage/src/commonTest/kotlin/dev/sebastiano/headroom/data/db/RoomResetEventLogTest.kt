@@ -200,6 +200,24 @@ class RoomResetEventLogTest {
         }
 
     @Test
+    fun `a retry confirmed after a sync replaced the usage snapshot does not measure post-attempt usage`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            val firstTry = now.plus(1.minutes)
+
+            now = firstTry.plus(1.minutes)
+            snapshot = snapshot(resets(soon, later), weeklyUsed = 5.0).copy(resetsReadFailed = true)
+            repo.refresh()
+
+            now = firstTry.plus(2.minutes)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"), attemptedAt = firstTry)
+
+            val event = events().single()
+            assertEquals(emptyMap(), event.givenBack)
+            assertFalse(event.givenBackEstimated)
+        }
+
+    @Test
     fun `a redeem recorded after a sync already found its reset gone takes over that use`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)

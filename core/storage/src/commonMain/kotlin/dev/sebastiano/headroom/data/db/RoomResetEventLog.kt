@@ -43,11 +43,15 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
                 stored.account.resetsJson?.let(ResetsCodec::decode)?.pools?.firstOrNull {
                     it.id == poolId
                 }
-            val givenBack = pool?.let {
-                ResetGivenBack.measure(it.scope, stored.windows.map { w -> w.toDomain() }, at)
-            }
             val fetchedAt = stored.account.fetchedAtEpochMs?.let(Instant::fromEpochMilliseconds)
-            val fresh = fetchedAt != null && (at - fetchedAt) <= ResetGivenBack.FRESH_FOR
+            val beforeAttempt = fetchedAt != null && fetchedAt <= at
+            val givenBack =
+                if (beforeAttempt && pool != null) {
+                    ResetGivenBack.measure(pool.scope, stored.windows.map { w -> w.toDomain() }, at)
+                } else {
+                    emptyMap()
+                }
+            val fresh = beforeAttempt && (at - fetchedAt) <= ResetGivenBack.FRESH_FOR
             ResetEvent(
                     accountId = account.id,
                     provider = account.provider,
@@ -57,8 +61,8 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
                     at = at,
                     expiresAt = pool?.soonestExpiry,
                     source = ResetUseSource.Headroom,
-                    givenBack = givenBack.orEmpty(),
-                    givenBackEstimated = !givenBack.isNullOrEmpty() && !fresh,
+                    givenBack = givenBack,
+                    givenBackEstimated = givenBack.isNotEmpty() && !fresh,
                 )
                 .toEntity(attemptKey = attemptKey.value, settled = false)
         }
