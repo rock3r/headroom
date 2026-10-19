@@ -32,6 +32,7 @@ import dev.sebastiano.headroom.prototype.ScenarioAccounts
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.ServiceSignIn
 import dev.sebastiano.headroom.signin.ServiceSignInState
+import dev.sebastiano.headroom.signin.SignInError
 import dev.sebastiano.headroom.ui.components.rememberResetFormatter
 import dev.sebastiano.headroom.ui.home.toSummary
 import dev.sebastiano.headroom.ui.overview.OVERVIEW_LIST_TAG
@@ -109,6 +110,70 @@ class RedeemSheetZCodeSignInTest {
         rule.onNodeWithTag(poolChoiceTag("five_hour")).assertExists()
         rule.onNodeWithTag(poolChoiceTag("week")).assertExists()
         assertEquals(0, dismissed)
+    }
+
+    @Test
+    fun `a ZCode sign-in for another account names the account that has it or the expected one`() {
+        var signIn by
+            mutableStateOf<ServiceSignInState>(
+                ServiceSignInState.Failed(
+                    accountId = state.account.id,
+                    error = SignInError.DifferentAccount,
+                    otherAccount = "Work",
+                )
+            )
+        val provider =
+            object : ResetProvider {
+                override suspend fun availability(account: Account): ResetAvailability = signedOut
+
+                override suspend fun redeem(
+                    account: Account,
+                    poolId: String,
+                    attemptKey: ResetAttemptKey,
+                ): RedeemOutcome = RedeemOutcome.Unsupported
+            }
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                RedeemSheet(
+                    account = state.account,
+                    summary = state.toSummary(FIXED_NOW, emptyMap(), emptyMap()),
+                    availability = signedOut,
+                    provider = provider,
+                    intent = RedeemIntent.Use,
+                    display = QuotaDisplay.Used,
+                    formatter = rememberResetFormatter(ZoneOffset.UTC),
+                    memory = ResetAttemptMemory(),
+                    onDismiss = {},
+                    onSignIn = {},
+                    signIn = signIn,
+                )
+            }
+        }
+        rule.waitForIdle()
+
+        rule
+            .onNode(
+                hasText(
+                    "That ZCode account is already connected to Work. Sign in to the ZCode account for this one."
+                ) and hasAnyAncestor(isDialog())
+            )
+            .assertExists()
+
+        signIn =
+            ServiceSignInState.Failed(
+                accountId = state.account.id,
+                error = SignInError.DifferentAccount,
+                expectedAccount = "ada@example.com",
+            )
+        rule.waitForIdle()
+
+        rule
+            .onNode(
+                hasText(
+                    "You signed in to a different account. Sign in as ada@example.com to update this one."
+                ) and hasAnyAncestor(isDialog())
+            )
+            .assertExists()
     }
 
     @Test

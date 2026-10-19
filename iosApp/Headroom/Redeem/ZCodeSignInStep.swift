@@ -42,7 +42,13 @@ struct ZCodeSignInStep: View {
             ContentUnavailableView {
                 Label("Sign in to ZCode", systemImage: "exclamationmark.triangle")
             } description: {
-                Text(RedeemTexts.zCodeError(failed.error))
+                Text(
+                    RedeemTexts.zCodeError(
+                        failed.error,
+                        otherAccount: failed.otherAccount,
+                        expectedAccount: failed.expectedAccount
+                    )
+                )
             } actions: {
                 Button("Try again", action: start)
                     .buttonStyle(.borderedProminent)

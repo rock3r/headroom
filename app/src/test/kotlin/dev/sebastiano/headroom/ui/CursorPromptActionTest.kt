@@ -12,7 +12,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import dev.sebastiano.headroom.auth.AuthException
+import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.TokenSet
+import dev.sebastiano.headroom.data.account.DifferentAccountException
 import dev.sebastiano.headroom.designsystem.HeadroomTheme
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.CursorPrompt
@@ -49,13 +51,14 @@ class CursorPromptActionTest {
 
     private val now = Instant.parse("2026-10-18T12:00:00Z")
     private var retries = 0
+    private var saveFailure: Exception? = null
     private val sessions = mutableListOf<FakeSession>()
     private val signIn = signIn()
 
     private fun signIn(scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined)) =
         ServiceSignIn(
             start = { FakeSession().also { sessions += it } },
-            save = { _, _ -> },
+            save = { _, _ -> saveFailure?.let { throw it } },
             scope = scope,
             label = "Cursor",
         )
@@ -144,6 +147,37 @@ class CursorPromptActionTest {
         rule.onNodeWithText("Connect").performClick()
         rule.waitForIdle()
         assertEquals(2, sessions.size)
+    }
+
+    @Test
+    fun `a sign-in for another account names the account that already has it or the expected one`() {
+        val summary = grokSummary(CursorPrompt.NotLinked)
+        rule.setContent {
+            HeadroomTheme(dynamicColor = false) {
+                CursorPromptRow(summary = summary, connect = connect)
+            }
+        }
+        val tokens = TokenSet(Provider.Grok, CredentialKind.OAuth, "access", "refresh", null)
+
+        saveFailure = DifferentAccountException(summary.id, otherAccount = "Work")
+        signIn.start(summary.id)
+        sessions.last().result.complete(tokens)
+        rule.waitForIdle()
+        rule
+            .onNodeWithText(
+                "That Cursor account is already connected to Work. Sign in to the Cursor account for this one."
+            )
+            .assertIsDisplayed()
+
+        saveFailure = DifferentAccountException(summary.id, expectedAccount = "ada@cursor.com")
+        signIn.start(summary.id)
+        sessions.last().result.complete(tokens)
+        rule.waitForIdle()
+        rule
+            .onNodeWithText(
+                "You signed in to a different account. Sign in as ada@cursor.com to update this one."
+            )
+            .assertIsDisplayed()
     }
 
     @Test

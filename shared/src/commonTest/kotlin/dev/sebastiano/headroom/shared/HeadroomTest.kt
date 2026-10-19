@@ -569,6 +569,64 @@ class HeadroomTest {
 
         assertEquals<List<Instant?>>(listOf(retryTime), resetEvents.attemptedAt)
     }
+
+    @Test
+    fun `a second sign-in already linked to another account fails with that account's name`() {
+        val store = InMemoryTokenStore()
+        val zCodeTokens =
+            TokenSet(
+                Provider.ZAi,
+                CredentialKind.OAuth,
+                "business",
+                "bundle",
+                null,
+                providerAccountId = "zcode-1",
+                label = "ada@example.com",
+            )
+        val deviceSession =
+            object : DeviceSession {
+                override val userCode: String = ""
+                override val verificationUrl: String = "https://chat.z.ai/a"
+
+                override suspend fun awaitTokens(): TokenSet = zCodeTokens
+            }
+        val instance =
+            Headroom(
+                HeadroomParts(
+                    repository = repository,
+                    tokenStore = store,
+                    signInSteps = ApiKeySteps,
+                    settings = settings,
+                    alerts = alerts,
+                    startZCode = { deviceSession },
+                    clock = { now },
+                    zone = { TimeZone.UTC },
+                    compute = StandardTestDispatcher(scope.testScheduler),
+                ),
+                scope,
+            )
+        repository.add(Account("z1", Provider.ZAi, "Z.AI", nickname = "Work"))
+        repository.add(Account("z2", Provider.ZAi, "Z.AI", nickname = "Personal"))
+
+        var state: ServiceSignInUi = ServiceSignInUi.Idle
+        val watch = instance.resets.zCode.watch { state = it }
+        instance.resets.zCode.start("z1")
+        scope.runCurrent()
+        assertEquals(ServiceSignInUi.Done, state)
+
+        instance.resets.zCode.start("z2")
+        scope.runCurrent()
+        watch.cancel()
+
+        assertEquals(
+            ServiceSignInUi.Failed(
+                error = "differentAccount",
+                otherAccount = "Work",
+                expectedAccount = null,
+            ),
+            state,
+        )
+    }
 }
 
 private class CountingResetProvider : ResetProvider by NoResets {

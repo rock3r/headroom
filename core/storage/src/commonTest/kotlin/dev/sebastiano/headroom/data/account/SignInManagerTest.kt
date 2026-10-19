@@ -288,6 +288,77 @@ class SignInManagerTest {
     }
 
     @Test
+    fun `a Cursor sign-in already linked to another Grok account is refused and names that account`() =
+        runTest {
+            val store = InMemoryTokenStore()
+            val accounts = MemoryAccounts()
+            val ids = ArrayDeque(listOf("g1", "g2"))
+            val manager = SignInManager(store, accounts) { ids.removeFirst() }
+            manager.complete(grokTokens.copy(label = "work@x.ai"))
+            manager.complete(grokTokens.copy(label = "personal@x.ai"))
+            val cursor =
+                cursorTokens.copy(providerAccountId = "cursor-1", label = "work@cursor.com")
+            manager.signInToCursor("g1", cursor)
+            accounts.refreshed.clear()
+
+            val byLabel =
+                assertFailsWith<DifferentAccountException> {
+                    manager.signInToCursor(
+                        "g2",
+                        cursor.copy(providerAccountId = null, label = "Work@Cursor.com"),
+                    )
+                }
+            assertEquals("g2", byLabel.accountId)
+            assertEquals("work@x.ai", byLabel.otherAccount)
+            assertNull(store.load(CursorCredential.idFor("g2")))
+            assertEquals(emptyList<String?>(), accounts.refreshed)
+
+            accounts.state.value =
+                accounts.state.value.map {
+                    if (it.account.id == "g1") it.copy(account = it.account.copy(nickname = "Work"))
+                    else it
+                }
+            val byId =
+                assertFailsWith<DifferentAccountException> {
+                    manager.signInToCursor("g2", cursor.copy(label = "renamed@cursor.com"))
+                }
+            assertEquals("Work", byId.otherAccount)
+            assertNull(store.load(CursorCredential.idFor("g2")))
+        }
+
+    @Test
+    fun `a Cursor sign-in that replaces an existing one as a different Cursor account is refused`() =
+        runTest {
+            val store = InMemoryTokenStore()
+            val accounts = MemoryAccounts()
+            val manager = SignInManager(store, accounts) { "g1" }
+            manager.complete(grokTokens)
+            manager.signInToCursor(
+                "g1",
+                cursorTokens.copy(providerAccountId = "cursor-1", label = "work@cursor.com"),
+            )
+            accounts.refreshed.clear()
+
+            val failure =
+                assertFailsWith<DifferentAccountException> {
+                    manager.signInToCursor(
+                        "g1",
+                        cursorTokens.copy(
+                            accessToken = "other-access",
+                            providerAccountId = "cursor-2",
+                            label = "other@cursor.com",
+                        ),
+                    )
+                }
+
+            assertEquals("g1", failure.accountId)
+            assertNull(failure.otherAccount)
+            assertEquals("work@cursor.com", failure.expectedAccount)
+            assertEquals("cursor-access", store.load(CursorCredential.idFor("g1"))?.accessToken)
+            assertEquals(emptyList<String?>(), accounts.refreshed)
+        }
+
+    @Test
     fun `a ZCode sign-in is stored next to the Z_AI account and refreshes it`() = runTest {
         val store = InMemoryTokenStore()
         val accounts = MemoryAccounts()
@@ -352,6 +423,69 @@ class SignInManagerTest {
         assertNull(store.load(ZCodeCredential.idFor("z1")))
         assertEquals(emptyList(), accounts.state.value)
     }
+
+    @Test
+    fun `a ZCode sign-in already linked to another Z_AI account is refused and names that account`() =
+        runTest {
+            val store = InMemoryTokenStore()
+            val accounts = MemoryAccounts()
+            val ids = ArrayDeque(listOf("z1", "z2"))
+            val manager = SignInManager(store, accounts) { ids.removeFirst() }
+            val apiKey =
+                TokenSet(Provider.ZAi, CredentialKind.ApiKey, "api-key", null, null, label = null)
+            manager.complete(apiKey)
+            manager.complete(apiKey.copy(accessToken = "api-key-2"))
+            accounts.state.value =
+                accounts.state.value.map {
+                    if (it.account.id == "z1") it.copy(account = it.account.copy(nickname = "Team"))
+                    else it
+                }
+            manager.signInToZCode(
+                "z1",
+                zCodeTokens.copy(providerAccountId = "zcode-1", label = "ada@example.com"),
+            )
+            accounts.refreshed.clear()
+
+            val failure =
+                assertFailsWith<DifferentAccountException> {
+                    manager.signInToZCode(
+                        "z2",
+                        zCodeTokens.copy(providerAccountId = "zcode-1", label = "ada@example.com"),
+                    )
+                }
+
+            assertEquals("z2", failure.accountId)
+            assertEquals("Team", failure.otherAccount)
+            assertNull(store.load(ZCodeCredential.idFor("z2")))
+            assertEquals(emptyList<String?>(), accounts.refreshed)
+        }
+
+    @Test
+    fun `a ZCode sign-in that replaces an existing one as a different ZCode account is refused`() =
+        runTest {
+            val store = InMemoryTokenStore()
+            val accounts = MemoryAccounts()
+            val manager = SignInManager(store, accounts) { "z1" }
+            manager.complete(
+                zCodeTokens.copy(kind = CredentialKind.ApiKey, accessToken = "api-key")
+            )
+            manager.signInToZCode("z1", zCodeTokens.copy(label = "ada@example.com"))
+            accounts.refreshed.clear()
+
+            val failure =
+                assertFailsWith<DifferentAccountException> {
+                    manager.signInToZCode(
+                        "z1",
+                        zCodeTokens.copy(accessToken = "other", label = "grace@example.com"),
+                    )
+                }
+
+            assertEquals("z1", failure.accountId)
+            assertNull(failure.otherAccount)
+            assertEquals("ada@example.com", failure.expectedAccount)
+            assertEquals("business", store.load(ZCodeCredential.idFor("z1"))?.accessToken)
+            assertEquals(emptyList<String?>(), accounts.refreshed)
+        }
 
     private val openCodeKey =
         TokenSet(Provider.OpenCodeGo, CredentialKind.ApiKey, "old-key", null, null)

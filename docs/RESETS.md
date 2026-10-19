@@ -182,6 +182,7 @@ Claude grant redemption passed a real-account check. The confirmation step still
 The credential uses the business token as its access token.
 Its refresh-token field contains both long-lived tokens as `ZCodeTokens` JSON.
 `SignInManager.signInToZCode` saves it alongside the API key under `ZCodeCredential.idFor(accountId)`, the account ID plus `#zcode`.
+Both `signInToZCode` and `signInToCursor` reject a secondary sign-in that is already linked to another account or replaces a stored secondary sign-in with a different account.
 Sign-out removes both credentials. Sign-in and sign-out cannot run concurrently, preventing late sign-in completion from leaving credentials behind.
 
 The Z.AI refresher in `AuthMethods.refreshers` renews expired business tokens. It never receives the non-expiring API key.

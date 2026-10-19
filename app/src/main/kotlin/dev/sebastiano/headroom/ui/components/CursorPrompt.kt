@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -158,7 +159,7 @@ private fun CursorPromptSurface(
     modifier: Modifier = Modifier,
 ) {
     val running = state is ServiceSignInState.Starting || state is ServiceSignInState.Waiting
-    val failed = (state as? ServiceSignInState.Failed)?.error
+    val failed = state as? ServiceSignInState.Failed
     val container =
         if (prompt == CursorPrompt.ReadFailed || failed != null)
             MaterialTheme.colorScheme.errorContainer
@@ -202,7 +203,7 @@ private fun CursorPromptSurface(
                         when {
                             running -> waiting
                             // A sign-in that failed says so: the button below starts it again.
-                            failed != null -> stringResource(signInFailure(failed))
+                            failed != null -> signInFailure(failed)
                             else -> body
                         },
                     style = MaterialTheme.typography.bodySmall,
@@ -271,11 +272,30 @@ private fun cursorAction(prompt: CursorPrompt): Int =
     }
 
 /** What a sign-in that failed says, in the prompt that started it. */
-private fun signInFailure(error: SignInError): Int =
-    when (error) {
-        SignInError.Denied -> R.string.signin_error_denied
-        SignInError.Expired -> R.string.signin_error_expired
-        SignInError.Network -> R.string.signin_error_network
-        SignInError.DifferentAccount -> R.string.signin_error_different_account
-        SignInError.Unknown -> R.string.signin_error_unknown
+@Composable
+@ReadOnlyComposable
+private fun signInFailure(failed: ServiceSignInState.Failed): String =
+    when (failed.error) {
+        SignInError.Denied -> stringResource(R.string.signin_error_denied)
+        SignInError.Expired -> stringResource(R.string.signin_error_expired)
+        SignInError.Network -> stringResource(R.string.signin_error_network)
+        SignInError.DifferentAccount -> {
+            val other = failed.otherAccount
+            val expected = failed.expectedAccount
+            when {
+                other != null ->
+                    stringResource(
+                        R.string.redeem_sign_in_already_linked,
+                        CURSOR_SERVICE_NAME,
+                        other,
+                    )
+                expected != null ->
+                    stringResource(R.string.signin_error_different_account, expected)
+                else ->
+                    stringResource(R.string.redeem_sign_in_different_account, CURSOR_SERVICE_NAME)
+            }
+        }
+        SignInError.Unknown -> stringResource(R.string.signin_error_unknown)
     }
+
+private const val CURSOR_SERVICE_NAME = "Cursor"

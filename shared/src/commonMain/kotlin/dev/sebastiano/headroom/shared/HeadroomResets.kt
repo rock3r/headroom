@@ -137,8 +137,14 @@ public sealed interface ServiceSignInUi {
 
     public data object Done : ServiceSignInUi
 
-    /** [error] is `denied`, `expired`, `network` or `unknown`. */
-    public data class Failed(val error: String) : ServiceSignInUi
+    /** [error] is `denied`, `expired`, `network`, `differentAccount` or `unknown`. */
+    public data class Failed(
+        val error: String,
+        val otherAccount: String? = null,
+        val expectedAccount: String? = null,
+    ) : ServiceSignInUi {
+        public constructor(error: String) : this(error, null, null)
+    }
 }
 
 /** The Resets tab, the redeem sheet and the second sign-ins. */
@@ -214,7 +220,8 @@ internal constructor(
             is ServiceSignInState.Starting -> ServiceSignInUi.Starting
             is ServiceSignInState.Waiting -> ServiceSignInUi.Waiting(state.url, state.opened)
             is ServiceSignInState.Done -> ServiceSignInUi.Done
-            is ServiceSignInState.Failed -> ServiceSignInUi.Failed(state.error.id())
+            is ServiceSignInState.Failed ->
+                ServiceSignInUi.Failed(state.error.id(), state.otherAccount, state.expectedAccount)
         }
 }
 

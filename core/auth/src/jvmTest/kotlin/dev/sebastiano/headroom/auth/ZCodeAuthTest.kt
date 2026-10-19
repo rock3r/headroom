@@ -1,6 +1,7 @@
 package dev.sebastiano.headroom.auth
 
 import dev.sebastiano.headroom.model.Provider
+import kotlin.io.encoding.Base64
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -54,6 +55,13 @@ class ZCodeAuthTest {
         """{"code":0,"msg":"ok","data":{"flow_id":"flow-1","authorize_url":"$authorizeUrl",""" +
             """"expires_at":${now.epochSeconds + 600},"poll_interval_sec":3,""" +
             """"poll_token":"server-poll-token"}}"""
+
+    private fun jwt(payload: String): String {
+        val encode = { text: String ->
+            Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(text.encodeToByteArray())
+        }
+        return "${encode("""{"alg":"none"}""")}.${encode(payload)}.signature"
+    }
 
     @Test
     fun `starting asks zcode for a flow with a poll token`() = runTest {
@@ -185,6 +193,38 @@ class ZCodeAuthTest {
         val bundle = assertNotNull(ZCodeTokens.decode(checkNotNull(tokens.refreshToken)))
         assertEquals("zcode-jwt", bundle.zCodeJwt)
         assertEquals("zai-oauth", bundle.zAiAccessToken)
+    }
+
+    @Test
+    fun `a ready flow keeps the ZCode account id from the user or the JWT`() = runTest {
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body =
+                    """{"code":0,"data":{"status":"ready","token":"${jwt("""{"sub":"jwt-id"}""")}",""" +
+                        """"zai":{"access_token":"zai-oauth"},""" +
+                        """"user":{"id":"user-id","email":"ada@example.com"}}}""",
+            )
+        )
+        server.enqueue(
+            MockResponse(code = 200, body = """{"code":0,"data":{"access_token":"business"}}""")
+        )
+        val fromUser = (zCode.poll(grant()) as DevicePoll.Authorized).tokens
+        assertEquals("user-id", fromUser.providerAccountId)
+
+        server.enqueue(
+            MockResponse(
+                code = 200,
+                body =
+                    """{"code":0,"data":{"status":"ready","token":"${jwt("""{"sub":"jwt-id"}""")}",""" +
+                        """"zai":{"access_token":"zai-oauth"}}}""",
+            )
+        )
+        server.enqueue(
+            MockResponse(code = 200, body = """{"code":0,"data":{"access_token":"business"}}""")
+        )
+        val fromJwt = (zCode.poll(grant()) as DevicePoll.Authorized).tokens
+        assertEquals("jwt-id", fromJwt.providerAccountId)
     }
 
     @Test
