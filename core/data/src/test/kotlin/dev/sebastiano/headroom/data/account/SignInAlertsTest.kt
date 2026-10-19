@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.account
 import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
+import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
@@ -104,5 +105,24 @@ class SignInAlertsTest {
         SignInAlerts(notifier, MemoryLedger()).update(listOf(expired, second))
 
         assertEquals(listOf("demo-claude" to true), notifier.posted)
+    }
+
+    @Test
+    fun `an alert is re-posted when the auth reason changes and cancelled when it recovers`() {
+        val notifier = RecordingNotifier()
+        val ledger = MemoryLedger()
+        val alerts = SignInAlerts(notifier, ledger)
+        val keyExpired = expired.copy(authReason = AuthFailureReason.KeyExpired)
+
+        alerts.update(listOf(expired))
+        alerts.update(listOf(keyExpired))
+        alerts.update(listOf(keyExpired))
+        assertEquals(listOf("demo-claude" to false, "demo-claude" to false), notifier.posted)
+        assertEquals(emptyList(), notifier.cancelled)
+        assertEquals(setOf("demo-claude:KeyExpired"), ledger.ids)
+
+        alerts.update(listOf(claude))
+        assertEquals(listOf("demo-claude"), notifier.cancelled)
+        assertEquals(emptySet(), ledger.ids)
     }
 }

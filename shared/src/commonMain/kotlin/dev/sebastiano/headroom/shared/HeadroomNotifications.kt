@@ -29,7 +29,7 @@ public data class NotificationPlanUi(
     val signInAlerts: List<SignInAlertUi>,
     /** Account ids whose sign-in warning must go: they synced fine again, or were removed. */
     val signInCancels: List<String>,
-    /** The account ids with a sign-in warning out: pass them to the next plan. */
+    /** The keys of the sign-in warnings that are out: pass them to the next plan. */
     val signInNotified: List<String>,
     /** The expiring resets a reminder covers now, or already did: pass them to the next plan. */
     val reminded: List<String>,
