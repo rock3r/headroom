@@ -145,7 +145,7 @@ Only a successful sync clears the Auth error.
   It updates the label if the provider returns a new email.
   It rejects a different provider account ID when both credentials have one; otherwise it compares email addresses.
   Copilot and API-key providers supply no account identity, so Headroom accepts any sign-in for them.
-- For API-key providers, `SignInManager` validates a submitted key with one quota fetch before saving it.
+- For API-key providers, `SignInManager` validates a submitted key with one quota fetch before saving it, then stores that snapshot on the account (`AccountsRepository.storeSnapshot`) instead of fetching a second time.
   When the provider rejects the key with `QuotaErrorKind.Auth`, `SignInManager` throws `InvalidApiKeyException`, leaving any stored credential untouched, and `RealSignInController` returns to `SignInState.ApiKey` with an inline error (`ApiKeyRejection.Expired` or `ApiKeyRejection.Unauthorized`).
   When validation fails with a network error, nothing is saved and the flow moves to `SignInState.Failed(SignInError.Network)` so the user can retry.
 - Debug builds preview it with demo data:

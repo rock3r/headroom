@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
+import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.UsagePoint
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -75,11 +76,36 @@ class SignInAlertsTest {
         assertEquals(listOf("demo-claude"), notifier.cancelled)
     }
 
+    @Test
+    fun `storing a validated snapshot cancels an expired sign-in alert`() = runTest {
+        val notifier = RecordingNotifier()
+        val stored = MutableStateFlow(listOf(expired))
+        val repository =
+            SignInAlertingRepository(StoredAccounts(stored), SignInAlerts(notifier, MemoryLedger()))
+
+        repository.refresh()
+        assertEquals(listOf("demo-claude" to false), notifier.posted)
+
+        repository.storeSnapshot(claude.snapshot!!)
+        assertEquals(listOf("demo-claude"), notifier.cancelled)
+    }
+
     private class StoredAccounts(val state: MutableStateFlow<List<AccountState>>) :
         AccountsRepository {
         override val accounts: StateFlow<List<AccountState>> = state
 
         override suspend fun addAccount(account: Account) = Unit
+
+        override suspend fun storeSnapshot(snapshot: QuotaSnapshot) {
+            state.value =
+                state.value.map {
+                    if (it.account.id == snapshot.accountId) {
+                        it.copy(snapshot = snapshot, lastError = null, authReason = null)
+                    } else {
+                        it
+                    }
+                }
+        }
 
         override suspend fun removeAccount(accountId: String) {
             state.value = state.value.filterNot { it.account.id == accountId }

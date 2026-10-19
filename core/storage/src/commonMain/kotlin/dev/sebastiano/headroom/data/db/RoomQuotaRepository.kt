@@ -4,14 +4,18 @@ import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.HistoryRetention
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.model.QuotaSnapshot
+import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.UsagePoint
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -25,6 +29,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * The real repository: accounts, their latest windows and the usage history live in Room. A refresh
@@ -41,7 +46,7 @@ internal class RoomQuotaRepository(
 ) : AccountsRepository {
     private val refreshing = MutableStateFlow<Set<String>>(emptySet())
     private val lastCompactedAt = MutableStateFlow<Map<String, Instant>>(emptyMap())
-    private val inFlight = mutableMapOf<String, CompletableDeferred<Unit>>()
+    private val inFlight = mutableMapOf<String, CompletableDeferred<Boolean>>()
     private val inFlightLock = Mutex()
 
     override val accounts: StateFlow<List<AccountState>> =
@@ -62,6 +67,39 @@ internal class RoomQuotaRepository(
             )
         )
     }
+
+    override suspend fun storeSnapshot(snapshot: QuotaSnapshot) {
+        val accountId = snapshot.accountId
+        val job = claimInFlight(accountId, coalesce = false) ?: return
+        var completed = false
+        try {
+            val entity = dao.account(accountId)
+            if (entity != null) {
+                val existingResets = entity.resetsJson?.let(ResetsCodec::decode)
+                // A validation snapshot comes from the usage fetcher, which does not read resets:
+                // an existing account keeps the ones it had, and a new Z.AI account starts with
+                // the ZCode sign-in prompt that a full sync would record before ZCode is signed in.
+                val merged =
+                    if (snapshot.resets == null) {
+                        snapshot.copy(
+                            resets = existingResets ?: initialResets(snapshot.provider),
+                            resetsReadFailed =
+                                if (existingResets != null) entity.resetsReadFailed else false,
+                        )
+                    } else {
+                        snapshot
+                    }
+                store(entity, QuotaResult.Success(merged))
+            }
+            completed = true
+        } finally {
+            releaseInFlight(accountId, job, completed)
+        }
+    }
+
+    private fun initialResets(provider: Provider): ResetAvailability? =
+        if (provider == Provider.ZAi) ResetAvailability(emptyList(), requiresSignIn = true)
+        else null
 
     /** Names the account. A blank [nickname] removes the name, so the provider's name shows. */
     override suspend fun renameAccount(accountId: String, nickname: String?) {
@@ -90,27 +128,48 @@ internal class RoomQuotaRepository(
 
     /** Claims the account's in-flight slot before touching the database, so callers coalesce. */
     private suspend fun refreshOne(accountId: String) {
-        val (job, owner) =
-            inFlightLock.withLock {
-                val existing = inFlight[accountId]
-                if (existing != null) {
-                    existing to false
-                } else {
-                    CompletableDeferred<Unit>().also { inFlight[accountId] = it } to true
-                }
-            }
-        if (!owner) {
-            job.await()
-            return
-        }
+        val job = claimInFlight(accountId, coalesce = true) ?: return
         refreshing.update { it + accountId }
+        var completed = false
         try {
-            val entity = dao.account(accountId) ?: return
-            store(entity, fetchAccount(entity))
+            val entity = dao.account(accountId)
+            if (entity != null) {
+                store(entity, fetchAccount(entity))
+            }
+            completed = true
         } finally {
             refreshing.update { it - accountId }
+            releaseInFlight(accountId, job, completed)
+        }
+    }
+
+    private suspend fun claimInFlight(
+        accountId: String,
+        coalesce: Boolean,
+    ): CompletableDeferred<Boolean>? {
+        while (true) {
+            val (job, existing) =
+                inFlightLock.withLock {
+                    val running = inFlight[accountId]
+                    if (running != null) {
+                        null to running
+                    } else {
+                        CompletableDeferred<Boolean>().also { inFlight[accountId] = it } to null
+                    }
+                }
+            if (job != null) return job
+            if (existing?.await() == true && coalesce) return null
+        }
+    }
+
+    private suspend fun releaseInFlight(
+        accountId: String,
+        job: CompletableDeferred<Boolean>,
+        completed: Boolean,
+    ) {
+        withContext(NonCancellable) {
             inFlightLock.withLock { inFlight.remove(accountId) }
-            job.complete(Unit)
+            job.complete(completed)
         }
     }
 

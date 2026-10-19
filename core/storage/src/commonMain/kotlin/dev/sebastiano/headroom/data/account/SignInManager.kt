@@ -13,6 +13,7 @@ import dev.sebastiano.headroom.model.AuthFailureReason
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.quota.ProviderCredentials
 import dev.sebastiano.headroom.quota.QuotaFetchers
 import kotlin.uuid.Uuid
@@ -46,12 +47,12 @@ public class SignInManager(
     private val secondaryLock = Mutex()
 
     public suspend fun complete(tokens: TokenSet): Account {
-        validateApiKey(tokens)
+        val validated = validateApiKey(tokens)
         val account =
             Account(newAccountId(), tokens.provider, tokens.label ?: tokens.provider.displayName)
         store.save(tokens.toCredential(account.id), expectedRevision = null)
         accounts.addAccount(account)
-        accounts.refresh(account.id)
+        storeValidatedOrRefresh(account.id, validated)
         return account
     }
 
@@ -73,7 +74,7 @@ public class SignInManager(
         if (account.provider != tokens.provider) {
             throw DifferentAccountException(accountId)
         }
-        validateApiKey(tokens)
+        val validated = validateApiKey(tokens)
         val credential = tokens.toCredential(accountId)
         // A concurrent refresh can bump the revision between the load and the save: try again.
         repeat(SAVE_ATTEMPTS) {
@@ -84,7 +85,7 @@ public class SignInManager(
             if (store.save(credential, expectedRevision = current?.revision) != null) {
                 val label = tokens.label?.takeIf { newLabel -> newLabel != account.label }
                 if (label != null) accounts.relabelAccount(accountId, label)
-                accounts.refresh(accountId)
+                storeValidatedOrRefresh(accountId, validated)
                 return if (label != null) account.copy(label = label) else account
             }
         }
@@ -93,19 +94,35 @@ public class SignInManager(
 
     /**
      * Runs one fetch with an API key before storing it, so an expired or unauthorized key never
-     * replaces a stored credential or reports a successful sign-in.
+     * replaces a stored credential or reports a successful sign-in, and returns the fetched
+     * snapshot so the caller can store it without fetching a second time.
      */
-    private suspend fun validateApiKey(tokens: TokenSet) {
-        if (tokens.kind != CredentialKind.ApiKey) return
-        val fetcher = fetchers?.getOrNull(tokens.provider) ?: return
-        val result = fetcher.fetch(ProviderCredentials(accessToken = tokens.accessToken))
-        if (result is QuotaResult.Failure) {
-            when (result.kind) {
-                QuotaErrorKind.Auth ->
-                    throw InvalidApiKeyException(tokens.provider, result.authReason)
-                QuotaErrorKind.Network -> throw AuthException.Network(result.message)
-                else -> throw AuthException.SignInFailed(result.message)
-            }
+    private suspend fun validateApiKey(tokens: TokenSet): QuotaSnapshot? {
+        if (tokens.kind != CredentialKind.ApiKey) return null
+        val fetcher = fetchers?.getOrNull(tokens.provider) ?: return null
+        return when (
+            val result = fetcher.fetch(ProviderCredentials(accessToken = tokens.accessToken))
+        ) {
+            is QuotaResult.Success -> result.snapshot
+            is QuotaResult.Failure ->
+                when (result.kind) {
+                    QuotaErrorKind.Auth ->
+                        throw InvalidApiKeyException(tokens.provider, result.authReason)
+                    QuotaErrorKind.Network -> throw AuthException.Network(result.message)
+                    else -> throw AuthException.SignInFailed(result.message)
+                }
+        }
+    }
+
+    /**
+     * Stores [validated] for [accountId] when validation already fetched the quota, or refreshes
+     * the account otherwise.
+     */
+    private suspend fun storeValidatedOrRefresh(accountId: String, validated: QuotaSnapshot?) {
+        if (validated != null) {
+            accounts.storeSnapshot(validated.copy(accountId = accountId))
+        } else {
+            accounts.refresh(accountId)
         }
     }
 

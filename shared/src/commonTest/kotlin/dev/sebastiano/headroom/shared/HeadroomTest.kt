@@ -195,6 +195,11 @@ class HeadroomTest {
 
         assertEquals(SignInUi.Success("opencode-go", "OpenCode Go", "OpenCode Go"), signIn)
         assertEquals("fresh-key", scope.runTestResult { store.load("oc-1")?.accessToken })
+        assertEquals(emptyList<String?>(), repository.refreshes)
+        assertEquals(
+            now.epochSeconds,
+            repository.accounts.value.single().snapshot?.fetchedAt?.epochSeconds,
+        )
     }
 
     @Test
@@ -625,6 +630,18 @@ private class MemoryAccountsRepository : AccountsRepository {
     }
 
     override suspend fun addAccount(account: Account) = add(account)
+
+    override suspend fun storeSnapshot(snapshot: QuotaSnapshot) {
+        accounts.update { list ->
+            list.map {
+                if (it.account.id == snapshot.accountId) {
+                    it.copy(snapshot = snapshot, lastError = null, authReason = null)
+                } else {
+                    it
+                }
+            }
+        }
+    }
 
     override suspend fun removeAccount(accountId: String) {
         accounts.update { list -> list.filterNot { it.account.id == accountId } }

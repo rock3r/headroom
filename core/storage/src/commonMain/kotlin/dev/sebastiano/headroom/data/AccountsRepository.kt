@@ -2,10 +2,17 @@ package dev.sebastiano.headroom.data
 
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.QuotaRepository
+import dev.sebastiano.headroom.model.QuotaSnapshot
 
 /** A [QuotaRepository] that also manages which accounts exist. */
 public interface AccountsRepository : QuotaRepository {
     public suspend fun addAccount(account: Account)
+
+    /**
+     * Stores [snapshot] as the latest snapshot of its account without fetching again, for example
+     * when signing in with an API key already fetched the quota to validate the key.
+     */
+    public suspend fun storeSnapshot(snapshot: QuotaSnapshot)
 
     public suspend fun removeAccount(accountId: String)
 
