@@ -22,6 +22,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -175,6 +176,36 @@ class StoreSnapshotTest {
 
             assertEquals(0, fetches)
             assertNull(repo.current().single().lastError)
+            assertEquals(71.0, repo.current().single().primaryWindow?.usedPercent)
+        }
+
+    @Test
+    fun `cancelling storeSnapshot while persisting releases the slot so a waiting refresh fetches`() =
+        runTest(UnconfinedTestDispatcher()) {
+            var fetches = 0
+            val storeGate = CompletableDeferred<HistoryRetention>()
+            val repo =
+                RoomQuotaRepository(
+                    db.quotaDao(),
+                    db.accountOrderDao(),
+                    {
+                        fetches++
+                        QuotaResult.Success(claude.snapshot!!)
+                    },
+                    clock = { now },
+                    scope = backgroundScope,
+                    retention = { storeGate.await() },
+                )
+            repo.addAccount(claude.account)
+
+            val storing = async { repo.storeSnapshot(claude.snapshot!!) }
+            val refreshing = async { repo.refresh(claude.account.id) }
+
+            storing.cancelAndJoin()
+            storeGate.complete(HistoryRetention.LongTerm)
+            refreshing.await()
+
+            assertEquals(1, fetches)
             assertEquals(71.0, repo.current().single().primaryWindow?.usedPercent)
         }
 }
