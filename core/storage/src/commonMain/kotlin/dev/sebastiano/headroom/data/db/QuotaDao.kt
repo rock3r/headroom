@@ -178,24 +178,33 @@ internal interface ResetEventQueries {
 
     @Query(
         "SELECT * FROM reset_events WHERE accountId = :accountId AND poolId = :poolId " +
-            "AND kind = 'Used' AND source = 'Elsewhere' AND attemptKey IS NULL " +
-            "AND atEpochMs >= :sinceEpochMs ORDER BY atEpochMs DESC, id DESC LIMIT 1"
+            "AND attemptKey IS NULL AND (" +
+            "(kind = 'Used' AND source = 'Elsewhere' AND atEpochMs >= :sinceEpochMs " +
+            "AND (expiresAtEpochMs IS NULL OR expiresAtEpochMs > :attemptedAtEpochMs)) " +
+            "OR (kind = 'Expired' AND atEpochMs >= :attemptedAtEpochMs " +
+            "AND expiresAtEpochMs > :attemptedAtEpochMs)" +
+            ") ORDER BY CASE WHEN expiresAtEpochMs IS NULL THEN 1 ELSE 0 END ASC, " +
+            "expiresAtEpochMs ASC, atEpochMs DESC, id DESC LIMIT 1"
     )
-    suspend fun recentUseElsewhere(
+    suspend fun claimableResetEvent(
         accountId: String,
         poolId: String,
         sinceEpochMs: Long,
+        attemptedAtEpochMs: Long,
     ): ResetEventEntity?
 
-    @Query("UPDATE reset_events SET source = 'Headroom', attemptKey = :attemptKey WHERE id = :id")
-    suspend fun claimUseElsewhere(id: Long, attemptKey: String)
+    @Query(
+        "UPDATE reset_events SET kind = 'Used', source = 'Headroom', atEpochMs = :atEpochMs, " +
+            "attemptKey = :attemptKey WHERE id = :id"
+    )
+    suspend fun claimResetEvent(id: Long, atEpochMs: Long, attemptKey: String)
 
     /**
      * Records a redeem that worked in Headroom, in one transaction with respect to the syncs. A
      * second call with the same attempt key records nothing. When a sync stored after the provider
      * used the reset but before this call, it recorded that reset as used elsewhere since
-     * [claimSinceEpochMs]: the redeem takes that use over, keeping its expiry and its estimate of
-     * the usage before the reset, instead of counting the reset twice.
+     * [claimSinceEpochMs], or as expired when the confirmation came after its expiry: the redeem
+     * takes over the earliest such reset instead of counting it twice.
      */
     @Transaction
     suspend fun recordRedeem(
@@ -207,7 +216,12 @@ internal interface ResetEventQueries {
         val redeem = event(stored)
         val key = redeem.attemptKey ?: return
         if (attemptCount(key) > 0) return
-        val elsewhere = recentUseElsewhere(accountId, redeem.poolId, claimSinceEpochMs)
-        if (elsewhere != null) claimUseElsewhere(elsewhere.id, key) else insertResetEvent(redeem)
+        val claimed =
+            claimableResetEvent(accountId, redeem.poolId, claimSinceEpochMs, redeem.atEpochMs)
+        if (claimed != null) {
+            claimResetEvent(claimed.id, redeem.atEpochMs, key)
+        } else {
+            insertResetEvent(redeem)
+        }
     }
 }

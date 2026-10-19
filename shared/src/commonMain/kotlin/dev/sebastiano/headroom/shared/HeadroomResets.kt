@@ -19,6 +19,10 @@ import dev.sebastiano.headroom.model.ResetRefresh
 import dev.sebastiano.headroom.signin.DeviceSession
 import dev.sebastiano.headroom.signin.ServiceSignIn
 import dev.sebastiano.headroom.signin.ServiceSignInState
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -147,12 +151,14 @@ internal constructor(
     memory: ResetAttemptMemory,
     events: ResetEventLog,
     private val scope: CoroutineScope,
+    clock: () -> Instant = Clock.System::now,
     startZCode: suspend () -> DeviceSession,
     saveZCode: suspend (accountId: String, tokens: TokenSet) -> Unit,
     startCursor: suspend () -> DeviceSession,
     saveCursor: suspend (accountId: String, tokens: TokenSet) -> Unit,
 ) {
-    public val redeem: HeadroomRedeem = HeadroomRedeem(sources, provider, memory, events, scope)
+    public val redeem: HeadroomRedeem =
+        HeadroomRedeem(sources, provider, memory, events, scope, clock)
 
     public val zCode: HeadroomServiceSignIn =
         HeadroomServiceSignIn(ServiceSignIn("ZCode", startZCode, saveZCode, scope), scope)
@@ -226,6 +232,7 @@ internal constructor(
     private val memory: ResetAttemptMemory,
     private val events: ResetEventLog,
     private val scope: CoroutineScope,
+    private val clock: () -> Instant = Clock.System::now,
 ) {
     private val session = MutableStateFlow<RedeemSession?>(null)
     private var pendingStart: Job? = null
@@ -233,6 +240,8 @@ internal constructor(
         UiMapping.pool(Provider.Codex, emptyList(), it)
     }
     private var experimental = false
+    private val lock = SynchronizedObject()
+    private val attemptTimes = LinkedHashMap<ResetAttemptKey, Instant>()
 
     /** True while the provider is working: the sheet must stay open. */
     public val isBusy: Boolean
@@ -334,15 +343,23 @@ internal constructor(
             account: Account,
             poolId: String,
             attemptKey: ResetAttemptKey,
-        ): RedeemOutcome =
-            inner.redeem(account, poolId, attemptKey).also { settle(poolId, attemptKey, it) }
+        ): RedeemOutcome {
+            val sentAt = clock()
+            return inner.redeem(account, poolId, attemptKey).also {
+                settle(poolId, attemptKey, sentAt, it)
+            }
+        }
 
         override suspend fun check(
             account: Account,
             poolId: String,
             attemptKey: ResetAttemptKey,
-        ): RedeemOutcome =
-            inner.check(account, poolId, attemptKey).also { settle(poolId, attemptKey, it) }
+        ): RedeemOutcome {
+            val sentAt = clock()
+            return inner.check(account, poolId, attemptKey).also {
+                settle(poolId, attemptKey, sentAt, it)
+            }
+        }
 
         override suspend fun askForMore(account: Account): AskOutcome =
             inner.askForMore(account).also { outcome ->
@@ -352,15 +369,38 @@ internal constructor(
         private suspend fun settle(
             poolId: String,
             attemptKey: ResetAttemptKey,
+            sentAt: Instant,
             outcome: RedeemOutcome,
         ) {
+            if (outcome is RedeemOutcome.RateLimited) return
+            val attemptedAt = rememberAttempt(attemptKey, sentAt)
+            if (!outcome.isSettled) return
+            forgetAttempt(attemptKey)
             if (outcome !is RedeemOutcome.Success) return
-            events.redeemed(account, poolId, attemptKey)
+            events.redeemed(account, poolId, attemptKey, attemptedAt)
             scope.launch {
                 delay(ResetRefresh.DELAY)
                 sources.refresh(account.id)
             }
         }
+    }
+
+    private fun rememberAttempt(attemptKey: ResetAttemptKey, sentAt: Instant): Instant =
+        synchronized(lock) {
+            attemptTimes.getOrPut(attemptKey) {
+                while (attemptTimes.size >= MAX_ATTEMPTS) {
+                    attemptTimes.remove(attemptTimes.keys.first())
+                }
+                sentAt
+            }
+        }
+
+    private fun forgetAttempt(attemptKey: ResetAttemptKey) {
+        synchronized(lock) { attemptTimes.remove(attemptKey) }
+    }
+
+    private companion object {
+        const val MAX_ATTEMPTS = 16
     }
 }
 

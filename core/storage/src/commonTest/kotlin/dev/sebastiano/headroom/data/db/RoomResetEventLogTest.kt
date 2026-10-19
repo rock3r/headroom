@@ -150,6 +150,102 @@ class RoomResetEventLogTest {
         }
 
     @Test
+    fun `a retry confirmed after the reset expired still settles it using the first attempt time`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            val firstTry = soon.minus(1.minutes)
+
+            now = soon.plus(1.minutes)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"), attemptedAt = firstTry)
+            now = now.plus(2.seconds)
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            val event = events().single()
+            assertEquals(ResetEventKind.Used, event.kind)
+            assertEquals(ResetUseSource.Headroom, event.source)
+            assertEquals(firstTry, event.at)
+            assertEquals(soon, event.expiresAt)
+        }
+
+    @Test
+    fun `a retry confirmed after a sync already recorded the reset as expired converts it to a use`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            val firstTry = soon.minus(1.minutes)
+
+            now = soon.plus(1.minutes)
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            now = soon.plus(2.minutes)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"), attemptedAt = firstTry)
+            now = now.plus(2.seconds)
+            repo.refresh()
+
+            val event = events().single()
+            assertEquals(ResetEventKind.Used, event.kind)
+            assertEquals(ResetUseSource.Headroom, event.source)
+            assertEquals(firstTry, event.at)
+            assertEquals(soon, event.expiresAt)
+
+            now = later.plus(1.minutes)
+            snapshot = snapshot(resets(), weeklyUsed = 0.0)
+            repo.refresh()
+
+            assertEquals(
+                listOf(ResetEventKind.Used, ResetEventKind.Expired),
+                events().map { it.kind },
+            )
+        }
+
+    @Test
+    fun `a retry confirmed after a sync replaced the usage snapshot does not measure post-attempt usage`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            val firstTry = now.plus(1.minutes)
+
+            now = firstTry.plus(1.minutes)
+            snapshot = snapshot(resets(soon, later), weeklyUsed = 5.0).copy(resetsReadFailed = true)
+            repo.refresh()
+
+            now = firstTry.plus(2.minutes)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"), attemptedAt = firstTry)
+
+            val event = events().single()
+            assertEquals(emptyMap(), event.givenBack)
+            assertFalse(event.givenBackEstimated)
+        }
+
+    @Test
+    fun `claiming after a use elsewhere and a later expiry picks the earlier reset`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val repo = setUpAccount(backgroundScope)
+            val firstTry = now.plus(1.minutes)
+
+            now = firstTry.plus(1.minutes)
+            snapshot = snapshot(resets(later), weeklyUsed = 0.0)
+            repo.refresh()
+
+            now = later.plus(1.minutes)
+            snapshot = snapshot(resets(), weeklyUsed = 0.0)
+            repo.refresh()
+
+            now = later.plus(2.minutes)
+            log().redeemed(account, "credits", ResetAttemptKey("key-1"), attemptedAt = firstTry)
+
+            val recorded = events()
+            assertEquals(2, recorded.size)
+            assertEquals(ResetEventKind.Used, recorded[0].kind)
+            assertEquals(ResetUseSource.Headroom, recorded[0].source)
+            assertEquals(firstTry, recorded[0].at)
+            assertEquals(soon, recorded[0].expiresAt)
+            assertEquals(mapOf(WindowKind.Weekly to 90.0), recorded[0].givenBack)
+            assertEquals(ResetEventKind.Expired, recorded[1].kind)
+            assertEquals(later, recorded[1].expiresAt)
+        }
+
+    @Test
     fun `a redeem recorded after a sync already found its reset gone takes over that use`() =
         runTest(UnconfinedTestDispatcher()) {
             val repo = setUpAccount(backgroundScope)

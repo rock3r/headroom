@@ -31,29 +31,38 @@ internal class RoomResetEventLog(private val dao: QuotaDao, private val clock: (
             rows.mapNotNull { it.toDomain() }
         }
 
-    override suspend fun redeemed(account: Account, poolId: String, attemptKey: ResetAttemptKey) {
-        val now = clock()
-        dao.recordRedeem(account.id, now.minus(CLAIM_WINDOW).toEpochMilliseconds()) { stored ->
+    override suspend fun redeemed(
+        account: Account,
+        poolId: String,
+        attemptKey: ResetAttemptKey,
+        attemptedAt: Instant?,
+    ) {
+        val at = attemptedAt ?: clock()
+        dao.recordRedeem(account.id, at.minus(CLAIM_WINDOW).toEpochMilliseconds()) { stored ->
             val pool =
                 stored.account.resetsJson?.let(ResetsCodec::decode)?.pools?.firstOrNull {
                     it.id == poolId
                 }
-            val givenBack = pool?.let {
-                ResetGivenBack.measure(it.scope, stored.windows.map { w -> w.toDomain() }, now)
-            }
             val fetchedAt = stored.account.fetchedAtEpochMs?.let(Instant::fromEpochMilliseconds)
-            val fresh = fetchedAt != null && (now - fetchedAt) <= ResetGivenBack.FRESH_FOR
+            val beforeAttempt = fetchedAt != null && fetchedAt <= at
+            val givenBack =
+                if (beforeAttempt && pool != null) {
+                    ResetGivenBack.measure(pool.scope, stored.windows.map { w -> w.toDomain() }, at)
+                } else {
+                    emptyMap()
+                }
+            val fresh = beforeAttempt && (at - fetchedAt) <= ResetGivenBack.FRESH_FOR
             ResetEvent(
                     accountId = account.id,
                     provider = account.provider,
                     poolId = poolId,
                     poolLabel = pool?.label ?: poolId,
                     kind = ResetEventKind.Used,
-                    at = now,
+                    at = at,
                     expiresAt = pool?.soonestExpiry,
                     source = ResetUseSource.Headroom,
-                    givenBack = givenBack.orEmpty(),
-                    givenBackEstimated = !givenBack.isNullOrEmpty() && !fresh,
+                    givenBack = givenBack,
+                    givenBackEstimated = givenBack.isNotEmpty() && !fresh,
                 )
                 .toEntity(attemptKey = attemptKey.value, settled = false)
         }
