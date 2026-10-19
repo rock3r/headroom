@@ -13,6 +13,7 @@ import dev.sebastiano.headroom.data.R
 import dev.sebastiano.headroom.data.SignInIntents
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AuthFailureReason
+import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.SignInAlertPolicy
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -81,6 +82,11 @@ internal class SignInAlertingRepository(
 ) : AccountsRepository by delegate {
     override suspend fun refresh(accountId: String?) {
         delegate.refresh(accountId)
+        alerts.update(delegate.current())
+    }
+
+    override suspend fun storeSnapshot(snapshot: QuotaSnapshot) {
+        delegate.storeSnapshot(snapshot)
         alerts.update(delegate.current())
     }
 

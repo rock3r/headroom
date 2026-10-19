@@ -46,6 +46,17 @@ class SignInManagerTest {
             state.value = state.value + AccountState(account, null)
         }
 
+        override suspend fun storeSnapshot(snapshot: QuotaSnapshot) {
+            state.value =
+                state.value.map {
+                    if (it.account.id == snapshot.accountId) {
+                        it.copy(snapshot = snapshot, lastError = null, authReason = null)
+                    } else {
+                        it
+                    }
+                }
+        }
+
         override suspend fun removeAccount(accountId: String) {
             removeGate?.await()
             state.value = state.value.filterNot { it.account.id == accountId }
@@ -399,24 +410,58 @@ class SignInManagerTest {
     }
 
     @Test
-    fun `a valid API key passes validation replaces the credential and refreshes`() = runTest {
-        val store = InMemoryTokenStore()
-        val accounts = MemoryAccounts()
-        SignInManager(store, accounts) { "oc" }.complete(openCodeKey)
-        accounts.refreshed.clear()
-        val seenKeys = mutableListOf<String>()
-        val fetchers = openCodeFetchers { credentials ->
-            seenKeys += credentials.accessToken
-            QuotaResult.Success(openCodeSnapshot)
+    fun `a valid API key stores the validation snapshot without fetching a second time`() =
+        runTest {
+            val store = InMemoryTokenStore()
+            val accounts = MemoryAccounts()
+            val seenKeys = mutableListOf<String>()
+            val fetchers = openCodeFetchers { credentials ->
+                seenKeys += credentials.accessToken
+                if (seenKeys.size > 1) {
+                    QuotaResult.Failure(QuotaErrorKind.RateLimited, "throttled")
+                } else {
+                    QuotaResult.Success(openCodeSnapshot.copy(accountId = ""))
+                }
+            }
+            val manager = SignInManager(store, accounts, fetchers) { "oc" }
+
+            val added = manager.complete(openCodeKey)
+
+            assertEquals("oc", added.id)
+            assertEquals(listOf("old-key"), seenKeys)
+            assertEquals("old-key", store.load("oc")?.accessToken)
+            assertEquals(emptyList<String?>(), accounts.refreshed)
+            assertEquals(openCodeSnapshot, accounts.state.value.single().snapshot)
+
+            seenKeys.clear()
+            accounts.state.value =
+                accounts.state.value.map {
+                    it.copy(
+                        lastError = QuotaErrorKind.Auth,
+                        authReason = AuthFailureReason.KeyExpired,
+                    )
+                }
+            val updatedSnapshot = openCodeSnapshot.copy(fetchedAt = Instant.fromEpochSeconds(60))
+            val replaceFetchers = openCodeFetchers { credentials ->
+                seenKeys += credentials.accessToken
+                if (seenKeys.size > 1) {
+                    QuotaResult.Failure(QuotaErrorKind.RateLimited, "throttled")
+                } else {
+                    QuotaResult.Success(updatedSnapshot.copy(accountId = ""))
+                }
+            }
+            val replaceManager = SignInManager(store, accounts, replaceFetchers) { "oc-2" }
+
+            replaceManager.reauthenticate("oc", openCodeKey.copy(accessToken = "fresh-key"))
+
+            assertEquals(listOf("fresh-key"), seenKeys)
+            assertEquals("fresh-key", store.load("oc")?.accessToken)
+            assertEquals(emptyList<String?>(), accounts.refreshed)
+            val state = accounts.state.value.single()
+            assertEquals(updatedSnapshot, state.snapshot)
+            assertNull(state.lastError)
+            assertNull(state.authReason)
         }
-        val manager = SignInManager(store, accounts, fetchers) { "oc-2" }
-
-        manager.reauthenticate("oc", openCodeKey.copy(accessToken = "fresh-key"))
-
-        assertEquals(listOf("fresh-key"), seenKeys)
-        assertEquals("fresh-key", store.load("oc")?.accessToken)
-        assertEquals(listOf<String?>("oc"), accounts.refreshed)
-    }
 
     @Test
     fun `a network error while validating an API key does not save it`() = runTest {

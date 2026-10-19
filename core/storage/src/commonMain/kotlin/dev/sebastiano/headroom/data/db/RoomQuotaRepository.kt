@@ -4,8 +4,11 @@ import dev.sebastiano.headroom.data.AccountsRepository
 import dev.sebastiano.headroom.model.Account
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.HistoryRetention
+import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.model.QuotaSnapshot
+import dev.sebastiano.headroom.model.ResetAvailability
 import dev.sebastiano.headroom.model.UsagePoint
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -62,6 +65,33 @@ internal class RoomQuotaRepository(
             )
         )
     }
+
+    override suspend fun storeSnapshot(snapshot: QuotaSnapshot) {
+        while (true) {
+            val running = inFlightLock.withLock { inFlight[snapshot.accountId] } ?: break
+            running.await()
+        }
+        val entity = dao.account(snapshot.accountId) ?: return
+        val existingResets = entity.resetsJson?.let(ResetsCodec::decode)
+        // A validation snapshot comes from the usage fetcher, which does not read resets: an
+        // existing account keeps the ones it had, and a new Z.AI account starts with the ZCode
+        // sign-in prompt that a full sync would record before ZCode is signed in.
+        val merged =
+            if (snapshot.resets == null) {
+                snapshot.copy(
+                    resets = existingResets ?: initialResets(snapshot.provider),
+                    resetsReadFailed =
+                        if (existingResets != null) entity.resetsReadFailed else false,
+                )
+            } else {
+                snapshot
+            }
+        store(entity, QuotaResult.Success(merged))
+    }
+
+    private fun initialResets(provider: Provider): ResetAvailability? =
+        if (provider == Provider.ZAi) ResetAvailability(emptyList(), requiresSignIn = true)
+        else null
 
     /** Names the account. A blank [nickname] removes the name, so the provider's name shows. */
     override suspend fun renameAccount(accountId: String, nickname: String?) {
