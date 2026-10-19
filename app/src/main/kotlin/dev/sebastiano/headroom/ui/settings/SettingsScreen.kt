@@ -204,11 +204,15 @@ fun SettingsScreen(
             )
         }
         if (showIslandSetup) {
-            ResetIslandSetup(
-                island = resetIsland,
-                onTry = actions.onTryResetIsland,
-                onDismiss = { showIslandSetup = false },
-            )
+            if (scrollToTile || reveal?.opening == false) {
+                showIslandSetup = false
+            } else {
+                ResetIslandSetup(
+                    island = resetIsland,
+                    onTry = actions.onTryResetIsland,
+                    onDismiss = { showIslandSetup = false },
+                )
+            }
         }
     }
 }

@@ -23,8 +23,10 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +67,7 @@ import dev.sebastiano.headroom.ui.delights.confettiColors
 import dev.sebastiano.headroom.ui.delights.delightAnchor
 import dev.sebastiano.headroom.ui.home.AccountSummary
 import dev.sebastiano.headroom.ui.home.WindowSummary
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 
 const val REDEEM_SHEET_TAG: String = "redeem-sheet"
@@ -117,6 +120,8 @@ fun RedeemSheet(
     onSignIn: (() -> Unit)? = null,
     /** How that sign-in is going, once it started from this sheet. */
     signIn: ServiceSignInState = ServiceSignInState.Idle,
+    /** Called when the sheet starts or stops working on a reset. */
+    onBusyChange: (Boolean) -> Unit = {},
 ) {
     // A sign-in that finishes while the sheet is open refreshes the availability, and the new
     // session then picks the resets up: the sheet goes on to them instead of closing.
@@ -125,14 +130,7 @@ fun RedeemSheet(
             RedeemSession(account, availability, provider, intent, memory)
         }
     val step by session.step.collectAsStateWithLifecycle()
-    // Nothing closes the sheet while the provider works, or while the new usage comes in.
-    val busy =
-        step is RedeemStep.Resetting ||
-            step is RedeemStep.Checking ||
-            step is RedeemStep.Asking ||
-            (step is RedeemStep.Finished &&
-                (step as RedeemStep.Finished).outcome is RedeemOutcome.Success &&
-                refreshing)
+    val (busy, runStep) = rememberRedeemBusy(session, step, refreshing, onBusyChange)
     val currentBusy by rememberUpdatedState(busy)
     val sheetState =
         rememberModalBottomSheetState(
@@ -140,18 +138,17 @@ fun RedeemSheet(
             confirmValueChange = { it != SheetValue.Hidden || !currentBusy },
         )
     val scope = rememberCoroutineScope()
-    LaunchedEffect(session) { session.start() }
     var stubNote by remember { mutableStateOf(false) }
     val actions =
         RedeemActions(
             onChoose = session::choose,
             onBack = session::back,
-            onConfirm = { scope.launch { session.confirm() } },
-            onTryAgain = { scope.launch { session.tryAgain() } },
-            onAsk = { scope.launch { session.ask() } },
-            onUseNow = { scope.launch { session.useNow() } },
+            onConfirm = { runStep { confirm() } },
+            onTryAgain = { runStep { tryAgain() } },
+            onAsk = { runStep { ask() } },
+            onUseNow = { runStep { useNow() } },
             onSignIn = onSignIn ?: { stubNote = true },
-            onCheckAgain = { scope.launch { session.checkAgain() } },
+            onCheckAgain = { runStep { checkAgain() } },
             // Z.AI's resets only use the ZCode sign-in, so that is the one to do again.
             onSignInAgain = onSignIn?.takeIf { account.provider == Provider.ZAi } ?: onSignInAgain,
             onClose = {
@@ -187,6 +184,56 @@ fun RedeemSheet(
         )
     }
 }
+
+/**
+ * Runs [session]'s actions and reports whether the sheet is busy: while the provider works, or
+ * while [refreshing] brings in the new usage after a reset. Actions start undispatched so
+ * [onBusyChange] sees the new step before the click returns.
+ */
+@Composable
+private fun rememberRedeemBusy(
+    session: RedeemSession,
+    step: RedeemStep,
+    refreshing: Boolean,
+    onBusyChange: (Boolean) -> Unit,
+): Pair<Boolean, (suspend RedeemSession.() -> Unit) -> Unit> {
+    val busy = session.busy || isRedeemBusy(step, refreshing)
+    val currentRefreshing by rememberUpdatedState(refreshing)
+    val currentOnBusyChange by rememberUpdatedState(onBusyChange)
+    SideEffect { currentOnBusyChange(session.isBusy(refreshing)) }
+    DisposableEffect(Unit) { onDispose { currentOnBusyChange(false) } }
+    val scope = rememberCoroutineScope()
+    val run: (suspend RedeemSession.() -> Unit) -> Unit =
+        remember(session, scope) {
+            { block ->
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    try {
+                        session.block()
+                    } finally {
+                        currentOnBusyChange(session.isBusy(currentRefreshing))
+                    }
+                }
+                currentOnBusyChange(session.isBusy(currentRefreshing))
+            }
+        }
+    LaunchedEffect(session) {
+        try {
+            session.start()
+        } finally {
+            currentOnBusyChange(session.isBusy(currentRefreshing))
+        }
+    }
+    return busy to run
+}
+
+private fun RedeemSession.isBusy(refreshing: Boolean): Boolean =
+    busy || isRedeemBusy(step.value, refreshing)
+
+private fun isRedeemBusy(step: RedeemStep, refreshing: Boolean): Boolean =
+    step is RedeemStep.Resetting ||
+        step is RedeemStep.Checking ||
+        step is RedeemStep.Asking ||
+        (step is RedeemStep.Finished && step.outcome is RedeemOutcome.Success && refreshing)
 
 /** The line that says how the sign-in to [service] is going, or null before it starts. */
 @Composable

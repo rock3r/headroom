@@ -104,14 +104,15 @@ fun HeadroomApp(
     var entrancePlayed by rememberSaveable { mutableStateOf(false) }
     val sheet = rememberSaveable(saver = ResetSheetState.Saver) { ResetSheetState() }
     val (home, detail) = holdUnderSheet(live, liveDetail, sheet.request?.accountId)
-    // A widget tap leaves the page on top, unless the user is in the middle of signing in.
+    // A widget tap leaves the page on top, unless the user is in the middle of signing in or
+    // redeeming a reset.
     val signingIn = (accounts.step as? AccountsStep.SignIn)?.state?.isWaitingForUser() == true
-    val requests = rememberPendingRequest(openAccountRequest, home, onConsumeOpenAccount)
-    val openNow = requests.ready.takeIf { !signingIn && it?.signInAgain != true }
+    val requests =
+        rememberPendingRequest(openAccountRequest, home, signingIn, sheet, onConsumeOpenAccount)
+    val openNow = requests.openNow
     val shown = if (openNow == null) page else Page.Home
     val signInAgain =
-        rememberSignInAgain(accountsViewModel, accounts.step, requests.ready, requests::drop) {
-            again ->
+        rememberSignInAgain(accountsViewModel, accounts.step, requests) { again ->
             if (again) accountsFromSettings = false
             page = if (again) Page.Accounts else Page.Home
         }
@@ -237,10 +238,10 @@ private class TileScroll {
 }
 
 /**
- * Handles a long press on the Quick Settings tile, by [request] serial: [onOpenPage] shows
- * Settings, the returned [TileScroll] asks it to scroll to the tile's rows, and [onConsume] tells
- * the host to clear the request. The long press wins over an earlier widget tap in [pending], like
- * the user's own taps.
+ * Handles a long press on the Quick Settings tile, by [request] serial: unless the redeem sheet is
+ * in the middle of a reset, it closes the sheet, [onOpenPage] shows Settings, and the returned
+ * [TileScroll] asks it to scroll to the tile's rows. [onConsume] tells the host to clear the
+ * request. The long press wins over an earlier widget tap in [pending], like the user's own taps.
  */
 @Composable
 private fun rememberTileScroll(
@@ -255,9 +256,11 @@ private fun rememberTileScroll(
         if (request == null || request == handled) return@SideEffect
         handled = request
         pending.drop()
+        onConsume()
+        if (pending.busy) return@SideEffect
+        pending.dismissSheet()
         onOpenPage(Page.Settings)
         scroll.pending = true
-        onConsume()
     }
     return scroll
 }
@@ -268,9 +271,17 @@ private const val ENTER_SCALE = 0.96f
 private class PendingRequest(
     /** The request, once the accounts are known well enough to act on it. */
     val ready: OpenAccountRequest?,
+    /** The request to open on the overview right now, or null while signing in. */
+    val openNow: OpenAccountRequest?,
     private val pending: OpenAccountRequest?,
+    private val sheet: ResetSheetState,
     private val markHandled: (serial: Long?) -> Unit,
 ) {
+    val busy: Boolean
+        get() = sheet.busy
+
+    fun dismissSheet() = sheet.dismiss()
+
     /** Marks the request with [serial] as handled, and tells the host to clear it. */
     fun handle(serial: Long?) = markHandled(serial)
 
@@ -283,49 +294,61 @@ private class PendingRequest(
 /**
  * Tracks [request] until it is handled. A request is acted on once, even if the host is slow to
  * clear it: a request left behind must never keep the accounts screen from opening. Unknown
- * accounts are dropped once loading is done, see [decideOpenAccount].
+ * accounts are dropped once loading is done, see [decideOpenAccount]. A request that arrives while
+ * [sheet] is in the middle of a reset is dropped; otherwise it closes [sheet].
  */
 @Composable
 private fun rememberPendingRequest(
     request: OpenAccountRequest?,
     home: HomeUiState,
+    signingIn: Boolean,
+    sheet: ResetSheetState,
     onConsume: () -> Unit,
 ): PendingRequest {
     var handledRequest by remember { mutableStateOf<Long?>(null) }
     val pending = request?.takeIf { it.serial != handledRequest }
     val decision = pending?.let {
-        decideOpenAccount(
-            it.accountId,
-            home.accounts.map { account -> account.id },
-            home.accountsLoaded,
-        )
+        if (sheet.busy) OpenAccountDecision.Ignore
+        else
+            decideOpenAccount(
+                it.accountId,
+                home.accounts.map { account -> account.id },
+                home.accountsLoaded,
+            )
     }
-    SideEffect { if (decision == OpenAccountDecision.Ignore) onConsume() }
-    return PendingRequest(pending.takeIf { decision == OpenAccountDecision.Open }, pending) { serial
-        ->
+    val ready = pending.takeIf { decision == OpenAccountDecision.Open }
+    val openNow = ready.takeIf { !signingIn && it?.signInAgain != true }
+    SideEffect {
+        if (decision == OpenAccountDecision.Ignore) {
+            handledRequest = pending.serial
+            onConsume()
+        }
+        if (openNow != null || ready?.signInAgain == true) sheet.dismiss()
+    }
+    return PendingRequest(ready, openNow, pending, sheet) { serial ->
         handledRequest = serial
         onConsume()
     }
 }
 
 /**
- * Starts signing an account in again, from a card, the detail or a sign-in warning's [request].
- * [onPage] is called with true to show the accounts page with the sign-in, and with false once that
- * sign-in is over (done, cancelled or backed out of), to go back to the overview.
+ * Starts signing an account in again, from a card, the detail or a sign-in warning's [pending]
+ * request. [onPage] is called with true to show the accounts page with the sign-in, and with false
+ * once that sign-in is over (done, cancelled or backed out of), to go back to the overview.
  */
 @Composable
 private fun rememberSignInAgain(
     viewModel: AccountsViewModel,
     step: AccountsStep,
-    request: OpenAccountRequest?,
-    onHandleRequest: () -> Unit,
+    pending: PendingRequest,
     onPage: (signingInAgain: Boolean) -> Unit,
 ): (accountId: String) -> Unit {
     // Started, and whether its sign-in step has shown yet: a browser sign-in starts a moment late.
     var started by rememberSaveable { mutableStateOf(false) }
     var shown by rememberSaveable { mutableStateOf(false) }
     val signingIn = (step as? AccountsStep.SignIn)?.again != null
-    val currentOnHandleRequest by rememberUpdatedState(onHandleRequest)
+    val request = pending.ready
+    val currentOnHandleRequest by rememberUpdatedState(pending::drop)
     val currentOnPage by rememberUpdatedState(onPage)
     // Remembered, so the screens it is passed to can skip recomposing.
     val start =
