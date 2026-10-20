@@ -133,7 +133,7 @@ private fun WavyRing(
                     infiniteRepeatable(tween(WAVE_PERIOD_MILLIS, easing = LinearEasing)),
                 label = "wave phase",
             )
-    Canvas(modifier = modifier) {
+    Canvas(modifier = modifier.decorativeFrameRate()) {
         val stroke = strokeWidth.toPx()
         val amplitude = WaveAmplitude.toPx()
         val radius = size.minDimension / 2 - stroke / 2 - amplitude

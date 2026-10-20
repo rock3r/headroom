@@ -2,18 +2,24 @@ package dev.sebastiano.headroom.designsystem
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.preferredFrameRate
+import kotlinx.coroutines.delay
 
 /**
  * Motion roles, following Material 3 Expressive and the rule that values read as data never
@@ -93,14 +99,19 @@ object HeadroomMotion {
     private const val RIPPLE_DURATION_MILLIS = 800
 
     /**
-     * For a slow decorative motion that never stops, such as the next reset card's shape turning.
-     * It runs a linear phase from 0 to 1 once per period and starts again, so a full turn per
-     * period loops without a jump. Slow enough to notice only when you look for it.
+     * How long a slow decorative motion that never stops takes to loop, such as the next reset
+     * card's shape turning: see [rememberDecorativePhase]. Slow enough to notice only when you look
+     * for it.
      */
-    fun <T> driftSpec(): InfiniteRepeatableSpec<T> =
-        infiniteRepeatable(tween(durationMillis = DRIFT_PERIOD_MILLIS, easing = LinearEasing))
+    const val DRIFT_PERIOD_MILLIS: Int = 60_000
 
-    private const val DRIFT_PERIOD_MILLIS = 60_000
+    /**
+     * The frame rate that endless decorative motion asks for: the next reset card's turning shape
+     * and the waves of a bar or ring that needs attention. They move so slowly that more frames
+     * look no smoother, yet each frame redraws the whole window, so at the display's 120 Hz a
+     * screen at rest would keep the CPU and GPU busy. See [decorativeFrameRate].
+     */
+    const val DECORATIVE_FRAME_RATE: Float = 30f
 
     /** For fades and colour changes. */
     @Composable
@@ -131,3 +142,41 @@ fun animationsEnabled(): Boolean {
     val scale = rememberCoroutineScope().coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
     return scale > 0f && !LocalReduceMotion.current
 }
+
+/**
+ * Asks the display for [HeadroomMotion.DECORATIVE_FRAME_RATE] while only this content moves, for
+ * endless decorative motion. The request is a vote: anything else that moves, a scroll or a
+ * transition, still gets the display's full rate. It needs a layer to vote with, so it adds one.
+ *
+ * Compose 1.13.0-alpha drops the vote for content inside lazy list and grid items (see
+ * docs/perf/UPSTREAM-ISSUES.md, U1). There, move the content on [rememberDecorativePhase] instead.
+ */
+fun Modifier.decorativeFrameRate(): Modifier =
+    preferredFrameRate(HeadroomMotion.DECORATIVE_FRAME_RATE).graphicsLayer()
+
+/**
+ * A phase from 0 to 1 that loops once every [periodMillis], for endless decorative motion such as
+ * the next reset card's turning shape. Read it while drawing or in a layer block.
+ *
+ * It moves on at [HeadroomMotion.DECORATIVE_FRAME_RATE], not on every frame: each change redraws
+ * the whole window, and a 120 Hz display would otherwise redraw a screen at rest 120 times a second
+ * for motion too slow to look any smoother. Unlike [decorativeFrameRate], this works wherever the
+ * content sits, including in lazy lists. Like any endless animation it stops in the background,
+ * when Compose pauses its frame clock.
+ */
+@Composable
+fun rememberDecorativePhase(periodMillis: Int): () -> Float {
+    val phase = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(periodMillis) {
+        val start = withInfiniteAnimationFrameMillis { it }
+        while (true) {
+            delay(DECORATIVE_FRAME_MILLIS)
+            withInfiniteAnimationFrameMillis { now ->
+                phase.floatValue = ((now - start) % periodMillis) / periodMillis.toFloat()
+            }
+        }
+    }
+    return remember(phase) { { phase.floatValue } }
+}
+
+private val DECORATIVE_FRAME_MILLIS = (1_000 / HeadroomMotion.DECORATIVE_FRAME_RATE).toLong()
