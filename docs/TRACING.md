@@ -104,3 +104,33 @@ group by t.name, s.name order by total_ms desc limit 25;
 Debug builds omit R8 and enable Compose debug checks. Their absolute timings are slower than release timings.
 Use debug traces to compare rows; use release measurements to assess the 16 ms frame budget.
 Software rendering makes emulator render-thread timings much slower than phone timings.
+
+## Measuring frames on a release build
+
+Debug builds are too slow to judge frame times. `./gradlew :app:assembleBenchmark` builds the
+`benchmark` build type: the release build (R8, no Compose debug checks), signed with the debug key,
+profileable from the shell, with in-process tracing that stays off until a `START` broadcast. It
+installs next to the shipped app as `dev.sebastiano.headroom.benchmark` and starts with demo data,
+so a phone's real accounts are never touched. To trace it, pass `PACKAGE=dev.sebastiano.headroom.benchmark`
+to `scripts/trace-steps.sh`. After reinstalling, send `START`, then force-stop and relaunch the app
+before tracing.
+
+`scripts/perf/` holds the performance audit's tools (see `docs/perf/`):
+
+- `ftl.py` runs a scripted interaction several times and reads Perfetto's FrameTimeline: frames,
+  jank SurfaceFlinger blames on the app, and main-thread and RenderThread time per frame. It
+  refuses to run when the animation scale is not 1 or the app is not in front.
+- `suite.sh` runs every scenario of the audit (idle screens, scrolls, screen openings, refresh,
+  theme changes) with `ftl.py`. `table.py` prints a run, or compares two runs.
+- `compile-modes.sh` repeats scenarios with the app compiled as `verify`, `speed-profile` and
+  `speed`, to see how much ahead-of-time compilation matters.
+- `baseline-profile.sh` regenerates `app/src/main/baseline-prof.txt`, the app's baseline profile,
+  by driving every scenario on an R8-less benchmark build (`-Pheadroom.benchmark.minify=false`)
+  and dumping the profile ART recorded. Regenerate it when screens or libraries change a lot.
+  `profile-ab.sh` compares two APKs as a first session after install, once ART has compiled the
+  APK's profile.
+- `long-frames-compose.sh` lists a merged trace's long frames with the composables that spent the
+  most time in them. `nodes.sh` lists tap targets on screen.
+
+They need `trace_processor` v58 or later from `https://get.perfetto.dev/trace_processor`, because
+older versions cannot read Android 17 traces.

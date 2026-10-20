@@ -50,9 +50,26 @@ android {
             initWith(getByName("release"))
             matchingFallbacks += "release"
         }
+        // A build for measuring performance: the release build (R8, no Compose debug checks),
+        // signed with the debug key, profileable from the shell (src/benchmark), and installed
+        // next to the shipped app under its own application ID, so a phone keeps its real
+        // accounts. Its in-process trace sections are off until a START broadcast, like debug's.
+        // See docs/TRACING.md.
+        create("benchmark") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".benchmark"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            // scripts/perf/baseline-profile.sh needs the source names, so it builds without R8.
+            if (providers.gradleProperty("headroom.benchmark.minify").orNull == "false") {
+                isMinifyEnabled = false
+                isShrinkResources = false
+            }
+        }
     }
     // The Play build ships the release code, including what only release builds have.
     sourceSets.getByName("play").kotlin.srcDir("src/release/kotlin")
+    sourceSets.getByName("benchmark").kotlin.srcDir("src/release/kotlin")
     // Only the Play build goes to Google Play.
     playConfigs { register("play") { enabled.set(true) } }
     testOptions {
@@ -119,6 +136,8 @@ dependencies {
     implementation(libs.androidx.tracing)
     debugImplementation(libs.androidx.tracing.wire)
     debugImplementation(libs.compose.runtime.tracing)
+    "benchmarkImplementation"(libs.androidx.tracing.wire)
+    "benchmarkImplementation"(libs.compose.runtime.tracing)
     implementation(libs.reorderable)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
