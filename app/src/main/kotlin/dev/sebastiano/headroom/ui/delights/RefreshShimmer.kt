@@ -87,11 +87,14 @@ half4 main(float2 coord) {
         for (int j = -1; j <= 1; j++) {
             float2 cell = base + float2(float(i), float(j));
             float h = hash(cell);
+            // Most cells hold no star: skip them before any other work. The shader runs for every
+            // pixel of the screen on every frame, so this is most of its cost.
+            if (h <= 0.72) continue;
             float2 jitter = float2(hash(cell + 1.7), hash(cell + 4.1)) - 0.5;
             float2 home = (cell + 0.5 + jitter * 0.6) * cellSize;
             float reached = clamp((dot(home, midSweep) / midReach + 0.25) / 1.5, 0.0, 1.0);
             float age = progress - TRAVEL * easeInverse(reached);
-            if (h > 0.72 && age > 0.0) {
+            if (age > 0.0) {
                 // The front pushes the star along, and it slows down as it fades.
                 float spread = (hash(cell + 3.3) - 0.5) * 1.4;
                 float2 heading = float2(cos(0.52 + spread), sin(0.52 + spread));
@@ -100,11 +103,15 @@ half4 main(float2 coord) {
                 // About half a second to a second of life, time being 2.4 s in all.
                 float life = exp(-age / (0.1 + 0.1 * hash(cell + 9.3)))
                     * smoothstep(0.0, 0.012, age);
+                float radius = (1.8 + 2.6 * hash(cell + 7.7)) * density * (0.6 + 0.4 * life);
+                // Beyond three radii a star adds less than a thousandth of a colour step (its
+                // rays fall off as exp(-q²)), so pixels that far away skip it.
+                float2 offset = coord - position;
+                if (dot(offset, offset) > 9.0 * radius * radius) continue;
                 float twinkle =
                     0.6 + 0.4 * sin(progress * (40.0 + 30.0 * hash(cell + 2.9)) + h * 40.0);
-                float radius = (1.8 + 2.6 * hash(cell + 7.7)) * density * (0.6 + 0.4 * life);
                 // Each star has its own hue, which shifts a little as it twinkles.
-                float4 lit = star(coord - position, radius, hash(cell + 5.3) + age * 0.6);
+                float4 lit = star(offset, radius, hash(cell + 5.3) + age * 0.6);
                 rgb += lit.rgb * life * twinkle;
                 weight += lit.a * life * twinkle;
             }
