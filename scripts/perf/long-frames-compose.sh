@@ -17,7 +17,11 @@ select f.ts as frame_ts, round(f.dur / 1e6, 1) as frame_ms, s.name,
   round(sum(s.dur - coalesce((select sum(c.dur) from slice c where c.parent_id = s.id), 0)) / 1e6, 2) as self_ms,
   count(*) as n
 from frames f join slice s on s.ts >= f.ts and s.ts < f.ts + f.dur
-where s.category is not null or s.name in ('AndroidOwner:measureAndLayout', 'TextStringSimpleNode::measure', 'Constructing StaticLayout', 'Compose:applyChanges', 'AndroidOwner:draw', 'Chart:compile')
+  -- Only the app's own slices: the trace records every process's track events.
+  left join thread_track tt on s.track_id = tt.id left join thread t using (utid)
+  left join process_track pt on s.track_id = pt.id
+where coalesce(t.upid, pt.upid) = (select upid from process where name = '$pkg')
+  and (s.category is not null or s.name in ('AndroidOwner:measureAndLayout', 'TextStringSimpleNode::measure', 'Constructing StaticLayout', 'Compose:applyChanges', 'AndroidOwner:draw', 'Chart:compile'))
 group by f.id, s.name;
 
 select * from (

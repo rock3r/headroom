@@ -185,3 +185,9 @@ W4 changes nothing here, because a fresh `adb install` is not compiled. See W4 f
 | alert_toggle | 350 → 348 | 6 → 8 | 6 → 6 | 2 → 1 | 1.57 → 1.51 | 2.26 → 2.24 | 21.12 → 19.96 | 2 → 3 | 5.41 → 4.99 | 7.03 → 7.17 |
 | add_account | 328 → 323 | 16 → 16 | 7 → 7 | 4 → 4 | 1.06 → 1.03 | 1.92 → 1.71 | 47.19 → 53.58 | 6 → 6 | 3.73 → 3.4 | 5.85 → 5.75 |
 | providers | 43 → 43 | 0 → 0 | 4 → 4 | 2 → 2 | 1.09 → 1.03 | 2.3 → 2.39 | 25.77 → 28.27 | 3 → 3 | 2.73 → 2.8 | 4.02 → 3.93 |
+
+## Follow-up after review (10-20 08:00)
+
+- The owner asked for the wavy bar fix at 60 Hz, since 30 fps looks janky. Vendored Material's indicator with a 60 fps wave (W5) and moved all decorative motion to 60 fps. `rememberDecorativePhase` now runs a `FrameGate` on every frame callback instead of `delay`, so its frames come at an even pace (every other vsync at 120 Hz). TDD: `FrameGateTest` failed against an always-pass stub, then passed.
+- Measured (`build/perf/wavy60`): idle overview 618 → 312 frames in 5 s; idle detail 156 → 314 (60 fps, as intended). The detail's "late" count (0–15 per run, no jank) comes from the display switching to 60 Hz for the vote; SurfaceFlinger reports no jank.
+- Codex review: `long-frames-compose.sh` counted other processes' track-event slices. It now counts only the app's own.
