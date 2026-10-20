@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,12 +19,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.sebastiano.headroom.material3.wavy.LinearWavyProgressIndicator
 
 /**
  * A horizontal quota bar. It is flat unless [wavy] is true, which marks an account that needs
- * attention; with animations off it is always flat and keeps its length. [paceFraction] draws the
- * even-pace tick, so over and under pace can be read without the chip. New values move on the slow
- * effects spring and never overshoot.
+ * attention; with animations off it is always flat and keeps its length. The wavy bar is
+ * Material's, vendored so its wave moves at 60 fps instead of the display's rate: at 120 Hz a bar
+ * at rest would otherwise redraw the whole window 120 times a second (third-party/material3-wavy).
+ * [paceFraction] draws the even-pace tick, so over and under pace can be read without the chip. New
+ * values move on the slow effects spring and never overshoot.
  */
 @Composable
 fun QuotaBar(

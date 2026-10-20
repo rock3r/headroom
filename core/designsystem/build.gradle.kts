@@ -9,4 +9,6 @@ dependencies {
     api(projects.core.model)
     api(libs.graphics.shapes)
     implementation(libs.materialkolor.utilities)
+    // Material's wavy linear indicator, with its wave at 60 fps: see third-party/material3-wavy.
+    implementation(projects.thirdParty.material3Wavy)
 }

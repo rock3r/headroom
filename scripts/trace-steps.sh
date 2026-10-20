@@ -23,7 +23,8 @@ set -euo pipefail
 serial="${1:?Pass the adb serial of the device}"
 out="${2:?Pass the output directory}"
 shift 2
-package="dev.sebastiano.headroom"
+# PACKAGE picks another build, such as the benchmark build (dev.sebastiano.headroom.benchmark).
+package="${PACKAGE:-dev.sebastiano.headroom}"
 receiver="$package/androidx.tracing.profiler.ConnectedProfilerTracingReceiver"
 adb=(adb -s "$serial")
 device_trace=/data/misc/perfetto-traces/headroom-steps.pftrace
@@ -49,9 +50,12 @@ if [ "$app_trace" = 1 ]; then broadcast START >/dev/null; else broadcast STOP >/
 # a long run and push its start out.
 config="$out/steps.pbtxt"
 if [ "$app_trace" = 1 ]; then
-  sed '/^duration_ms:/d' "$(dirname "$0")/perfetto/scroll.pbtxt" > "$config"
+  sed -e '/^duration_ms:/d' -e "s/atrace_apps: \"[^\"]*\"/atrace_apps: \"$package\"/" \
+    "$(dirname "$0")/perfetto/scroll.pbtxt" > "$config"
 else
-  sed -e '/^duration_ms:/d' -e '/name: "track_event"/d' "$(dirname "$0")/perfetto/scroll.pbtxt" > "$config"
+  sed -e '/^duration_ms:/d' -e '/name: "track_event"/d' \
+    -e "s/atrace_apps: \"[^\"]*\"/atrace_apps: \"$package\"/" \
+    "$(dirname "$0")/perfetto/scroll.pbtxt" > "$config"
 fi
 "${adb[@]}" push "$config" /data/local/tmp/headroom-steps.pbtxt >/dev/null
 "${adb[@]}" shell "rm -f $device_trace"

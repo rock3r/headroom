@@ -28,5 +28,6 @@ include(
     ":core:designsystem",
     ":widget",
     ":third-party:compose-charts",
+    ":third-party:material3-wavy",
 )
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")

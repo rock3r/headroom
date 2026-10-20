@@ -1,8 +1,6 @@
 package dev.sebastiano.headroom.ui.overview
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -47,6 +45,7 @@ import dev.sebastiano.headroom.designsystem.HeadroomIcons
 import dev.sebastiano.headroom.designsystem.HeadroomMotion
 import dev.sebastiano.headroom.designsystem.animationsEnabled
 import dev.sebastiano.headroom.designsystem.liquidRipple
+import dev.sebastiano.headroom.designsystem.rememberDecorativePhase
 import dev.sebastiano.headroom.designsystem.rememberLiquidRippleState
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.ui.ResetFormatter
@@ -201,20 +200,18 @@ private fun NextResetText(next: NextResetSummary, now: Instant, formatter: Reset
  * How far the card's shape has turned from its resting tilt, in degrees. It turns slowly and
  * evenly, a full turn per period; a full turn looks the same as none, so it loops without a jump.
  * It is read only while drawing, so the turn redraws the shape's layer and never recomposes the
- * card.
+ * card. It moves on at the decorative frame rate (see [rememberDecorativePhase]): at a full turn a
+ * minute, more frames would look no smoother, and every frame redraws the whole window.
  *
- * An endless animation is not timed by the duration scale, so with animations off or motion reduced
- * it is not started at all and the shape rests at its tilt. It costs nothing when the card is not
- * on screen: the overview's list disposes items it scrolls away, and Compose pauses its frame clock
- * while the app is in the background.
+ * With animations off or motion reduced it is not started at all and the shape rests at its tilt.
+ * It costs nothing when the card is not on screen: the overview's list disposes items it scrolls
+ * away, and Compose pauses its frame clock while the app is in the background.
  */
 @Composable
 private fun rememberDecorationDrift(animate: Boolean): () -> Float {
     if (!animate) return NoDrift
-    val phase =
-        rememberInfiniteTransition(label = "next reset shape drift")
-            .animateFloat(0f, 1f, HeadroomMotion.driftSpec(), label = "drift phase")
-    return remember(phase) { { FULL_TURN_DEGREES * phase.value } }
+    val phase = rememberDecorativePhase(HeadroomMotion.DRIFT_PERIOD_MILLIS)
+    return remember(phase) { { FULL_TURN_DEGREES * phase() } }
 }
 
 private val NoDrift: () -> Float = { 0f }
