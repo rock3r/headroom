@@ -1,0 +1,16 @@
+{
+  "uniqueId": "androidx.compose.material3:material3-wavy-vendored",
+  "name": "Material 3 wavy progress indicator (vendored)",
+  "description": "Material 3's linear wavy progress indicator from the Android Open Source Project, vendored in third-party/material3-wavy with its wave moving at 60 fps. Copyright 2025 The Android Open Source Project.",
+  "artifactVersion": "1.5.0-alpha29",
+  "website": "https://developer.android.com/jetpack/androidx/releases/compose-material3",
+  "developers": [
+    {
+      "name": "The Android Open Source Project"
+    }
+  ],
+  "licenses": [
+    "Apache-2.0"
+  ],
+  "tag": "vendored"
+}

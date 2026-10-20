@@ -29,22 +29,5 @@ class DecorativePhaseTest {
         assertTrue(off < 0.02f, "a period later the phase is back where it was, off by $off")
     }
 
-    @Test
-    fun `the phase changes at the decorative frame rate, not on every frame`() {
-        rule.mainClock.autoAdvance = false
-        var phase: () -> Float = { 0f }
-        rule.setContent { phase = rememberDecorativePhase(periodMillis = 60_000) }
-        rule.mainClock.advanceTimeByFrame()
-        var changes = 0
-        var last = phase()
-        // One second of the test clock's 16 ms frames: about 60 frames.
-        repeat(60) {
-            rule.mainClock.advanceTimeByFrame()
-            val now = phase()
-            if (now != last) changes++
-            last = now
-        }
-        val rate = HeadroomMotion.DECORATIVE_FRAME_RATE.toInt()
-        assertTrue(changes in rate / 2..rate + 2, "the phase changed $changes times in a second")
-    }
+    // The pace (every other frame at 120 Hz) is FrameGateTest's: the test clock runs at 60 Hz.
 }

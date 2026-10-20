@@ -6,7 +6,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.preferredFrameRate
-import kotlinx.coroutines.delay
 
 /**
  * Motion roles, following Material 3 Expressive and the rule that values read as data never
@@ -111,7 +110,7 @@ object HeadroomMotion {
      * look no smoother, yet each frame redraws the whole window, so at the display's 120 Hz a
      * screen at rest would keep the CPU and GPU busy. See [decorativeFrameRate].
      */
-    const val DECORATIVE_FRAME_RATE: Float = 30f
+    const val DECORATIVE_FRAME_RATE: Float = 60f
 
     /** For fades and colour changes. */
     @Composable
@@ -158,25 +157,44 @@ fun Modifier.decorativeFrameRate(): Modifier =
  * A phase from 0 to 1 that loops once every [periodMillis], for endless decorative motion such as
  * the next reset card's turning shape. Read it while drawing or in a layer block.
  *
- * It moves on at [HeadroomMotion.DECORATIVE_FRAME_RATE], not on every frame: each change redraws
- * the whole window, and a 120 Hz display would otherwise redraw a screen at rest 120 times a second
- * for motion too slow to look any smoother. Unlike [decorativeFrameRate], this works wherever the
- * content sits, including in lazy lists. Like any endless animation it stops in the background,
- * when Compose pauses its frame clock.
+ * It moves on at [HeadroomMotion.DECORATIVE_FRAME_RATE] (see [FrameGate]), not on every display
+ * frame: each change redraws the whole window, and a 120 Hz display would otherwise redraw a screen
+ * at rest 120 times a second for motion too slow to look any smoother. Unlike
+ * [decorativeFrameRate], this works wherever the content sits, including in lazy lists. Like any
+ * endless animation it stops in the background, when Compose pauses its frame clock.
  */
 @Composable
 fun rememberDecorativePhase(periodMillis: Int): () -> Float {
     val phase = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(periodMillis) {
-        val start = withInfiniteAnimationFrameMillis { it }
+        val gate = FrameGate(HeadroomMotion.DECORATIVE_FRAME_RATE.toInt())
+        val start = withInfiniteAnimationFrameNanos { it }
+        val periodNanos = periodMillis * 1_000_000L
         while (true) {
-            delay(DECORATIVE_FRAME_MILLIS)
-            withInfiniteAnimationFrameMillis { now ->
-                phase.floatValue = ((now - start) % periodMillis) / periodMillis.toFloat()
+            // A frame that does not pass changes nothing, so nothing is drawn for it.
+            withInfiniteAnimationFrameNanos { now ->
+                if (gate.pass(now)) {
+                    phase.floatValue = ((now - start) % periodNanos) / periodNanos.toFloat()
+                }
             }
         }
     }
     return remember(phase) { { phase.floatValue } }
 }
 
-private val DECORATIVE_FRAME_MILLIS = (1_000 / HeadroomMotion.DECORATIVE_FRAME_RATE).toLong()
+/**
+ * Lets through at most [frameRate] frames a second, at an even pace. A frame passes when at least
+ * three quarters of a [frameRate] frame has gone by since the last one that passed, so a frame that
+ * comes a little early still counts: at [frameRate] 60, a 120 Hz display passes every other frame
+ * and a 60 Hz display every frame.
+ */
+internal class FrameGate(frameRate: Int) {
+    private val minIntervalNanos = 1_000_000_000L / frameRate * 3 / 4
+    private var lastNanos = Long.MIN_VALUE
+
+    fun pass(nowNanos: Long): Boolean {
+        if (lastNanos != Long.MIN_VALUE && nowNanos - lastNanos < minIntervalNanos) return false
+        lastNanos = nowNanos
+        return true
+    }
+}
