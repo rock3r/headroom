@@ -1,0 +1,9 @@
+# Performance audit: Compose and Material issues
+
+Problems found in the libraries (Compose UI, Compose Material 3 and others) while tracing
+Headroom. Each entry gives the evidence and whether Headroom works around it.
+
+| # | Library | Issue | Evidence | Headroom workaround |
+|---|---|---|---|---|
+| U1 | Compose UI 1.13.0-alpha (`Modifier.preferredFrameRate`) | The vote has no effect for content inside `LazyVerticalGrid` items. The same modifier on the same kind of content in a plain column works. | Account detail (`WavyRing` in a column): `preferredFrameRate(30f)` took the idle detail from 631 to 155 frames in 5 s, and the trace shows `gc - votePreferredFrameRate: 30.0` on every frame. Overview (next reset card's shape and `LinearWavyProgressIndicator`, both in grid items): still about 625 frames in 5 s with the vote, and no `votePreferredFrameRate` slice at all, so no layer voted. Seen on a fresh overview and on one recomposed after navigating. Bytecode: `FrameRateModifierNode` sets layer rates only in its first `draw()` after attach (`shouldUpdateFrameRates`). Layers that `AndroidComposeView.createLayer` recycles from its `WeakCache` (`reuseLayer`) are a suspect. | The next reset card's turn uses `rememberDecorativePhase`, its own 30 fps clock. `WavyRing` keeps the vote. |
+| U2 | Material 3 1.5.0-alpha29 (`LinearWavyProgressIndicator`) | The determinate wavy indicator's wave runs at the display's full rate, forever, with no way to lower its frame rate: the wave-offset `Animatable` runs in the node's own coroutine on the composition's frame clock. On a 120 Hz phone, one wavy bar keeps a screen at rest drawing 120 frames a second: about 2 ms of main thread and 5 ms of RenderThread per frame on a Pixel 7 Pro. `preferredFrameRate` around it does not help (U1). | `idle_overview` with every wavy bar turned off, and the card's turn off too: 0 frames in 5 s, against about 625 with them. | None yet: open decision (see the work ledger). |
