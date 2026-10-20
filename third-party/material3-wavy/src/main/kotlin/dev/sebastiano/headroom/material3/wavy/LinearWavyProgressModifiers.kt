@@ -320,11 +320,19 @@ private abstract class BaseLinearWavyProgressNode(
                     currentCoroutineContext()[MotionDurationScale]?.scaleFactor?.takeIf { it > 0f }
                         ?: 1f
                 val startNanos = withInfiniteAnimationFrameNanos { it }
-                var lastUpdateNanos = startNanos
+                var deadlineNanos = startNanos + WaveFrameIntervalNanos
                 while (true) {
                     withInfiniteAnimationFrameNanos { nowNanos ->
-                        if (nowNanos - lastUpdateNanos >= MinWaveFrameIntervalNanos) {
-                            lastUpdateNanos = nowNanos
+                        if (nowNanos >= deadlineNanos - WaveFrameEarlyNanos) {
+                            // The next frame is due a 60 fps frame after this one was due, or
+                            // after now if the clock paused, so the pace holds on 90 Hz and
+                            // 144 Hz displays too.
+                            deadlineNanos =
+                                if (nowNanos - deadlineNanos > WaveFrameIntervalNanos) {
+                                    nowNanos + WaveFrameIntervalNanos
+                                } else {
+                                    deadlineNanos + WaveFrameIntervalNanos
+                                }
                             val elapsed = (nowNanos - startNanos) / scale
                             waveOffset.floatValue =
                                 ((startValue + elapsed / durationNanos) % 1.0).toFloat()
@@ -1154,11 +1162,13 @@ private class LinearProgressDrawingCache {
 // Minimum animation duration to ensure we don't overwhelm the CPU.
 private const val MinAnimationDuration = 50
 
-// Headroom patch: the wave's frame rate, and the shortest time between two of its frames. The
-// interval is three quarters of a frame, so a frame that comes a little early still counts: on a
-// 120 Hz display the wave moves every other frame, on a 60 Hz display every frame.
+// Headroom patch: the wave's frame rate. Each frame the wave moves on sets the deadline for the
+// next one a frame later, and a display frame up to WaveFrameEarlyNanos before that deadline still
+// counts, as display timing jitters: on a 120 Hz display the wave moves every other frame, on a
+// 90 Hz display two frames in three, on a 60 Hz display every frame.
 internal const val WaveFrameRate = 60
-private const val MinWaveFrameIntervalNanos = 1_000_000_000L / WaveFrameRate * 3 / 4
+private const val WaveFrameIntervalNanos = 1_000_000_000L / WaveFrameRate
+private const val WaveFrameEarlyNanos = 2_000_000L
 
 // Headroom patch: from androidx.compose.material3.WavyProgressIndicator, where they are internal.
 // Animation spec for increasing the amplitude drawing when its changing.

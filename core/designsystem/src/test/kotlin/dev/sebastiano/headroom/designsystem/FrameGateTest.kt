@@ -1,6 +1,8 @@
 package dev.sebastiano.headroom.designsystem
 
+import kotlin.math.abs
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import org.junit.Test
 
 class FrameGateTest {
@@ -21,6 +23,16 @@ class FrameGateTest {
     }
 
     @Test
+    fun `on a 90 Hz display two frames in three pass`() {
+        assertEquals(60, framesPassed(displayHz = 90.0), absoluteTolerance = 1)
+    }
+
+    @Test
+    fun `on a 144 Hz display about 60 frames a second pass`() {
+        assertEquals(60, framesPassed(displayHz = 144.0), absoluteTolerance = 1)
+    }
+
+    @Test
     fun `a slightly early frame still passes`() {
         val gate = FrameGate(frameRate = 60)
         assertEquals(true, gate.pass(0L))
@@ -28,4 +40,7 @@ class FrameGateTest {
         assertEquals(true, gate.pass(15_000_000L))
         assertEquals(false, gate.pass(23_000_000L))
     }
+
+    private fun assertEquals(expected: Int, actual: Int, absoluteTolerance: Int) =
+        assertTrue(abs(expected - actual) <= absoluteTolerance, "expected $expected, got $actual")
 }

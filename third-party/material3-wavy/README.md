@@ -27,9 +27,10 @@ grid (U1).
   Material's own private classes of the same names.
 - Patch (marked `Headroom patch`): the wave offset moves on at most 60 frames a second
   (`WaveFrameRate`). It still follows the frame clock and the animation duration scale, so the
-  wave moves at the same speed. It only skips display frames that come sooner than 3/4 of a
-  60 Hz frame after the last one it used: every other frame at 120 Hz, every frame at 60 Hz.
-  Frames it skips change no state, so nothing is drawn for them.
+  wave moves at the same speed. Each frame the wave moves on sets the deadline for the next one
+  a 60 Hz frame later, and display frames before that deadline are skipped: every other frame at
+  120 Hz, two in three at 90 Hz, every frame at 60 Hz. Frames it skips change no state, so
+  nothing is drawn for them.
 - Static analysis: `:third-party:*` modules are excluded from detekt, Compose Rules, ktfmt and
   Android Lint, so the copy stays close to upstream.
 

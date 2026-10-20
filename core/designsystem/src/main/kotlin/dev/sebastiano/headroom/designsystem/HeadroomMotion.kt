@@ -183,18 +183,29 @@ fun rememberDecorativePhase(periodMillis: Int): () -> Float {
 }
 
 /**
- * Lets through at most [frameRate] frames a second, at an even pace. A frame passes when at least
- * three quarters of a [frameRate] frame has gone by since the last one that passed, so a frame that
- * comes a little early still counts: at [frameRate] 60, a 120 Hz display passes every other frame
- * and a 60 Hz display every frame.
+ * Lets through about [frameRate] frames a second, whatever the display's rate. Each frame that
+ * passes sets the deadline for the next one a [frameRate] frame later, and a frame passes once it
+ * is within [EARLY_NANOS] of that deadline, so frames that come a little early, as a display's
+ * timing jitters, still count. At [frameRate] 60, a 120 Hz display passes every other frame, a 90
+ * Hz display two frames in three, and a 60 Hz display every frame. After a pause, such as the app
+ * in the background, it starts again from the next frame instead of catching up.
  */
 internal class FrameGate(frameRate: Int) {
-    private val minIntervalNanos = 1_000_000_000L / frameRate * 3 / 4
-    private var lastNanos = Long.MIN_VALUE
+    private val intervalNanos = 1_000_000_000L / frameRate
+    private var deadlineNanos = Long.MIN_VALUE
 
     fun pass(nowNanos: Long): Boolean {
-        if (lastNanos != Long.MIN_VALUE && nowNanos - lastNanos < minIntervalNanos) return false
-        lastNanos = nowNanos
+        if (deadlineNanos != Long.MIN_VALUE && nowNanos < deadlineNanos - EARLY_NANOS) return false
+        deadlineNanos =
+            if (deadlineNanos == Long.MIN_VALUE || nowNanos - deadlineNanos > intervalNanos) {
+                nowNanos + intervalNanos
+            } else {
+                deadlineNanos + intervalNanos
+            }
         return true
+    }
+
+    private companion object {
+        const val EARLY_NANOS = 2_000_000L
     }
 }
