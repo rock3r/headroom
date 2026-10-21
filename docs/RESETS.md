@@ -209,7 +209,7 @@ line says so. The page opens in this app's task, so the browser tab goes away wh
 - The sheet creates one attempt key per confirmation. "Try again" reuses that key.
 - `ResetAttemptMemory` retains unsettled keys for 10 minutes per account and pool.
   `SharedPreferencesResetAttemptStore` saves the account ID, pool, key and time before sending requests, preserving them after restart.
-  It stores no tokens. All app files exclude backup and device transfer.
+  It stores no tokens.
 - Codex keeps credit associations only in memory. Its server's `already_redeemed` response protects retries after restart.
   Grok saves token associations to disk because its server accepts no idempotency key.
 - After success, `ResetCenter` waits 2 seconds (`ResetRefresh.DELAY`) and refreshes usage.
@@ -261,7 +261,6 @@ The Stats tab's "Usage limit resets" card shows used and expired resets from sto
 ### Where it is stored
 
 - Room stores reset events in `headroom.db`'s `reset_events` table, introduced in database version 7.
-  All app files exclude backup and device transfer.
 - Rows contain account ID, provider, pool ID and label, used or expired status, observation time and expiry date.
   Used events also record redemption location, restored quota and the Headroom attempt key where available. Rows contain no tokens.
 - Each sync deletes rows older than 365 days. Removing an account deletes its reset events and usage history.

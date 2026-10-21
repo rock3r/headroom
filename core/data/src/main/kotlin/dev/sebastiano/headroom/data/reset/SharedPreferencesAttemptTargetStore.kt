@@ -15,8 +15,7 @@ import kotlinx.serialization.json.Json
  * - [ZAI_REACHED_USE]: the Z.AI attempt keys that reached `use`, each with its pool.
  * - [GROK_PINNED_TOKENS]: the Grok attempt keys, each with the id of the reset token it redeems.
  *
- * Each entry is an attempt key and an id: no access token or other credential. Like every app file,
- * it is excluded from backup and device transfer.
+ * Each entry is an attempt key and an id: no access token or other credential.
  */
 public class SharedPreferencesAttemptTargetStore(
     context: Context,

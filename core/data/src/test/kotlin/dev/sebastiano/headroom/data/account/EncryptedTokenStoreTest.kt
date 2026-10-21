@@ -103,4 +103,46 @@ class EncryptedTokenStoreTest {
         }
         kotlin.test.assertFailsWith<java.io.IOException> { store.delete("a1") }
     }
+
+    @Test
+    fun `TinkCredentialCipher wraps its keyset with a restore key and unlocks backed-up credentials on a new device`() =
+        runTest {
+            val sourceKeysetPrefs =
+                context.getSharedPreferences("source_keyset", Context.MODE_PRIVATE)
+            val sourceCipher = TinkCredentialCipher(context, keysetPrefs = sourceKeysetPrefs)
+            val sharedTokenPrefs =
+                context.getSharedPreferences("migrated_tokens", Context.MODE_PRIVATE)
+            val sourceStore = EncryptedTokenStore(context, sourceCipher, sharedTokenPrefs)
+            sourceStore.save(credential(), expectedRevision = null)
+
+            val restoreKey = ByteArray(32) { (it + 1).toByte() }
+            val wrappedKeyset = sourceCipher.wrapKeyset(restoreKey)
+
+            // On the destination device, the device-local keyset prefs are empty (excluded from
+            // backup), while the encrypted token prefs were restored.
+            val destKeysetPrefs = context.getSharedPreferences("dest_keyset", Context.MODE_PRIVATE)
+            val destCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs = destKeysetPrefs,
+                    hasPendingRestore = {
+                        !destKeysetPrefs.contains(TinkCredentialCipher.KEYSET_NAME)
+                    },
+                )
+            val destStore = EncryptedTokenStore(context, destCipher, sharedTokenPrefs)
+
+            // Before the restore keyset is unwrapped, reading returns null without polluting
+            // destKeysetPrefs with a newly generated keyset.
+            assertNull(destStore.load("a1"))
+            assertFalse(destKeysetPrefs.contains(TinkCredentialCipher.KEYSET_NAME))
+
+            // Once the restore key unwraps the keyset, both the active cipher and a fresh cipher
+            // instance can decrypt the restored credentials.
+            destCipher.restoreKeyset(wrappedKeyset, restoreKey)
+            assertEquals("secret-access", destStore.load("a1")?.accessToken)
+
+            val restartedCipher = TinkCredentialCipher(context, keysetPrefs = destKeysetPrefs)
+            val restartedStore = EncryptedTokenStore(context, restartedCipher, sharedTokenPrefs)
+            assertEquals("secret-access", restartedStore.load("a1")?.accessToken)
+        }
 }

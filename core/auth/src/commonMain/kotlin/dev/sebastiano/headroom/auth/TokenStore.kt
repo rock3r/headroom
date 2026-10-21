@@ -4,8 +4,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Persists one [StoredCredential] per account. The Android implementation encrypts it and keeps it
- * out of backups.
+ * Persists one [StoredCredential] per account. The Android implementation encrypts it and keeps the
+ * device-local Android Keystore keyset out of backups, unlocking a backup-wrapped keyset on a new
+ * device through Android's Restore Credentials.
  *
  * Saves are compare-and-swap on [StoredCredential.revision]. A refresh started from an old revision
  * can never overwrite a newer sign-in, a newer refresh, or a sign-out.

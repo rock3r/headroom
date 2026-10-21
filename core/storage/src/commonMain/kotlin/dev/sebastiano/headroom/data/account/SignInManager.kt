@@ -54,6 +54,8 @@ public class SignInManager(
     private val store: TokenStore,
     private val accounts: AccountsRepository,
     private val fetchers: QuotaFetchers? = null,
+    private val onSignedIn: suspend () -> Unit = {},
+    private val onAllSignedOut: suspend () -> Unit = {},
     private val newAccountId: () -> String = { Uuid.random().toString() },
 ) {
     /** Keeps a second sign-in (ZCode, Cursor) from saving while a sign-out runs. */
@@ -65,6 +67,7 @@ public class SignInManager(
             Account(newAccountId(), tokens.provider, tokens.label ?: tokens.provider.displayName)
         store.save(tokens.toCredential(account.id), expectedRevision = null)
         accounts.addAccount(account)
+        onSignedIn()
         storeValidatedOrRefresh(account.id, validated)
         return account
     }
@@ -98,6 +101,7 @@ public class SignInManager(
             if (store.save(credential, expectedRevision = current?.revision) != null) {
                 val label = tokens.label?.takeIf { newLabel -> newLabel != account.label }
                 if (label != null) accounts.relabelAccount(accountId, label)
+                onSignedIn()
                 storeValidatedOrRefresh(accountId, validated)
                 return if (label != null) account.copy(label = label) else account
             }
@@ -240,6 +244,9 @@ public class SignInManager(
             store.delete(ZCodeCredential.idFor(accountId))
             store.delete(CursorCredential.idFor(accountId))
             accounts.removeAccount(accountId)
+            if (accounts.current().isEmpty()) {
+                onAllSignedOut()
+            }
         }
     }
 

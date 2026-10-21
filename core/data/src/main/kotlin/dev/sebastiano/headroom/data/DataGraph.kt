@@ -9,6 +9,7 @@ import dev.sebastiano.headroom.auth.TokenStore
 import dev.sebastiano.headroom.data.account.AccountQuotaFetcher
 import dev.sebastiano.headroom.data.account.AndroidSignInNotifier
 import dev.sebastiano.headroom.data.account.EncryptedTokenStore
+import dev.sebastiano.headroom.data.account.RestoreCredentials
 import dev.sebastiano.headroom.data.account.SharedPreferencesSignInAlertLedger
 import dev.sebastiano.headroom.data.account.SignInAlertingRepository
 import dev.sebastiano.headroom.data.account.SignInAlerts
@@ -66,8 +67,12 @@ public class DataGraph(
     context: Context,
     private val scope: CoroutineScope,
     private val clock: () -> Instant = Clock.System::now,
+    credentialCipher: TinkCredentialCipher = TinkCredentialCipher(context),
     /** Where sign-in tokens live. Defaults to the encrypted on-device store. */
-    public val tokenStore: TokenStore = EncryptedTokenStore(context, TinkCredentialCipher(context)),
+    public val tokenStore: TokenStore = EncryptedTokenStore(context, credentialCipher),
+    /** Creates, retrieves and clears Android's Restore Credentials key for device migration. */
+    public val restoreCredentials: RestoreCredentials =
+        RestoreCredentials(context, credentialCipher),
     /** How each provider signs in and refreshes its tokens. */
     public val authMethods: AuthMethods = AuthMethods(),
     quotaFetchers: QuotaFetchers =
@@ -142,7 +147,13 @@ public class DataGraph(
 
     /** Turns finished sign-ins into accounts, and signs accounts out. */
     public val signInManager: SignInManager =
-        SignInManager(tokenStore, repository, fetchers = quotaFetchers)
+        SignInManager(
+            store = tokenStore,
+            accounts = repository,
+            fetchers = quotaFetchers,
+            onSignedIn = restoreCredentials::createRestoreCredential,
+            onAllSignedOut = restoreCredentials::clearRestoreCredential,
+        )
 
     private val scheduler =
         AlarmResetScheduler(appContext) { overdue ->
@@ -188,6 +199,7 @@ public class DataGraph(
      */
     @OptIn(FlowPreview::class)
     public fun start() {
+        scope.launch { reconcileRestoreCredentials() }
         scope.launch {
             settings.settings
                 .map { it.syncFrequency }
@@ -203,6 +215,35 @@ public class DataGraph(
             combine(repository.accounts, settings.settings) { _, _ -> Unit }
                 .debounce(RESCHEDULE_DEBOUNCE_MS)
                 .collect { resetReminders.reschedule() }
+        }
+    }
+
+    /**
+     * Tier 1 (background) restoration: called synchronously from `BackupAgent.onRestoreFinished`
+     * after the system restores the app's files. Unlocks the backed-up credential keyset and
+     * restores background sync, reset alarms and reset reminders before the user opens the app.
+     */
+    public suspend fun onRestoreFinished() {
+        restoreCredentials.restore()
+        SyncWorker.schedule(appContext, settings.settings.first().syncFrequency)
+        rescheduleResetAlarms()
+        rescheduleResetReminders()
+    }
+
+    /**
+     * Tier 2 (foreground) restoration and back-fill: unlocks a restored keyset if background
+     * restoration did not finish during device setup (then refreshes the restored accounts), and
+     * ensures a restore credential exists when the user is already signed in.
+     */
+    public suspend fun reconcileRestoreCredentials() {
+        val restored = restoreCredentials.restore()
+        if (restored) {
+            repository.refresh()
+            rescheduleResetAlarms()
+            rescheduleResetReminders()
+        }
+        if (repository.current().isNotEmpty()) {
+            restoreCredentials.createRestoreCredential()
         }
     }
 

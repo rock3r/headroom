@@ -43,9 +43,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Edge to edge; AppearanceTheme then makes the system bar icons follow the chosen theme.
         enableEdgeToEdge()
-        val graph = (application as HeadroomApplication).graph
+        val app = application as HeadroomApplication
+        val graph = app.graph
         // After a configuration change the launch intent is old news: the UI restores itself.
-        if (savedInstanceState == null) handleRequest(intent)
+        if (savedInstanceState == null) {
+            handleRequest(intent)
+            lifecycleScope.launch { app.reconcileRestoreCredentials() }
+        }
         val settings = graph.settings.settings.stateIn(lifecycleScope, SharingStarted.Eagerly, null)
         keepSplashUntil { settings.value != null }
         setContent {
