@@ -65,6 +65,9 @@ public class TinkCredentialCipher(
     internal fun hasLocalKeyset(): Boolean =
         synchronized(lock) { cachedHandle != null || keysetPrefs.contains(KEYSET_NAME) }
 
+    internal fun hasPendingRestoreState(): Boolean =
+        synchronized(lock) { !hasLocalKeyset() && hasPendingRestore() }
+
     /**
      * Encrypts the Tink keyset with [restoreKey] (32 bytes, AES-256-GCM) so it can be backed up in
      * preferences while [restoreKey] itself is stored only in Android's Restore Credentials.
@@ -122,7 +125,7 @@ public class TinkCredentialCipher(
         if (existingHex != null) {
             return parseKeysetFromPrefs(Hex.decode(existingHex))
         }
-        if (!allowCreate && hasPendingRestore()) {
+        if (!allowCreate || hasPendingRestore()) {
             throw GeneralSecurityException("Waiting for Restore Credentials to unwrap the keyset")
         }
         val generated = KeysetHandle.generateNew(KeyTemplates.get("AES256_GCM"))

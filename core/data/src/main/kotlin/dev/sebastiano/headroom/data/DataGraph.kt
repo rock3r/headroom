@@ -2,7 +2,9 @@ package dev.sebastiano.headroom.data
 
 import android.content.Context
 import android.util.Log
+import androidx.work.Configuration
 import androidx.work.ExistingWorkPolicy
+import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import dev.sebastiano.headroom.auth.AuthMethods
 import dev.sebastiano.headroom.auth.TokenStore
@@ -225,9 +227,20 @@ public class DataGraph(
      */
     public suspend fun onRestoreFinished() {
         restoreCredentials.restore()
+        if (!WorkManager.isInitialized()) {
+            WorkManager.initialize(
+                appContext,
+                Configuration.Builder().setWorkerFactory(workerFactory).build(),
+            )
+        }
         SyncWorker.schedule(appContext, settings.settings.first().syncFrequency)
         rescheduleResetAlarms()
         rescheduleResetReminders()
+    }
+
+    /** Closes the underlying database when a temporary [DataGraph] finishes background work. */
+    public fun close() {
+        storage.close()
     }
 
     /**

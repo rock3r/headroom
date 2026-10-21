@@ -60,7 +60,7 @@ public class RestoreCredentials(
      * [E2eeUnavailableException] is thrown.
      */
     public suspend fun createRestoreCredential(): Unit = mutex.withLock {
-        if (isSynced()) return@withLock
+        if (isSynced() || cipher.hasPendingRestoreState()) return@withLock
         val restoreKey = randomBytes(TinkCredentialCipher.RESTORE_KEY_BYTES)
         val challenge = randomBytes(CHALLENGE_BYTES)
         val wrappedKeyset =

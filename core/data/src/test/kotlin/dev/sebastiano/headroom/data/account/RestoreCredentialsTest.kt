@@ -27,9 +27,11 @@ import androidx.test.core.app.ApplicationProvider
 import dev.sebastiano.headroom.auth.CredentialKind
 import dev.sebastiano.headroom.auth.StoredCredential
 import dev.sebastiano.headroom.model.Provider
+import java.security.GeneralSecurityException
 import java.util.concurrent.Executor
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -339,6 +341,14 @@ class RestoreCredentialsTest {
         credentialManager.failGetWith = GetCredentialUnknownException("Play Services busy")
         assertFalse(destRestore.restore())
         assertNull(destStore.load("acc-2"))
+
+        // While the wrapped keyset is still waiting to be restored, back-filling must not generate
+        // a new local keyset or overwrite the backed-up wrapped keyset.
+        destRestore.createRestoreCredential()
+        assertEquals(1, credentialManager.createRequests.size)
+        assertFalse(destCipher.hasLocalKeyset())
+        assertFailsWith<GeneralSecurityException> { destCipher.wrapKeyset(ByteArray(32)) }
+        assertFalse(destCipher.hasLocalKeyset())
 
         // Tier 2 runs on MainActivity launch and succeeds.
         credentialManager.failGetWith = null

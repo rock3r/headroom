@@ -4,6 +4,12 @@ import android.app.backup.BackupAgent
 import android.app.backup.BackupDataInput
 import android.app.backup.BackupDataOutput
 import android.os.ParcelFileDescriptor
+import dev.sebastiano.headroom.data.DataGraph
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -13,7 +19,10 @@ import kotlinx.coroutines.runBlocking
  */
 class HeadroomBackupAgent
 @JvmOverloads
-constructor(private val restore: (suspend () -> Unit)? = null) : BackupAgent() {
+constructor(
+    private val restore: (suspend () -> Unit)? = null,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : BackupAgent() {
     override fun onBackup(
         oldState: ParcelFileDescriptor?,
         data: BackupDataOutput?,
@@ -33,10 +42,27 @@ constructor(private val restore: (suspend () -> Unit)? = null) : BackupAgent() {
     override fun onRestoreFinished() {
         super.onRestoreFinished()
         runBlocking {
-            val action =
-                restore
-                    ?: (applicationContext as? HeadroomApplication)?.let { it::onRestoreFinished }
-            action?.invoke()
+            val action = restore ?: ::restoreFromContext
+            action()
+        }
+    }
+
+    private suspend fun restoreFromContext() {
+        val app = applicationContext as? HeadroomApplication
+        if (app != null) {
+            app.onRestoreFinished()
+            return
+        }
+        // Android Auto Backup runs BackupAgent in restricted mode and instantiates the base
+        // Application class rather than HeadroomApplication.
+        val job = SupervisorJob()
+        val scope = CoroutineScope(job + dispatcher)
+        val dataGraph = DataGraph(this, scope)
+        try {
+            dataGraph.onRestoreFinished()
+        } finally {
+            dataGraph.close()
+            job.cancelAndJoin()
         }
     }
 }
