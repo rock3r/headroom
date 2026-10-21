@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sign-in tokens must never leave the device, so nothing is backed up or transferred. -->
+<!--
+    App config (Room database, DataStore preferences) and ciphertext credentials are backed up so
+    migrating to a new phone keeps accounts, history, settings and widgets. The device-local
+    Android Keystore-wrapped keyset (credentials_keyset_prefs.xml) is excluded because its hardware
+    master key never leaves the source device; the destination device unlocks the backed-up keyset
+    (in credentials_restore.xml) through Android's Restore Credentials API.
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="root" />
-        <exclude domain="file" />
-        <exclude domain="database" />
-        <exclude domain="sharedpref" />
-        <exclude domain="external" />
+        <exclude domain="sharedpref" path="credentials_keyset_prefs.xml" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="root" />
-        <exclude domain="file" />
-        <exclude domain="database" />
-        <exclude domain="sharedpref" />
-        <exclude domain="external" />
+        <exclude domain="sharedpref" path="credentials_keyset_prefs.xml" />
     </device-transfer>
 </data-extraction-rules>

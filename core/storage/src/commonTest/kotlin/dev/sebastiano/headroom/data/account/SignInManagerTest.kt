@@ -617,4 +617,48 @@ class SignInManagerTest {
         }
         assertNull(store.load("oc-2"))
     }
+
+    @Test
+    fun `notifies when a sign-in completes and when the last account signs out`() = runTest {
+        val store = InMemoryTokenStore()
+        val accounts = MemoryAccounts()
+        val ids = ArrayDeque(listOf("a1", "a2"))
+        var signedInCount = 0
+        var allSignedOutCount = 0
+        val manager =
+            SignInManager(
+                store = store,
+                accounts = accounts,
+                newAccountId = { ids.removeFirst() },
+                onSignedIn = { signedInCount++ },
+                onAllSignedOut = { allSignedOutCount++ },
+            )
+
+        manager.complete(tokens.copy(providerAccountId = "org-1"))
+        assertEquals(1, signedInCount)
+        assertEquals(0, allSignedOutCount)
+
+        manager.reauthenticate(
+            "a1",
+            tokens.copy(accessToken = "fresh", providerAccountId = "org-1"),
+        )
+        assertEquals(2, signedInCount)
+
+        assertFailsWith<DifferentAccountException> {
+            manager.reauthenticate(
+                "a1",
+                tokens.copy(accessToken = "other", providerAccountId = "org-2"),
+            )
+        }
+        assertEquals(2, signedInCount)
+
+        manager.complete(grokTokens)
+        assertEquals(3, signedInCount)
+
+        manager.signOut("a1")
+        assertEquals(0, allSignedOutCount)
+
+        manager.signOut("a2")
+        assertEquals(1, allSignedOutCount)
+    }
 }

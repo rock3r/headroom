@@ -14,7 +14,7 @@ import kotlinx.serialization.json.Json
 /**
  * Keeps the unsettled redeem attempts in private shared preferences, so a retry after the app was
  * stopped still sends the same key. Each entry is the account id, the pool, the key and the time:
- * no token. Like every app file, it is excluded from backup and device transfer.
+ * no token.
  */
 public class SharedPreferencesResetAttemptStore(
     context: Context,

@@ -51,7 +51,8 @@ Keep changes to what the task asks for. Unrequested behaviour changes are regres
 ### Secrets
 
 Never commit tokens, keys or real account data. Tests use fixtures and fake data only. Sign-in
-tokens are stored encrypted on the device and excluded from backup.
+tokens are stored encrypted on the device, with the device-local Android Keystore keyset excluded
+from backup and a backup-wrapped keyset unlocked via Android's Restore Credentials.
 
 ## Running the build
 

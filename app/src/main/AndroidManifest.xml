@@ -22,8 +22,10 @@
 
     <application
         android:name=".HeadroomApplication"
-        android:allowBackup="false"
+        android:allowBackup="true"
+        android:backupAgent=".HeadroomBackupAgent"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupOnly="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"

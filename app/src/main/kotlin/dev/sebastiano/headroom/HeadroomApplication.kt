@@ -158,6 +158,17 @@ open class HeadroomApplication :
         appScope.launch { updateWidgets(dataGraph.repository.current(), widgetLook().first()) }
     }
 
+    internal suspend fun onRestoreFinished() {
+        if (!usesDataLayer) return
+        dataGraph.onRestoreFinished()
+        updateWidgets(dataGraph.repository.current(), widgetLook().first())
+    }
+
+    internal suspend fun reconcileRestoreCredentials() {
+        if (!usesDataLayer) return
+        dataGraph.reconcileRestoreCredentials()
+    }
+
     /** The settings the widgets show: used or left, and the colour palette. */
     private fun widgetLook() =
         dataGraph.settings.settings

@@ -103,4 +103,104 @@ class EncryptedTokenStoreTest {
         }
         kotlin.test.assertFailsWith<java.io.IOException> { store.delete("a1") }
     }
+
+    @Test
+    fun `TinkCredentialCipher wraps its keyset with a restore key and unlocks backed-up credentials on a new device`() =
+        runTest {
+            val sourceKeysetPrefs =
+                context.getSharedPreferences("source_keyset", Context.MODE_PRIVATE)
+            val sourceCipher = TinkCredentialCipher(context, keysetPrefs = sourceKeysetPrefs)
+            val sharedTokenPrefs =
+                context.getSharedPreferences("migrated_tokens", Context.MODE_PRIVATE)
+            val sourceStore = EncryptedTokenStore(context, sourceCipher, sharedTokenPrefs)
+            sourceStore.save(credential(), expectedRevision = null)
+
+            val restoreKey = ByteArray(32) { (it + 1).toByte() }
+            val wrappedKeyset = sourceCipher.wrapKeyset(restoreKey)
+
+            // On the destination device, the device-local keyset prefs are empty (excluded from
+            // backup), while the encrypted token prefs were restored.
+            val destKeysetPrefs = context.getSharedPreferences("dest_keyset", Context.MODE_PRIVATE)
+            val destCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs = destKeysetPrefs,
+                    hasPendingRestore = {
+                        !destKeysetPrefs.contains(TinkCredentialCipher.KEYSET_NAME)
+                    },
+                )
+            val destStore = EncryptedTokenStore(context, destCipher, sharedTokenPrefs)
+
+            // Before the restore keyset is unwrapped, reading returns null without polluting
+            // destKeysetPrefs with a newly generated keyset.
+            assertNull(destStore.load("a1"))
+            assertFalse(destKeysetPrefs.contains(TinkCredentialCipher.KEYSET_NAME))
+
+            // Once the restore key unwraps the keyset, both the active cipher and a fresh cipher
+            // instance can decrypt the restored credentials.
+            destCipher.restoreKeyset(wrappedKeyset, restoreKey)
+            assertEquals("secret-access", destStore.load("a1")?.accessToken)
+
+            val restartedCipher = TinkCredentialCipher(context, keysetPrefs = destKeysetPrefs)
+            val restartedStore = EncryptedTokenStore(context, restartedCipher, sharedTokenPrefs)
+            assertEquals("secret-access", restartedStore.load("a1")?.accessToken)
+        }
+
+    @Test
+    fun `TinkCredentialCipher does not activate a keyset when persisting to keysetPrefs fails`() =
+        runTest {
+            val sourceCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs = context.getSharedPreferences("ok_keyset", Context.MODE_PRIVATE),
+                )
+            val restoreKey = ByteArray(32) { (it + 1).toByte() }
+            val wrappedKeyset = sourceCipher.wrapKeyset(restoreKey)
+
+            val failingKeysetPrefs = failingPrefs()
+            val cipher = TinkCredentialCipher(context, keysetPrefs = failingKeysetPrefs)
+            val store =
+                EncryptedTokenStore(
+                    context,
+                    cipher,
+                    context.getSharedPreferences("tokens_ok", Context.MODE_PRIVATE),
+                )
+
+            kotlin.test.assertFailsWith<java.io.IOException> {
+                store.save(credential(), expectedRevision = null)
+            }
+            assertFalse(cipher.hasLocalKeyset())
+
+            kotlin.test.assertFailsWith<java.security.GeneralSecurityException> {
+                cipher.restoreKeyset(wrappedKeyset, restoreKey)
+            }
+            assertFalse(cipher.hasLocalKeyset())
+        }
+
+    @Test
+    fun `restoreKeyset does not overwrite a local keyset created by a concurrent sign-in`() =
+        runTest {
+            val sourceCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs =
+                        context.getSharedPreferences("race_src_keyset", Context.MODE_PRIVATE),
+                )
+            val restoreKey = ByteArray(32) { (it + 1).toByte() }
+            val wrappedKeyset = sourceCipher.wrapKeyset(restoreKey)
+
+            val destKeysetPrefs =
+                context.getSharedPreferences("race_dst_keyset", Context.MODE_PRIVATE)
+            val destTokenPrefs =
+                context.getSharedPreferences("race_dst_tokens", Context.MODE_PRIVATE)
+            val destCipher = TinkCredentialCipher(context, keysetPrefs = destKeysetPrefs)
+            val destStore = EncryptedTokenStore(context, destCipher, destTokenPrefs)
+
+            // User completes a sign-in while CredentialManager.getCredential() is still in flight.
+            destStore.save(credential(), expectedRevision = null)
+
+            // Late-arriving restoreKeyset must not overwrite the keyset used by that sign-in.
+            assertFalse(destCipher.restoreKeyset(wrappedKeyset, restoreKey))
+            assertEquals("secret-access", destStore.load("a1")?.accessToken)
+        }
 }

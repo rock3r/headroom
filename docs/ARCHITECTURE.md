@@ -169,6 +169,17 @@ Reset clients live in `:core:quota`, storage in `:core:storage`, sync and remind
 60 days when off) and compacts it with `HistoryRetention`.
 UI tests, end-to-end tests and README screenshots use the same repository.
 
+## Device migration and Restore Credentials
+
+On Android, `allowBackup="true"` and `fullBackupOnly="true"` back up app configuration (`headroom.db`, DataStore preferences for settings, alerts and widgets) and the encrypted credential preferences (`credentials.xml`), while `res/xml/data_extraction_rules.xml` excludes the device-local Android Keystore-wrapped keyset (`credentials_keyset_prefs.xml`).
+
+- `RestoreCredentials` in `:core:data` uses Android's Credential Manager Restore Credentials API (`androidx.credentials`) to transfer a 256-bit wrapping key in the WebAuthn `user.id` (`response.userHandle` on retrieval), trying `isCloudBackupEnabled = true` first and falling back to `isCloudBackupEnabled = false` on `E2eeUnavailableException`.
+- `TinkCredentialCipher` wraps its Tink keyset with that 256-bit key into `credentials_restore.xml` (`wrapped_keyset`) and marks `has_synced_restore_credential = true`.
+- When migrating to a new phone, a two-tier restoration flow unlocks the backed-up keyset and re-wraps it with the new phone's Android Keystore master key:
+  1. **Tier 1 (background):** `HeadroomBackupAgent.onRestoreFinished()` runs `DataGraph.onRestoreFinished()` synchronously via `runBlocking`, unlocking the keyset and rescheduling periodic sync, reset alarms and reset reminders before the user opens the app.
+  2. **Tier 2 (foreground):** `MainActivity.onCreate()` and `DataGraph.start()` call `DataGraph.reconcileRestoreCredentials()` to retry keyset restoration if background restoration did not complete, refresh restored accounts, and create a restore credential when the user is already signed in.
+- Signing out of the last account calls `RestoreCredentials.clearRestoreCredential()`, which clears `credentials_restore.xml` and calls `CredentialManager.clearCredentialState(ClearCredentialStateRequest(TYPE_CLEAR_RESTORE_CREDENTIAL))`.
+
 ## Reset island (experimental)
 
 The opt-in reset island expands from the camera cutout after a reset while Headroom runs in the background.
