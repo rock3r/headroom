@@ -176,4 +176,31 @@ class EncryptedTokenStoreTest {
             }
             assertFalse(cipher.hasLocalKeyset())
         }
+
+    @Test
+    fun `restoreKeyset does not overwrite a local keyset created by a concurrent sign-in`() =
+        runTest {
+            val sourceCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs =
+                        context.getSharedPreferences("race_src_keyset", Context.MODE_PRIVATE),
+                )
+            val restoreKey = ByteArray(32) { (it + 1).toByte() }
+            val wrappedKeyset = sourceCipher.wrapKeyset(restoreKey)
+
+            val destKeysetPrefs =
+                context.getSharedPreferences("race_dst_keyset", Context.MODE_PRIVATE)
+            val destTokenPrefs =
+                context.getSharedPreferences("race_dst_tokens", Context.MODE_PRIVATE)
+            val destCipher = TinkCredentialCipher(context, keysetPrefs = destKeysetPrefs)
+            val destStore = EncryptedTokenStore(context, destCipher, destTokenPrefs)
+
+            // User completes a sign-in while CredentialManager.getCredential() is still in flight.
+            destStore.save(credential(), expectedRevision = null)
+
+            // Late-arriving restoreKeyset must not overwrite the keyset used by that sign-in.
+            assertFalse(destCipher.restoreKeyset(wrappedKeyset, restoreKey))
+            assertEquals("secret-access", destStore.load("a1")?.accessToken)
+        }
 }

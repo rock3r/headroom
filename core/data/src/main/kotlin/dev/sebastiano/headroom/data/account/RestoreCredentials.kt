@@ -105,7 +105,6 @@ public class RestoreCredentials(
         return@withLock try {
             val wrappedKeyset = Base64.decode(wrappedEncoded, Base64.NO_WRAP)
             cipher.restoreKeyset(wrappedKeyset, restoreKey)
-            true
         } catch (e: GeneralSecurityException) {
             Log.w(TAG, "Could not unwrap restored credential keyset", e)
             false

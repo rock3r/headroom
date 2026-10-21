@@ -87,9 +87,10 @@ public class TinkCredentialCipher(
 
     /**
      * Unwraps [wrappedKeyset] with [restoreKey], persists it into the device-local [keysetPrefs]
-     * wrapped by this device's Android Keystore master key, and activates it in memory.
+     * wrapped by this device's Android Keystore master key, and activates it in memory. Returns
+     * `false` without overwriting when a local keyset has already been created on this device.
      */
-    internal fun restoreKeyset(wrappedKeyset: ByteArray, restoreKey: ByteArray) {
+    internal fun restoreKeyset(wrappedKeyset: ByteArray, restoreKey: ByteArray): Boolean {
         require(restoreKey.size == RESTORE_KEY_BYTES) {
             "Restore key must be $RESTORE_KEY_BYTES bytes"
         }
@@ -100,9 +101,11 @@ public class TinkCredentialCipher(
                 KEYSET_AAD,
             )
         synchronized(lock) {
+            if (hasLocalKeyset()) return false
             writeKeysetToPrefs(handle)
             cachedHandle = handle
             cachedAead = handle.getPrimitive(RegistryConfiguration.get(), Aead::class.java)
+            return true
         }
     }
 
