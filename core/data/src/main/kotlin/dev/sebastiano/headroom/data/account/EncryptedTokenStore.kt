@@ -76,7 +76,8 @@ public class TinkCredentialCipher(
         require(restoreKey.size == RESTORE_KEY_BYTES) {
             "Restore key must be $RESTORE_KEY_BYTES bytes"
         }
-        val handle = synchronized(lock) { getOrLoadKeysetHandle(allowCreate = true) }
+        val handle =
+            synchronized(lock) { getOrLoadKeysetHandle(allowCreate = !hasPendingRestore()) }
         return TinkProtoKeysetFormat.serializeEncryptedKeyset(
             handle,
             AesGcmJce(restoreKey),
@@ -125,11 +126,17 @@ public class TinkCredentialCipher(
         if (existingHex != null) {
             return parseKeysetFromPrefs(Hex.decode(existingHex))
         }
-        if (!allowCreate || hasPendingRestore()) {
+        if (!allowCreate) {
             throw GeneralSecurityException("Waiting for Restore Credentials to unwrap the keyset")
         }
         val generated = KeysetHandle.generateNew(KeyTemplates.get("AES256_GCM"))
         writeKeysetToPrefs(generated)
+        if (restorePrefs.contains(RestoreCredentials.KEY_WRAPPED_KEYSET)) {
+            restorePrefs.edit(commit = true) {
+                remove(RestoreCredentials.KEY_WRAPPED_KEYSET)
+                putBoolean(RestoreCredentials.KEY_HAS_SYNCED_RESTORE_CREDENTIAL, false)
+            }
+        }
         return generated
     }
 
@@ -153,7 +160,14 @@ public class TinkCredentialCipher(
             } else {
                 TinkProtoKeysetFormat.serializeKeyset(handle, InsecureSecretKeyAccess.get())
             }
-        keysetPrefs.edit(commit = true) { putString(KEYSET_NAME, Hex.encode(serialized)) }
+        val committed =
+            keysetPrefs.edit().apply { putString(KEYSET_NAME, Hex.encode(serialized)) }.commit()
+        if (!committed) {
+            throw GeneralSecurityException(
+                "Could not write the credential keyset to storage",
+                IOException("SharedPreferences.Editor.commit() returned false"),
+            )
+        }
     }
 
     private fun masterKeyAead(generateIfMissing: Boolean): Aead? =
@@ -208,10 +222,14 @@ public class EncryptedTokenStore(
         val next = prefs.getLong(revisionKey(credential.accountId), 0) + 1
         val saved = credential.copy(revision = next)
         val encrypted =
-            cipher.encrypt(
-                CredentialCodec.encode(saved).toByteArray(),
-                saved.accountId.toByteArray(),
-            )
+            try {
+                cipher.encrypt(
+                    CredentialCodec.encode(saved).toByteArray(),
+                    saved.accountId.toByteArray(),
+                )
+            } catch (e: GeneralSecurityException) {
+                throw IOException("Could not encrypt the sign-in for storage", e)
+            }
         commitOrThrow {
             putString(saved.accountId, Base64.encodeToString(encrypted, Base64.NO_WRAP))
             putLong(revisionKey(saved.accountId), next)

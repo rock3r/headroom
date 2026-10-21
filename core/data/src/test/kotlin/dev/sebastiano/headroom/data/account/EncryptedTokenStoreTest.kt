@@ -145,4 +145,35 @@ class EncryptedTokenStoreTest {
             val restartedStore = EncryptedTokenStore(context, restartedCipher, sharedTokenPrefs)
             assertEquals("secret-access", restartedStore.load("a1")?.accessToken)
         }
+
+    @Test
+    fun `TinkCredentialCipher does not activate a keyset when persisting to keysetPrefs fails`() =
+        runTest {
+            val sourceCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs = context.getSharedPreferences("ok_keyset", Context.MODE_PRIVATE),
+                )
+            val restoreKey = ByteArray(32) { (it + 1).toByte() }
+            val wrappedKeyset = sourceCipher.wrapKeyset(restoreKey)
+
+            val failingKeysetPrefs = failingPrefs()
+            val cipher = TinkCredentialCipher(context, keysetPrefs = failingKeysetPrefs)
+            val store =
+                EncryptedTokenStore(
+                    context,
+                    cipher,
+                    context.getSharedPreferences("tokens_ok", Context.MODE_PRIVATE),
+                )
+
+            kotlin.test.assertFailsWith<java.io.IOException> {
+                store.save(credential(), expectedRevision = null)
+            }
+            assertFalse(cipher.hasLocalKeyset())
+
+            kotlin.test.assertFailsWith<java.security.GeneralSecurityException> {
+                cipher.restoreKeyset(wrappedKeyset, restoreKey)
+            }
+            assertFalse(cipher.hasLocalKeyset())
+        }
 }

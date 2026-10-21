@@ -357,6 +357,79 @@ class RestoreCredentialsTest {
     }
 
     @Test
+    fun `reauthenticating when restore credential is unavailable recovers by generating a new keyset and syncing it`() =
+        runTest {
+            val credentialManager = FakeCredentialManager()
+            val sourceKeysetPrefs =
+                context.getSharedPreferences("rec_src_keyset", Context.MODE_PRIVATE)
+            val sharedRestorePrefs =
+                context.getSharedPreferences("rec_restore", Context.MODE_PRIVATE)
+            val sharedTokenPrefs = context.getSharedPreferences("rec_tokens", Context.MODE_PRIVATE)
+
+            val sourceCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs = sourceKeysetPrefs,
+                    restorePrefs = sharedRestorePrefs,
+                )
+            EncryptedTokenStore(context, sourceCipher, sharedTokenPrefs)
+                .save(
+                    StoredCredential(
+                        Provider.Claude,
+                        "acc-1",
+                        CredentialKind.OAuth,
+                        "old-access",
+                        "old-refresh",
+                        null,
+                    ),
+                    expectedRevision = null,
+                )
+            RestoreCredentials(context, sourceCipher, credentialManager, sharedRestorePrefs)
+                .createRestoreCredential()
+
+            // Simulate a destination device where the wrapped keyset was restored by Backup, but
+            // CredentialManager has no restore credential (NoCredentialException).
+            credentialManager.storedUserHandle = null
+            val destKeysetPrefs =
+                context.getSharedPreferences("rec_dst_keyset", Context.MODE_PRIVATE)
+            val destCipher =
+                TinkCredentialCipher(
+                    context,
+                    keysetPrefs = destKeysetPrefs,
+                    restorePrefs = sharedRestorePrefs,
+                )
+            val destStore = EncryptedTokenStore(context, destCipher, sharedTokenPrefs)
+            val destRestore =
+                RestoreCredentials(context, destCipher, credentialManager, sharedRestorePrefs)
+
+            assertFalse(destRestore.restore())
+            assertNull(destStore.load("acc-1"))
+            assertFalse(destCipher.hasLocalKeyset())
+
+            // Reauthenticating the restored account saves new tokens, generates a new local keyset,
+            // and allows createRestoreCredential() to sync the new keyset.
+            val saved =
+                destStore.save(
+                    StoredCredential(
+                        Provider.Claude,
+                        "acc-1",
+                        CredentialKind.OAuth,
+                        "new-access",
+                        "new-refresh",
+                        null,
+                    ),
+                    expectedRevision = null,
+                )
+            assertNotNull(saved)
+            assertTrue(destCipher.hasLocalKeyset())
+            assertEquals("new-access", destStore.load("acc-1")?.accessToken)
+
+            destRestore.createRestoreCredential()
+            assertEquals(2, credentialManager.createRequests.size)
+            assertNotNull(credentialManager.storedUserHandle)
+        }
+
+    @Test
     fun `clearing restore credentials calls clearCredentialState with TYPE_CLEAR_RESTORE_CREDENTIAL`() =
         runTest {
             val credentialManager = FakeCredentialManager()
