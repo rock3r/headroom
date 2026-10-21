@@ -290,6 +290,19 @@ class RestoreCredentialsTest {
             assertEquals(2, credentialManager.createRequests.size)
             assertTrue(credentialManager.createRequests[0].isCloudBackupEnabled)
             assertFalse(credentialManager.createRequests[1].isCloudBackupEnabled)
+            assertTrue(restorePrefs.contains(RestoreCredentials.KEY_WRAPPED_KEYSET))
+            assertFalse(
+                restorePrefs.getBoolean(
+                    RestoreCredentials.KEY_HAS_SYNCED_RESTORE_CREDENTIAL,
+                    false,
+                )
+            )
+
+            // Once E2EE becomes available, a subsequent reconciliation upgrades to cloud backup.
+            credentialManager.failCloudBackupWithE2eeUnavailable = false
+            restore.createRestoreCredential()
+            assertEquals(3, credentialManager.createRequests.size)
+            assertTrue(credentialManager.createRequests[2].isCloudBackupEnabled)
             assertTrue(
                 restorePrefs.getBoolean(
                     RestoreCredentials.KEY_HAS_SYNCED_RESTORE_CREDENTIAL,

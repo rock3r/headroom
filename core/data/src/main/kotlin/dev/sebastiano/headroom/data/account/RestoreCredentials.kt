@@ -71,11 +71,15 @@ public class RestoreCredentials(
                 return@withLock
             }
         val requestJson = buildCreationOptionsJson(restoreKey = restoreKey, challenge = challenge)
-        val created = createWithCloudFallback(requestJson)
-        if (!created) return@withLock
+        val result =
+            createWithCloudFallback(
+                requestJson,
+                allowLocalFallback = !restorePrefs.contains(KEY_WRAPPED_KEYSET),
+            )
+        if (result == CreationResult.Failed) return@withLock
         restorePrefs.edit(commit = true) {
             putString(KEY_WRAPPED_KEYSET, Base64.encodeToString(wrappedKeyset, Base64.NO_WRAP))
-            putBoolean(KEY_HAS_SYNCED_RESTORE_CREDENTIAL, true)
+            putBoolean(KEY_HAS_SYNCED_RESTORE_CREDENTIAL, result == CreationResult.CloudSynced)
         }
     }
 
@@ -138,7 +142,16 @@ public class RestoreCredentials(
             restorePrefs.getBoolean(KEY_HAS_SYNCED_RESTORE_CREDENTIAL, false) &&
             restorePrefs.contains(KEY_WRAPPED_KEYSET)
 
-    private suspend fun createWithCloudFallback(requestJson: String): Boolean =
+    private enum class CreationResult {
+        CloudSynced,
+        LocalOnly,
+        Failed,
+    }
+
+    private suspend fun createWithCloudFallback(
+        requestJson: String,
+        allowLocalFallback: Boolean,
+    ): CreationResult =
         try {
             credentialManager.createCredential(
                 appContext,
@@ -147,33 +160,37 @@ public class RestoreCredentials(
                     isCloudBackupEnabled = true,
                 ),
             )
-            true
+            CreationResult.CloudSynced
         } catch (_: E2eeUnavailableException) {
-            try {
-                credentialManager.createCredential(
-                    appContext,
-                    CreateRestoreCredentialRequest(
-                        requestJson = requestJson,
-                        isCloudBackupEnabled = false,
-                    ),
-                )
-                true
-            } catch (e: CreateCredentialException) {
-                Log.w(TAG, "Could not create local-only restore credential", e)
-                false
-            } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "Invalid restore credential request", e)
-                false
+            if (!allowLocalFallback) {
+                CreationResult.Failed
+            } else {
+                try {
+                    credentialManager.createCredential(
+                        appContext,
+                        CreateRestoreCredentialRequest(
+                            requestJson = requestJson,
+                            isCloudBackupEnabled = false,
+                        ),
+                    )
+                    CreationResult.LocalOnly
+                } catch (e: CreateCredentialException) {
+                    Log.w(TAG, "Could not create local-only restore credential", e)
+                    CreationResult.Failed
+                } catch (e: IllegalArgumentException) {
+                    Log.w(TAG, "Invalid restore credential request", e)
+                    CreationResult.Failed
+                }
             }
         } catch (e: CreateRestoreCredentialDomException) {
             Log.w(TAG, "Restore credential request JSON rejected", e)
-            false
+            CreationResult.Failed
         } catch (e: CreateCredentialException) {
             Log.w(TAG, "Could not create restore credential", e)
-            false
+            CreationResult.Failed
         } catch (e: IllegalArgumentException) {
             Log.w(TAG, "Invalid restore credential request", e)
-            false
+            CreationResult.Failed
         }
 
     private fun extractUserHandle(authenticationResponseJson: String): ByteArray? =
