@@ -10,6 +10,7 @@ struct AccountDetailContent: View {
     var showsResets = false
     @Environment(AppModel.self) private var model
     @State private var signingInAgain = false
+    @State private var connectingCursor = false
     @State private var redeeming: Redeeming?
 
     /// What the redeem sheet opens for.
@@ -47,6 +48,25 @@ struct AccountDetailContent: View {
                     }
                     if let balance = account.balance {
                         LabeledContent("Balance", value: Formats.balance(balance.amount, unit: balance.unit))
+                    }
+                }
+                if let prompt = account.cursorPrompt {
+                    Section("Cursor usage") {
+                        if prompt == "readFailed" {
+                            Text("Your Cursor sign-in is connected, but its usage could not be read this time.")
+                                .foregroundStyle(.secondary)
+                            Button("Retry Cursor usage", systemImage: "arrow.clockwise") {
+                                model.refresh(accountId: account.id)
+                            }
+                            .disabled(isDemo || account.isRefreshing || account.signInExpired)
+                        } else {
+                            Text("Cursor serves its own model pools and the Grok Bot pool from a separate Cursor account. Connect it to see them here.")
+                                .foregroundStyle(.secondary)
+                            Button("Connect Cursor", systemImage: "person.badge.key") {
+                                connectingCursor = true
+                            }
+                            .disabled(isDemo || account.signInExpired)
+                        }
                     }
                 }
                 PaceChartSection(account: account)
@@ -90,6 +110,9 @@ struct AccountDetailContent: View {
         }
         .sheet(isPresented: $signingInAgain) {
             SignInView(mode: .again(accountId: account.id, providerId: account.providerId))
+        }
+        .sheet(isPresented: $connectingCursor) {
+            CursorSignInSheet(account: account)
         }
     }
 
