@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.shared
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.Countdown
+import dev.sebastiano.headroom.model.CursorPrompt
 import dev.sebastiano.headroom.model.ExpiryLine
 import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.Pace
@@ -118,6 +119,8 @@ public data class AccountUi(
     val usesApiKey: Boolean = false,
     /** Why an `auth` sync failed, such as `keyExpired`, or null for a generic auth failure. */
     val authReason: String? = null,
+    /** `notLinked` or `readFailed` for Grok's Cursor connection; null when no prompt is needed. */
+    val cursorPrompt: String? = null,
 ) {
     public constructor(
         id: String,
@@ -405,6 +408,12 @@ internal object UiMapping {
             justReset = justReset,
             usesApiKey = state.account.provider.usesApiKey,
             authReason = state.authReason?.id(),
+            cursorPrompt =
+                when (state.cursorPrompt) {
+                    CursorPrompt.NotLinked -> "notLinked"
+                    CursorPrompt.ReadFailed -> "readFailed"
+                    null -> null
+                },
         )
     }
 

@@ -185,6 +185,30 @@ class UiMappingTest {
     }
 
     @Test
+    fun `Cursor prompts distinguish a missing connection from a failed read`() {
+        val grok = DemoData.accounts(now).first { it.account.provider == Provider.Grok }
+        val snapshot = checkNotNull(grok.snapshot)
+
+        assertEquals("notLinked", UiMapping.account(grok, now).cursorPrompt)
+        assertEquals("notLinked", UiMapping.account(grok.copy(snapshot = null), now).cursorPrompt)
+        assertEquals(
+            "readFailed",
+            UiMapping.account(
+                    grok.copy(
+                        snapshot = snapshot.copy(cursorLinked = true, cursorReadFailed = true)
+                    ),
+                    now,
+                )
+                .cursorPrompt,
+        )
+        assertNull(
+            UiMapping.account(grok.copy(snapshot = snapshot.copy(cursorLinked = true)), now)
+                .cursorPrompt
+        )
+        assertNull(UiMapping.account(DemoData.accounts(now).first(), now).cursorPrompt)
+    }
+
+    @Test
     fun `providers say how they sign in and carry their logo`() {
         val zai = UiMapping.provider(Provider.ZAi, SignInKind.ApiKey)
 

@@ -14,6 +14,7 @@ final class AppModel {
     private(set) var signInStep: any SignInUi = SignInUiIdle.shared
     private(set) var redeemStep: any RedeemUi = RedeemUiIdle.shared
     private(set) var zCodeStep: any ServiceSignInUi = ServiceSignInUiIdle.shared
+    private(set) var cursorStep: any ServiceSignInUi = ServiceSignInUiIdle.shared
     let providers: [ProviderUi]
     let delights = DelightCenter()
     /// Where a notification tap asked to go, until the overview goes there.
@@ -42,6 +43,7 @@ final class AppModel {
         watch(headroom.signIn.watch) { $0.signInStep = $1 }
         watch(headroom.resets.redeem.watch) { $0.redeemStep = $1 }
         watch(headroom.resets.zCode.watch) { $0.zCodeStep = $1 }
+        watch(headroom.resets.cursor.watch) { $0.cursorStep = $1 }
         watch(headroom.watchDelights) { $0.play($1) }
     }
 
