@@ -19,10 +19,11 @@ import kotlinx.serialization.json.jsonObject
  * parse failure.
  *
  * With an ID token, the fetcher also reads the JetBrains AI quotas (see [JetBrainsAiQuotaReader])
- * and adds one window for each license and workspace seat. The refresh token lets the reader find
- * the account's licenses and seats. The windows count AI credits, so the snapshot then has no
- * balance. When no quota can be read, the snapshot has the plan and the balance only, as it does
- * for sign-ins without an ID token. A working balance never becomes an error.
+ * and adds one window for each license and workspace seat, led by one that pools their credits when
+ * there is more than one (see [withCombinedWindow]). The refresh token lets the reader find the
+ * account's licenses and seats. The windows count AI credits, so the snapshot then has no balance.
+ * When no quota can be read, the snapshot has the plan and the balance only, as it does for
+ * sign-ins without an ID token. A working balance never becomes an error.
  *
  * @param log receives diagnostic lines about the JetBrains AI quota calls. They never contain a
  *   token, a license id, a name, an email address or a header value.
@@ -97,6 +98,7 @@ public class JetBrainsQuotaFetcher(
                         log("JetBrains AI quota unavailable, showing the balance only")
                         emptyList()
                     }
+                    .let { withCombinedWindow(it, clock.now()) }
         }
 
     private companion object {
