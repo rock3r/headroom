@@ -139,6 +139,10 @@ class JetBrainsAccessOptionsTest {
 
     private fun QuotaSnapshot.window(label: String) = windows.single { it.label == label }
 
+    /** The license and seat windows, without the one that pools them. */
+    private val QuotaSnapshot.optionWindows
+        get() = windows.filterNot { it.id == COMBINED_WINDOW_ID }
+
     @Test
     fun `reads one window for each enabled license and workspace option`() = runTest {
         routes()
@@ -146,7 +150,7 @@ class JetBrainsAccessOptionsTest {
         val snapshot = fetchSnapshot()
 
         assertEquals(
-            listOf(WORKSPACE_LABEL, LICENSE_LABEL, ALUMNI_LABEL),
+            listOf(COMBINED_WINDOW_LABEL, WORKSPACE_LABEL, LICENSE_LABEL, ALUMNI_LABEL),
             snapshot.windows.map { it.label },
         )
         assertEquals(25.0, snapshot.window(WORKSPACE_LABEL).usedPercent)
@@ -175,15 +179,40 @@ class JetBrainsAccessOptionsTest {
     }
 
     @Test
-    fun `the window closest to its limit comes first, so it leads the account`() = runTest {
+    fun `the window closest to its limit comes first, below the combined one`() = runTest {
         routes(alumniQuota = jsonResponse(quota(current = "1800000", maximum = "2000000")))
 
         val snapshot = fetchSnapshot()
 
         assertEquals(
-            listOf(ALUMNI_LABEL, WORKSPACE_LABEL, LICENSE_LABEL),
+            listOf(COMBINED_WINDOW_LABEL, ALUMNI_LABEL, WORKSPACE_LABEL, LICENSE_LABEL),
             snapshot.windows.map { it.label },
         )
+    }
+
+    @Test
+    fun `leads with a window that pools the credits of every license and seat`() = runTest {
+        routes()
+
+        val windows = fetchSnapshot().windows
+
+        val combined = windows.first()
+        assertEquals(COMBINED_WINDOW_ID, combined.id)
+        // 50 of 200 workspace credits, 0.01187525 of 10 license credits, 0 of 20 alumni credits.
+        assertEquals(50.01187525, combined.usedAmount!!, 1e-9)
+        assertEquals(230.0, combined.limitAmount)
+        assertEquals(50.01187525 / 230.0 * 100, combined.usedPercent, 1e-9)
+        assertTrue(windows.drop(1).all { it.isSecondary })
+    }
+
+    @Test
+    fun `a single grazie-lite window has no combined window`() = runTest {
+        routes()
+
+        val windows = fetchSnapshot(credentials(refreshToken = null)).windows
+
+        assertEquals(1, windows.size)
+        assertEquals(false, windows.single().isSecondary)
     }
 
     @Test
@@ -227,7 +256,7 @@ class JetBrainsAccessOptionsTest {
 
             val snapshot = fetchSnapshot()
 
-            assertEquals(3, snapshot.windows.size)
+            assertEquals(3, snapshot.optionWindows.size)
             val first = seatSwitches().filter { it.form()["workspace_id"] == WORKSPACE_ID }
             assertEquals(listOf(true, false), first.map { "org_id" in it.form() })
             assertEquals(listOf(ORGS_JWT, ORGS_JWT), first.map { it.form()["orgs_user_info"] })
@@ -274,7 +303,7 @@ class JetBrainsAccessOptionsTest {
     fun `finds the orgs user info JWT anywhere in the response, as the Junie CLI does`() = runTest {
         routes(orgsUserInfo = MockResponse(code = 200, body = ORGS_JWT))
 
-        assertEquals(3, fetchSnapshot().windows.size)
+        assertEquals(3, fetchSnapshot().optionWindows.size)
     }
 
     @Test
@@ -374,15 +403,15 @@ class JetBrainsAccessOptionsTest {
 
         val snapshot = fetchSnapshot()
 
-        assertEquals(listOf(LICENSE_LABEL, ALUMNI_LABEL), snapshot.windows.map { it.label })
+        assertEquals(listOf(LICENSE_LABEL, ALUMNI_LABEL), snapshot.optionWindows.map { it.label })
     }
 
     @Test
     fun `window ids are stable and never contain a raw license or workspace id`() = runTest {
         routes()
 
-        val first = fetchSnapshot().windows.map { it.id }.sorted()
-        val second = fetchSnapshot().windows.map { it.id }.sorted()
+        val first = fetchSnapshot().optionWindows.map { it.id }.sorted()
+        val second = fetchSnapshot().optionWindows.map { it.id }.sorted()
 
         assertEquals(first, second)
         assertEquals(3, first.toSet().size)
@@ -409,7 +438,7 @@ class JetBrainsAccessOptionsTest {
             snapshot.window(ALUMNI_LABEL).binding,
         )
         val logged = logs.joinToString("\n")
-        for (window in snapshot.windows) {
+        for (window in snapshot.optionWindows) {
             val binding = window.binding
             assertTrue(binding != null && binding !in logged, logged)
         }
@@ -457,7 +486,7 @@ class JetBrainsAccessOptionsTest {
         val snapshot = fetchSnapshot()
 
         assertEquals(5, seatSwitches().size)
-        assertEquals(5, snapshot.windows.size)
+        assertEquals(5, snapshot.optionWindows.size)
     }
 
     @Test
