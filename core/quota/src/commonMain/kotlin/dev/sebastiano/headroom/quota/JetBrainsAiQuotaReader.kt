@@ -112,10 +112,7 @@ internal class JetBrainsAiQuotaReader(
         sink(secrets.fold(line) { masked, secret -> masked.replace(secret, "<secret>") })
     }
 
-    /**
-     * The quota windows, the one closest to its limit first. With more than one, a window that
-     * pools their credits leads (see [withCombinedWindow]). Empty when no license gives one.
-     */
+    /** The quota windows, the one closest to its limit first. Empty when no license gives one. */
     suspend fun readWindows(
         endpoints: JetBrainsAiEndpoints,
         idToken: String,
@@ -165,9 +162,7 @@ internal class JetBrainsAiQuotaReader(
                             "${source.logName} ${formatPercent(window.usedPercent)}"
                         }
                 )
-                return withCombinedWindow(
-                    read.map { it.second }.sortedByDescending { it.usedPercent }
-                )
+                return read.map { it.second }.sortedByDescending { it.usedPercent }
             }
             if (sources.isNotEmpty()) {
                 log("No quota from the access options, trying the grazie-lite license")
