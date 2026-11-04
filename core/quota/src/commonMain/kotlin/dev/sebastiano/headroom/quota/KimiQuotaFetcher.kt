@@ -83,17 +83,28 @@ public class KimiQuotaFetcher(
         root.objectOrNull("usage_windows")?.let {
             return it.keyedWindows()
         }
-        val computed = usageAndLimitsWindows(root)
+        val plan = root.objectOrNull("usages")?.planUsageWindows().orEmpty()
+        val computed = usageAndLimitsWindows(root, plan)
         if (computed.isNotEmpty()) return computed
         return JsonObject(root.filterKeys { it !in NON_WINDOW_KEYS }).keyedWindows()
     }
 
-    private fun usageAndLimitsWindows(root: JsonObject): List<QuotaWindow> = buildList {
+    /**
+     * The plan's `usages` block first, when present, then the older `usage` and `limits` shapes. A
+     * `limits[]` entry whose window length the `usages` block already covers is skipped, so a
+     * payload carrying both reports each window once.
+     */
+    private fun usageAndLimitsWindows(
+        root: JsonObject,
+        plan: List<QuotaWindow>,
+    ): List<QuotaWindow> = buildList {
+        addAll(plan)
         root.objectOrNull("usage")?.computedWindow(WEEKLY_ID, "Weekly", ONE_WEEK)?.let(::add)
         root.arrayOrNull("limits")?.forEachIndexed { index, element ->
             val limit = element as? JsonObject ?: return@forEachIndexed
             val detail = limit.objectOrNull("detail") ?: limit
             val span = limitSpan(limit, detail)
+            if (span != null && plan.any { it.length == span.length }) return@forEachIndexed
             val label = explicitLimitLabel(limit, detail) ?: span?.label ?: "Limit ${index + 1}"
             detail.computedWindow("limit_${index + 1}", label, span?.length)?.let(::add)
         }
@@ -139,6 +150,8 @@ public class KimiQuotaFetcher(
                 "totalQuota",
                 "authentication",
                 "windows",
+                "usages",
+                "booster_wallet",
             )
     }
 }
@@ -146,6 +159,91 @@ public class KimiQuotaFetcher(
 private const val FRACTION_MAX = 1.0
 private const val MINUTES_PER_HOUR = 60L
 private val KIMI_WINDOW_LABELS = mapOf("monthly_quota" to "Monthly")
+
+private const val PLAN_USAGE_MONTH_TOTAL = "limit_month_total"
+private const val PLAN_USAGE_MONTH_CODE = "limit_month_code"
+
+/** Sort ranks: the 5-hour window leads, the monthly pool follows, unknown windows come last. */
+private const val PLAN_USAGE_RANK_FIVE_HOURS = 0
+private const val PLAN_USAGE_RANK_MONTHLY = 1
+private const val PLAN_USAGE_RANK_MONTHLY_CODE = 2
+private const val PLAN_USAGE_RANK_OTHER = 3
+
+/** Labels for the keys a Kimi plan reports under `usages`. */
+private val PLAN_USAGE_LABELS =
+    mapOf(
+        "limit_5h" to "5h limit",
+        PLAN_USAGE_MONTH_TOTAL to "Monthly",
+        PLAN_USAGE_MONTH_CODE to "Monthly (Code)",
+    )
+
+/**
+ * The `usages` block a plan reports: each key carries a `used_ratio` (0–1, sometimes already a
+ * percent) and a `reset_time`. A newer shape than `usage` and `limits`, and the only one that
+ * carries the monthly pool.
+ */
+private fun JsonObject.planUsageWindows(): List<QuotaWindow> {
+    val windows = mapNotNull { (id, value) ->
+        val window = value as? JsonObject ?: return@mapNotNull null
+        val ratio = window.doubleOrNull("used_ratio") ?: return@mapNotNull null
+        PlanUsageWindow(
+            id = id,
+            usedPercent =
+                (if (ratio <= FRACTION_MAX) ratio * MAX_PERCENT else ratio).coerceIn(
+                    MIN_PERCENT,
+                    MAX_PERCENT,
+                ),
+            resetsAt = window.stringOrNull("reset_time")?.let(::parseInstantOrNull),
+            length = planUsageLength(id),
+        )
+    }
+    // A single-product account reports the same pool under both month keys. Show the code window
+    // only when it covers a different pool.
+    val total = windows.firstOrNull { it.id == PLAN_USAGE_MONTH_TOTAL }
+    val code = windows.firstOrNull { it.id == PLAN_USAGE_MONTH_CODE }
+    val duplicated = total != null && code != null && total.sameUsageAs(code)
+    return windows
+        .filterNot { duplicated && it.id == PLAN_USAGE_MONTH_CODE }
+        .sortedBy { planUsageRank(it.id) }
+        .map { it.toQuotaWindow() }
+}
+
+private data class PlanUsageWindow(
+    val id: String,
+    val usedPercent: Double,
+    val resetsAt: Instant?,
+    val length: Duration?,
+) {
+    fun toQuotaWindow(): QuotaWindow =
+        quotaWindow(
+            id = id,
+            label = PLAN_USAGE_LABELS[id] ?: fallbackWindowLabel(id),
+            usedPercent = usedPercent,
+            resetsAt = resetsAt,
+            length = length,
+        )
+
+    fun sameUsageAs(other: PlanUsageWindow): Boolean =
+        usedPercent == other.usedPercent && resetsAt == other.resetsAt
+}
+
+private fun planUsageLength(id: String): Duration? =
+    when {
+        id.contains("5h") || id.contains("five_hour") -> FIVE_HOURS
+        id.contains("week") -> ONE_WEEK
+        id.contains("month") -> THIRTY_DAYS
+        else -> null
+    }
+
+/** The 5-hour window leads, then the monthly pool, then anything the provider adds. */
+private fun planUsageRank(id: String): Int =
+    when (id) {
+        "limit_5h",
+        "five_hour" -> PLAN_USAGE_RANK_FIVE_HOURS
+        PLAN_USAGE_MONTH_TOTAL -> PLAN_USAGE_RANK_MONTHLY
+        PLAN_USAGE_MONTH_CODE -> PLAN_USAGE_RANK_MONTHLY_CODE
+        else -> PLAN_USAGE_RANK_OTHER
+    }
 
 /** Windows keyed by id, each with `utilization` or `used_percent` and an optional `resets_at`. */
 private fun JsonObject.keyedWindows(): List<QuotaWindow> = mapNotNull { (id, value) ->
