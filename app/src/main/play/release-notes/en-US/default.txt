@@ -1,4 +1,6 @@
-Headroom 1.4.1 removes the sign-in notification 1.4.0 added, and the permission that came with it.
+Headroom 1.5 moves to a new phone with you.
 
-• No foreground service and no notification while you sign in to ZCode or Cursor. Come back to Headroom when you are done and it finishes the sign-in.
-• Everything from 1.4.0 stays: Cursor usage for a Grok account, a ZCode sign-in that opens at once and shows your resets, and clearer messages when a sign-in fails.
+• Restore from a backup and your accounts and settings come back, without signing in again. Tokens stay encrypted, with their key kept end-to-end encrypted.
+• JetBrains accounts with several licenses lead with the combined credits of all of them.
+• Connecting Cursor or ZCode checks that the sign-in belongs to that account.
+• Smoother on high refresh rate screens, lighter refreshes, and faster starts after an update.

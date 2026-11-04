@@ -14,8 +14,8 @@ android {
     namespace = "dev.sebastiano.headroom"
     defaultConfig {
         applicationId = "dev.sebastiano.headroom"
-        versionCode = 6
-        versionName = "1.4.1"
+        versionCode = 7
+        versionName = "1.5.0"
         // Starts the app in demo mode with a fixed clock for the end-to-end tests.
         testInstrumentationRunner = "dev.sebastiano.headroom.HeadroomTestRunner"
     }
