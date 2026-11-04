@@ -139,7 +139,7 @@ If Play rejects "No data collected", declare the locally stored provider email a
 | News app | No |
 | Advertising ID | No |
 | Exact alarm permission | Not needed: the Play build uses `SCHEDULE_EXACT_ALARM`, which has no declaration |
-| Foreground service permissions | Not needed: only WorkManager's plain `FOREGROUND_SERVICE`, with no typed foreground service |
+| Foreground service permissions | Not needed: only WorkManager's plain `FOREGROUND_SERVICE`, with no typed foreground service. A build with a typed foreground service, such as 1.4.0, must not stay on any track: while one does, Play refuses every upload with "You must let us know whether your app uses any Foreground Service permissions". Replace it on that track with a later build from the library. |
 | Accessibility API | Not needed: the Play build has no accessibility service |
 
 ## App signing
