@@ -1,0 +1,14 @@
+{
+  "billingCycleStart": "1793679013383",
+  "billingCycleEnd": "1794283813383",
+  "planUsage": {
+    "remainingBonus": false,
+    "autoPercentUsed": 61.95016251354279,
+    "totalPercentUsed": 61.95016251354279
+  },
+  "spendLimitUsage": { "limitType": "user" },
+  "displayThreshold": 200,
+  "enabled": true,
+  "displayMessage": "You've used 62% of your included usage",
+  "autoBucketModels": ["default", "composer-2.5", "grok-4.7", "cursor-grok-4.6"]
+}

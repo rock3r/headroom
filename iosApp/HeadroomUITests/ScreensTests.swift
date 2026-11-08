@@ -62,6 +62,17 @@ final class ScreensTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Limits"].exists)
     }
 
+    func testGrokOffersCursorConnectionWithoutSigningInDemoAccounts() {
+        app.terminate()
+        app.launchArguments = ["-openURL", "headroom://account/demo-grok"]
+        app.launch()
+
+        XCTAssertTrue(app.navigationBars.staticTexts["Grok"].waitForExistence(timeout: 10))
+        let connect = app.buttons["Connect Cursor"]
+        XCTAssertTrue(scrollTo(connect))
+        XCTAssertFalse(connect.isEnabled, "Demo accounts must not start a real Cursor sign-in")
+    }
+
     func testSettingsListsTheOpenSourceLicences() {
         app.buttons["Settings"].tap()
         let historyToggle = app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Keep long-term history'")).firstMatch
@@ -76,9 +87,8 @@ final class ScreensTests: XCTestCase {
         XCTAssertEqual("1", historyToggle.value as? String)
 
         let licences = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Open-source licences'")).firstMatch
-        for _ in 0 ..< 6 where !licences.isHittable {
-            app.swipeUp()
-        }
+        // Asking whether a row the list is still laying out is hittable fails the test.
+        XCTAssertTrue(scrollTo(licences))
         licences.tap()
 
         let ktor = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'ktor-client-core'")).firstMatch

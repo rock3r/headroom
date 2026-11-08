@@ -205,6 +205,7 @@ internal class RoomQuotaRepository(
                             resetsReadFailed = snapshot.resetsReadFailed,
                             cursorLinked = snapshot.cursorLinked,
                             cursorReadFailed = snapshot.cursorReadFailed,
+                            sharesCursorPool = snapshot.sharesCursorPool,
                         ),
                     windows =
                         snapshot.windows.mapIndexed { index, window ->

@@ -48,6 +48,12 @@ public data class QuotaWindow(
      * pools their credits leads the account instead.
      */
     val isSecondary: Boolean = false,
+    /**
+     * What makes up [usedPercent], for a window that several products draw on, such as the weekly
+     * pool The X Subscription shares between Grok, Cursor and Grok Bot. Empty for every other
+     * window. The parts may not add up to [usedPercent] exactly: the provider rounds them.
+     */
+    val parts: List<WindowPart> = emptyList(),
 ) {
     val remainingPercent: Double
         get() = (MAX_PERCENT - usedPercent).coerceIn(0.0, MAX_PERCENT)
@@ -59,7 +65,33 @@ public data class QuotaWindow(
      */
     val isInformational: Boolean
         get() = kind == WindowKind.Credit || !isRecognised
+
+    /**
+     * How much of a full bar each of [parts] covers, from 0 to 1, in the same order. The provider
+     * rounds the parts, so they are scaled to fill exactly the share [usedPercent] fills.
+     */
+    val partFractions: List<Double>
+        get() {
+            val total = parts.sumOf { it.usedPercent }
+            if (total <= 0.0) return parts.map { 0.0 }
+            val used = usedPercent.coerceIn(0.0, MAX_PERCENT) / MAX_PERCENT
+            return parts.map { it.usedPercent / total * used }
+        }
 }
+
+/** One product's share of a [QuotaWindow] that several products draw on. */
+public data class WindowPart(
+    /** The provider's id for the product, such as `GrokBot`. */
+    val id: String,
+    val label: String,
+    /** The share of the whole window this product used, from 0 to 100. */
+    val usedPercent: Double,
+    /**
+     * Which of the part colours it takes, the same on every platform and from one sync to the next,
+     * so a product keeps its colour when another one comes or goes.
+     */
+    val colorSlot: Int,
+)
 
 internal const val MAX_PERCENT = 100.0
 

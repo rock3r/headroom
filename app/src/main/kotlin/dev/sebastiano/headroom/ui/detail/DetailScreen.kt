@@ -357,6 +357,9 @@ private fun WindowList(
                         )
                         if (!window.isRecognised) UnknownQuotaInfo()
                     }
+                    if (window.parts.isNotEmpty()) {
+                        SharedWindowParts(window, account.provider)
+                    }
                     val expiresAt = window.expiresAt
                     val resetsAt = window.resetsAt
                     val timeLine =

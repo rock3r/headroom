@@ -123,6 +123,30 @@ class CursorQuotaReaderTest {
     }
 
     @Test
+    fun `reads a plan with no third-party pool and a weekly cycle`() = runTest {
+        // A plan Cursor sends without apiPercentUsed has no "Other Models" pool, not a broken one.
+        respond(
+            period =
+                jsonResponse(
+                    """{"billingCycleStart":"1793679013383","billingCycleEnd":"1794283813383",""" +
+                        """"planUsage":{"remainingBonus":false,"autoPercentUsed":60.108342361863485,""" +
+                        """"totalPercentUsed":60.108342361863485},""" +
+                        """"spendLimitUsage":{"limitType":"user"},"enabled":true}"""
+                ),
+            sand = jsonResponse(fixture("cursor/sand_usage_status.json")),
+        )
+
+        val windows = readKnown().windows
+
+        assertEquals(listOf("cursor-models", "grok-bot"), windows.map { it.id })
+        val models = windows[0]
+        assertEquals(60.108342361863485, models.usedPercent)
+        assertEquals(WindowKind.Weekly, models.kind)
+        assertEquals(7.days, models.length)
+        assertEquals(Instant.fromEpochMilliseconds(1794283813383), models.resetsAt)
+    }
+
+    @Test
     fun `maps an unauthorized period read to an auth failure`() = runTest {
         respond(period = MockResponse(code = 401))
 

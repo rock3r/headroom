@@ -7,6 +7,7 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.WindowPart
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -354,6 +355,101 @@ class GrokQuotaFetcherTest {
             snapshot.windows.map { it.id },
         )
         assertTrue(snapshot.windows.drop(1).all { it.isSecondary })
+    }
+
+    @Test
+    fun `shows the X Subscription's shared weekly pool once`() = runTest {
+        respond(
+            weekly = jsonResponse(fixture("grok/billing_x_subscription.json")),
+            cursorPeriod = jsonResponse(fixture("cursor/current_period_usage_x_subscription.json")),
+            cursorSand = jsonResponse(fixture("cursor/sand_usage_status_x_subscription.json")),
+        )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(
+                    fetcher.fetch(credentials(CursorSignIn.Ready("cursor-token")))
+                )
+                .snapshot
+
+        // Grok, Cursor and Grok Bot draw on one pool: three bars would be one meter read three
+        // ways. The xAI window is the pool's own meter, so it stays, named for all three.
+        val shared = snapshot.windows.single()
+        assertEquals("weekly", shared.id)
+        assertEquals("Weekly · Grok, Cursor and Grok Bot", shared.label)
+        assertEquals(61.0, shared.usedPercent)
+        // What fills it, biggest first, each product with the colour it always has.
+        assertEquals(
+            listOf(
+                WindowPart("Api", "Cursor & API", 37.0, colorSlot = 0),
+                WindowPart("GrokBot", "Grok Bot", 20.0, colorSlot = 1),
+                WindowPart("GrokImagine", "Grok Imagine", 3.0, colorSlot = 3),
+                WindowPart("GrokChat", "Grok Chat", 1.0, colorSlot = 2),
+            ),
+            shared.parts,
+        )
+        assertEquals(true, snapshot.sharesCursorPool)
+        assertEquals(true, snapshot.cursorLinked)
+        assertEquals(false, snapshot.cursorReadFailed)
+    }
+
+    @Test
+    fun `names the X Subscription's pool for all three without a Cursor sign-in`() = runTest {
+        respond(weekly = jsonResponse(fixture("grok/billing_x_subscription.json")))
+
+        val snapshot = fetchSnapshot()
+
+        assertEquals("Weekly · Grok, Cursor and Grok Bot", snapshot.windows.single().label)
+        // Nothing to connect: the pool already counts Cursor.
+        assertEquals(true, snapshot.sharesCursorPool)
+    }
+
+    @Test
+    fun `names a product it does not know from its id and gives it a colour of its own`() =
+        runTest {
+            respond(
+                weekly =
+                    jsonResponse(
+                        """{"config":{"isUnifiedBillingUser":true,"creditUsagePercent":30.0,""" +
+                            """"currentPeriod":{"start":"2026-11-03T04:10:13Z",""" +
+                            """"end":"2026-11-10T04:10:13Z"},"productUsage":[""" +
+                            """{"product":"GrokChat","usagePercent":10.0},""" +
+                            """{"product":"GrokVoiceMode","usagePercent":20.0},""" +
+                            """{"product":"Api","usagePercent":0.0},""" +
+                            """{"product":"GrokBot"}]}}"""
+                    )
+            )
+
+            val parts = fetchSnapshot().windows.single().parts
+
+            // A product with nothing used, or no share at all, has nothing to show.
+            assertEquals(
+                listOf(
+                    WindowPart("GrokVoiceMode", "Grok Voice Mode", 20.0, colorSlot = 5),
+                    WindowPart("GrokChat", "Grok Chat", 10.0, colorSlot = 2),
+                ),
+                parts,
+            )
+        }
+
+    @Test
+    fun `keeps a weekly Cursor pool apart on other subscriptions`() = runTest {
+        respond(
+            weekly = jsonResponse(fixture("grok/billing_weekly.json")),
+            cursorPeriod = jsonResponse(fixture("cursor/current_period_usage_x_subscription.json")),
+            cursorSand = jsonResponse(fixture("cursor/sand_usage_status_x_subscription.json")),
+        )
+
+        val snapshot =
+            assertIs<QuotaResult.Success>(
+                    fetcher.fetch(credentials(CursorSignIn.Ready("cursor-token")))
+                )
+                .snapshot
+
+        assertEquals(listOf("weekly", "cursor-models", "grok-bot"), snapshot.windows.map { it.id })
+        assertEquals("Weekly", snapshot.windows.first().label)
+        // Its product shares are not one pool's breakdown: they do not add up to it.
+        assertEquals(emptyList(), snapshot.windows.first().parts)
+        assertEquals(false, snapshot.sharesCursorPool)
     }
 
     @Test

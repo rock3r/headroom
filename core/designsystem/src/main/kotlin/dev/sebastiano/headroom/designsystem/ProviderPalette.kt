@@ -56,6 +56,27 @@ object ProviderPalette {
         }
     }
 
+    /**
+     * The colour of one product's segment in a window several products share. Slot 0 is the
+     * provider's own accent, so the biggest part matches the ring above it; the others come from
+     * [PART_COLORS_LIGHT] and [PART_COLORS_DARK], which the iOS app copies, so a product has the
+     * same colour on both. They are this palette's accents at fixed hues: orange, magenta, green,
+     * coral and olive.
+     */
+    fun partColor(provider: Provider, slot: Int, primary: Color, dark: Boolean): Color {
+        if (slot == 0) return colors(provider, primary, dark).accent
+        val table = if (dark) PART_COLORS_DARK else PART_COLORS_LIGHT
+        return Color(table[Math.floorMod(slot - 1, table.size)])
+    }
+
+    @Suppress("MagicNumber")
+    private val PART_COLORS_LIGHT =
+        longArrayOf(0xFFB05A00, 0xFF9C54A1, 0xFF34893C, 0xFFB84C59, 0xFF857500)
+
+    @Suppress("MagicNumber")
+    private val PART_COLORS_DARK =
+        longArrayOf(0xFFF0AD7F, 0xFFDFA8E1, 0xFF95CF96, 0xFFF7A3A9, 0xFFCDC072)
+
     private const val LIGHT_ACCENT_L = 0.56f
     private const val LIGHT_ACCENT_C = 0.14f
     private const val LIGHT_ON_ACCENT_L = 0.99f
@@ -71,6 +92,16 @@ object ProviderPalette {
 }
 
 private const val DARK_SURFACE_LUMINANCE = 0.5f
+
+/** The colours of the parts in [slots] of a window [provider] shares, for the current theme. */
+@Composable
+fun partColors(provider: Provider, slots: List<Int>): List<Color> {
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.surface.luminance() < DARK_SURFACE_LUMINANCE
+    return remember(provider, slots, scheme.primary, dark) {
+        slots.map { ProviderPalette.partColor(provider, it, scheme.primary, dark) }
+    }
+}
 
 /** The provider's colours for the current theme. */
 @Composable

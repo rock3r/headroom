@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.shared
 import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.AppSettings
 import dev.sebastiano.headroom.model.Countdown
+import dev.sebastiano.headroom.model.CursorPrompt
 import dev.sebastiano.headroom.model.ExpiryLine
 import dev.sebastiano.headroom.model.NextReset
 import dev.sebastiano.headroom.model.Pace
@@ -118,6 +119,8 @@ public data class AccountUi(
     val usesApiKey: Boolean = false,
     /** Why an `auth` sync failed, such as `keyExpired`, or null for a generic auth failure. */
     val authReason: String? = null,
+    /** `notLinked` or `readFailed` for Grok's Cursor connection; null when no prompt is needed. */
+    val cursorPrompt: String? = null,
 ) {
     public constructor(
         id: String,
@@ -248,6 +251,19 @@ public data class WindowUi(
     val paceChip: String?,
     /** How many points over or under pace, for "5 pts over pace". */
     val pacePoints: Int,
+    /** What makes up a window several products share, biggest first; empty for other windows. */
+    val parts: List<WindowPartUi> = emptyList(),
+)
+
+/** One product's share of a [WindowUi], as its segment of the bar and its line in the legend. */
+public data class WindowPartUi(
+    val id: String,
+    val label: String,
+    val usedPercent: Double,
+    /** Which part colour it takes, the same as on Android: see `PartColors`. */
+    val colorSlot: Int,
+    /** How much of a full bar its segment covers, from 0 to 1. */
+    val barFraction: Double,
 )
 
 /** A provider the user can add, and how it signs in. */
@@ -405,6 +421,12 @@ internal object UiMapping {
             justReset = justReset,
             usesApiKey = state.account.provider.usesApiKey,
             authReason = state.authReason?.id(),
+            cursorPrompt =
+                when (state.cursorPrompt) {
+                    CursorPrompt.NotLinked -> "notLinked"
+                    CursorPrompt.ReadFailed -> "readFailed"
+                    null -> null
+                },
         )
     }
 
@@ -522,6 +544,10 @@ internal object UiMapping {
             isRecognised = window.isRecognised,
             paceChip = chip?.first,
             pacePoints = chip?.second ?: 0,
+            parts =
+                window.parts.zip(window.partFractions) { part, fraction ->
+                    WindowPartUi(part.id, part.label, part.usedPercent, part.colorSlot, fraction)
+                },
         )
     }
 

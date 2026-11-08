@@ -5,6 +5,7 @@ import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
 import dev.sebastiano.headroom.model.QuotaSnapshot
 import dev.sebastiano.headroom.model.QuotaWindow
+import dev.sebastiano.headroom.model.WindowPart
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -23,12 +24,14 @@ import kotlinx.serialization.json.jsonObject
  * Credentials: the xAI OAuth access token (sent as `Authorization: Bearer`, together with the
  * `X-XAI-Token-Auth` header the proxy expects). API keys are not supported.
  *
- * The weekly credit pool comes first. Accounts on unified billing have no weekly period, so the
- * monthly included budget is the fallback. The plan is often missing from billing; the CLI settings
- * (`subscription_tier_display`) or the user profile fill it in, best effort.
+ * The weekly credit pool comes first. Accounts on unified billing without a weekly period fall back
+ * to the monthly included budget; unified billing with a weekly period is The X Subscription. The
+ * plan is often missing from billing; the CLI settings (`subscription_tier_display`) or the user
+ * profile fill it in, best effort.
  *
  * When the account has a Cursor sign-in, the Cursor model pools and the Grok Bot pool join the
- * snapshot. A Cursor read that fails never fails the Grok fetch: the snapshot flags it instead.
+ * snapshot, except on The X Subscription, where they are the weekly pool itself. A Cursor read that
+ * fails never fails the Grok fetch: the snapshot flags it instead.
  */
 public class GrokQuotaFetcher(
     private val httpClient: QuotaHttpClient,
@@ -70,10 +73,13 @@ public class GrokQuotaFetcher(
                 provider = provider,
                 accountId = credentials.accountId.orEmpty(),
                 planLabel = planLabel,
-                windows = listOf(usage.window) + cursor.windows,
+                windows =
+                    if (usage.sharedPool) sharedPool(usage.window, cursor.windows)
+                    else listOf(usage.window) + cursor.windows,
                 fetchedAt = clock.now(),
                 cursorLinked = cursor.linked,
                 cursorReadFailed = cursor.readFailed,
+                sharesCursorPool = usage.sharedPool,
             )
         )
     }
@@ -103,6 +109,16 @@ public class GrokQuotaFetcher(
             null -> CursorReading(emptyList(), linked = false, readFailed = false)
         }
     }
+
+    /**
+     * The windows of an account on The X Subscription, whose Grok, Cursor and Grok Bot usage draws
+     * on one weekly pool. The xAI window is that pool's own meter, so it stays, named for all
+     * three, and Cursor's readings of the same pool go. Third-party models are billed apart, so a
+     * Cursor "Other Models" pool, if one is ever sent, stays.
+     */
+    private fun sharedPool(grok: QuotaWindow, cursor: List<QuotaWindow>): List<QuotaWindow> =
+        listOf(grok.copy(label = SHARED_POOL_LABEL)) +
+            cursor.filterNot { it.id == CURSOR_MODELS_ID || it.id == GROK_BOT_ID }
 
     /** The Cursor windows of one read, with the account's linked state. */
     private data class CursorReading(
@@ -159,6 +175,14 @@ public class GrokQuotaFetcher(
         return BillingConfig(
             creditUsagePercent = config.doubleOrNull(CREDIT_USAGE_PERCENT_KEY),
             omitsCreditUsagePercent = !config.containsKey(CREDIT_USAGE_PERCENT_KEY),
+            isUnifiedBillingUser = config.booleanOrNull("isUnifiedBillingUser") == true,
+            productUsage =
+                config.arrayOrNull("productUsage").orEmpty().mapNotNull { entry ->
+                    val product = entry as? JsonObject ?: return@mapNotNull null
+                    val id = product.nonBlankStringOrNull("product") ?: return@mapNotNull null
+                    val percent = product.doubleOrNull("usagePercent") ?: return@mapNotNull null
+                    (id to percent).takeIf { percent > MIN_PERCENT && percent <= MAX_PERCENT }
+                },
             hasWeeklyPeriod = currentPeriod != null,
             periodStart = currentPeriod?.instantOrNull("start"),
             periodEnd = currentPeriod?.instantOrNull("end"),
@@ -184,7 +208,14 @@ public class GrokQuotaFetcher(
                 resetsAt = periodEnd,
                 length = lengthBetween(periodStart, periodEnd) ?: ONE_WEEK,
             )
-        return GrokUsage(window, grokPlanLabel(tier))
+        // Unified billing with a weekly period is The X Subscription: one pool for Grok, Cursor and
+        // Grok Bot, whose product shares add up to it. Other plans' shares do not.
+        if (!isUnifiedBillingUser) return GrokUsage(window, grokPlanLabel(tier))
+        return GrokUsage(
+            window.copy(parts = grokProductParts(productUsage)),
+            grokPlanLabel(tier),
+            sharedPool = true,
+        )
     }
 
     private fun BillingConfig.toMonthlyUsage(): GrokUsage? {
@@ -220,6 +251,9 @@ public class GrokQuotaFetcher(
     private data class BillingConfig(
         val creditUsagePercent: Double?,
         val omitsCreditUsagePercent: Boolean,
+        val isUnifiedBillingUser: Boolean,
+        /** Each product's share of the weekly pool, by xAI's product id. */
+        val productUsage: List<Pair<String, Double>>,
         val hasWeeklyPeriod: Boolean,
         val periodStart: Instant?,
         val periodEnd: Instant?,
@@ -230,7 +264,11 @@ public class GrokQuotaFetcher(
         val billingPeriodEnd: Instant?,
     )
 
-    private data class GrokUsage(val window: QuotaWindow, val planLabel: String?)
+    private data class GrokUsage(
+        val window: QuotaWindow,
+        val planLabel: String?,
+        val sharedPool: Boolean = false,
+    )
 
     private companion object {
         const val PROVIDER_NAME = "Grok"
@@ -245,7 +283,45 @@ public class GrokQuotaFetcher(
         const val CREDIT_USAGE_PERCENT_KEY = "creditUsagePercent"
         const val WEEKLY_ID = "weekly"
         const val MONTHLY_ID = "monthly"
+        const val SHARED_POOL_LABEL = "Weekly · Grok, Cursor and Grok Bot"
     }
+}
+
+/**
+ * The products xAI reports in a shared pool, in the order of their colours, with the names the app
+ * shows. xAI reports no Cursor product of its own, so "Api" is named for both.
+ */
+private val GROK_PRODUCTS =
+    listOf(
+        "Api" to "Cursor & API",
+        "GrokBot" to "Grok Bot",
+        "GrokChat" to "Grok Chat",
+        "GrokImagine" to "Grok Imagine",
+        "GrokBuild" to "Grok Build",
+    )
+private val CAMEL_CASE_BOUNDARY = Regex("(?<=[a-z0-9])(?=[A-Z])")
+
+/**
+ * The parts of a shared pool, biggest first. A known product keeps its colour slot; one the app
+ * does not know yet is named from its id, `GrokVoiceMode` as "Grok Voice Mode", and takes the slots
+ * after the known ones, in the order of their ids, so it keeps one too.
+ */
+private fun grokProductParts(usage: List<Pair<String, Double>>): List<WindowPart> {
+    val known = GROK_PRODUCTS.map { it.first }
+    val unknown = usage.map { it.first }.filter { it !in known }.distinct().sorted()
+    return usage
+        .map { (id, percent) ->
+            val index = known.indexOf(id)
+            WindowPart(
+                id = id,
+                label =
+                    if (index >= 0) GROK_PRODUCTS[index].second
+                    else id.replace(CAMEL_CASE_BOUNDARY, " "),
+                usedPercent = percent,
+                colorSlot = if (index >= 0) index else known.size + unknown.indexOf(id),
+            )
+        }
+        .sortedByDescending { it.usedPercent }
 }
 
 private const val SUBSCRIPTION_TIER_PREFIX = "SUBSCRIPTION_TIER_"

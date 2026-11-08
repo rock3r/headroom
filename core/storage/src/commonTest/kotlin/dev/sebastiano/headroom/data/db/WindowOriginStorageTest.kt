@@ -3,6 +3,7 @@ package dev.sebastiano.headroom.data.db
 import dev.sebastiano.headroom.model.DemoData
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaResult
+import dev.sebastiano.headroom.model.WindowPart
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -51,5 +52,37 @@ class WindowOriginStorageTest {
             // back, and its headline, pace and sorting follow the wrong provider.
             assertEquals(true, stored.single { it.id == "grok-bot" }.isSecondary)
             assertEquals(false, stored.single { it.id == own.id }.isSecondary)
+        }
+
+    @Test
+    fun `what makes up a shared window survives storage`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val parts =
+                listOf(
+                    WindowPart("Api", "Cursor & API", 37.0, colorSlot = 0),
+                    WindowPart("GrokChat", "Grok Chat", 1.0, colorSlot = 2),
+                )
+            val own = claude.snapshot!!.windows.first()
+            val shared = own.copy(usedPercent = 38.0, parts = parts)
+            val other = claude.snapshot!!.windows[1]
+            val snapshot =
+                claude.snapshot!!.copy(windows = listOf(shared, other), sharesCursorPool = true)
+            val repo =
+                RoomQuotaRepository(
+                    db.quotaDao(),
+                    db.accountOrderDao(),
+                    { QuotaResult.Success(snapshot) },
+                    clock = { now },
+                    scope = backgroundScope,
+                )
+            repo.addAccount(claude.account)
+            repo.refresh()
+
+            val storedSnapshot = repo.current().single().snapshot!!
+            // Without it, the account asks to connect Cursor again as soon as it is read back.
+            assertEquals(true, storedSnapshot.sharesCursorPool)
+            val stored = storedSnapshot.windows
+            assertEquals(parts, stored.single { it.id == own.id }.parts)
+            assertEquals(emptyList(), stored.single { it.id == other.id }.parts)
         }
 }

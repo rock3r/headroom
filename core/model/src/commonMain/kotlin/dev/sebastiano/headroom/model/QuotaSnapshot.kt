@@ -31,6 +31,12 @@ public data class QuotaSnapshot(
      * new; the snapshot holds no Cursor windows. Only set when [cursorLinked] is true.
      */
     val cursorReadFailed: Boolean = false,
+    /**
+     * True when the account's own window already counts its Cursor usage, as on The X Subscription,
+     * where Grok, Cursor and Grok Bot draw on one weekly pool. Connecting Cursor then shows nothing
+     * more.
+     */
+    val sharesCursorPool: Boolean = false,
 )
 
 /** An amount left to spend, such as AI credits. */

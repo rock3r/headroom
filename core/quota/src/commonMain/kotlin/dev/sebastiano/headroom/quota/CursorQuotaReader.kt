@@ -27,11 +27,12 @@ public sealed interface CursorRead {
  * token. One Grok window set draws on three Cursor pools:
  * - "Cursor Models", the first-party pool (Cursor Grok and Composer), which Cursor calls the auto
  *   bucket.
- * - "Other Models", the third-party pool, which Cursor calls the API bucket.
+ * - "Other Models", the third-party pool, which Cursor calls the API bucket. Plans without one
+ *   leave it out.
  * - "Grok Bot", the weekly Grok Bot pool, which Cursor calls Sand.
  *
- * The model pools share the monthly billing cycle. The Grok Bot pool has its own week. A Grok Bot
- * read that fails drops only its window: the model pools still count.
+ * The model pools share the billing cycle, which can be a month or a week. The Grok Bot pool has
+ * its own week. A Grok Bot read that fails drops only its window: the model pools still count.
  */
 public class CursorQuotaReader(private val httpClient: QuotaHttpClient) {
 
@@ -73,24 +74,31 @@ public class CursorQuotaReader(private val httpClient: QuotaHttpClient) {
         val start = root.epochMillisOrNull("billingCycleStart")
         val end = root.epochMillisOrNull("billingCycleEnd")
         val auto = plan.percentOrNull("autoPercentUsed") ?: return null
-        val api = plan.percentOrNull("apiPercentUsed") ?: return null
-        return listOf(
+        // Some plans have no third-party pool, and Cursor then sends no apiPercentUsed at all.
+        val api =
+            if (plan.containsKey("apiPercentUsed")) {
+                plan.percentOrNull("apiPercentUsed") ?: return null
+            } else null
+        val length = lengthBetween(start, end) ?: THIRTY_DAYS
+        return listOfNotNull(
             quotaWindow(
-                id = MODELS_ID,
+                id = CURSOR_MODELS_ID,
                 label = "Cursor Models",
                 usedPercent = auto,
                 resetsAt = end,
-                length = lengthBetween(start, end) ?: THIRTY_DAYS,
+                length = length,
                 group = GROUP,
             ),
-            quotaWindow(
-                id = OTHER_MODELS_ID,
-                label = "Other Models",
-                usedPercent = api,
-                resetsAt = end,
-                length = lengthBetween(start, end) ?: THIRTY_DAYS,
-                group = GROUP,
-            ),
+            api?.let {
+                quotaWindow(
+                    id = CURSOR_OTHER_MODELS_ID,
+                    label = "Other Models",
+                    usedPercent = it,
+                    resetsAt = end,
+                    length = length,
+                    group = GROUP,
+                )
+            },
         )
     }
 
@@ -112,7 +120,7 @@ public class CursorQuotaReader(private val httpClient: QuotaHttpClient) {
         val start = root.nonBlankStringOrNull("currentPeriodStart")?.let(::parseInstantOrNull)
         val end = root.nonBlankStringOrNull("nextResetTimestampUtc")?.let(::parseInstantOrNull)
         return quotaWindow(
-            id = BOT_ID,
+            id = GROK_BOT_ID,
             label = "Grok Bot",
             usedPercent = percent,
             resetsAt = end,
@@ -143,8 +151,10 @@ public class CursorQuotaReader(private val httpClient: QuotaHttpClient) {
         const val PERIOD_PATH = "/aiserver.v1.DashboardService/GetCurrentPeriodUsage"
         const val SAND_PATH = "/aiserver.v1.DashboardService/GetSandUsageStatus"
         const val GROUP = "Cursor"
-        const val MODELS_ID = "cursor-models"
-        const val OTHER_MODELS_ID = "cursor-other-models"
-        const val BOT_ID = "grok-bot"
     }
 }
+
+/** The ids of the Cursor windows: the first-party and third-party model pools, and Grok Bot. */
+internal const val CURSOR_MODELS_ID = "cursor-models"
+internal const val CURSOR_OTHER_MODELS_ID = "cursor-other-models"
+internal const val GROK_BOT_ID = "grok-bot"

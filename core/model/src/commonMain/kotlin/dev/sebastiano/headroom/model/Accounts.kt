@@ -68,12 +68,14 @@ public data class AccountState(
 
     /**
      * The account the user could connect Cursor to: a Grok account with no working Cursor sign-in,
-     * or one whose sign-in could not be read. Null for every other account.
+     * or one whose sign-in could not be read. Null for every other account, and for one whose own
+     * window already counts its Cursor usage.
      */
     val cursorPrompt: CursorPrompt?
         get() =
             when {
                 account.provider != Provider.Grok -> null
+                snapshot?.sharesCursorPool == true -> null
                 !cursorLinked -> CursorPrompt.NotLinked
                 cursorReadFailed -> CursorPrompt.ReadFailed
                 else -> null

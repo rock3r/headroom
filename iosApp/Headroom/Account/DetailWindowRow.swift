@@ -32,12 +32,20 @@ struct DetailWindowRow: View {
                     .foregroundStyle(window.needsAttention && !account.signInExpired ? .red : .primary)
                     .accessibilityLabel(Texts.percent(window, left: model.showsLeft))
             }
-            QuotaBar(
-                window: window,
-                color: ProviderColors(providerId: account.providerId, colorScheme: colorScheme).accent,
-                showsLeft: model.showsLeft,
-                showsPace: window.id == account.primary?.id
-            )
+            if window.parts.isEmpty {
+                QuotaBar(
+                    window: window,
+                    color: ProviderColors(providerId: account.providerId, colorScheme: colorScheme).accent,
+                    showsLeft: model.showsLeft,
+                    showsPace: window.id == account.primary?.id
+                )
+            } else {
+                SharedWindowParts(
+                    window: window,
+                    providerId: account.providerId,
+                    showsPace: window.id == account.primary?.id
+                )
+            }
             if let amount = amountLine {
                 Text(amount)
                     .font(.footnote.monospacedDigit())
