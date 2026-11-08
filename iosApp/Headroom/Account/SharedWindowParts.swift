@@ -47,7 +47,7 @@ struct SharedWindowParts: View {
 /// The segments side by side from the start of the bar, with a hairline between them. A segment
 /// that rounds to almost nothing still shows, as a sliver, so every product in the legend has its
 /// colour on the bar. The legend says the same, so the bar itself is hidden from accessibility.
-private struct StackedBar: View {
+struct StackedBar: View {
     let fractions: [Double]
     let colors: [Color]
 
@@ -55,19 +55,51 @@ private struct StackedBar: View {
         Canvas { context, size in
             let track = Path(CGRect(origin: .zero, size: size))
             context.fill(track, with: .style(.quaternary))
+            let gap = 2.0
             var x = 0.0
-            for (index, fraction) in fractions.enumerated() where fraction > 0 {
-                let width = max(fraction * size.width, 3)
+            for (index, width) in Self.widths(fractions, width: size.width, gap: gap, minWidth: 3).enumerated()
+            where width > 0 {
                 context.fill(
                     Path(CGRect(x: x, y: 0, width: width, height: size.height)),
                     with: .color(colors[index])
                 )
-                x += width + (index < fractions.count - 1 ? 2 : 0)
+                x += width + gap
             }
         }
         .frame(height: 8)
         .clipShape(Capsule())
         .accessibilityHidden(true)
+    }
+}
+
+extension StackedBar {
+    /// How wide each segment is, as the Android app's `stackedBarWidths`: zero for a part that used
+    /// nothing. The visible segments and the gaps between them end exactly where the share used ends,
+    /// and every segment is at least `minWidth`; what the gaps and the slivers take comes out of the
+    /// bigger segments, in proportion.
+    nonisolated static func widths(_ fractions: [Double], width: Double, gap: Double, minWidth: Double) -> [Double] {
+        let visible = fractions.indices.filter { fractions[$0] > 0 }
+        var widths = Array(repeating: 0.0, count: fractions.count)
+        guard !visible.isEmpty else { return widths }
+        let used = min(visible.reduce(0) { $0 + fractions[$1] }, 1) * width
+        let available = used - gap * Double(visible.count - 1)
+        if available <= minWidth * Double(visible.count) {
+            for index in visible { widths[index] = minWidth }
+            return widths
+        }
+        // Pin the segments too thin to see at minWidth, then share the rest among the others;
+        // pinning one makes the others thinner, so repeat until no more need it.
+        var pinned = Set<Int>()
+        while true {
+            let free = visible.filter { !pinned.contains($0) }
+            let room = available - minWidth * Double(pinned.count)
+            let total = free.reduce(0) { $0 + fractions[$1] }
+            for index in free { widths[index] = fractions[index] / total * room }
+            for index in pinned { widths[index] = minWidth }
+            let tooThin = free.filter { widths[$0] < minWidth }
+            if tooThin.isEmpty { return widths }
+            pinned.formUnion(tooThin)
+        }
     }
 }
 

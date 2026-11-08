@@ -94,19 +94,52 @@ private fun StackedBar(
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
     Canvas(modifier.height(8.dp).clip(CircleShape).clearAndSetSemantics {}) {
         drawRect(track)
-        val minWidth = MIN_SEGMENT.toPx()
         val gap = GAP.toPx()
+        val widths = stackedBarWidths(fractions, size.width, gap, MIN_SEGMENT.toPx())
         var x = 0f
-        fractions.forEachIndexed { index, fraction ->
-            if (fraction <= 0.0) return@forEachIndexed
-            val width = (fraction.toFloat() * size.width).coerceAtLeast(minWidth)
+        widths.forEachIndexed { index, width ->
+            if (width <= 0f) return@forEachIndexed
             drawRect(colors[index], topLeft = Offset(x, 0f), size = Size(width, size.height))
-            x += width
-            if (index < fractions.lastIndex) {
-                drawRect(track, topLeft = Offset(x, 0f), size = Size(gap, size.height))
-                x += gap
-            }
+            x += width + gap
         }
+    }
+}
+
+/**
+ * How wide each segment of a stacked bar [width] wide is, for [fractions] of the whole bar: zero
+ * for a part that used nothing. The visible segments and the [gap]s between them end exactly where
+ * the share used ends, so the bar never shows more than was used, and every segment is at least
+ * [minWidth], so a product that rounds to nothing still has its colour. What the gaps and the
+ * slivers take comes out of the bigger segments, in proportion. The iOS app's `StackedBar` lays out
+ * the same way.
+ */
+internal fun stackedBarWidths(
+    fractions: List<Double>,
+    width: Float,
+    gap: Float,
+    minWidth: Float,
+): List<Float> {
+    val visible = fractions.indices.filter { fractions[it] > 0.0 }
+    if (visible.isEmpty()) return fractions.map { 0f }
+    val used = visible.sumOf { fractions[it] }.coerceAtMost(1.0).toFloat() * width
+    val available = used - gap * (visible.size - 1)
+    val widths = FloatArray(fractions.size)
+    if (available <= minWidth * visible.size) {
+        visible.forEach { widths[it] = minWidth }
+        return widths.toList()
+    }
+    // Pin the segments too thin to see at minWidth, then share the rest among the others; pinning
+    // one makes the others thinner, so repeat until no more need it.
+    val pinned = mutableSetOf<Int>()
+    while (true) {
+        val free = visible.filterNot { it in pinned }
+        val room = available - minWidth * pinned.size
+        val total = free.sumOf { fractions[it] }
+        free.forEach { widths[it] = (fractions[it] / total * room).toFloat() }
+        pinned.forEach { widths[it] = minWidth }
+        val tooThin = free.filter { widths[it] < minWidth }
+        if (tooThin.isEmpty()) return widths.toList()
+        pinned += tooThin
     }
 }
 
