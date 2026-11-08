@@ -38,6 +38,8 @@ internal data class AccountEntity(
      * account's windows hold no Cursor windows.
      */
     @ColumnInfo(defaultValue = "0") val cursorReadFailed: Boolean = false,
+    /** True when the account's own window already counts its Cursor usage; see QuotaSnapshot. */
+    @ColumnInfo(defaultValue = "0") val sharesCursorPool: Boolean = false,
 )
 
 @Entity(

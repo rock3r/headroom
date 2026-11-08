@@ -33,6 +33,7 @@ internal fun AccountWithWindows.toState(refreshing: Boolean): AccountState? {
             resetsReadFailed = account.resetsReadFailed,
             cursorLinked = account.cursorLinked,
             cursorReadFailed = account.cursorReadFailed,
+            sharesCursorPool = account.sharesCursorPool,
         )
     }
     return AccountState(

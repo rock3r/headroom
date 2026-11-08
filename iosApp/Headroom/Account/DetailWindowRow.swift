@@ -40,7 +40,11 @@ struct DetailWindowRow: View {
                     showsPace: window.id == account.primary?.id
                 )
             } else {
-                SharedWindowParts(window: window, providerId: account.providerId)
+                SharedWindowParts(
+                    window: window,
+                    providerId: account.providerId,
+                    showsPace: window.id == account.primary?.id
+                )
             }
             if let amount = amountLine {
                 Text(amount)

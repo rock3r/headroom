@@ -79,6 +79,7 @@ public class GrokQuotaFetcher(
                 fetchedAt = clock.now(),
                 cursorLinked = cursor.linked,
                 cursorReadFailed = cursor.readFailed,
+                sharesCursorPool = usage.sharedPool,
             )
         )
     }

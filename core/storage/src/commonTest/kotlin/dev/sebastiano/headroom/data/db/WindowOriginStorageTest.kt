@@ -65,7 +65,8 @@ class WindowOriginStorageTest {
             val own = claude.snapshot!!.windows.first()
             val shared = own.copy(usedPercent = 38.0, parts = parts)
             val other = claude.snapshot!!.windows[1]
-            val snapshot = claude.snapshot!!.copy(windows = listOf(shared, other))
+            val snapshot =
+                claude.snapshot!!.copy(windows = listOf(shared, other), sharesCursorPool = true)
             val repo =
                 RoomQuotaRepository(
                     db.quotaDao(),
@@ -77,7 +78,10 @@ class WindowOriginStorageTest {
             repo.addAccount(claude.account)
             repo.refresh()
 
-            val stored = repo.current().single().snapshot!!.windows
+            val storedSnapshot = repo.current().single().snapshot!!
+            // Without it, the account asks to connect Cursor again as soon as it is read back.
+            assertEquals(true, storedSnapshot.sharesCursorPool)
+            val stored = storedSnapshot.windows
             assertEquals(parts, stored.single { it.id == own.id }.parts)
             assertEquals(emptyList(), stored.single { it.id == other.id }.parts)
         }

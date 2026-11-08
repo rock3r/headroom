@@ -387,6 +387,7 @@ class GrokQuotaFetcherTest {
             ),
             shared.parts,
         )
+        assertEquals(true, snapshot.sharesCursorPool)
         assertEquals(true, snapshot.cursorLinked)
         assertEquals(false, snapshot.cursorReadFailed)
     }
@@ -395,9 +396,11 @@ class GrokQuotaFetcherTest {
     fun `names the X Subscription's pool for all three without a Cursor sign-in`() = runTest {
         respond(weekly = jsonResponse(fixture("grok/billing_x_subscription.json")))
 
-        val window = fetchSnapshot().windows.single()
+        val snapshot = fetchSnapshot()
 
-        assertEquals("Weekly · Grok, Cursor and Grok Bot", window.label)
+        assertEquals("Weekly · Grok, Cursor and Grok Bot", snapshot.windows.single().label)
+        // Nothing to connect: the pool already counts Cursor.
+        assertEquals(true, snapshot.sharesCursorPool)
     }
 
     @Test
@@ -446,6 +449,7 @@ class GrokQuotaFetcherTest {
         assertEquals("Weekly", snapshot.windows.first().label)
         // Its product shares are not one pool's breakdown: they do not add up to it.
         assertEquals(emptyList(), snapshot.windows.first().parts)
+        assertEquals(false, snapshot.sharesCursorPool)
     }
 
     @Test

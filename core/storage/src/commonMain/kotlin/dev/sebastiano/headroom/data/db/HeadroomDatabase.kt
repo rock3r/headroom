@@ -16,7 +16,7 @@ import androidx.sqlite.execSQL
             UsagePointEntity::class,
             ResetEventEntity::class,
         ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 @ConstructedBy(HeadroomDatabaseConstructor::class)
@@ -181,6 +181,16 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 }
             }
 
+        /** Version 13 remembers which accounts' own window already counts their Cursor usage. */
+        val MIGRATION_12_13: Migration =
+            object : Migration(12, 13) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL(
+                        "ALTER TABLE accounts ADD COLUMN sharesCursorPool INTEGER NOT NULL DEFAULT 0"
+                    )
+                }
+            }
+
         /** Every migration, oldest first. */
         val MIGRATIONS: List<Migration> =
             listOf(
@@ -195,6 +205,7 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 MIGRATION_9_10,
                 MIGRATION_10_11,
                 MIGRATION_11_12,
+                MIGRATION_12_13,
             )
 
         /** The database file's name, the same on every platform. */

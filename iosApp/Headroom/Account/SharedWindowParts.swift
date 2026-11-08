@@ -8,11 +8,20 @@ import SwiftUI
 struct SharedWindowParts: View {
     let window: WindowUi
     let providerId: String
+    /// Marks where even pace would be, as `QuotaBar` does for the account's main window.
+    var showsPace = false
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             StackedBar(fractions: window.parts.map(\.barFraction), colors: colors)
+                .overlay {
+                    // The bar always shows what was used, so even in left mode the tick marks
+                    // even pace on the used scale.
+                    if showsPace, let expected = window.expectedPercent?.doubleValue {
+                        PaceTick(fraction: expected / 100).fill(.primary.opacity(0.6))
+                    }
+                }
             FlowLayout(spacing: 12, lineSpacing: 2) {
                 ForEach(Array(window.parts.enumerated()), id: \.element.id) { index, part in
                     HStack(spacing: 6) {

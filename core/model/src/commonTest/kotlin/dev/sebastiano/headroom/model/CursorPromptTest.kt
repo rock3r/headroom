@@ -11,7 +11,12 @@ class CursorPromptTest {
     private fun account(provider: Provider, id: String = "a1") =
         Account(id = id, provider = provider, label = "someone@example.com")
 
-    private fun snapshot(provider: Provider, linked: Boolean, readFailed: Boolean) =
+    private fun snapshot(
+        provider: Provider,
+        linked: Boolean,
+        readFailed: Boolean,
+        sharesCursorPool: Boolean = false,
+    ) =
         QuotaSnapshot(
             provider = provider,
             accountId = "a1",
@@ -20,6 +25,7 @@ class CursorPromptTest {
             fetchedAt = now,
             cursorLinked = linked,
             cursorReadFailed = readFailed,
+            sharesCursorPool = sharesCursorPool,
         )
 
     private fun state(
@@ -52,6 +58,26 @@ class CursorPromptTest {
             state(snapshot = snapshot(Provider.Grok, linked = true, readFailed = true))
                 .cursorPrompt,
         )
+    }
+
+    @Test
+    fun `an account whose weekly pool already counts Cursor is never asked about it`() {
+        // On The X Subscription, Cursor draws on the Grok weekly pool the account already shows:
+        // connecting Cursor, or reading it again, would show nothing more.
+        listOf(false to false, true to true).forEach { (linked, readFailed) ->
+            assertNull(
+                state(
+                        snapshot =
+                            snapshot(
+                                Provider.Grok,
+                                linked = linked,
+                                readFailed = readFailed,
+                                sharesCursorPool = true,
+                            )
+                    )
+                    .cursorPrompt
+            )
+        }
     }
 
     @Test
