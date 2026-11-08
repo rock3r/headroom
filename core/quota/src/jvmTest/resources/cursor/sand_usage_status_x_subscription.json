@@ -1,0 +1,12 @@
+{
+  "currentPeriodStart": "2026-11-03T04:10:13.383Z",
+  "nextResetTimestampUtc": "2026-11-10T04:10:13.383Z",
+  "usagePercent": 61.95016251354279,
+  "hasAvailableUsage": true,
+  "hasNonZeroIncludedLimit": true,
+  "grokPlanLabel": "Grok Bot Plan",
+  "cursorPlanName": "Premium",
+  "isUnified": true,
+  "billingBrand": "SAND_BILLING_BRAND_GROK",
+  "prepaidAvailableCents": "0"
+}

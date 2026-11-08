@@ -16,7 +16,7 @@ import androidx.sqlite.execSQL
             UsagePointEntity::class,
             ResetEventEntity::class,
         ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 @ConstructedBy(HeadroomDatabaseConstructor::class)
@@ -173,6 +173,14 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 }
             }
 
+        /** Version 12 remembers what makes up a window several products share. */
+        val MIGRATION_11_12: Migration =
+            object : Migration(11, 12) {
+                override fun migrate(connection: SQLiteConnection) {
+                    connection.execSQL("ALTER TABLE windows ADD COLUMN partsJson TEXT")
+                }
+            }
+
         /** Every migration, oldest first. */
         val MIGRATIONS: List<Migration> =
             listOf(
@@ -186,6 +194,7 @@ internal abstract class HeadroomDatabase : RoomDatabase() {
                 MIGRATION_8_9,
                 MIGRATION_9_10,
                 MIGRATION_10_11,
+                MIGRATION_11_12,
             )
 
         /** The database file's name, the same on every platform. */

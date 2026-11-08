@@ -144,6 +144,10 @@
     <string name="detail_resets_at">Resets %1$s</string>
     <!-- When a one-time credit expires, such as "Expires 5 Nov 2026". -->
     <string name="detail_expires_at">Expires %1$s</string>
+    <!-- One product in the legend of a window several products share, as "Grok Bot 20%". -->
+    <string name="detail_part">%1$s %2$d%%</string>
+    <!-- Under the legend of a window several products share, as "61% used in total". -->
+    <string name="detail_parts_total">%1$d%% used in total</string>
     <!-- Money spent out of a credit, such as "$102 of $250 used". -->
     <string name="detail_credit_used">%1$s of %2$s used</string>
     <!-- Money left out of a credit, such as "$148 left of $250". -->

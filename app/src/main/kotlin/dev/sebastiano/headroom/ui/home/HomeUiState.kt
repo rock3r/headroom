@@ -12,6 +12,7 @@ import dev.sebastiano.headroom.model.QuotaDisplay
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.WindowPart
 import dev.sebastiano.headroom.ui.detail.UsageHistoryModel
 import kotlin.time.Instant
 
@@ -119,6 +120,10 @@ data class WindowSummary(
     val expiresAt: Instant? = null,
     /** False for a quota Headroom does not know. The detail explains it next to the label. */
     val isRecognised: Boolean = true,
+    /** What makes up a window several products share, biggest first; see `QuotaWindow.parts`. */
+    val parts: List<WindowPart> = emptyList(),
+    /** How much of a full bar each of [parts] covers; see `QuotaWindow.partFractions`. */
+    val partFractions: List<Double> = emptyList(),
 )
 
 @Immutable

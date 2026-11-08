@@ -73,6 +73,8 @@ internal data class WindowEntity(
     @ColumnInfo(defaultValue = "1") val isRecognised: Boolean = true,
     /** True for a window a second sign-in added; see [QuotaWindow.isSecondary]. */
     @ColumnInfo(defaultValue = "0") val isSecondary: Boolean = false,
+    /** What makes up the window, as JSON: see [WindowPartsCodec]. Null when nothing does. */
+    val partsJson: String? = null,
 )
 
 @Entity(

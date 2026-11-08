@@ -20,7 +20,7 @@ struct WidgetSnapshotTests {
             resetsAtEpochSeconds: KotlinLong(value: 2_000_000_000), expiresAtEpochSeconds: nil, pace: nil,
             expectedPercent: nil, needsAttention: false, isInformational: false, isUnlimited: false,
             usedAmount: nil, limitAmount: nil, amountUnit: nil, canAlert: true, alertOn: false,
-            isRecognised: true, paceChip: nil, pacePoints: 0)
+            isRecognised: true, paceChip: nil, pacePoints: 0, parts: [])
         return AccountUi(id: id, providerId: "claude", providerName: "Claude", title: "Claude", label: label,
             plan: nil, primary: window, windows: [window], isRefreshing: false, signInExpired: false, error: nil,
             updatedAtEpochSeconds: nil, needsAttention: false, resets: nil, balance: nil,

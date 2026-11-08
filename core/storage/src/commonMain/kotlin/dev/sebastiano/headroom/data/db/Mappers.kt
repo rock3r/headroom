@@ -79,6 +79,7 @@ internal fun WindowEntity.toDomain() =
         expiresAt = expiresAtEpochMs?.let(Instant::fromEpochMilliseconds),
         isRecognised = isRecognised,
         isSecondary = isSecondary,
+        parts = partsJson?.let(WindowPartsCodec::decode).orEmpty(),
     )
 
 internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
@@ -99,6 +100,7 @@ internal fun QuotaWindow.toEntity(accountId: String, position: Int) =
         expiresAtEpochMs = expiresAt?.toEpochMilliseconds(),
         isRecognised = isRecognised,
         isSecondary = isSecondary,
+        partsJson = parts.takeIf { it.isNotEmpty() }?.let(WindowPartsCodec::encode),
     )
 
 internal fun UsagePointEntity.toDomain() =

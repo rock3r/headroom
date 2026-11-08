@@ -251,6 +251,19 @@ public data class WindowUi(
     val paceChip: String?,
     /** How many points over or under pace, for "5 pts over pace". */
     val pacePoints: Int,
+    /** What makes up a window several products share, biggest first; empty for other windows. */
+    val parts: List<WindowPartUi> = emptyList(),
+)
+
+/** One product's share of a [WindowUi], as its segment of the bar and its line in the legend. */
+public data class WindowPartUi(
+    val id: String,
+    val label: String,
+    val usedPercent: Double,
+    /** Which part colour it takes, the same as on Android: see `PartColors`. */
+    val colorSlot: Int,
+    /** How much of a full bar its segment covers, from 0 to 1. */
+    val barFraction: Double,
 )
 
 /** A provider the user can add, and how it signs in. */
@@ -531,6 +544,10 @@ internal object UiMapping {
             isRecognised = window.isRecognised,
             paceChip = chip?.first,
             pacePoints = chip?.second ?: 0,
+            parts =
+                window.parts.zip(window.partFractions) { part, fraction ->
+                    WindowPartUi(part.id, part.label, part.usedPercent, part.colorSlot, fraction)
+                },
         )
     }
 
