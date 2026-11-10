@@ -15,7 +15,7 @@ kotlin {
             implementation(libs.okio)
         }
         jvmMain.dependencies { implementation(libs.ktor.client.okhttp) }
-        iosMain.dependencies { implementation(libs.ktor.client.darwin) }
+        appleMain.dependencies { implementation(libs.ktor.client.darwin) }
         jvmTest.dependencies {
             implementation(libs.okhttp)
             implementation(libs.okhttp.mockwebserver)
