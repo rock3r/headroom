@@ -50,13 +50,15 @@ private fun hook(args: List<String>) {
 private fun serve(args: List<String>) {
     val port = args.getOrNull(args.indexOf("--port") + 1)?.toIntOrNull() ?: DEFAULT_PORT
     val token = localToken()
-    writeToken(token)
     val store = FileStateStore(statePath())
     val server = LoopbackHttp { request ->
         val readings = store.load()?.readings.orEmpty()
         LocalApi.handle(request, token, QuotaCache.reportOf(readings, Clock.System.now()))
     }
+    // Bind before publishing the token: a startup that fails on a taken port must not replace
+    // the token a running instance is already authenticating with.
     val bound = server.start(port)
+    writeToken(token)
     println("headroomd listening on 127.0.0.1:$bound")
     while (true) server.serveOne()
 }

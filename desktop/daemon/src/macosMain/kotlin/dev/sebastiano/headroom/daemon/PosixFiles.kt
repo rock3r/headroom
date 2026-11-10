@@ -87,6 +87,7 @@ internal object PosixFiles {
 
     /** Runs [block] holding an exclusive advisory lock on [path], creating it if needed. */
     public fun <T> withLock(path: String, block: () -> T): T {
+        parent(path)?.let(::mkdirs)
         val descriptor = open(path, O_RDWR or O_CREAT, OWNER_ONLY)
         check(descriptor >= 0) { "cannot open $path" }
         flock(descriptor, LOCK_EX)
