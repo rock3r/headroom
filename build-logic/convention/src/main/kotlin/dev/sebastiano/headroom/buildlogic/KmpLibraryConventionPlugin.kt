@@ -36,9 +36,6 @@ internal fun Project.configureKmpTargets() {
         jvm()
         iosArm64()
         iosSimulatorArm64()
-        // Desktop daemon. The Darwin HTTP engine already used by iOS also publishes a macOS
-        // variant, so the shared quota and auth code compiles without a JVM.
-        macosArm64()
 
         sourceSets.named("commonTest") {
             dependencies {
