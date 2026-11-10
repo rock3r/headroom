@@ -15,4 +15,15 @@ internal class FileStateStore(private val path: String) : StateStore {
     override fun save(state: StoredDaemonState, now: Instant) {
         PosixFiles.writeText(path, StateFile.encode(state.readings, state.advisory, now))
     }
+
+    override fun <T> update(
+        now: Instant,
+        block: (StoredDaemonState?) -> Pair<T, StoredDaemonState?>,
+    ): T =
+        PosixFiles.withLock("$path.lock") {
+            val current = load()
+            val (result, next) = block(current)
+            if (next != null) save(next, now)
+            result
+        }
 }

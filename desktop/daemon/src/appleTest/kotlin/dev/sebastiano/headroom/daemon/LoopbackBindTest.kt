@@ -50,6 +50,16 @@ class LoopbackBindTest {
         }
     }
 
+    @Test
+    fun theHeaderTerminatorIsOnlyRecognisedOnceComplete() {
+        val partial = "GET /v1/quotas HTTP/1.1\r\nHost: 127.0.0.1".encodeToByteArray()
+        assertFalse(LoopbackHttp.hasHeaderEnd(partial, partial.size))
+        val complete = "GET /v1/quotas HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".encodeToByteArray()
+        assertTrue(LoopbackHttp.hasHeaderEnd(complete, complete.size))
+        val splitEnd = "x\r\n\r".encodeToByteArray()
+        assertFalse(LoopbackHttp.hasHeaderEnd(splitEnd, splitEnd.size))
+    }
+
     private fun connectLoopback(port: Int): Int = memScoped {
         val socketFd = socket(AF_INET, SOCK_STREAM, 0)
         val address = alloc<sockaddr_in>()

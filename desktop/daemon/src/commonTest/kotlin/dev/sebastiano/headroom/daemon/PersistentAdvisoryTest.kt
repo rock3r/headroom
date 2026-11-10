@@ -43,6 +43,34 @@ class PersistentAdvisoryTest {
     }
 
     @Test
+    fun anUpdateTransactionReturnsItsResultAndReplacesTheState() {
+        val store =
+            MemoryStateStore(StoredDaemonState(listOf(reading(usedPercent = 96.0)), emptySet()))
+
+        val answer =
+            store.update(now) { stored -> "kept" to stored?.copy(advisory = setOf("latch")) }
+
+        assertEquals("kept", answer)
+        assertEquals(setOf("latch"), store.load()!!.advisory)
+        assertEquals(
+            96.0,
+            store.load()!!.readings.single().snapshot?.windows?.single()?.usedPercent,
+        )
+    }
+
+    @Test
+    fun anUpdateThatAnswersNullDoesNotSave() {
+        val store =
+            MemoryStateStore(StoredDaemonState(listOf(reading(usedPercent = 10.0)), emptySet()))
+        store.update(now) { stored -> Unit to stored?.copy(readings = emptyList()) }
+
+        val sawState = store.update(now) { stored -> (stored != null) to null }
+
+        assertEquals(true, sawState)
+        assertEquals(0, store.load()!!.readings.size)
+    }
+
+    @Test
     fun aMissingStateFileIsSilence() {
         val store = MemoryStateStore(null)
 

@@ -15,7 +15,6 @@ import kotlinx.coroutines.runBlocking
 import platform.Foundation.NSProcessInfo
 import platform.Security.SecRandomCopyBytes
 import platform.Security.kSecRandomDefault
-import platform.posix.chmod
 import platform.posix.fputs
 import platform.posix.realpath
 import platform.posix.stderr
@@ -93,10 +92,14 @@ private fun refresh() = runBlocking {
                 .toMap()
         }
     val outcome = LiveRefresh(fetchers, readers).refresh(accounts, previous?.readings.orEmpty())
-    store.save(
-        StoredDaemonState(outcome.readings, previous?.advisory ?: emptySet()),
-        Clock.System.now(),
-    )
+    // Saved as one transaction, keeping any latch a hook armed while the providers were called.
+    store.update(Clock.System.now()) { current ->
+        Unit to
+            StoredDaemonState(
+                outcome.readings,
+                current?.advisory ?: previous?.advisory ?: emptySet(),
+            )
+    }
     println(QuotaCache.reportOf(outcome.readings, Clock.System.now()))
 }
 
@@ -195,8 +198,7 @@ private fun warn(line: String) {
 }
 
 private fun writeToken(token: String) {
-    if (!PosixFiles.writeText(tokenPath(), token)) return
-    chmod(tokenPath(), OWNER_READ_WRITE.toUShort())
+    PosixFiles.writePrivateText(tokenPath(), token)
 }
 
 private fun localToken(): String {
@@ -221,7 +223,6 @@ private const val TOKEN_BYTES = 16
 private const val BYTE_MASK = 0xFF
 private const val HEX_RADIX = 16
 private const val HEX_WIDTH = 2
-private const val OWNER_READ_WRITE: Int = 384
 
 private const val USAGE =
     "usage: headroomd serve [--port 4217] | headroomd hook [--agent claude|codex] | " +

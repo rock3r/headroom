@@ -9,6 +9,16 @@ public interface StateStore {
     public fun load(): StoredDaemonState?
 
     public fun save(state: StoredDaemonState, now: Instant)
+
+    /**
+     * One load-modify-save transaction. Hooks and refreshes are separate processes sharing one
+     * file, so implementations that persist must hold the file exclusively for the whole
+     * transaction; a null state from [block] means "do not save".
+     */
+    public fun <T> update(
+        now: Instant,
+        block: (StoredDaemonState?) -> Pair<T, StoredDaemonState?>,
+    ): T
 }
 
 public class MemoryStateStore(private var current: StoredDaemonState? = null) : StateStore {
@@ -16,6 +26,15 @@ public class MemoryStateStore(private var current: StoredDaemonState? = null) : 
 
     override fun save(state: StoredDaemonState, now: Instant) {
         current = state
+    }
+
+    override fun <T> update(
+        now: Instant,
+        block: (StoredDaemonState?) -> Pair<T, StoredDaemonState?>,
+    ): T {
+        val (result, next) = block(current)
+        if (next != null) current = next
+        return result
     }
 }
 

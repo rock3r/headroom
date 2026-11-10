@@ -121,9 +121,11 @@ public class HookResponder(
 
     private fun nextNotice(now: Instant): AdvisoryNotice? {
         for (reading in readings()) {
-            val snapshot: QuotaSnapshot = reading.snapshot ?: continue
+            val snapshot = reading.snapshot?.takeIf { isFresh(reading, it, now) } ?: continue
             val account = AccountRef(reading.provider, reading.accountId)
             for (window in snapshot.windows) {
+                val resetsAt = window.resetsAt
+                if (resetsAt != null && resetsAt <= now) continue
                 val decision = policy.evaluate(account, window, now, armed)
                 armed = decision.memory
                 if (decision.notice != null) return decision.notice
@@ -131,4 +133,12 @@ public class HookResponder(
         }
         return null
     }
+
+    /**
+     * The hook only speaks from current knowledge: a reading the API would call stale (older than
+     * [QuotaView.STALE_AFTER], or kept from before a failed refresh) is silence, not advice, and a
+     * window whose reset has already passed cannot justify pacing advice.
+     */
+    private fun isFresh(reading: AccountReading, snapshot: QuotaSnapshot, now: Instant): Boolean =
+        reading.error == null && now - snapshot.fetchedAt <= QuotaView.STALE_AFTER
 }

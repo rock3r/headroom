@@ -18,6 +18,7 @@ import platform.posix.INADDR_LOOPBACK
 import platform.posix.POLLIN
 import platform.posix.SOCK_STREAM
 import platform.posix.SOL_SOCKET
+import platform.posix.SO_NOSIGPIPE
 import platform.posix.SO_REUSEADDR
 import platform.posix.accept
 import platform.posix.bind
@@ -81,9 +82,19 @@ public class LoopbackHttp(private val handler: (LocalRequest) -> LocalResponse) 
         val client = accept(fd, null, null)
         if (client < 0) return false
         fcntl(client, F_SETFL, 0)
+        memScoped {
+            val on = alloc<platform.posix.int32_tVar>().apply { value = 1 }
+            setsockopt(
+                client,
+                SOL_SOCKET,
+                SO_NOSIGPIPE,
+                on.ptr,
+                sizeOf<platform.posix.int32_tVar>().convert(),
+            )
+        }
         try {
             if (!awaitReadable(client, timeoutMillis)) return false
-            val raw = readRequest(client)
+            val raw = readRequest(client, timeoutMillis)
             val request = parse(raw)
             val response = handler(request)
             writeResponse(client, response)
@@ -107,12 +118,29 @@ public class LoopbackHttp(private val handler: (LocalRequest) -> LocalResponse) 
         fd = -1
     }
 
-    private fun readRequest(client: Int): String {
+    /**
+     * Reads until the end of the header block: TCP does not preserve request boundaries, so a
+     * request line or header may arrive in several writes. Bounded by the buffer size and the
+     * socket deadline, so a client that never finishes cannot hold the listener.
+     */
+    private fun readRequest(client: Int, timeoutMillis: Int): String {
         val buffer = ByteArray(READ_BUFFER)
-        val count = buffer.usePinned { recv(client, it.addressOf(0), buffer.size.convert(), 0) }
-        if (count <= 0) return ""
-        return buffer.decodeToString(endIndex = count.toInt())
+        var received = 0
+        while (received < buffer.size && !hasHeaderEnd(buffer, received)) {
+            val count =
+                if (awaitReadable(client, timeoutMillis)) receive(client, buffer, received) else 0
+            if (count <= 0) break
+            received += count
+        }
+        return buffer.decodeToString(endIndex = received)
     }
+
+    private fun receive(client: Int, buffer: ByteArray, received: Int): Int =
+        buffer
+            .usePinned {
+                recv(client, it.addressOf(received), (buffer.size - received).convert(), 0)
+            }
+            .toInt()
 
     private fun writeResponse(client: Int, response: LocalResponse) {
         val body = response.body.encodeToByteArray()
@@ -142,6 +170,11 @@ public class LoopbackHttp(private val handler: (LocalRequest) -> LocalResponse) 
         private const val READ_BUFFER = 8192
         private const val BYTE_BITS = 8
         private const val BYTE_MASK = 0xFF
+        private const val HEADER_TERMINATOR = "\r\n\r\n"
+
+        /** True when the bytes received so far contain the blank line that ends the headers. */
+        public fun hasHeaderEnd(buffer: ByteArray, received: Int): Boolean =
+            buffer.decodeToString(endIndex = received).contains(HEADER_TERMINATOR)
 
         public fun parse(raw: String): LocalRequest {
             val lines = raw.split("\r\n")

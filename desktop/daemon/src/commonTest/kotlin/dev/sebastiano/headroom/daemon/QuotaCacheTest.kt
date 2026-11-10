@@ -12,6 +12,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 
@@ -43,6 +45,97 @@ class QuotaCacheTest {
         assertFalse(report.contains("token"))
         assertFalse(report.contains("redeem"))
     }
+
+    @Test
+    fun aStaleSnapshotIsSilenceInTheHook() {
+        val reading =
+            AccountReading(
+                provider = Provider.Claude,
+                accountId = "claude-1",
+                snapshot =
+                    readingSnapshot(
+                        usedPercent = 96.0,
+                        resetsAt = now + 2.days,
+                        fetchedAt = now - 30.minutes,
+                    ),
+            )
+        val responder = HookResponder(readings = { listOf(reading) })
+
+        assertEquals(
+            "{}",
+            responder.respond(
+                AgentHook.ClaudeCode,
+                "{\"hook_event_name\":\"UserPromptSubmit\"}",
+                now,
+            ),
+        )
+    }
+
+    @Test
+    fun aReadingKeptFromAFailedRefreshIsSilenceInTheHook() {
+        val reading =
+            AccountReading(
+                provider = Provider.Claude,
+                accountId = "claude-1",
+                snapshot =
+                    readingSnapshot(usedPercent = 96.0, resetsAt = now + 2.days, fetchedAt = now),
+                error = QuotaErrorKind.Auth,
+            )
+        val responder = HookResponder(readings = { listOf(reading) })
+
+        assertEquals(
+            "{}",
+            responder.respond(
+                AgentHook.ClaudeCode,
+                "{\"hook_event_name\":\"UserPromptSubmit\"}",
+                now,
+            ),
+        )
+    }
+
+    @Test
+    fun aWindowWhoseResetHasPassedIsSilenceInTheHook() {
+        val reading =
+            AccountReading(
+                provider = Provider.Claude,
+                accountId = "claude-1",
+                snapshot =
+                    readingSnapshot(usedPercent = 96.0, resetsAt = now - 1.hours, fetchedAt = now),
+            )
+        val responder = HookResponder(readings = { listOf(reading) })
+
+        assertEquals(
+            "{}",
+            responder.respond(
+                AgentHook.ClaudeCode,
+                "{\"hook_event_name\":\"UserPromptSubmit\"}",
+                now,
+            ),
+        )
+    }
+
+    private fun readingSnapshot(
+        usedPercent: Double,
+        resetsAt: kotlin.time.Instant,
+        fetchedAt: kotlin.time.Instant,
+    ) =
+        QuotaSnapshot(
+            provider = Provider.Claude,
+            accountId = "claude-1",
+            planLabel = null,
+            windows =
+                listOf(
+                    QuotaWindow(
+                        id = "seven_day",
+                        label = "Weekly",
+                        kind = WindowKind.Weekly,
+                        usedPercent = usedPercent,
+                        resetsAt = resetsAt,
+                        length = 7.days,
+                    )
+                ),
+            fetchedAt = fetchedAt,
+        )
 
     @Test
     fun hookReadsTheCacheAndFailsOpenOnGarbage() = runTest {
