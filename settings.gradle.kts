@@ -29,5 +29,6 @@ include(
     ":widget",
     ":third-party:compose-charts",
     ":third-party:material3-wavy",
+    ":desktop:daemon",
 )
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
