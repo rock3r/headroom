@@ -26,3 +26,6 @@ captures/
 .claude/
 .worktrees/
 docs/screenshots/prototypes/
+
+# Amp orb state (portal URLs are per orb)
+.amp/portals/*

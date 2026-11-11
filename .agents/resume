@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Runs after the orb wakes, before Amp continues. The toolchain, the dependencies and the build
+# outputs are on disk, so the only repair left is swap: .agents/setup deletes the swap file before
+# the project snapshot is published, and a full build needs it back before the first Gradle run.
+set -euo pipefail
+
+swapfile=/swapfile
+if ! /sbin/swapon --show=NAME --noheadings 2>/dev/null | grep -Fqx "$swapfile"; then
+    if [[ ! -f "$swapfile" ]]; then
+        # -n so a missing passwordless sudo fails here instead of prompting with no one to answer.
+        sudo -n fallocate -l 6G "$swapfile"
+        sudo -n chmod 600 "$swapfile"
+        sudo -n /sbin/mkswap "$swapfile" >/dev/null
+    fi
+    sudo -n /sbin/swapon "$swapfile"
+    echo "enabled $swapfile"
+fi

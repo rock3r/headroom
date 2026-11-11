@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# Prepares a fresh Amp orb to build and test Headroom: JDK 21, the Android SDK that compileSdk 37
+# needs, and warm Gradle caches.
+#
+# Every step checks for what a stale project snapshot already restored before it installs or
+# downloads anything, so a rerun on a warm filesystem only verifies and exits.
+set -euo pipefail
+
+readonly jdk_home=/usr/lib/jvm/java-21-openjdk-amd64
+readonly android_sdk=/opt/android-sdk
+readonly cmdline_tools_version=23.0
+readonly cmdline_tools_zip=commandlinetools-linux-16111833_latest.zip
+# What .github/actions/setup-ci installs for the same build.
+readonly sdk_packages=(
+    platform-tools
+    "platforms;android-37.0"
+    "build-tools;37.0.0"
+    # AGP's own default for this platform; install it up front so a build never mutates the SDK.
+    "build-tools;36.0.0"
+)
+readonly swapfile=/swapfile
+# gradle.properties gives the Gradle daemon 4 GB, and the Kotlin compiler adds its own JVM on top.
+# Together with lint and the test JVMs that outgrows this orb's 8 GB of RAM.
+readonly swap_size=6G
+
+# The scripts and tools below read these; a fresh shell gets them from the profile file written
+# further down.
+export JAVA_HOME="$jdk_home"
+export ANDROID_HOME="$android_sdk"
+export ANDROID_SDK_ROOT="$android_sdk"
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+step() { printf '\n==> %s\n' "$*"; }
+elapsed() { printf '    done in %ss\n' "$(( $(date +%s) - start ))" && start=$(date +%s); }
+start=$(date +%s)
+
+# Installs only the apt packages that are missing.
+install_packages() {
+    local packages=() package
+    for package in "$@"; do
+        dpkg -s "$package" >/dev/null 2>&1 || packages+=("$package")
+    done
+    if ((${#packages[@]} == 0)); then
+        echo "already installed: $*"
+        return
+    fi
+    echo "installing: ${packages[*]}"
+    sudo apt-get update -qq
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
+}
+
+step "System packages"
+# The JDK runs Gradle and Android tooling; zip is what some packaging tasks shell out to.
+install_packages openjdk-21-jdk-headless zip
+"$JAVA_HOME/bin/javac" -version
+elapsed
+
+step "Android SDK"
+sdkmanager="$android_sdk/cmdline-tools/$cmdline_tools_version/bin/sdkmanager"
+if [[ ! -x "$sdkmanager" ]]; then
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+    echo "downloading command-line tools $cmdline_tools_version"
+    curl -fsSL -o "$tmp_dir/cmdline-tools.zip" \
+        "https://dl.google.com/android/repository/$cmdline_tools_zip"
+    unzip -q "$tmp_dir/cmdline-tools.zip" -d "$tmp_dir"
+    sudo mkdir -p "$android_sdk/cmdline-tools"
+    # sdkmanager and the packages it installs must outlive setup, so it runs unprivileged.
+    sudo chown -R "$(id -u):$(id -g)" "$android_sdk"
+    rm -rf "${android_sdk:?}/cmdline-tools/$cmdline_tools_version"
+    mv "$tmp_dir/cmdline-tools" "$android_sdk/cmdline-tools/$cmdline_tools_version"
+fi
+
+# sdkmanager checks the remote repository on every run, so only ask it when a package is missing.
+missing=()
+[[ -x "$android_sdk/platform-tools/adb" ]] || missing+=("platform-tools")
+[[ -f "$android_sdk/platforms/android-37.0/android.jar" ]] || missing+=("platforms;android-37.0")
+[[ -x "$android_sdk/build-tools/37.0.0/aapt2" ]] || missing+=("build-tools;37.0.0")
+[[ -x "$android_sdk/build-tools/36.0.0/aapt2" ]] || missing+=("build-tools;36.0.0")
+if ((${#missing[@]})); then
+    echo "installing: ${missing[*]}"
+    if [[ ! -f "$android_sdk/licenses/android-sdk-license" ]]; then
+        yes | "$sdkmanager" --sdk_root="$android_sdk" --licenses >/dev/null || true
+    fi
+    "$sdkmanager" --sdk_root="$android_sdk" --install "${missing[@]}"
+else
+    echo "already installed: ${sdk_packages[*]}"
+fi
+elapsed
+
+step "Shell environment"
+# Login shells are the environment Amp and orb services start in. Amp's own ~/.env resets PATH,
+# so the block goes at the end of ~/.bash_profile, after ~/.env is sourced.
+profile_file="$HOME/.bash_profile"
+marker="# Headroom orb toolchain"
+if ! grep -Fqx "$marker" "$profile_file" 2>/dev/null; then
+    cat >>"$profile_file" <<EOF
+
+$marker
+export JAVA_HOME=$jdk_home
+export ANDROID_HOME=$android_sdk
+export ANDROID_SDK_ROOT=$android_sdk
+case ":\$PATH:" in
+  *":\$ANDROID_HOME/platform-tools:"*) ;;
+  *) export PATH="\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/cmdline-tools/$cmdline_tools_version/bin:\$PATH" ;;
+esac
+EOF
+    echo "wrote $profile_file"
+else
+    echo "already configured: $profile_file"
+fi
+# AGP also accepts this, which covers tools that start without a login shell. The file is
+# gitignored and never overwrites one that already names an SDK.
+if [[ ! -f local.properties ]]; then
+    printf 'sdk.dir=%s\n' "$android_sdk" >local.properties
+    echo "wrote local.properties"
+fi
+elapsed
+
+step "Swap"
+# A full check outgrows this orb's 8 GB of RAM, and the kernel kills the build without swap.
+# The file is removed again at the end: swapped pages can hold the daemons' environment, which
+# includes this orb's secrets, and project snapshots are shared. .agents/resume recreates it.
+if ! /sbin/swapon --show=NAME --noheadings 2>/dev/null | grep -Fqx "$swapfile"; then
+    if [[ ! -f "$swapfile" ]]; then
+        sudo fallocate -l "$swap_size" "$swapfile"
+        sudo chmod 600 "$swapfile"
+        sudo /sbin/mkswap "$swapfile" >/dev/null
+    fi
+    sudo /sbin/swapon "$swapfile"
+    echo "enabled $swapfile"
+else
+    echo "already enabled: $swapfile"
+fi
+elapsed
+
+step "Agent notes"
+# What an agent in this orb needs that neither AGENTS.md nor the README says.
+orb_notes="$HOME/.config/amp/AGENTS.md"
+notes_marker="<!-- headroom-orb-toolchain -->"
+if ! grep -Fqx "$notes_marker" "$orb_notes" 2>/dev/null; then
+    mkdir -p "$(dirname "$orb_notes")"
+    cat >>"$orb_notes" <<EOF
+
+$notes_marker
+## Headroom orb toolchain
+
+- JDK 21 is at $jdk_home and the Android SDK at $android_sdk. Login shells export JAVA_HOME,
+  ANDROID_HOME and ANDROID_SDK_ROOT, and local.properties names the SDK for tools without them.
+- gradle.properties gives the Gradle daemon 4 GB, so a full check needs the swap file that setup
+  creates and .agents/resume turns back on when the orb wakes.
+- Managed-device tests (:app:pixel9api37DebugAndroidTest) need KVM, which orbs do not have.
+  iOS builds and simulator tests need a Mac satellite.
+EOF
+    echo "appended to $orb_notes"
+else
+    echo "already present: $orb_notes"
+fi
+elapsed
+
+step "Gradle"
+# Compiling the app and every test source set downloads each dependency a build or a test run
+# needs, and leaves Gradle's incremental state in the snapshot for the first agent.
+./gradlew --no-daemon --console=plain assembleDebug compileDebugUnitTestKotlin compileTestKotlinJvm
+elapsed
+
+step "Robolectric"
+# Robolectric downloads its Android runtime jar from Maven the first time a test runs. Fetch it
+# with one test here, so the first test an agent runs does not wait for it.
+./gradlew --no-daemon --console=plain :core:data:testDebugUnitTest \
+    --tests dev.sebastiano.headroom.data.account.EncryptedTokenStoreTest
+elapsed
+
+step "Swap cleanup"
+# Swap back in, file out: see the note above the swap step.
+if /sbin/swapon --show=NAME --noheadings 2>/dev/null | grep -Fqx "$swapfile"; then
+    sudo /sbin/swapoff "$swapfile"
+fi
+sudo rm -f "$swapfile"
+elapsed
+
+step "All done"
