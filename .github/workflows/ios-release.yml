@@ -1,0 +1,114 @@
+name: iOS release
+
+# Pushing a tag such as v1.5.0 archives the iOS app, uploads it to App Store Connect and hands the
+# build to the internal TestFlight testers. It never submits for App Review. Run it by hand to upload
+# a build of any branch without a tag. See docs/RELEASING.md.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Archive and upload to TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 75
+    env:
+      ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Read the version
+        id: version
+        run: |
+          version=$(sed -nE 's/^[[:space:]]*MARKETING_VERSION: "([^"]+)"/\1/p' iosApp/project.yml)
+          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not match MARKETING_VERSION $version in iosApp/project.yml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up CI
+        uses: ./.github/actions/setup-ci
+        with:
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Install XcodeGen and asc
+        run: brew install xcodegen asc
+
+      # An App Store Connect API key with the Admin role. xcodebuild uses it for cloud signing, so
+      # no certificate or profile is stored in the repository's secrets.
+      - name: Write the App Store Connect key
+        env:
+          ASC_PRIVATE_KEY_CONTENT: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          for name in ASC_PRIVATE_KEY_CONTENT ASC_KEY_ID ASC_ISSUER_ID ASC_APP_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s\n' "$ASC_PRIVATE_KEY_CONTENT" > "$RUNNER_TEMP/AuthKey.p8"
+
+      - name: Generate the Xcode project
+        run: cd iosApp && xcodegen
+
+      - name: Pick the build number
+        id: build
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+          ASC_BYPASS_KEYCHAIN: "1"
+        run: |
+          number=$(asc builds next-build-number --app "$ASC_APP_ID" \
+            --version "${{ steps.version.outputs.version }}" --platform IOS --output json \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["nextBuildNumber"])')
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Archive, upload and distribute
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+          ASC_BYPASS_KEYCHAIN: "1"
+          BUILD_NUMBER: ${{ steps.build.outputs.number }}
+        run: |
+          auth=(-allowProvisioningUpdates
+            -authenticationKeyPath "$ASC_PRIVATE_KEY_PATH"
+            -authenticationKeyID "$ASC_KEY_ID"
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          archive_flags=(--archive-xcodebuild-flag=-destination
+            --archive-xcodebuild-flag=generic/platform=iOS
+            --archive-xcodebuild-flag="CURRENT_PROJECT_VERSION=$BUILD_NUMBER")
+          export_flags=()
+          for flag in "${auth[@]}"; do
+            archive_flags+=(--archive-xcodebuild-flag="$flag")
+            export_flags+=(--export-xcodebuild-flag="$flag")
+          done
+          asc publish testflight --app "$ASC_APP_ID" \
+            --project iosApp/Headroom.xcodeproj --scheme Headroom --configuration Release \
+            --version "${{ steps.version.outputs.version }}" \
+            --archive-path "$RUNNER_TEMP/Headroom.xcarchive" --ipa-path "$RUNNER_TEMP/Headroom.ipa" \
+            --signing-style automatic \
+            "${archive_flags[@]}" "${export_flags[@]}" \
+            --upload-only --wait --timeout 60m --output json
+          # The internal group has access to all builds, so a processed build reaches its testers
+          # without being added to it; App Store Connect refuses an explicit add.
+
+      - name: Remove the App Store Connect key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"

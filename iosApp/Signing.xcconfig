@@ -9,8 +9,11 @@
 //
 // The app becomes <prefix>.headroom, the widgets <prefix>.headroom.widgets, and the App Group they
 // share group.<prefix>.headroom. Xcode's automatic signing registers all three.
+//
+// The defaults below are the team that publishes Headroom on the App Store and TestFlight. A Team ID
+// is not a secret. See docs/RELEASING.md.
 
-DEVELOPMENT_TEAM =
+DEVELOPMENT_TEAM = Q7CUB3RNAK
 BUNDLE_ID_PREFIX = dev.sebastiano
 CODE_SIGN_STYLE = Automatic
 

@@ -4,11 +4,14 @@ Pushing a version tag, such as `v1.0.0`, starts the [Release workflow](../.githu
 The workflow builds a minified APK and a Play bundle. It signs both with the release key and checks their signatures.
 An emulator then runs a smoke test on the APK. A failed smoke test stops publication.
 After success, the workflow attaches the APK and SHA-256 checksum to the GitHub release, then uploads the bundle to Google Play.
+The same tag also starts the [iOS release workflow](../.github/workflows/ios-release.yml), which uploads an iOS build to TestFlight.
+See [iOS and TestFlight](#ios-and-testflight).
 
 ## Steps
 
 1. Set `versionName` in `app/build.gradle.kts` and increase `versionCode` by one.
-   The workflow stops if the tag and `versionName` do not match.
+   Set the same version as `MARKETING_VERSION` in `iosApp/project.yml`.
+   Each workflow stops if the tag does not match its version.
 2. Write `docs/release-notes/<version>.md`. If the file is missing, GitHub generates notes from commits.
 3. Write plain-text Play notes in `app/src/main/play/release-notes/en-US/default.txt`, using at most 500 characters.
    The workflow rejects longer notes before building. Unchanged notes cause Play to display the previous release's text.
@@ -40,6 +43,35 @@ The workflow uploads it through Gradle Play Publisher to the track named by `PLA
 An unset variable selects production. Play upload runs after GitHub publication, so upload failures leave the GitHub release available.
 Fix the cause and rerun the failed job.
 [PLAY-STORE.md](PLAY-STORE.md) covers build differences, listing files and Console settings.
+
+## iOS and TestFlight
+
+The iOS workflow runs on macOS. It generates the Xcode project, archives the Release build and uploads it to App Store Connect.
+The workflow waits for processing. The internal TestFlight group, `Internal`, has access to all builds, so its testers get the build without further steps.
+It never submits a build for App Review. Run the workflow by hand from the Actions tab to upload a build without a tag.
+
+The workflow asks App Store Connect for the next build number of the version, so nobody edits `CURRENT_PROJECT_VERSION`.
+Signing is automatic and cloud-managed: xcodebuild signs with the App Store Connect API key, and no certificate or profile is stored.
+
+| What | Where |
+|---|---|
+| Apple team | `Q7CUB3RNAK`, the default `DEVELOPMENT_TEAM` in `iosApp/Signing.xcconfig` |
+| Bundle IDs and App Group | `dev.sebastiano.headroom`, `dev.sebastiano.headroom.widgets`, `group.dev.sebastiano.headroom` |
+| App Store Connect app | "Headroom: AI Quota Tracker", app ID in the `ASC_APP_ID` repository variable |
+| API key (Admin role) | GitHub Actions secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_PRIVATE_KEY`, the contents of the `.p8` file |
+
+To upload from a Mac by hand, archive with `-allowProvisioningUpdates` and upload with the [`asc`](https://github.com/rudrankriyam/App-Store-Connect-CLI) CLI:
+
+```bash
+cd iosApp && xcodegen && cd ..
+asc xcode archive --project iosApp/Headroom.xcodeproj --scheme Headroom --configuration Release \
+    --archive-path build/Headroom.xcarchive --xcodebuild-flag=-allowProvisioningUpdates \
+    --xcodebuild-flag=-destination --xcodebuild-flag=generic/platform=iOS \
+    --xcodebuild-flag=CURRENT_PROJECT_VERSION=<next build number>
+asc xcode export --archive-path build/Headroom.xcarchive --ipa-path build/Headroom.ipa \
+    --xcodebuild-flag=-allowProvisioningUpdates
+asc publish testflight --app <app ID> --ipa build/Headroom.ipa --upload-only --wait
+```
 
 ## The smoke test
 

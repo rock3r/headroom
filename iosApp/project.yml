@@ -13,7 +13,7 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "1.0.0"
+    MARKETING_VERSION: "1.5.0"
     CURRENT_PROJECT_VERSION: "1"
     # The app's bundle id is BUNDLE_ID_PREFIX and ".headroom"; its App Group is "group." and that id.
     HEADROOM_APP_GROUP: group.$(BUNDLE_ID_PREFIX).headroom
