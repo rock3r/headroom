@@ -108,14 +108,26 @@ struct AlloTests {
         }
     }
 
-    @Test func `changing quota digits does not change their width`() {
-        for size: CGFloat in [20, 38, 72] {
-            let font = Allo.font(.number, size: size)
-            #expect(font.familyName == "Allo Variable")
-            let widths = (0 ... 9).map {
-                NSAttributedString(string: "\($0)", attributes: [.font: font]).size().width
+    @Test func `display percentages use proportional digits`() {
+        for size: CGFloat in [20, 30, 44] {
+            for bold in [false, true] {
+                let font = Allo.font(.number, size: size, bold: bold)
+                let narrow = NSAttributedString(string: "11%", attributes: [.font: font]).size().width
+                let wide = NSAttributedString(string: "88%", attributes: [.font: font]).size().width
+                #expect(narrow < wide)
             }
-            #expect(widths.max()! - widths.min()! < 0.01)
+        }
+    }
+
+    @Test func `timers and codes keep equal width digits`() {
+        for size: CGFloat in [20, 38, 72] {
+            for font in [Allo.font(.number, size: size, tabular: true), Allo.font(.code, size: size)] {
+                #expect(font.familyName == "Allo Variable")
+                let widths = (0 ... 9).map {
+                    NSAttributedString(string: "\($0)", attributes: [.font: font]).size().width
+                }
+                #expect(widths.max()! - widths.min()! < 0.01)
+            }
         }
     }
 

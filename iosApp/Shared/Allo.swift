@@ -27,8 +27,8 @@ enum Allo {
             kCTFontVariationAttribute: variations,
         ]
         var features: [[CFString: Any]] = []
-        if tabular || role == .number || role == .code {
-            // Tabular figures keep a countdown or percentage from shifting as its digits change.
+        if tabular || role == .code {
+            // Opt in for countdowns and aligned columns; display percentages use natural widths.
             features.append([
                 kCTFontFeatureTypeIdentifierKey: kNumberSpacingType,
                 kCTFontFeatureSelectorIdentifierKey: kMonospacedNumbersSelector,
@@ -67,8 +67,8 @@ private struct AlloFont: ViewModifier {
 }
 
 extension View {
-    func alloFont(_ role: Allo.Role, size: CGFloat, relativeTo style: Font.TextStyle) -> some View {
-        modifier(AlloFont(role: role, size: size, relativeTo: style))
+    func alloFont(_ role: Allo.Role, size: CGFloat, relativeTo style: Font.TextStyle, tabular: Bool = false) -> some View {
+        modifier(AlloFont(role: role, size: size, relativeTo: style, tabular: tabular))
     }
 
     /// Match the existing semantic sizes and Dynamic Type curves, without reverting to SF.

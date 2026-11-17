@@ -16,7 +16,7 @@ struct NextResetCard: View {
                 .foregroundStyle(.secondary)
             TimelineView(.everyMinute) { context in
                 Text(Formats.countdown(to: resetsAt, now: context.date))
-                    .alloFont(.number, size: 38, relativeTo: .largeTitle)
+                    .alloFont(.number, size: 38, relativeTo: .largeTitle, tabular: true)
                     .contentTransition(.numericText())
             }
             Text("\(next.accountTitle) · \(Formats.long(resetsAt))")

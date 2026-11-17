@@ -69,7 +69,7 @@ struct LockScreenView: View {
                 .alloFont(.caption)
         } currentValueLabel: {
             Text(account.signInExpired ? "!" : "\(Int(snapshot.shown(account.usedPercent).rounded()))")
-                .alloFont(.body, weight: 700, tabular: true)
+                .alloFont(.body, weight: 700)
         }
         .gaugeStyle(.accessoryCircularCapacity)
         .accessibilityLabel(WidgetTexts.gauge(account, left: snapshot.showsLeft))

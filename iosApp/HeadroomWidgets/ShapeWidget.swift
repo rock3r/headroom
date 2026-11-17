@@ -64,7 +64,7 @@ struct UsageShapeView: View {
             .overlay {
                 if let used = account.currentUsedPercent {
                     Text(WidgetTexts.percent(snapshot.shown(used)))
-                        .alloFont(big ? .title : .headline, weight: 700, tabular: true)
+                        .alloFont(big ? .title : .headline, weight: 700)
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.5)
                 }
