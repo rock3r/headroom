@@ -1,0 +1,12 @@
+diff --git a/third-party/compose-charts/src/main/kotlin/dev/c5inco/charts/compose/Platform.android.kt b/third-party/compose-charts/src/main/kotlin/dev/c5inco/charts/compose/Platform.android.kt
+--- a/third-party/compose-charts/src/main/kotlin/dev/c5inco/charts/compose/Platform.android.kt
++++ b/third-party/compose-charts/src/main/kotlin/dev/c5inco/charts/compose/Platform.android.kt
+@@ -37,6 +37,8 @@
+     }
+ }
+
++// ChartScenes.trace closes this section in finally; Lint cannot see that pairing.
++@android.annotation.SuppressLint("UnclosedTrace")
+ internal actual fun beginTraceSection(name: String) = android.os.Trace.beginSection(name)
+
+ internal actual fun endTraceSection() = android.os.Trace.endSection()

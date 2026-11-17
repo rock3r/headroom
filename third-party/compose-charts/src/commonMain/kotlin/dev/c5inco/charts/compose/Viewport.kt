@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.MotionDurationScale
 import dev.c5inco.charts.core.ViewportBounds
 import dev.c5inco.charts.core.ViewportRange
@@ -28,7 +29,7 @@ import kotlin.coroutines.coroutineContext
  * for localisation.
  */
 @Immutable
-data class ViewportActions(
+public data class ViewportActions(
     val scrollBack: String = "Scroll back",
     val scrollForward: String = "Scroll forward",
     val zoomIn: String = "Zoom in",
@@ -61,18 +62,18 @@ data class ViewportActions(
  *   ```
  */
 @Stable
-class ChartViewport(
-    val min: Double,
-    val max: Double,
+public class ChartViewport(
+    public val min: Double,
+    public val max: Double,
     initialStart: Double = min,
     initialEnd: Double = max,
-    val minSpan: Double = 0.0,
-    val maxSpan: Double = max - min,
+    public val minSpan: Double = 0.0,
+    public val maxSpan: Double = max - min,
     actions: ViewportActions = ViewportActions(),
 ) {
     /** Accessibility action labels exposed in semantics; updatable on locale changes without resetting the window. */
-    var actions: ViewportActions by mutableStateOf(actions)
-    constructor(
+    public var actions: ViewportActions by mutableStateOf(actions)
+    public constructor(
         min: Instant,
         max: Instant,
         initialStart: Instant = min,
@@ -95,25 +96,25 @@ class ChartViewport(
     private val initial = bounds.clamp(initialStart, initialEnd)
 
     /** Start of the visible x window, in domain units (epoch milliseconds on a `TimeAxis`). */
-    var start: Double by mutableDoubleStateOf(initial.start)
+    public var start: Double by mutableDoubleStateOf(initial.start)
         private set
 
     /** End of the visible x window, in domain units (epoch milliseconds on a `TimeAxis`). */
-    var end: Double by mutableDoubleStateOf(initial.end)
+    public var end: Double by mutableDoubleStateOf(initial.end)
         private set
 
     /** Current visible width `end - start`, in domain units. */
-    val span: Double get() = end - start
+    public val span: Double get() = end - start
 
     /** Current `[start, end]` snapshot as a core [ViewportRange]. */
-    val range: ViewportRange get() = ViewportRange(start, end)
+    public val range: ViewportRange get() = ViewportRange(start, end)
 
     private val eps: Double get() = bounds.totalSpan * 1e-9
 
-    val canPanBack: Boolean get() = start > bounds.min + eps
-    val canPanForward: Boolean get() = end < bounds.max - eps
-    val canZoomIn: Boolean get() = span > bounds.effectiveMinSpan * (1.0 + 1e-6)
-    val canZoomOut: Boolean get() = span < bounds.effectiveMaxSpan * (1.0 - 1e-6)
+    public val canPanBack: Boolean get() = start > bounds.min + eps
+    public val canPanForward: Boolean get() = end < bounds.max - eps
+    public val canZoomIn: Boolean get() = span > bounds.effectiveMinSpan * (1.0 + 1e-6)
+    public val canZoomOut: Boolean get() = span < bounds.effectiveMaxSpan * (1.0 - 1e-6)
 
     private var activeJob: Job? = null
 
@@ -137,14 +138,14 @@ class ChartViewport(
     }
 
     /** Moves the window immediately to `[start, end]`, clamped to bounds and span constraints. */
-    fun snapTo(start: Double, end: Double) {
+    public fun snapTo(start: Double, end: Double) {
         stopAnimation()
         val next = bounds.clamp(start, end)
         applyRange(next)
     }
 
     /** Moves the window immediately to `[start, end]` on a time axis, clamped to bounds and span constraints. */
-    fun snapTo(start: Instant, end: Instant) =
+    public fun snapTo(start: Instant, end: Instant): Unit =
         snapTo(start.toEpochMilli().toDouble(), end.toEpochMilli().toDouble())
 
     /**
@@ -152,7 +153,7 @@ class ChartViewport(
      * negative backward toward [min]), preserving [span] and clamping at `[min, max]`. Returns the
      * actual domain shift applied after clamping.
      */
-    fun panBy(delta: Double): Double {
+    public fun panBy(delta: Double): Double {
         stopAnimation()
         return panStep(delta)
     }
@@ -171,7 +172,7 @@ class ChartViewport(
      * [anchor] (in domain units; defaults to the window's centre). While neither data bound is hit,
      * [anchor] stays at the same relative position in the window.
      */
-    fun zoomBy(factor: Double, anchor: Double = start + (end - start) * 0.5) {
+    public fun zoomBy(factor: Double, anchor: Double = start + (end - start) * 0.5) {
         stopAnimation()
         val next = bounds.zoom(ViewportRange(start, end), factor, anchor)
         applyRange(next)
@@ -183,7 +184,7 @@ class ChartViewport(
      * immediately when animations are disabled (`MotionDurationScale.scaleFactor == 0f`) or
      * [animationSpec] is [ChartMotion.Instant].
      */
-    suspend fun animateTo(
+    public suspend fun animateTo(
         targetStart: Double,
         targetEnd: Double,
         animationSpec: FiniteAnimationSpec<Float> = ChartMotion.Viewport,
@@ -218,20 +219,25 @@ class ChartViewport(
     }
 
     /** Animates the visible window to `[targetStart, targetEnd]` on a time axis. */
-    suspend fun animateTo(
+    public suspend fun animateTo(
         targetStart: Instant,
         targetEnd: Instant,
         animationSpec: FiniteAnimationSpec<Float> = ChartMotion.Viewport,
-    ) = animateTo(targetStart.toEpochMilli().toDouble(), targetEnd.toEpochMilli().toDouble(), animationSpec)
+    ): Unit = animateTo(targetStart.toEpochMilli().toDouble(), targetEnd.toEpochMilli().toDouble(), animationSpec)
 
     private fun applyRange(next: ViewportRange) {
-        if (start != next.start) start = next.start
-        if (end != next.end) end = next.end
+        if (start == next.start && end == next.end) return
+        start = next.start
+        end = next.end
+        // Tell the chart at once, rather than when the platform next sends the global snapshot's
+        // changes: a window set from outside a gesture or animation frame (a button, a test) then
+        // lands on the very next frame, whatever else is or is not pending.
+        Snapshot.sendApplyNotifications()
     }
 
-    companion object {
+    public companion object {
         /** Saves and restores a [ChartViewport], keeping its current `[start, end]` across recreation. */
-        fun Saver(
+        public fun Saver(
             min: Double,
             max: Double,
             minSpan: Double = 0.0,
@@ -259,7 +265,7 @@ class ChartViewport(
  * on a time axis).
  */
 @Composable
-fun rememberChartViewport(
+public fun rememberChartViewport(
     min: Double,
     max: Double,
     initialStart: Double = min,
@@ -286,7 +292,7 @@ fun rememberChartViewport(
  * Remembers and saves a [ChartViewport] over `[min, max]` instants for a [dev.c5inco.charts.core.TimeAxis].
  */
 @Composable
-fun rememberChartViewport(
+public fun rememberChartViewport(
     min: Instant,
     max: Instant,
     initialStart: Instant = min,

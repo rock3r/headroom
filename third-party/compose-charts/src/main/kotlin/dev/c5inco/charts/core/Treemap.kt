@@ -4,9 +4,9 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 /** Treemap tiling: d3-hierarchy's `treemapSquarify`, as a pure function from sizes to rectangles. */
-object Treemap {
+public object Treemap {
     /** The golden ratio, d3's default target aspect ratio for squarified rows. */
-    val PHI: Double = (1 + sqrt(5.0)) / 2
+    public val PHI: Double = (1 + sqrt(5.0)) / 2
 
     /**
      * Tiles [bounds] with one rectangle per value, in input order, each with an area proportional
@@ -17,7 +17,7 @@ object Treemap {
      * Only positive, finite values take area. Anything else (zero, negative, NaN, infinite) gets an
      * empty rectangle at the top-left of [bounds], as does every value when [bounds] is empty.
      */
-    fun squarify(values: List<Double>, bounds: Bounds, ratio: Double = PHI): List<Bounds> {
+    public fun squarify(values: List<Double>, bounds: Bounds, ratio: Double = PHI): List<Bounds> {
         require(ratio >= 1.0) { "Treemap.squarify ratio must be at least 1, was $ratio" }
         val n = values.size
         val v = DoubleArray(n) { values[it].takeIf { x -> x.isFinite() && x > 0.0 } ?: 0.0 }

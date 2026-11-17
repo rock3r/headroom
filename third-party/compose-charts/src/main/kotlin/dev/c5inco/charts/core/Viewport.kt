@@ -11,7 +11,7 @@ import kotlin.math.min
  * outside the window (keeping one point beyond each edge so lines and areas run to the plot border),
  * recomputes ticks for the window, and marks the scene to clip marks to the plot rectangle.
  */
-data class ViewportRange(val start: Double, val end: Double) {
+public data class ViewportRange(val start: Double, val end: Double) {
     init {
         require(start.isFinite() && end.isFinite()) { "ViewportRange bounds must be finite, got [$start, $end]" }
         require(end > start) { "ViewportRange.end must be greater than start, got [$start, $end]" }
@@ -19,7 +19,7 @@ data class ViewportRange(val start: Double, val end: Double) {
 
     val span: Double get() = end - start
 
-    operator fun contains(value: Double): Boolean = value in start..end
+    public operator fun contains(value: Double): Boolean = value in start..end
 }
 
 /**
@@ -31,7 +31,7 @@ data class ViewportRange(val start: Double, val end: Double) {
  *   defaults to a one-ppm floor of the full domain so zooming in can never collapse the window to
  *   zero width; [maxSpan] is capped at `max - min`.
  */
-data class ViewportBounds(
+public data class ViewportBounds(
     val min: Double,
     val max: Double,
     val minSpan: Double = 0.0,
@@ -72,7 +72,7 @@ data class ViewportBounds(
      * When the requested span is out of range it is resized around the window's midpoint before
      * clamping to the domain ends.
      */
-    fun clamp(start: Double, end: Double): ViewportRange {
+    public fun clamp(start: Double, end: Double): ViewportRange {
         require(start.isFinite() && end.isFinite()) { "Viewport window must be finite, got [$start, $end]" }
         val lo = min(start, end)
         val hi = max(start, end)
@@ -85,7 +85,7 @@ data class ViewportBounds(
     /**
      * Shifts [range] by [delta] domain units while keeping its span constant, clamped to `[min, max]`.
      */
-    fun pan(range: ViewportRange, delta: Double): ViewportRange {
+    public fun pan(range: ViewportRange, delta: Double): ViewportRange {
         if (!delta.isFinite() || delta == 0.0) return clamp(range.start, range.end)
         val targetSpan = range.span.coerceIn(effectiveMinSpan, effectiveMaxSpan)
         return placeSpan(range.start + delta, targetSpan)
@@ -99,7 +99,7 @@ data class ViewportBounds(
      * of the window before and after the zoom, so the datum under a pinch centroid stays under the
      * fingers.
      */
-    fun zoom(
+    public fun zoom(
         range: ViewportRange,
         factor: Double,
         anchor: Double = range.start + (range.end - range.start) * 0.5,

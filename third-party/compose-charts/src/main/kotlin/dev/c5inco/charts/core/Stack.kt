@@ -1,7 +1,7 @@
 package dev.c5inco.charts.core
 
 /** Stacking layout. A port of d3-shape's `stack()` with `stackOffsetDiverging`. */
-object Stack {
+public object Stack {
     /**
      * Stacks [values] (indexed `[series][datum]`). Positive values stack upward from zero and
      * negative values downward, so mixed-sign data never overlaps. A missing (non-finite) value
@@ -9,7 +9,7 @@ object Stack {
      *
      * @return `[series][datum]` = lower and upper bound of each segment.
      */
-    fun diverging(values: List<List<Double>>): List<List<Pair<Double, Double>>> {
+    public fun diverging(values: List<List<Double>>): List<List<Pair<Double, Double>>> {
         val n = values.maxOfOrNull { it.size } ?: 0
         val result = values.map { MutableList(it.size) { 0.0 to 0.0 } }
         for (i in 0 until n) {

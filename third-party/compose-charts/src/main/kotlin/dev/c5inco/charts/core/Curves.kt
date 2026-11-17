@@ -8,22 +8,22 @@ import kotlin.math.min
  * [PathCommand]s. Keeping geometry as points until this last step is what lets the motion
  * layer interpolate data points rather than path strings.
  */
-interface PathSink {
-    fun moveTo(x: Float, y: Float)
-    fun lineTo(x: Float, y: Float)
-    fun cubicTo(x1: Float, y1: Float, x2: Float, y2: Float, x: Float, y: Float)
-    fun close()
+public interface PathSink {
+    public fun moveTo(x: Float, y: Float)
+    public fun lineTo(x: Float, y: Float)
+    public fun cubicTo(x1: Float, y1: Float, x2: Float, y2: Float, x: Float, y: Float)
+    public fun close()
 }
 
-sealed interface PathCommand {
-    data class MoveTo(val x: Float, val y: Float) : PathCommand
-    data class LineTo(val x: Float, val y: Float) : PathCommand
-    data class CubicTo(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val x: Float, val y: Float) : PathCommand
-    data object Close : PathCommand
+public sealed interface PathCommand {
+    public data class MoveTo(val x: Float, val y: Float) : PathCommand
+    public data class LineTo(val x: Float, val y: Float) : PathCommand
+    public data class CubicTo(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val x: Float, val y: Float) : PathCommand
+    public data object Close : PathCommand
 }
 
-class CommandList : PathSink {
-    val commands = mutableListOf<PathCommand>()
+public class CommandList : PathSink {
+    public val commands: MutableList<PathCommand> = mutableListOf<PathCommand>()
     override fun moveTo(x: Float, y: Float) { commands += PathCommand.MoveTo(x, y) }
     override fun lineTo(x: Float, y: Float) { commands += PathCommand.LineTo(x, y) }
     override fun cubicTo(x1: Float, y1: Float, x2: Float, y2: Float, x: Float, y: Float) {
@@ -33,7 +33,7 @@ class CommandList : PathSink {
 }
 
 /** How consecutive points are joined. Ports of d3-shape's `curveLinear`, `curveMonotoneX` and `curveStep`. */
-enum class Curve {
+public enum class Curve {
     Linear,
 
     /** Smooth, and never overshoots the data: a peak in the curve is a peak in the data. */
@@ -45,7 +45,7 @@ enum class Curve {
      * and starts a new subpath after it. A run of one point traces to itself, which a round-capped
      * stroke draws as a dot.
      */
-    fun trace(points: List<XY>, sink: PathSink) {
+    public fun trace(points: List<XY>, sink: PathSink) {
         runs(points.size, { points[it].isDefined }) { run ->
             val sub = points.subList(run.first, run.last + 1)
             traceRun(sub, sink, connect = false)
@@ -57,7 +57,7 @@ enum class Curve {
      * Traces the closed areas between [top] and [bottom], which share x positions. Each run where
      * both edges are defined becomes its own closed shape.
      */
-    fun traceArea(top: List<XY>, bottom: List<XY>, sink: PathSink) {
+    public fun traceArea(top: List<XY>, bottom: List<XY>, sink: PathSink) {
         val n = minOf(top.size, bottom.size)
         runs(n, { top[it].isDefined && bottom[it].isDefined }) { run ->
             if (run.first == run.last) return@runs
@@ -86,7 +86,7 @@ enum class Curve {
     }
 }
 
-val XY.isDefined: Boolean get() = x.isFinite() && y.isFinite()
+public val XY.isDefined: Boolean get() = x.isFinite() && y.isFinite()
 
 /** Calls [block] with each maximal run of consecutive indices in `0 until n` where [defined] holds. */
 internal inline fun runs(n: Int, defined: (Int) -> Boolean, block: (IntRange) -> Unit) {
@@ -103,7 +103,8 @@ internal inline fun runs(n: Int, defined: (Int) -> Boolean, block: (IntRange) ->
 
 /**
  * Fritsch–Carlson monotone cubic interpolation, following d3-shape's `monotoneX`
- * (Steffen's method for tangents). The first point has already been emitted.
+ * (Steffen's method for tangents). The first point has already been emitted. Tangents are computed
+ * as the segments reach them, so tracing allocates nothing.
  */
 private fun monotone(points: List<XY>, sink: PathSink) {
     val n = points.size
@@ -112,15 +113,24 @@ private fun monotone(points: List<XY>, sink: PathSink) {
         sink.lineTo(points[1].x, points[1].y)
         return
     }
-    val tangents = FloatArray(n)
-    for (i in 1 until n - 1) tangents[i] = slope3(points[i - 1], points[i], points[i + 1])
-    tangents[0] = slope2(points[0], points[1], tangents[1])
-    tangents[n - 1] = slope2(points[n - 2], points[n - 1], tangents[n - 2])
+    var ta = tangent(points, 0)
     for (i in 0 until n - 1) {
         val a = points[i]
         val b = points[i + 1]
+        val tb = tangent(points, i + 1)
         val dx = (b.x - a.x) / 3f
-        sink.cubicTo(a.x + dx, a.y + dx * tangents[i], b.x - dx, b.y - dx * tangents[i + 1], b.x, b.y)
+        sink.cubicTo(a.x + dx, a.y + dx * ta, b.x - dx, b.y - dx * tb, b.x, b.y)
+        ta = tb
+    }
+}
+
+/** The monotone tangent at point [i] of [points] (at least three). */
+private fun tangent(points: List<XY>, i: Int): Float {
+    val last = points.size - 1
+    return when (i) {
+        0 -> slope2(points[0], points[1], slope3(points[0], points[1], points[2]))
+        last -> slope2(points[last - 1], points[last], slope3(points[last - 2], points[last - 1], points[last]))
+        else -> slope3(points[i - 1], points[i], points[i + 1])
     }
 }
 
