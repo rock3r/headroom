@@ -26,7 +26,8 @@ struct AlloTests {
         #expect(tab.pointSize == 11)
     }
 
-    @MainActor @Test func `allowance meters fit narrow cards at accessibility sizes`() throws {
+    @MainActor @Test(arguments: [DynamicTypeSize.xLarge, .xxLarge, .xxxLarge, .accessibility1, .accessibility5])
+    func `allowance meters fit narrow cards with enlarged text`(typeSize: DynamicTypeSize) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let headroom = OpenHeadroomKt.openHeadroom(directory: directory.path,
@@ -43,11 +44,15 @@ struct AlloTests {
         let row = MeterRow(label: window.label, window: window, providerId: "copilot",
                           trailing: "Thu, Nov 19 at 9:42 PM", labelWidth: 96)
             .environment(AppModel(headroom: headroom))
-            .dynamicTypeSize(.accessibility5)
+            .dynamicTypeSize(typeSize)
         let host = UIHostingController(rootView: row)
         let size = host.sizeThatFits(in: CGSize(width: 280, height: 1000))
         #expect(size.width <= 280)
         #expect(size.height > 50)
+        if !typeSize.isAccessibilitySize {
+            let wideSize = host.sizeThatFits(in: CGSize(width: 1000, height: 1000))
+            #expect(wideSize.height < 50)
+        }
     }
 
     @Test func `a missing font licence does not hide library licences`() throws {

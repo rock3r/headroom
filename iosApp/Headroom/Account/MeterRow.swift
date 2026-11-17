@@ -16,11 +16,21 @@ struct MeterRow: View {
     @ScaledMetric(relativeTo: .caption) private var labelScale = 1.0
 
     var body: some View {
-        let stacked = dynamicTypeSize.isAccessibilitySize
+        if dynamicTypeSize.isAccessibilitySize {
+            row(stacked: true)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                row(stacked: false)
+                row(stacked: true)
+            }
+        }
+    }
+
+    private func row(stacked: Bool) -> some View {
         let layout = stacked
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
             : AnyLayout(HStackLayout(spacing: 10))
-        layout {
+        return layout {
             Text(label)
                 .alloFont(.caption)
                 .foregroundStyle(.secondary)
@@ -34,6 +44,8 @@ struct MeterRow: View {
                 showsPace: showsPace,
                 wavy: wavy
             )
+            // Stack before the labels squeeze the meter into an unreadable sliver.
+            .frame(minWidth: stacked ? nil : 40)
             if let trailing {
                 Text(trailing)
                     .alloFont(.caption, tabular: true)
