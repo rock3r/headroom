@@ -13,13 +13,13 @@ struct RedeemConfirm: View {
         VStack(alignment: .leading, spacing: 12) {
             if step.experimental {
                 Text("Experimental")
-                    .font(.caption.bold())
+                    .alloFont(.caption, weight: 700)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
                     .background(.secondary.opacity(0.18), in: .rect(cornerRadius: 8))
             }
             Text(title)
-                .font(.title2.bold())
+                .alloFont(.title2, weight: 700)
             Text(RedeemTexts.scope(step.pool))
             Group {
                 if let expiry = step.pool.soonestExpiryEpochSeconds?.int64Value {

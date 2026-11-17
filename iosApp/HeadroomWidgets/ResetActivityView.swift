@@ -9,14 +9,14 @@ struct ResetActivityView: View {
         HStack {
             VStack(alignment: .leading) {
                 Text(state.accountTitle)
-                    .font(.headline)
+                    .alloFont(.headline)
                 Text(state.hasReset ? "\(state.windowLabel) limit reset" : "\(state.windowLabel) limit resets in")
-                    .font(.subheadline)
+                    .alloFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             ResetCountdown(state: state)
-                .font(.title2.bold().monospacedDigit())
+                .alloFont(.title2, weight: 700)
         }
     }
 }

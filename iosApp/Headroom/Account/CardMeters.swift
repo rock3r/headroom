@@ -10,7 +10,7 @@ struct CardMeters: View {
         VStack(alignment: .leading, spacing: 8) {
             if account.primary == nil, let balance = account.balance {
                 Text("Balance · \(Formats.balance(balance.amount, unit: balance.unit))")
-                    .font(.headline)
+                    .alloFont(.headline)
             } else if account.separateAllowances, !allowances.isEmpty {
                 ForEach(allowances) { window in
                     let isPrimary = window.id == account.primary?.id
@@ -24,7 +24,7 @@ struct CardMeters: View {
                          wavy: primary.needsAttention)
             } else {
                 Text("No usage data yet.")
-                    .font(.subheadline)
+                    .alloFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
             if let session {

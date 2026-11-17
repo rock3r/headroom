@@ -12,15 +12,15 @@ struct ResetPoolRow: View {
                 Spacer()
                 if let status = RedeemTexts.status(pool.status) {
                     Text(status)
-                        .font(.caption.bold())
+                        .alloFont(.caption, weight: 700)
                         .foregroundStyle(.secondary)
                 }
                 Text(count)
-                    .font(.subheadline.monospacedDigit())
+                    .alloFont(.subheadline)
                     .accessibilityLabel(countDescription)
             }
             Text(RedeemTexts.scope(pool))
-                .font(.footnote)
+                .alloFont(.footnote)
                 .foregroundStyle(.secondary)
             ExpiryList(lines: pool.expiryLines)
         }

@@ -57,19 +57,19 @@ private struct Highlight: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.headline)
+                .alloFont(.heading, size: 17, relativeTo: .headline)
             if let value, let sentence, let account {
                 HStack(spacing: 8) {
                     ProviderAvatar(provider: model.provider(id: account.providerId), size: 28)
                     Text("\(value)%")
-                        .font(.title.bold().monospacedDigit())
+                        .alloFont(.number, size: 28, relativeTo: .title)
                 }
                 Text(sentence)
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             } else {
                 Text(empty)
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

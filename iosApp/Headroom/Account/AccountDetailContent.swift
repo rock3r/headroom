@@ -38,7 +38,7 @@ struct AccountDetailContent: View {
                     }
                     if let updated = account.updatedAtEpochSeconds?.int64Value {
                         Text("Updated \(Date(epochSeconds: updated), format: .relative(presentation: .named))")
-                            .font(.footnote)
+                            .alloFont(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -96,9 +96,9 @@ struct AccountDetailContent: View {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 0) {
                     Text(account.title)
-                        .font(.headline)
+                        .alloFont(.headline)
                     Text(subtitle)
-                        .font(.caption)
+                        .alloFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct HeadroomApp: App {
@@ -7,6 +8,7 @@ struct HeadroomApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        Allo.configureControls()
         let model = AppModel.live()
         _model = State(initialValue: model)
         _services = State(initialValue: AppServices(model: model))
@@ -23,6 +25,7 @@ struct HeadroomApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .alloFont(.body)
                 .environment(model)
                 .preferredColorScheme(Appearance.colorScheme(model.settings?.theme))
                 .tint(Appearance.tint(model.settings?.palette))
@@ -31,6 +34,9 @@ struct HeadroomApp: App {
                     if model.settings?.reduceMotion == true { transaction.disablesAnimations = true }
                 }
                 .onOpenURL { url in model.open(url) }
+                .onReceive(NotificationCenter.default.publisher(for: UIAccessibility.boldTextStatusDidChangeNotification)) { _ in
+                    Allo.configureControls()
+                }
                 .task(id: ServicesInput(overview: model.overview, settings: model.settings)) {
                     // Waits for the numbers to settle: a sync changes them several times.
                     try? await Task.sleep(for: .seconds(1))

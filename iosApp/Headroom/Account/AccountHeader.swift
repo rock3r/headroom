@@ -11,12 +11,12 @@ struct AccountHeader: View {
             ProviderAvatar(provider: provider)
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.title)
-                    .font(.headline)
+                    .alloFont(.heading, size: 17, relativeTo: .headline)
                     .lineLimit(1)
                 // The plan only adds something when it is not the account's name.
                 if let plan = account.plan, plan != account.title {
                     Text(plan)
-                        .font(.subheadline)
+                        .alloFont(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

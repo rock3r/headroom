@@ -16,10 +16,10 @@ struct AccountCard: View {
                 if let primary = account.primary {
                     VStack(alignment: .trailing, spacing: 0) {
                         Text("\(Int((model.showsLeft ? primary.leftPercent : primary.usedPercent).rounded()))%")
-                            .font(.title.bold().monospacedDigit())
+                            .alloFont(.number, size: 30, relativeTo: .title)
                             .contentTransition(.numericText())
                         Text(Texts.quotaLabel(primary.kind, left: model.showsLeft))
-                            .font(.caption2)
+                            .alloFont(.caption2)
                             .foregroundStyle(.secondary)
                     }
                     .opacity(account.signInExpired ? 0.55 : 1)
@@ -39,7 +39,7 @@ struct AccountCard: View {
                 )
             } else if let error = account.error {
                 Text(Texts.syncError(error))
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.red)
             }
         }

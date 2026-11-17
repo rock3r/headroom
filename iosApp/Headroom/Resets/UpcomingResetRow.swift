@@ -16,7 +16,7 @@ struct UpcomingResetRow: View {
                         Text("\(ResetTitles.name(reset.accountTitle, label: reset.accountLabel)) · \(reset.windowLabel)")
                         TimelineView(.everyMinute) { context in
                             Text(when(now: context.date))
-                                .font(.footnote)
+                                .alloFont(.footnote)
                                 .foregroundStyle(.secondary)
                         }
                     }

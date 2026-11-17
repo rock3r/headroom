@@ -16,6 +16,7 @@ struct ResetAlertsSection: View {
                 Toggle(isOn: binding(for: window)) {
                     Text("Alert when \(window.label) resets")
                     Text(subtitle(window))
+                        .alloFont(.subheadline)
                 }
             }
         } header: {
@@ -23,6 +24,7 @@ struct ResetAlertsSection: View {
         } footer: {
             if account.windows.contains(where: { $0.kind == "session" }) {
                 Text("Session limits never send alerts.")
+                    .alloFont(.footnote)
             }
         }
     }

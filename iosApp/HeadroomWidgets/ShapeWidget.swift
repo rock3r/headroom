@@ -41,7 +41,7 @@ struct ShapeView: View {
         VStack(spacing: 4) {
             UsageShapeView(account: account, snapshot: snapshot, big: big)
             Text(account.name)
-                .font(.caption2)
+                .alloFont(.caption2)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .ignore)
@@ -64,7 +64,7 @@ struct UsageShapeView: View {
             .overlay {
                 if let used = account.currentUsedPercent {
                     Text(WidgetTexts.percent(snapshot.shown(used)))
-                        .font(.system(big ? .title : .headline, design: .rounded).bold().monospacedDigit())
+                        .alloFont(big ? .title : .headline, weight: 700)
                         .foregroundStyle(.white)
                         .minimumScaleFactor(0.5)
                 }

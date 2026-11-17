@@ -17,7 +17,7 @@ struct ResetCount: View {
                     Text("\(resets.availableNow)")
                 }
             }
-            .font(.title2.bold().monospacedDigit())
+            .alloFont(.number, size: 22, relativeTo: .title2)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(description)

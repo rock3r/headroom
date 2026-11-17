@@ -29,10 +29,10 @@ struct PaceChartSection: View {
                     .frame(height: 180)
                     .padding(.vertical, 8)
                 Text("dashed = even pace")
-                    .font(.caption)
+                    .alloFont(.caption)
                     .foregroundStyle(.secondary)
                 Text(PaceTexts.projection(chart, showsLeft: model.showsLeft))
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             } else if chartModel.loaded {
                 Text("No history for this window yet.")

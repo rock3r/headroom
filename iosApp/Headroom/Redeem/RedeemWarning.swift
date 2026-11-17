@@ -6,7 +6,7 @@ struct RedeemWarning: View {
 
     var body: some View {
         Label(text, systemImage: "exclamationmark.circle")
-            .font(.subheadline)
+            .alloFont(.subheadline)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.orange.opacity(0.14), in: .rect(cornerRadius: 14))

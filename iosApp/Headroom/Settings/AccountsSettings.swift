@@ -72,7 +72,7 @@ struct AccountsSettings: View {
             VStack(alignment: .leading) {
                 Text(account.title)
                 Text(details(account))
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
             Spacer()

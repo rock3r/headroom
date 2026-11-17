@@ -17,7 +17,10 @@ struct CursorSignInSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button(action: { dismiss() }) {
+                        Text("Close").alloFont(.body, weight: 600)
+                            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    }
                 }
             }
         }

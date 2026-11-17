@@ -12,14 +12,31 @@ struct MeterRow: View {
     var wavy = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var labelScale = 1.0
 
     var body: some View {
-        HStack(spacing: 10) {
+        if dynamicTypeSize.isAccessibilitySize {
+            row(stacked: true)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                row(stacked: false)
+                row(stacked: true)
+            }
+        }
+    }
+
+    private func row(stacked: Bool) -> some View {
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             Text(label)
-                .font(.caption)
+                .alloFont(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: labelWidth, alignment: .leading)
+                .lineLimit(stacked ? nil : 1)
+                .fixedSize(horizontal: false, vertical: stacked)
+                .frame(width: stacked ? nil : labelWidth * labelScale, alignment: .leading)
             QuotaBar(
                 window: window,
                 color: ProviderColors(providerId: providerId, colorScheme: colorScheme).accent,
@@ -27,12 +44,14 @@ struct MeterRow: View {
                 showsPace: showsPace,
                 wavy: wavy
             )
+            // Stack before the labels squeeze the meter into an unreadable sliver.
+            .frame(minWidth: stacked ? nil : 40)
             if let trailing {
                 Text(trailing)
-                    .font(.caption.monospacedDigit())
+                    .alloFont(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
+                    .lineLimit(stacked ? nil : 1)
+                    .fixedSize(horizontal: !stacked, vertical: true)
             }
         }
     }

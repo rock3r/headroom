@@ -18,7 +18,7 @@ struct SparklinesCard: View {
                         .lineLimit(1)
                     if line.points.count < 2 {
                         Text("No history in the last 7 days")
-                            .font(.footnote)
+                            .alloFont(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
                         Chart(line.points, id: \.atEpochSeconds) { point in
@@ -33,13 +33,12 @@ struct SparklinesCard: View {
                         .frame(height: 32)
                     }
                     Text("\(Int(line.current.rounded()))%")
-                        .monospacedDigit()
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(description(line))
             }
             Text("Drops are resets.")
-                .font(.footnote)
+                .alloFont(.footnote)
                 .foregroundStyle(.secondary)
         }
     }

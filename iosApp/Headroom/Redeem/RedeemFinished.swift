@@ -12,7 +12,7 @@ struct RedeemFinished: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(RedeemTexts.outcomeTitle(step.outcome), systemImage: symbol)
-                .font(.title2.bold())
+                .alloFont(.title2, weight: 700)
             Text(RedeemTexts.outcomeBody(step, provider: account.providerName))
             if let retry = step.retryAfterEpochSeconds?.int64Value {
                 Text("Try again after \(Formats.long(Date(epochSeconds: retry))).")

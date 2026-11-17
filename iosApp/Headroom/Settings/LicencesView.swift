@@ -15,7 +15,7 @@ struct LicencesView: View {
                             Text(library.name)
                             Text([library.artifactVersion, library.licenses.compactMap { licences.licenses[$0]?.name }.first]
                                 .compactMap { $0 }.joined(separator: " · "))
-                                .font(.footnote)
+                                .alloFont(.footnote)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -41,14 +41,14 @@ private struct LicenceDetail: View {
                 }
                 if let website = library.website, let url = URL(string: website) {
                     Link(website, destination: url)
-                        .font(.footnote)
+                        .alloFont(.footnote)
                 }
                 ForEach(library.licenses, id: \.self) { id in
                     if let licence = licences.licenses[id] {
                         Text(licence.name)
-                            .font(.headline)
+                            .alloFont(.headline)
                         Text(licence.content ?? licence.url ?? "")
-                            .font(.footnote.monospaced())
+                            .alloFont(.footnote)
                             .textSelection(.enabled)
                     }
                 }

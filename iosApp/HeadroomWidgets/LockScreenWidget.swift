@@ -28,7 +28,7 @@ struct LockScreenView: View {
             case .accessoryCircular:
                 if let account = snapshot.tightest {
                     gauge(account)
-                        .widgetLabel(account.name)
+                        .widgetLabel { Text(account.name).alloFont(.caption) }
                         .widgetURL(WidgetTexts.link(account))
                 }
             case .accessoryRectangular:
@@ -40,7 +40,7 @@ struct LockScreenView: View {
                     }
                     if let next = snapshot.nextReset {
                         Text(footer(next))
-                            .font(.caption2)
+                            .alloFont(.caption2)
                             .lineLimit(1)
                     }
                 }
@@ -57,6 +57,7 @@ struct LockScreenView: View {
                             }
                     }
                 }
+                .alloFont(.body)
                 .widgetURL(snapshot.inlineDestination)
             }
         }
@@ -65,8 +66,10 @@ struct LockScreenView: View {
     private func gauge(_ account: WidgetSnapshot.Account) -> some View {
         Gauge(value: snapshot.shown(account.usedPercent), in: 0 ... 100) {
             Text(account.name.prefix(1))
+                .alloFont(.caption)
         } currentValueLabel: {
             Text(account.signInExpired ? "!" : "\(Int(snapshot.shown(account.usedPercent).rounded()))")
+                .alloFont(.body, weight: 700)
         }
         .gaugeStyle(.accessoryCircularCapacity)
         .accessibilityLabel(WidgetTexts.gauge(account, left: snapshot.showsLeft))

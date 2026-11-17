@@ -35,7 +35,8 @@ struct RingGauge: View {
             }
             if showsNumber, let used = account.currentUsedPercent {
                 Text(WidgetTexts.percent(snapshot.shown(used)))
-                    .font(.system(.headline, design: .rounded).monospacedDigit())
+                    .alloFont(.headline)
+                    .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .padding(lineWidth * (account.sessionUsedPercent == nil ? 1.2 : 2.4))
             }
@@ -73,13 +74,13 @@ struct WidgetBadge: View {
     var body: some View {
         if account.signInExpired {
             Text("!")
-                .font(.caption2.bold())
+                .alloFont(.caption2, weight: 700)
                 .frame(width: 16, height: 16)
                 .background(.red, in: .circle)
                 .foregroundStyle(.white)
         } else if account.resetsAvailable > 0 {
             Text("\(account.resetsAvailable)")
-                .font(.caption2.bold().monospacedDigit())
+                .alloFont(.caption2, weight: 700)
                 .padding(.horizontal, 4)
                 .frame(minWidth: 16, minHeight: 16)
                 .background(.tint, in: .capsule)

@@ -13,9 +13,9 @@ struct SignInExpiredNotice: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.headline)
+                .alloFont(.headline)
             Text(detail)
-                .font(.subheadline)
+                .alloFont(.subheadline)
                 .foregroundStyle(.secondary)
             Button(actionTitle, action: onSignIn)
                 .buttonStyle(.borderedProminent)

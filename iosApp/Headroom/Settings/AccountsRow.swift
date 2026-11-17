@@ -10,7 +10,7 @@ struct AccountsRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Your accounts")
                 Text(summary)
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
             Spacer()

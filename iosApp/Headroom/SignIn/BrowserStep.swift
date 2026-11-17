@@ -27,6 +27,7 @@ struct BrowserStep: View {
             } footer: {
                 if codeRejected {
                     Text("That code did not work. Copy it again from the page.")
+                        .alloFont(.footnote)
                         .foregroundStyle(.red)
                 }
             }

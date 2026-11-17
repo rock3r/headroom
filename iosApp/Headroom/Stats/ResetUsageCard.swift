@@ -39,11 +39,11 @@ struct ResetUsageCard: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(provider.providerName)
                                 Text("\(provider.used) used, \(provider.expired) expired")
-                                    .font(.footnote)
+                                    .alloFont(.footnote)
                                     .foregroundStyle(.secondary)
                                 if let givenBack = Self.givenBack(provider.givenBack) {
                                     Text(givenBack)
-                                        .font(.footnote)
+                                        .alloFont(.footnote)
                                         .foregroundStyle(.secondary)
                                 }
                             }
@@ -56,13 +56,14 @@ struct ResetUsageCard: View {
             Text("Usage limit resets")
         } footer: {
             Text("A reset counts as used when it is gone before its expiry date. Restored quota adds up how much of each limit was used when a reset cleared it. \"About\" means part of it comes from usage synced some time before the reset.")
+                .alloFont(.footnote)
         }
     }
 
     private func number(_ value: Int32, _ label: LocalizedStringKey) -> some View {
         VStack(alignment: .leading) {
             Text("\(value)")
-                .font(.largeTitle.bold().monospacedDigit())
+                .alloFont(.number, size: 34, relativeTo: .largeTitle)
             Text(label)
                 .foregroundStyle(.secondary)
         }

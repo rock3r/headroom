@@ -21,7 +21,10 @@ struct SignInView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel", action: close)
+                        Button(action: close) {
+                            Text("Cancel").alloFont(.body, weight: 600)
+                                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                        }
                     }
                 }
         }

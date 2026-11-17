@@ -22,9 +22,11 @@ struct ApiKeyStep: View {
             } footer: {
                 if keyRejected {
                     Text(Texts.apiKeyRejection(providerId: providerId, providerName: providerName, rejection: rejection))
+                        .alloFont(.footnote)
                         .foregroundStyle(.red)
                 } else {
                     Text("Paste your API key. Headroom keeps it in the Keychain on this device only.")
+                        .alloFont(.footnote)
                 }
             }
         }

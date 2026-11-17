@@ -12,7 +12,7 @@ struct LeftOverCard: View {
             if let leftOver {
                 HStack(alignment: .firstTextBaseline) {
                     Text("\(Int(leftOver.averageLeft.rounded()))%")
-                        .font(.largeTitle.bold().monospacedDigit())
+                        .alloFont(.number, size: 34, relativeTo: .largeTitle)
                     Text(leftOver.resets == 1
                          ? "left unused, on average, when a limit reset. From 1 reset."
                          : "left unused, on average, when a limit reset. From \(leftOver.resets) resets.")
@@ -34,7 +34,6 @@ struct LeftOverCard: View {
                         }
                         .frame(height: 8)
                         Text("\(Int(account.averageLeft.rounded()))%")
-                            .monospacedDigit()
                     }
                 }
                 .accessibilityElement(children: .ignore)

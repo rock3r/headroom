@@ -68,22 +68,22 @@ struct RingsView: View {
             if family == .systemMedium {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(account.name)
-                        .font(.headline)
+                        .alloFont(.headline)
                     if let used = account.currentUsedPercent {
                         Text(WidgetTexts.percentUsed(snapshot.shown(used), left: snapshot.showsLeft))
-                            .font(.subheadline)
+                            .alloFont(.subheadline)
                     } else {
                         Text("Sign in again")
-                            .font(.subheadline)
+                            .alloFont(.subheadline)
                     }
                     if !account.signInExpired, let session = account.sessionUsedPercent {
                         Text("\(WidgetTexts.windowName("session")) \(WidgetTexts.percent(snapshot.shown(session)))")
-                            .font(.caption)
+                            .alloFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                     if !account.signInExpired, let resetsAt = account.resetsAt {
                         Text("Resets \(resetsAt, style: .relative)")
-                            .font(.caption)
+                            .alloFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -98,7 +98,7 @@ struct RingsView: View {
         VStack(spacing: 2) {
             RingGauge(account: account, snapshot: snapshot, lineWidth: lineWidth, showsSession: false)
             Text(account.name)
-                .font(.caption2)
+                .alloFont(.caption2)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .ignore)
