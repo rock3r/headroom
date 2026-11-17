@@ -12,15 +12,21 @@ struct MeterRow: View {
     var wavy = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .caption) private var labelScale = 1.0
 
     var body: some View {
-        HStack(spacing: 10) {
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 10))
+        layout {
             Text(label)
                 .alloFont(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: labelWidth * labelScale, alignment: .leading)
+                .lineLimit(stacked ? nil : 1)
+                .fixedSize(horizontal: false, vertical: stacked)
+                .frame(width: stacked ? nil : labelWidth * labelScale, alignment: .leading)
             QuotaBar(
                 window: window,
                 color: ProviderColors(providerId: providerId, colorScheme: colorScheme).accent,
@@ -32,8 +38,8 @@ struct MeterRow: View {
                 Text(trailing)
                     .alloFont(.caption, tabular: true)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
+                    .lineLimit(stacked ? nil : 1)
+                    .fixedSize(horizontal: !stacked, vertical: true)
             }
         }
     }

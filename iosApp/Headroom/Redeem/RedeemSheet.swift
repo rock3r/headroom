@@ -54,6 +54,7 @@ struct RedeemSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(action: close) {
                         Text("Close").alloFont(.body, weight: 600)
+                            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     }
                     .disabled(isBusy)
                 }

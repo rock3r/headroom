@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct HeadroomApp: App {
@@ -33,6 +34,9 @@ struct HeadroomApp: App {
                     if model.settings?.reduceMotion == true { transaction.disablesAnimations = true }
                 }
                 .onOpenURL { url in model.open(url) }
+                .onReceive(NotificationCenter.default.publisher(for: UIAccessibility.boldTextStatusDidChangeNotification)) { _ in
+                    Allo.configureControls()
+                }
                 .task(id: ServicesInput(overview: model.overview, settings: model.settings)) {
                     // Waits for the numbers to settle: a sync changes them several times.
                     try? await Task.sleep(for: .seconds(1))

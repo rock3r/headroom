@@ -19,6 +19,7 @@ struct CursorSignInSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(action: { dismiss() }) {
                         Text("Close").alloFont(.body, weight: 600)
+                            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     }
                 }
             }

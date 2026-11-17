@@ -21,6 +21,7 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: close) {
                         Text("Done").alloFont(.body, weight: 600)
+                            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     }
                 }
             }

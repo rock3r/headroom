@@ -23,6 +23,7 @@ struct SignInView: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(action: close) {
                             Text("Cancel").alloFont(.body, weight: 600)
+                                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         }
                     }
                 }

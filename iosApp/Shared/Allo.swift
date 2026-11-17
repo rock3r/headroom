@@ -16,29 +16,9 @@ enum Allo {
         }
     }
 
-    @MainActor static func configureControls() {
-        UINavigationBar.appearance().largeTitleTextAttributes = [
-            .font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: font(.heading, size: 34)),
-        ]
-        UINavigationBar.appearance().titleTextAttributes = [
-            .font: UIFontMetrics(forTextStyle: .headline).scaledFont(for: font(.heading, size: 17)),
-        ]
-        for state: UIControl.State in [.normal, .highlighted, .selected, .disabled] {
-            UIBarButtonItem.appearance().setTitleTextAttributes([
-                .font: UIFontMetrics(forTextStyle: .body).scaledFont(for: font(.text, size: 17, weight: 600)),
-            ], for: state)
-            UITabBarItem.appearance().setTitleTextAttributes([
-                .font: UIFontMetrics(forTextStyle: .caption2).scaledFont(for: font(.text, size: 11, weight: 600)),
-            ], for: state)
-            UISegmentedControl.appearance().setTitleTextAttributes([
-                .font: UIFontMetrics(forTextStyle: .footnote).scaledFont(for: font(.text, size: 13, weight: 500)),
-            ], for: state)
-        }
-    }
-
-    static func font(_ role: Role, size: CGFloat, weight: CGFloat? = nil, tabular: Bool = false) -> UIFont {
+    static func font(_ role: Role, size: CGFloat, weight: CGFloat? = nil, tabular: Bool = false, bold: Bool = false) -> UIFont {
         let variations: [NSNumber: CGFloat] = [
-            0x77676874: weight ?? role.weight, // wght
+            0x77676874: min(900, (weight ?? role.weight) + (bold ? 200 : 0)), // wght
             0x524F4E44: 100, // ROND
             0x6F70737A: min(32, max(9, size)), // opsz: text spacing at small sizes, display above 32pt
         ]
@@ -72,6 +52,7 @@ private struct AlloFont: ViewModifier {
     let weight: CGFloat?
     let tabular: Bool
     @ScaledMetric private var size: CGFloat
+    @Environment(\.legibilityWeight) private var legibilityWeight
 
     init(role: Allo.Role, size: CGFloat, relativeTo style: Font.TextStyle, weight: CGFloat? = nil, tabular: Bool = false) {
         self.role = role
@@ -81,7 +62,7 @@ private struct AlloFont: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content.font(Font(Allo.font(role, size: size, weight: weight, tabular: tabular)))
+        content.font(Font(Allo.font(role, size: size, weight: weight, tabular: tabular, bold: legibilityWeight == .bold)))
     }
 }
 

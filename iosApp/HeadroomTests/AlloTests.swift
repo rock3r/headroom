@@ -1,10 +1,69 @@
 import CoreText
+import HeadroomKit
 import SwiftUI
 import Testing
 import UIKit
 @testable import HeadroomApp
 
 struct AlloTests {
+    @MainActor @Test func `Bold Text changes the rendered type`() throws {
+        func render(_ weight: LegibilityWeight) throws -> Data {
+            let view = Text("Account settings").alloFont(.body)
+                .environment(\.legibilityWeight, weight)
+            return try #require(ImageRenderer(content: view).uiImage?.pngData())
+        }
+        #expect(try render(.regular) != render(.bold))
+    }
+
+    @MainActor @Test func `native bar fonts stay within their fixed control heights`() throws {
+        defer { Allo.configureControls() }
+        UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge).performAsCurrent {
+            Allo.configureControls()
+        }
+        let title = try #require(UINavigationBar.appearance().titleTextAttributes?[.font] as? UIFont)
+        let tab = try #require(UITabBarItem.appearance().titleTextAttributes(for: .normal)?[.font] as? UIFont)
+        #expect(title.pointSize == 17)
+        #expect(tab.pointSize == 11)
+    }
+
+    @MainActor @Test func `allowance meters fit narrow cards at accessibility sizes`() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let headroom = OpenHeadroomKt.openHeadroom(directory: directory.path,
+            secrets: KeychainStore(service: "dev.headroom.tests.\(UUID().uuidString)"))
+        defer {
+            headroom.close()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let window = WindowUi(id: "weekly", label: "Premium requests", kind: "weekly", usedPercent: 40, leftPercent: 60,
+            resetsAtEpochSeconds: nil, expiresAtEpochSeconds: nil, pace: nil, expectedPercent: nil,
+            needsAttention: false, isInformational: false, isUnlimited: false, usedAmount: nil,
+            limitAmount: nil, amountUnit: nil, canAlert: true, alertOn: false, isRecognised: true,
+            paceChip: nil, pacePoints: 0, parts: [])
+        let row = MeterRow(label: window.label, window: window, providerId: "copilot",
+                          trailing: "Thu, Nov 19 at 9:42 PM", labelWidth: 96)
+            .environment(AppModel(headroom: headroom))
+            .dynamicTypeSize(.accessibility5)
+        let host = UIHostingController(rootView: row)
+        let size = host.sizeThatFits(in: CGSize(width: 280, height: 1000))
+        #expect(size.width <= 280)
+        #expect(size.height > 50)
+    }
+
+    @Test func `a missing font licence does not hide library licences`() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).bundle")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let info = ["CFBundleIdentifier": "dev.headroom.tests.licences"]
+        try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+            .write(to: directory.appendingPathComponent("Info.plist"))
+        let source = try #require(Bundle.main.url(forResource: "licences", withExtension: "json"))
+        try FileManager.default.copyItem(at: source, to: directory.appendingPathComponent("licences.json"))
+        let bundle = try #require(Bundle(url: directory))
+        let licences = try #require(Licences.load(bundle: bundle))
+        #expect(!licences.libraries.isEmpty)
+    }
+
     @Test func `the widget extension bundles and registers Allo`() throws {
         let plugins = try #require(Bundle.main.builtInPlugInsURL)
         let widgets = try #require(Bundle(url: plugins.appendingPathComponent("HeadroomWidgets.appex")))

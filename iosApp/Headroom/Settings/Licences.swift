@@ -25,9 +25,9 @@ struct Licences: Decodable {
     static func load(bundle: Bundle = .main) -> Licences? {
         guard let url = bundle.url(forResource: "licences", withExtension: "json"),
               let data = try? Data(contentsOf: url),
-              let libraries = try? JSONDecoder().decode(Licences.self, from: data),
-              let fontURL = bundle.url(forResource: "Allo-OFL", withExtension: "txt"),
-              let fontLicence = try? String(contentsOf: fontURL, encoding: .utf8) else { return nil }
+              let libraries = try? JSONDecoder().decode(Licences.self, from: data) else { return nil }
+        guard let fontURL = bundle.url(forResource: "Allo-OFL", withExtension: "txt"),
+              let fontLicence = try? String(contentsOf: fontURL, encoding: .utf8) else { return libraries }
         let allo = Library(
             uniqueId: "allo", name: "Allo", artifactVersion: "1.0",
             description: "Typeface by Josh Puckett, built on Inter by Rasmus Andersson.",
