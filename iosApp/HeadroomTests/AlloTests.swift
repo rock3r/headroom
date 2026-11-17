@@ -119,15 +119,25 @@ struct AlloTests {
         }
     }
 
-    @Test func `timers and codes keep equal width digits`() {
+    @MainActor @Test func `reset counts use proportional digits`() {
+        func width(_ count: Int32) -> CGFloat {
+            let resets = AccountResetsUi(availableNow: count, queued: 0, pools: [], canAskForMore: false,
+                requiresSignIn: false, canRedeem: true, ineligibleReason: nil, showsSummary: true,
+                holdsNone: false, notes: [], hasFooter: false)
+            let view = UIHostingController(rootView: ResetCount(resets: resets).dynamicTypeSize(.large))
+            return view.sizeThatFits(in: CGSize(width: 1000, height: 1000)).width
+        }
+        #expect(width(11) < width(88))
+    }
+
+    @Test func `codes keep equal width digits`() {
         for size: CGFloat in [20, 38, 72] {
-            for font in [Allo.font(.number, size: size, tabular: true), Allo.font(.code, size: size)] {
-                #expect(font.familyName == "Allo Variable")
-                let widths = (0 ... 9).map {
-                    NSAttributedString(string: "\($0)", attributes: [.font: font]).size().width
-                }
-                #expect(widths.max()! - widths.min()! < 0.01)
+            let font = Allo.font(.code, size: size)
+            #expect(font.familyName == "Allo Variable")
+            let widths = (0 ... 9).map {
+                NSAttributedString(string: "\($0)", attributes: [.font: font]).size().width
             }
+            #expect(widths.max()! - widths.min()! < 0.01)
         }
     }
 

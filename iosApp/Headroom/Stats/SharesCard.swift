@@ -25,7 +25,6 @@ struct SharesCard: View {
                                 Text(share.providerName)
                                 Spacer()
                                 Text("\(percent(share.fraction))%")
-                                    .monospacedDigit()
                             }
                         }
                     }

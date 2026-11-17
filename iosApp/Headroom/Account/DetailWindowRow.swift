@@ -48,7 +48,7 @@ struct DetailWindowRow: View {
             }
             if let amount = amountLine {
                 Text(amount)
-                    .alloFont(.footnote, tabular: true)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
             if let time = timeLine {

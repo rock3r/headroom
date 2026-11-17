@@ -11,14 +11,14 @@ struct ResetScoreCard: View {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading) {
                         Text("\(score.clean) of \(score.total)")
-                            .alloFont(.number, size: 34, relativeTo: .largeTitle, tabular: true)
+                            .alloFont(.number, size: 34, relativeTo: .largeTitle)
                         Text("resets came without hitting the limit")
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     VStack(spacing: 0) {
                         Text("\(score.streak)")
-                            .alloFont(.number, size: 22, relativeTo: .title2, tabular: true)
+                            .alloFont(.number, size: 22, relativeTo: .title2)
                         Text("in a row")
                             .alloFont(.caption)
                     }

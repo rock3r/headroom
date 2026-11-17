@@ -33,7 +33,6 @@ struct SparklinesCard: View {
                         .frame(height: 32)
                     }
                     Text("\(Int(line.current.rounded()))%")
-                        .monospacedDigit()
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(description(line))

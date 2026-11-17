@@ -18,7 +18,7 @@ struct ResetActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ResetCountdown(state: state)
-                        .alloFont(.headline, tabular: true)
+                        .alloFont(.headline)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     Text(state.hasReset ? "\(state.windowLabel) limit reset" : "\(state.windowLabel) limit resets soon")
@@ -29,7 +29,7 @@ struct ResetActivityWidget: Widget {
                 Image(systemName: "arrow.counterclockwise")
             } compactTrailing: {
                 ResetCountdown(state: state)
-                    .alloFont(.body, tabular: true)
+                    .alloFont(.body)
                     .frame(maxWidth: 56)
             } minimal: {
                 Image(systemName: state.hasReset ? "checkmark" : "arrow.counterclockwise")

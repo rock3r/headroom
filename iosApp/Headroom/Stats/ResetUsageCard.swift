@@ -63,7 +63,7 @@ struct ResetUsageCard: View {
     private func number(_ value: Int32, _ label: LocalizedStringKey) -> some View {
         VStack(alignment: .leading) {
             Text("\(value)")
-                .alloFont(.number, size: 34, relativeTo: .largeTitle, tabular: true)
+                .alloFont(.number, size: 34, relativeTo: .largeTitle)
             Text(label)
                 .foregroundStyle(.secondary)
         }

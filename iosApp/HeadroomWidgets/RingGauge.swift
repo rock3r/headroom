@@ -80,7 +80,7 @@ struct WidgetBadge: View {
                 .foregroundStyle(.white)
         } else if account.resetsAvailable > 0 {
             Text("\(account.resetsAvailable)")
-                .alloFont(.caption2, weight: 700, tabular: true)
+                .alloFont(.caption2, weight: 700)
                 .padding(.horizontal, 4)
                 .frame(minWidth: 16, minHeight: 16)
                 .background(.tint, in: .capsule)

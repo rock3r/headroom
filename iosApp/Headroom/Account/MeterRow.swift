@@ -48,7 +48,7 @@ struct MeterRow: View {
             .frame(minWidth: stacked ? nil : 40)
             if let trailing {
                 Text(trailing)
-                    .alloFont(.caption, tabular: true)
+                    .alloFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(stacked ? nil : 1)
                     .fixedSize(horizontal: !stacked, vertical: true)

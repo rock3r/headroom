@@ -34,14 +34,14 @@ private struct CompatibleCountdownView: View {
         } else if let next = snapshot.nextReset {
             if family == .accessoryInline {
                 Text("\(next.accountTitle) · \(next.resetsAt, style: .relative)")
-                    .alloFont(.body, tabular: true)
+                    .alloFont(.body)
                     .widgetURL(next.destination)
             } else {
                 VStack(alignment: .leading) {
                     Text("\(next.accountTitle) · \(WidgetTexts.nextReset(next.kind))")
                         .alloFont(.caption)
                     Text(next.resetsAt, style: .relative)
-                        .alloFont(.body, tabular: true)
+                        .alloFont(.body)
                 }
                 .widgetURL(next.destination)
             }
@@ -66,7 +66,7 @@ struct CountdownView: View {
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 Text(next.resetsAt, style: .relative)
-                    .alloFont(.title2, weight: 700, tabular: true)
+                    .alloFont(.title2, weight: 700)
                     .minimumScaleFactor(0.6)
                 Text("\(next.accountTitle) · \(next.resetsAt.formatted(.dateTime.weekday().hour().minute()))")
                     .alloFont(.caption)

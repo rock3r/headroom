@@ -66,8 +66,10 @@ Sign-in tests stop before contacting a provider.
   `Headroom/Fonts` bundles the unmodified variable TTF and SIL Open Font License from upstream commit
   `4bef023e21d938ab2b6982d3dda5fa334e1e5a9b`. The licence also appears in Settings.
   `Shared/Allo.swift` keeps roundness at 100, varies weight by role, tracks optical size with the scaled
-  point size, and uses proportional digits for prominent percentages. Timers, counts, codes and aligned
-  numeric columns retain tabular digits. Native navigation, toolbar, tab and segmented
+  point size, and uses proportional digits throughout the UI, including timers, counts and widgets.
+  Only sign-in codes explicitly request tabular digits. SwiftUI's system-driven Live Activity countdown
+  overrides this with tabular digits; it keeps ticking without the app and stops at zero.
+  Native navigation, toolbar, tab and segmented
   controls use their public font attributes; iOS-owned menus, alerts and keyboards keep system fonts.
   Device codes use Allo's disambiguated letter and digit alternates.
   The widget extension bundles and registers the same font for Home Screen and Lock Screen widgets,

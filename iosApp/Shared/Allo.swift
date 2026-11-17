@@ -16,7 +16,7 @@ enum Allo {
         }
     }
 
-    static func font(_ role: Role, size: CGFloat, weight: CGFloat? = nil, tabular: Bool = false, bold: Bool = false) -> UIFont {
+    static func font(_ role: Role, size: CGFloat, weight: CGFloat? = nil, bold: Bool = false) -> UIFont {
         let variations: [NSNumber: CGFloat] = [
             0x77676874: min(900, (weight ?? role.weight) + (bold ? 200 : 0)), // wght
             0x524F4E44: 100, // ROND
@@ -26,14 +26,11 @@ enum Allo {
             kCTFontNameAttribute: "AlloVariable-Regular",
             kCTFontVariationAttribute: variations,
         ]
-        var features: [[CFString: Any]] = []
-        if tabular || role == .code {
-            // Opt in for countdowns and aligned columns; display percentages use natural widths.
-            features.append([
-                kCTFontFeatureTypeIdentifierKey: kNumberSpacingType,
-                kCTFontFeatureSelectorIdentifierKey: kMonospacedNumbersSelector,
-            ])
-        }
+        // Request natural widths except for sign-in codes. System timer text can override this.
+        var features: [[CFString: Any]] = [[
+            kCTFontFeatureTypeIdentifierKey: kNumberSpacingType,
+            kCTFontFeatureSelectorIdentifierKey: role == .code ? kMonospacedNumbersSelector : kProportionalNumbersSelector,
+        ]]
         if role == .code {
             // Allo's disambiguated I, l, 1 and 0 make device codes safe to transcribe.
             features.append([
@@ -50,29 +47,27 @@ enum Allo {
 private struct AlloFont: ViewModifier {
     let role: Allo.Role
     let weight: CGFloat?
-    let tabular: Bool
     @ScaledMetric private var size: CGFloat
     @Environment(\.legibilityWeight) private var legibilityWeight
 
-    init(role: Allo.Role, size: CGFloat, relativeTo style: Font.TextStyle, weight: CGFloat? = nil, tabular: Bool = false) {
+    init(role: Allo.Role, size: CGFloat, relativeTo style: Font.TextStyle, weight: CGFloat? = nil) {
         self.role = role
         self.weight = weight
-        self.tabular = tabular
         _size = ScaledMetric(wrappedValue: size, relativeTo: style)
     }
 
     func body(content: Content) -> some View {
-        content.font(Font(Allo.font(role, size: size, weight: weight, tabular: tabular, bold: legibilityWeight == .bold)))
+        content.font(Font(Allo.font(role, size: size, weight: weight, bold: legibilityWeight == .bold)))
     }
 }
 
 extension View {
-    func alloFont(_ role: Allo.Role, size: CGFloat, relativeTo style: Font.TextStyle, tabular: Bool = false) -> some View {
-        modifier(AlloFont(role: role, size: size, relativeTo: style, tabular: tabular))
+    func alloFont(_ role: Allo.Role, size: CGFloat, relativeTo style: Font.TextStyle) -> some View {
+        modifier(AlloFont(role: role, size: size, relativeTo: style))
     }
 
     /// Match the existing semantic sizes and Dynamic Type curves, without reverting to SF.
-    func alloFont(_ style: Font.TextStyle, weight: CGFloat? = nil, tabular: Bool = false) -> some View {
+    func alloFont(_ style: Font.TextStyle, weight: CGFloat? = nil) -> some View {
         let size: CGFloat = switch style {
         case .largeTitle: 34
         case .title: 28
@@ -87,6 +82,6 @@ extension View {
         @unknown default: 17
         }
         return modifier(AlloFont(role: style == .headline ? .heading : .text, size: size,
-                                 relativeTo: style, weight: weight, tabular: tabular))
+                                 relativeTo: style, weight: weight))
     }
 }

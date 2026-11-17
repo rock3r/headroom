@@ -16,7 +16,7 @@ struct ResetActivityView: View {
             }
             Spacer()
             ResetCountdown(state: state)
-                .alloFont(.title2, weight: 700, tabular: true)
+                .alloFont(.title2, weight: 700)
         }
     }
 }

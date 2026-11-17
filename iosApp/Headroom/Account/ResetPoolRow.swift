@@ -16,7 +16,7 @@ struct ResetPoolRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Text(count)
-                    .alloFont(.subheadline, tabular: true)
+                    .alloFont(.subheadline)
                     .accessibilityLabel(countDescription)
             }
             Text(RedeemTexts.scope(pool))

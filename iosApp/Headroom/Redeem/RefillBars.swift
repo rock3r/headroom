@@ -30,7 +30,7 @@ struct RefillBars: View {
                     )
                     .shimmer(working && isCleared)
                     Text(Texts.percent(window, left: model.showsLeft))
-                        .alloFont(.caption, tabular: true)
+                        .alloFont(.caption)
                         .contentTransition(.numericText())
                 }
                 .opacity(isCleared || cleared.isEmpty ? 1 : 0.4)

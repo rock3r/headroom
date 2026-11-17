@@ -72,7 +72,7 @@ struct BarsView: View {
             .opacity(account.signInExpired ? 0.6 : 1)
             if let used = account.currentUsedPercent {
                 Text(WidgetTexts.percent(snapshot.shown(used)))
-                    .alloFont(.caption, weight: 700, tabular: true)
+                    .alloFont(.caption, weight: 700)
                     .frame(width: 38, alignment: .trailing)
             }
             WidgetBadge(account: account)

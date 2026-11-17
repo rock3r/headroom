@@ -34,7 +34,6 @@ struct LeftOverCard: View {
                         }
                         .frame(height: 8)
                         Text("\(Int(account.averageLeft.rounded()))%")
-                            .monospacedDigit()
                     }
                 }
                 .accessibilityElement(children: .ignore)
