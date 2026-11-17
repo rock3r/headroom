@@ -2,6 +2,7 @@ package dev.c5inco.charts.compose
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -23,9 +24,14 @@ import kotlin.math.ceil
  * Swapping a style re-skins a chart without touching its data or layout code.
  *
  * Fields that move geometry (bar padding, gaps, radii) feed [metrics]; the rest are paint.
+ *
+ * A style, and everything in it, is treated as an immutable value: to change how a chart looks,
+ * pass a new style. A list (the palette, the glyphs) changed in place, or a `Path`, shader or brush
+ * a [Glyph] mutates in place, is not seen: the chart is drawn again only when the style it is given
+ * changes, or when snapshot state its drawing reads changes, and may keep showing the old look.
  */
 @Immutable
-data class ChartStyle(
+public data class ChartStyle(
     /** Nonempty series colours, indexed by a series' palette slot. */
     val palette: List<Color>,
     val curve: Curve = Curve.Monotone,
@@ -48,11 +54,11 @@ data class ChartStyle(
 ) {
     init { require(palette.isNotEmpty()) { "ChartStyle.palette must contain at least one colour" } }
 
-    fun color(slot: Int): Color = palette[Math.floorMod(slot, palette.size)]
+    public fun color(slot: Int): Color = palette[Math.floorMod(slot, palette.size)]
 
-    fun glyph(slot: Int): Glyph = dot.glyphs[Math.floorMod(slot, dot.glyphs.size)]
+    public fun glyph(slot: Int): Glyph = dot.glyphs[Math.floorMod(slot, dot.glyphs.size)]
 
-    fun metrics(density: Density): ChartMetrics = with(density) {
+    public fun metrics(density: Density): ChartMetrics = with(density) {
         val linePx = line.width.toPx()
         ChartMetrics(
             labelGap = axis.labelGap.toPx(),
@@ -82,11 +88,11 @@ data class ChartStyle(
         )
     }
 
-    companion object
+    public companion object
 }
 
 @Immutable
-data class LineStyle(
+public data class LineStyle(
     val width: Dp = 2.5.dp,
     val markerRadius: Dp = 4.dp,
     /**
@@ -98,30 +104,36 @@ data class LineStyle(
 )
 
 @Immutable
-sealed interface AreaFill {
-    data class Solid(val alpha: Float) : AreaFill
-    /** Fades from [topAlpha] at the top of the plot to [bottomAlpha] at the baseline. */
-    data class Gradient(val topAlpha: Float, val bottomAlpha: Float) : AreaFill
+public sealed interface AreaFill {
+    public data class Solid(val alpha: Float) : AreaFill
+    /**
+     * Fades from [topAlpha] at the plot edge the area's values point to, farthest from zero, to
+     * [bottomAlpha] at the baseline: the positive end of the value axis (the top, or the bottom on a
+     * reversed axis), or the negative end for a series with values below zero and none above
+     * ([dev.c5inco.charts.core.AreaKind.Upright.fadeFrom]). A diverging area fades each side from its
+     * own edge.
+     */
+    public data class Gradient(val topAlpha: Float, val bottomAlpha: Float) : AreaFill
 }
 
 @Immutable
-data class AreaStyle(
+public data class AreaStyle(
     val fill: AreaFill = AreaFill.Gradient(0.28f, 0.02f),
     /** Width of the stroke along the top of each area; zero hides it. */
     val edgeWidth: Dp = 2.dp,
 )
 
 @Immutable
-sealed interface BarCorners {
-    data object Square : BarCorners
+public sealed interface BarCorners {
+    public data object Square : BarCorners
     /** Rounds the end away from the baseline, on the outermost segment of a stack. */
-    data class End(val radius: Dp) : BarCorners
+    public data class End(val radius: Dp) : BarCorners
     /** Fully rounded on every segment: pills. */
-    data object Pill : BarCorners
+    public data object Pill : BarCorners
 }
 
 @Immutable
-data class BarStyle(
+public data class BarStyle(
     val corners: BarCorners = BarCorners.End(6.dp),
     /** A full-height backdrop behind each bar, showing the scale's extent. */
     val track: Color? = null,
@@ -137,7 +149,7 @@ data class BarStyle(
  * beside colour.
  */
 @Immutable
-data class CandleStyle(
+public data class CandleStyle(
     val up: Color = Color(0xFF26A69A),
     val down: Color = Color(0xFFEF5350),
     val wickWidth: Dp = 1.dp,
@@ -151,7 +163,7 @@ data class CandleStyle(
     /** Space between the price area and the volume strip. */
     val volumeGap: Dp = 4.dp,
 ) {
-    fun color(down: Boolean): Color = if (down) this.down else up
+    public fun color(down: Boolean): Color = if (down) this.down else up
 }
 
 /**
@@ -161,7 +173,7 @@ data class CandleStyle(
  * A market heatmap in percent with `domain = 3.0` saturates at ±3%.
  */
 @Immutable
-data class DivergingColors(
+public data class DivergingColors(
     val negative: Color = Color(0xFFE5484D),
     val neutral: Color = Color(0xFF8B8D98),
     val positive: Color = Color(0xFF30A46C),
@@ -171,7 +183,7 @@ data class DivergingColors(
         require(domain > 0.0 && domain.isFinite()) { "DivergingColors.domain must be positive and finite, was $domain" }
     }
 
-    fun color(value: Double): Color {
+    public fun color(value: Double): Color {
         if (value.isNaN()) return neutral
         val t = (value / domain).coerceIn(-1.0, 1.0).toFloat()
         return if (t < 0f) lerp(neutral, negative, -t) else lerp(neutral, positive, t)
@@ -183,7 +195,7 @@ data class DivergingColors(
  * [groupGap] and [padding] move geometry and feed [ChartStyle.metrics].
  */
 @Immutable
-data class TreemapStyle(
+public data class TreemapStyle(
     val corner: Dp = 4.dp,
     /** Gap between neighbouring tiles. */
     val gap: Dp = 2.dp,
@@ -208,7 +220,7 @@ data class TreemapStyle(
  * colour at that level's fraction.
  */
 @Immutable
-data class SequentialColors(
+public data class SequentialColors(
     val colors: List<Color> = listOf(Color(0xFFD3EEEA), Color(0xFF14A39A), Color(0xFF0B5550)),
     val steps: Int = 0,
 ) {
@@ -217,7 +229,7 @@ data class SequentialColors(
         require(steps == 0 || steps >= 2) { "SequentialColors.steps must be 0 (continuous) or at least 2, was $steps" }
     }
 
-    fun color(intensity: Float): Color {
+    public fun color(intensity: Float): Color {
         var t = if (intensity.isNaN()) 0f else intensity.coerceIn(0f, 1f)
         if (steps > 0 && t > 0f) t = ceil(t * (steps - 1)).coerceIn(1f, (steps - 1).toFloat()) / (steps - 1)
         if (colors.size == 1) return colors[0]
@@ -233,7 +245,7 @@ data class SequentialColors(
  * feeds [ChartStyle.metrics].
  */
 @Immutable
-data class HeatmapStyle(
+public data class HeatmapStyle(
     val empty: Color = Color(0x0F000000),
     val corner: Dp = 3.dp,
     /** Gap between neighbouring cells; shrinks to a quarter of a cell's step when cells are tiny. */
@@ -241,7 +253,7 @@ data class HeatmapStyle(
 )
 
 @Immutable
-data class DotStyle(
+public data class DotStyle(
     val radius: Dp = 4.5.dp,
     /** Nonempty glyphs cycled per series slot. Shape is a second channel beside colour. */
     val glyphs: List<Glyph> = listOf(Glyph.Circle),
@@ -253,10 +265,10 @@ data class DotStyle(
     init { require(glyphs.isNotEmpty()) { "DotStyle.glyphs must contain at least one glyph" } }
 }
 
-enum class ArcCap { Butt, Round }
+public enum class ArcCap { Butt, Round }
 
 @Immutable
-data class ArcStyle(
+public data class ArcStyle(
     /** Inner radius as a fraction of the outer. Zero is a pie. */
     val innerRadius: Float = 0.62f,
     val gap: Dp = 2.dp,
@@ -266,17 +278,17 @@ data class ArcStyle(
 
 /** How a rule is stroked. */
 @Immutable
-sealed interface StrokePattern {
-    data object Solid : StrokePattern
+public sealed interface StrokePattern {
+    public data object Solid : StrokePattern
 
-    data class Dashed(val on: Dp, val off: Dp) : StrokePattern
+    public data class Dashed(val on: Dp, val off: Dp) : StrokePattern
 
     /** Round dots as wide as the stroke, [spacing] apart centre to centre. */
-    data class Dotted(val spacing: Dp) : StrokePattern
+    public data class Dotted(val spacing: Dp) : StrokePattern
 }
 
 @Immutable
-data class GridStyle(
+public data class GridStyle(
     val color: Color,
     val width: Dp = 1.dp,
     /** On/off lengths for a dashed grid. Null is solid; a near-zero "on" with a round cap gives dots. */
@@ -302,7 +314,7 @@ data class GridStyle(
 )
 
 @Immutable
-data class AxisStyle(
+public data class AxisStyle(
     val labels: TextStyle,
     val referenceLabel: TextStyle = labels,
     val labelGap: Dp = 8.dp,
@@ -310,7 +322,7 @@ data class AxisStyle(
 )
 
 @Immutable
-data class FocusStyle(
+public data class FocusStyle(
     val rule: Color,
     val ruleWidth: Dp = 1.dp,
     /** Ring around focused points, usually the surface colour. */
@@ -335,7 +347,7 @@ data class FocusStyle(
 )
 
 @Immutable
-data class TooltipStyle(
+public data class TooltipStyle(
     val container: Color,
     val title: TextStyle,
     val body: TextStyle,
@@ -349,35 +361,75 @@ data class TooltipStyle(
     val fingerClearance: Dp = 48.dp,
 )
 
-/** A point shape. Implementations draw centred on [center] within [radius]. */
+/**
+ * A point shape. Implementations draw centred on [center] within [radius].
+ *
+ * Prefer the library's glyphs ([Circle], [Square], [path]). A chart whose dots and markers all use
+ * them keeps its marks as pixels while a focus is scrubbed over them (an offscreen layer on
+ * Android). A glyph of your own may read state or blend against what lies under it, which an
+ * isolated, cached layer cannot reproduce, so a chart that draws one is painted directly on every
+ * frame instead: the same picture, without that cache.
+ *
+ * Like the rest of [ChartStyle], a glyph is treated as an immutable value. Snapshot state it reads
+ * while drawing is observed, so a glyph may animate through state; a `Path` or shader it changes in
+ * place is not, and the chart may keep showing the shape it had.
+ */
 @Immutable
-fun interface Glyph {
-    fun DrawScope.draw(center: Offset, radius: Float, color: Color, alpha: Float)
+public fun interface Glyph {
+    public fun DrawScope.draw(center: Offset, radius: Float, color: Color, alpha: Float)
 
-    companion object {
-        val Circle = Glyph { center, radius, color, alpha -> drawCircle(color, radius, center, alpha) }
+    public companion object {
+        public val Circle: Glyph = LibraryGlyph(null) { center, radius, color, alpha -> drawCircle(color, radius, center, alpha) }
 
-        val Square = Glyph { center, radius, color, alpha ->
+        public val Square: Glyph = LibraryGlyph(null) { center, radius, color, alpha ->
             drawRect(color, Offset(center.x - radius, center.y - radius), Size(radius * 2f, radius * 2f), alpha)
         }
 
-        /** Draws [unitPath], a path laid out in the unit square, scaled to fill the radius. */
-        fun path(unitPath: Path): Glyph = Glyph { center, radius, color, alpha ->
-            withTransform({
-                translate(center.x - radius, center.y - radius)
-                scale(radius * 2f, radius * 2f, Offset.Zero)
-            }) { drawPath(unitPath, color, alpha) }
+        /**
+         * Draws [unitPath], a path laid out in the unit square, scaled to fill the radius. The path
+         * is copied: changing [unitPath] later does not change the glyph.
+         */
+        public fun path(unitPath: Path): Glyph {
+            val shape = Path().apply {
+                addPath(unitPath)
+                fillType = unitPath.fillType
+            }
+            return LibraryGlyph(shape) { center, radius, color, alpha ->
+                withTransform({
+                    translate(center.x - radius, center.y - radius)
+                    scale(radius * 2f, radius * 2f, Offset.Zero)
+                }) { drawPath(shape, color, alpha) }
+            }
         }
     }
 }
 
+/**
+ * One of [Glyph]'s own glyphs: painted with plain source-over paint and no state, inside the box
+ * [inkBox] gives. [unitPath] is a [Glyph.path]'s own copy of its path, null for a circle or square.
+ */
+internal class LibraryGlyph(
+    private val unitPath: Path?,
+    private val paint: DrawScope.(center: Offset, radius: Float, color: Color, alpha: Float) -> Unit,
+) : Glyph {
+    override fun DrawScope.draw(center: Offset, radius: Float, color: Color, alpha: Float) = paint(center, radius, color, alpha)
+
+    /** The box this glyph paints for [center] and [radius]: the square around the circle, or the path's bounds scaled as drawn. */
+    fun inkBox(center: Offset, radius: Float): Rect {
+        val unit = unitPath?.getBounds() ?: Rect(0f, 0f, 1f, 1f)
+        val left = center.x - radius
+        val top = center.y - radius
+        return Rect(left + unit.left * 2f * radius, top + unit.top * 2f * radius, left + unit.right * 2f * radius, top + unit.bottom * 2f * radius)
+    }
+}
+
 /** A palette tuned for legibility on light and dark surfaces. */
-val CleanPalette = listOf(
+public val CleanPalette: List<Color> = listOf(
     Color(0xFF4F5BD5), Color(0xFF14A39A), Color(0xFFF2A93B), Color(0xFFE5546B), Color(0xFF8B6FE0), Color(0xFF6B7A90),
 )
 
 /** d3's `schemeCategory10`, the de-facto default of web charting. */
-val Category10 = listOf(
+public val Category10: List<Color> = listOf(
     Color(0xFF1F77B4), Color(0xFFFF7F0E), Color(0xFF2CA02C), Color(0xFFD62728), Color(0xFF9467BD), Color(0xFF8C564B),
 )
 
@@ -385,11 +437,11 @@ val Category10 = listOf(
  * The library default: quiet guides, no axis lines, smooth curves and rounded bar ends, so the
  * data carries the contrast.
  */
-fun ChartStyle.Companion.clean(
+public fun ChartStyle.Companion.clean(
     content: Color = Color(0xFF1B1B1F),
     surface: Color = Color.White,
     palette: List<Color> = CleanPalette,
-) = ChartStyle(
+): ChartStyle = ChartStyle(
     palette = palette,
     dot = DotStyle(outline = surface),
     grid = GridStyle(
@@ -419,10 +471,10 @@ fun ChartStyle.Companion.clean(
  * What most charting libraries ship by default: full grid, axis lines, straight segments,
  * square bars and the category10 palette.
  */
-fun ChartStyle.Companion.basic(
+public fun ChartStyle.Companion.basic(
     content: Color = Color(0xFF1B1B1F),
     surface: Color = Color.White,
-) = ChartStyle(
+): ChartStyle = ChartStyle(
     palette = Category10,
     curve = Curve.Linear,
     line = LineStyle(width = 1.5.dp, showMarkers = false),

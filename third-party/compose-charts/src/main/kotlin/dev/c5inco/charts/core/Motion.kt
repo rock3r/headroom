@@ -1,5 +1,6 @@
 package dev.c5inco.charts.core
 
+import java.util.IdentityHashMap
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.floor
@@ -15,24 +16,35 @@ import kotlin.math.max
  * changed point count still tweens cleanly: lines and areas morph along x when their counts differ
  * (a change of range), and never bridge a gap (see [morph]).
  *
- * Polar scenes ([ChartScene.origin] set: radar, rose) are their own topology: marks grow out of
- * the origin, staggered clockwise from twelve o'clock, and lines and areas always pair points by
- * index (see [lerp]).
+ * Every decision about where a mark grows from is made by the scene's [SceneLayout]:
+ *
+ * - [SceneLayout.Cartesian]: bars, lines and areas grow from the baseline along the value axis
+ *   (an area filled to the plot's bottom rises from there), and entering marks stagger along the
+ *   category axis: left to right, or top to bottom for horizontal bars.
+ * - [SceneLayout.Polar] (radar, rose) is its own topology: marks grow out of the centre,
+ *   staggered clockwise from twelve o'clock.
+ * - [SceneLayout.Free] (pie, treemap, heatmap): marks enter in place, slices sweeping from twelve
+ *   o'clock and tiles and cells opening out from their own centres.
+ *
+ * Only an arriving node reads a layout, the one of the scene it arrives in, which compiled it.
+ * Matched and leaving nodes never do: they may come from a scene of another layout (or from an
+ * interpolated scene still holding nodes leaving an earlier one), so how a matched polygon pairs its
+ * points is the node's own ([AreaKind.Polar], [LineNode.polar]), and a leaving node only fades.
  */
-object SceneMotion {
+public object SceneMotion {
     /** Fraction of the timeline spent staggering entering marks left to right (rows: top to bottom). */
-    const val STAGGER = 0.3f
+    public const val STAGGER: Float = 0.3f
 
     // A leaving node below one 8-bit alpha step no longer needs geometry. Interrupted updates
     // reuse their current scene, so retaining these nodes would accumulate every past key.
     private const val MIN_LEAVING_ALPHA = 1f / 255f
 
     /** The collapsed state a scene grows out of on first appearance. */
-    fun enter(scene: ChartScene): ChartScene = scene.copy(
+    public fun enter(scene: ChartScene): ChartScene = scene.copy(
         guides = scene.guides.map { entering(it, scene) },
         marks = scene.marks.map { entering(it, scene) },
         labels = scene.labels.map { entering(it, scene) },
-    ).also { it.alignedPointAt = scene.alignedPointAt }
+    )
 
     /**
      * Where a chart's first appearance starts: [enter]'s collapsed guides and labels, and no marks,
@@ -40,70 +52,160 @@ object SceneMotion {
      * bottom) like marks arriving in a later update. `lerp(enter(scene), scene, t)` grows every mark
      * together instead.
      */
-    fun reveal(scene: ChartScene): ChartScene =
-        enter(scene).copy(marks = emptyList()).also { it.alignedPointAt = scene.alignedPointAt }
+    public fun reveal(scene: ChartScene): ChartScene = enter(scene).copy(marks = emptyList())
 
     /**
-     * The scene at [t] (0..1) on the way from [from] to [to]. When either scene is polar, lines and
-     * areas pair their points by index, never by x: a radar polygon's x runs back on itself, so
-     * sampling it along x would tear it. A change in the number of axes pads the shorter side
-     * with its last point (a closed polygon's last point is its first).
+     * The scene at [t] (0..1) on the way from [from] to [to]: the target scene, with matched nodes
+     * tweened, new ones growing and the ones it no longer has fading where they stand. A polar
+     * polygon ([AreaKind.Polar], a [LineNode.polar] edge) pairs its points by index, never by x: its
+     * x runs back on itself, so sampling it along x would tear it. A change in the number of axes
+     * pads the shorter side with its last point (a closed polygon's last point is its first).
      */
-    fun lerp(from: ChartScene, to: ChartScene, t: Float): ChartScene {
+    public fun lerp(from: ChartScene, to: ChartScene, t: Float): ChartScene {
         if (t >= 1f) return to
-        val polar = from.origin != null || to.origin != null
-        return to.copy(
-            guides = layer(from.guides, to.guides, to, t, polar),
-            marks = layer(from.marks, to.marks, to, t, polar),
-            labels = layer(from.labels, to.labels, to, t, polar),
-        ).also { it.alignedPointAt = to.alignedPointAt }
+        return SceneTween(from, to).at(t)
     }
 
-    private fun layer(from: List<Node>, to: List<Node>, scene: ChartScene, t: Float, polar: Boolean): List<Node> {
-        val previous = from.associateBy { it.key }
-        val targetKeys = to.mapTo(HashSet()) { it.key }
-        val out = ArrayList<Node>(from.size + to.size)
-        // Leaving nodes fade where they stand, underneath everything arriving.
-        from.forEach {
-            if (it.key !in targetKeys) {
-                val alpha = it.alpha * (1f - t)
-                if (alpha >= MIN_LEAVING_ALPHA) out += withAlpha(it, alpha)
+    /**
+     * One layer of a tween from [from] to [to] (in [scene], the target), paired once: which nodes
+     * leave, which each target node tweens from, and the collapsed state and stagger of each one
+     * arriving. Those depend only on the two scenes, so a transition works them out once rather than
+     * on every frame; [at] then does only what changes with t.
+     */
+    internal class LayerTween(from: List<Node>, private val to: List<Node>, private val scene: ChartScene) {
+        // Nodes the target no longer has: they fade where they stand, underneath everything arriving.
+        private val leaving: List<Node>
+        // Per target node: the node it tweens from (matched by key and kind), its collapsed state
+        // when it arrives and grows, or null when it arrives some other way (a polar polygon).
+        private val starts = arrayOfNulls<Node>(to.size)
+        // Per target node: true when matched, so it tweens from its start at t itself.
+        private val matched = BooleanArray(to.size)
+        // Per arriving node that grows: its stagger fraction, or NaN to grow with t itself.
+        private val fractions = FloatArray(to.size)
+        // Per target node: for an area's edge whose points tween exactly as the area's top does, the
+        // index of that area (earlier in the layer), so the edge takes the area's points rather than
+        // interpolating them a second time; else -1.
+        private val alongTopOf = IntArray(to.size) { -1 }
+        private val hasEdgesAlongTops: Boolean
+
+        init {
+            val previous = from.associateBy { it.key }
+            val targetKeys = to.mapTo(HashSet()) { it.key }
+            leaving = from.filter { it.key !in targetKeys }
+            to.forEachIndexed { i, node ->
+                val start = previous[node.key]
+                if (start != null && start::class == node::class) {
+                    starts[i] = start
+                    matched[i] = true
+                } else if (!arrivesAsPolygon(node, scene)) {
+                    starts[i] = entering(node, scene)
+                    fractions[i] = staggerFraction(node, scene) ?: Float.NaN
+                }
             }
-        }
-        to.forEach { node ->
-            val start = previous[node.key]
-            val origin = scene.origin
-            out += when {
-                start != null && start::class == node::class -> lerpNode(start, node, t, polar)
-                // A polygon arriving in a polar scene sweeps out vertex by vertex.
-                origin != null && (node is LineNode || node is AreaNode) -> growPolar(node, origin, t)
-                else -> lerpNode(entering(node, scene), node, staggered(node, scene, t), polar)
+            // An area's edge is compiled along its top: the same list of points.
+            var areaByTop: IdentityHashMap<List<XY>, Int>? = null
+            to.forEachIndexed { i, node -> if (node is AreaNode) (areaByTop ?: IdentityHashMap<List<XY>, Int>().also { areaByTop = it })[node.top] = i }
+            var any = false
+            if (areaByTop != null) {
+                to.forEachIndexed { i, node ->
+                    if (node is LineNode && node.isAreaEdge) {
+                        val area = areaByTop!![node.points]
+                        if (area != null && area < i && tweensAlongTop(i, area)) {
+                            alongTopOf[i] = area
+                            any = true
+                        }
+                    }
+                }
             }
+            hasEdgesAlongTops = any
         }
-        return out
+
+        /**
+         * Whether edge [edge]'s points come out of every frame exactly as area [area]'s top does: both
+         * on the same clock (matched, or arriving without a stagger), from equal points to the same
+         * points, paired index for index (equal counts, where a line's and an area's tween both do).
+         */
+        private fun tweensAlongTop(edge: Int, area: Int): Boolean {
+            val e = starts[edge] as? LineNode ?: return false
+            val a = starts[area] as? AreaNode ?: return false
+            val b = to[area] as AreaNode
+            if (matched[edge] != matched[area]) return false
+            if (!matched[edge] && !(fractions[edge].isNaN() && fractions[area].isNaN())) return false
+            return a.top.size == b.top.size && (e.points === a.top || e.points == a.top)
+        }
+
+        fun at(t: Float): List<Node> {
+            val out = ArrayList<Node>(leaving.size + to.size)
+            for (node in leaving) {
+                val alpha = node.alpha * (1f - t)
+                if (alpha >= MIN_LEAVING_ALPHA) out += withAlpha(node, alpha)
+            }
+            val made = if (hasEdgesAlongTops) arrayOfNulls<Node>(to.size) else null
+            for (i in to.indices) {
+                val node = to[i]
+                val start = starts[i]
+                val area = alongTopOf[i]
+                val next = when {
+                    area >= 0 -> edgeAlong(start as LineNode, node as LineNode, (made!![area] as AreaNode).top, t)
+                    matched[i] -> lerpNode(start!!, node, t)
+                    start != null -> lerpNode(start, node, fractions[i].let { f -> if (f.isNaN()) t else stagger(t, f) })
+                    else -> arrivingPolygon(node, scene.layout as SceneLayout.Polar, t)
+                }
+                if (made != null) made[i] = next
+                out += next
+            }
+            return out
+        }
+    }
+
+    /** A polygon arriving in a polar scene: it sweeps out vertex by vertex, rather than growing whole. */
+    private fun arrivesAsPolygon(node: Node, scene: ChartScene): Boolean =
+        scene.layout is SceneLayout.Polar && (node is LineNode || node is AreaNode)
+
+    private fun arrivingPolygon(node: Node, layout: SceneLayout.Polar, t: Float): Node = when (node) {
+        is LineNode -> node.copy(points = growPolar(node.points, layout.center, t))
+        is AreaNode -> node.copy(top = growPolar(node.top, layout.center, t), bottom = growPolar(node.bottom, layout.center, t))
+        else -> error("not a polygon: $node")
     }
 
     /**
      * Entering marks sweep left to right inside a fixed budget, however many there are; horizontal
-     * bars sweep top to bottom.
+     * bars sweep top to bottom. The fraction of the sweep [node] waits for, or null for a node that
+     * grows with t itself.
      */
-    private fun staggered(node: Node, scene: ChartScene, t: Float): Float {
+    private fun staggerFraction(node: Node, scene: ChartScene): Float? {
         val plot = scene.plot
-        val origin = scene.origin
-        val f = when {
+        fun across(x: Float) = fraction(x, plot.left, plot.width)
+        return when (val layout = scene.layout) {
             // Polar marks sweep clockwise from twelve o'clock: petals by their middle, markers by
             // their vertex (the same fraction as the polygon's vertex under them).
-            origin != null && node is ArcNode -> turnFraction((node.startAngle + node.endAngle) / 2f)
-            origin != null && node is DotNode -> polarFraction(node.center, origin)
-            origin != null -> return t
-            node is RectNode && node.kind == RectKind.Band -> return t
-            node is RectNode && node.horizontal -> fraction(node.bounds.centerY, plot.top, plot.height)
-            node is RectNode -> fraction(node.bounds.centerX, plot.left, plot.width)
-            node is DotNode -> fraction(node.center.x, plot.left, plot.width)
-            node is RuleNode && node.kind == RuleKind.Wick -> fraction(node.from.x, plot.left, plot.width)
-            else -> return t
+            is SceneLayout.Polar -> when (node) {
+                is ArcNode -> turnFraction((node.startAngle + node.endAngle) / 2f)
+                is DotNode -> polarFraction(node.center, layout.center)
+                is RectNode, is LineNode, is AreaNode, is RuleNode, is TextNode -> null
+            }
+            is SceneLayout.Cartesian, SceneLayout.Free -> when (node) {
+                is RectNode -> when (node.kind) {
+                    // A band is an annotation, not data: it fades in all at once.
+                    is RectKind.Band -> null
+                    // Bars sweep along the category axis: down the rows of horizontal bars.
+                    is RectKind.Bar -> if (layout.sideways()) fraction(node.bounds.centerY, plot.top, plot.height) else across(node.bounds.centerX)
+                    is RectKind.Candle, is RectKind.Volume, is RectKind.Tile, is RectKind.Cell -> across(node.bounds.centerX)
+                }
+                is DotNode -> across(node.center.x)
+                is RuleNode -> when (node.kind) {
+                    is RuleKind.Wick -> across(node.from.x)
+                    RuleKind.GridX, RuleKind.GridY, RuleKind.AxisX, RuleKind.AxisY, RuleKind.Baseline, RuleKind.Reference, is RuleKind.XRule -> null
+                }
+                is LineNode, is AreaNode, is ArcNode, is TextNode -> null
+            }
         }
-        return stagger(t, f)
+    }
+
+    /** A Cartesian layout whose value axis runs across: horizontal bars. */
+    private fun SceneLayout.sideways(): Boolean = when (this) {
+        is SceneLayout.Cartesian -> valueAxis == AxisOrientation.Horizontal
+        is SceneLayout.Polar, SceneLayout.Free -> false
     }
 
     private fun fraction(v: Float, start: Float, span: Float): Float =
@@ -131,71 +233,93 @@ object SceneMotion {
     }
 
     /**
-     * A polar line or area arriving: each defined point moves out from [origin] on its own clock,
-     * staggered by its angle like the markers on it, so vertex and marker stay together. Missing
-     * points stay missing, so gaps hold through the reveal.
+     * A polar line's or area's points arriving: each defined point moves out from [center] on its
+     * own clock, staggered by its angle like the markers on it, so vertex and marker stay together.
+     * Missing points stay missing, so gaps hold through the reveal.
      */
-    private fun growPolar(node: Node, origin: XY, t: Float): Node {
-        fun grow(points: List<XY>) = points.map { p -> if (p.isDefined) lerp(origin, p, stagger(t, polarFraction(p, origin))) else p }
-        return when (node) {
-            is LineNode -> node.copy(points = grow(node.points))
-            is AreaNode -> node.copy(top = grow(node.top), bottom = grow(node.bottom))
-            else -> node
+    private fun growPolar(points: List<XY>, center: XY, t: Float): List<XY> =
+        points.map { p -> if (p.isDefined) lerp(center, p, stagger(t, polarFraction(p, center))) else p }
+
+    /** The collapsed state [node] enters from, in [scene]'s layout. */
+    private fun entering(node: Node, scene: ChartScene): Node = when (val layout = scene.layout) {
+        // Polar marks grow out of the centre: vertices and markers from it, petals from their inner
+        // radius. Guides and labels fade in as anywhere else.
+        is SceneLayout.Polar -> when (node) {
+            is LineNode -> node.copy(points = node.points.map { if (it.isDefined) layout.center else it })
+            is AreaNode -> node.copy(
+                top = node.top.map { if (it.isDefined) layout.center else it },
+                bottom = node.bottom.map { if (it.isDefined) layout.center else it },
+            )
+            is DotNode -> node.copy(center = layout.center, radius = 0f)
+            is ArcNode -> node.copy(outerRadius = node.innerRadius)
+            is RectNode, is RuleNode, is TextNode -> enteringInPlace(node, scene)
         }
+        is SceneLayout.Cartesian, SceneLayout.Free -> enteringInPlace(node, scene)
     }
 
-    private val RectNode.horizontal: Boolean get() = base == Edge.Left || base == Edge.Right
-
-    private fun entering(node: Node, scene: ChartScene): Node {
-        val base = scene.baseline
-        val origin = scene.origin
-        if (origin != null) {
-            // Polar marks grow out of the centre: vertices and markers from it, petals from their
-            // inner radius. Guides and labels fade in below.
-            when (node) {
-                is LineNode -> return node.copy(points = node.points.map { if (it.isDefined) origin else it })
-                is AreaNode -> return node.copy(
-                    top = node.top.map { if (it.isDefined) origin else it },
-                    bottom = node.bottom.map { if (it.isDefined) origin else it },
-                )
-                is DotNode -> return node.copy(center = origin, radius = 0f)
-                is ArcNode -> return node.copy(outerRadius = node.innerRadius)
-                else -> Unit
-            }
-        }
-        return when (node) {
+    /** The collapsed state of a node that grows where it stands or from the value baseline. */
+    private fun enteringInPlace(node: Node, scene: ChartScene): Node = when (node) {
+        is RectNode -> when (val kind = node.kind) {
             // A vertical band is an annotation spanning the plot's height: it fades in where it stands.
-            is RectNode -> if (node.kind == RectKind.Band) {
-                node.copy(alpha = 0f)
-            } else if (node.kind == RectKind.Cell) {
-                node.copy(bounds = node.bounds.let { Bounds(it.centerX, it.centerY, it.centerX, it.centerY) }, alpha = 0f)
-            } else node.copy(
-                bounds = when {
-                    // A treemap tile has no baseline: it grows out of its own centre.
-                    node.kind == RectKind.Tile -> node.bounds.let { Bounds(it.centerX, it.centerY, it.centerX, it.centerY) }
-                    // A candle opens out from its open price; a volume bar rises from the strip's
-                    // floor. Both collapse onto their base edge, not the price baseline.
-                    node.kind == RectKind.Candle || node.kind == RectKind.Volume ->
-                        if (node.base == Edge.Top) node.bounds.copy(bottom = node.bounds.top) else node.bounds.copy(top = node.bounds.bottom)
-                    // A horizontal scene's baseline is an x position.
-                    node.horizontal -> node.bounds.copy(left = base, right = base)
-                    else -> node.bounds.copy(top = base, bottom = base)
-                },
-            )
-            // An area filled to the plot's bottom (and its edge) rises from there instead.
-            is LineNode -> (node.floor ?: base).let { row -> node.copy(points = node.points.map { it.collapse(row) }) }
-            is AreaNode -> (node.floor ?: base).let { row -> node.copy(top = node.top.map { it.collapse(row) }, bottom = node.bottom.map { it.collapse(row) }) }
-            is DotNode -> node.copy(radius = 0f)
-            is ArcNode -> node.copy(startAngle = 0f, endAngle = 0f)
-            // A wick grows out from its middle as it fades in; other rules just fade in.
-            is RuleNode -> if (node.kind == RuleKind.Wick) {
-                val mid = lerp(node.from, node.to, 0.5f)
-                node.copy(from = mid, to = mid, alpha = 0f)
-            } else {
-                node.copy(alpha = 0f)
-            }
-            is TextNode -> node.copy(alpha = 0f)
+            is RectKind.Band -> node.copy(alpha = 0f)
+            is RectKind.Cell -> node.copy(bounds = node.bounds.centre(), alpha = 0f)
+            // A treemap tile has no baseline: it grows out of its own centre.
+            is RectKind.Tile -> node.copy(bounds = node.bounds.centre())
+            // A candle opens out from its open price; a volume bar rises from the strip's floor.
+            // Both collapse onto their base edge, not the price baseline.
+            is RectKind.Candle -> node.copy(bounds = node.bounds.onto(kind.base))
+            is RectKind.Volume -> node.copy(bounds = node.bounds.onto(Edge.Bottom))
+            is RectKind.Bar -> node.copy(bounds = barEntering(node.bounds, kind, scene.layout))
         }
+        // An area filled to the plot's bottom (and its edge) rises from there instead.
+        is LineNode -> (node.floor ?: riseRow(scene)).let { row -> node.copy(points = node.points.map { it.collapse(row) }) }
+        is AreaNode -> (node.floor ?: riseRow(scene)).let { row -> node.copy(top = node.top.map { it.collapse(row) }, bottom = node.bottom.map { it.collapse(row) }) }
+        is DotNode -> node.copy(radius = 0f)
+        is ArcNode -> node.copy(startAngle = 0f, endAngle = 0f)
+        is RuleNode -> when (node.kind) {
+            // A wick grows out from its middle as it fades in; other rules just fade in.
+            is RuleKind.Wick -> lerp(node.from, node.to, 0.5f).let { mid -> node.copy(from = mid, to = mid, alpha = 0f) }
+            RuleKind.GridX, RuleKind.GridY, RuleKind.AxisX, RuleKind.AxisY, RuleKind.Baseline, RuleKind.Reference, is RuleKind.XRule ->
+                node.copy(alpha = 0f)
+        }
+        is TextNode -> node.copy(alpha = 0f)
+    }
+
+    /**
+     * A bar collapsed onto the value baseline: a y position on an upright value axis, an x position
+     * on one that runs across. Outside a Cartesian layout there is no baseline, and a bar collapses
+     * onto its own base edge.
+     */
+    private fun barEntering(bounds: Bounds, bar: RectKind.Bar, layout: SceneLayout): Bounds = when (layout) {
+        is SceneLayout.Cartesian -> when (layout.valueAxis) {
+            AxisOrientation.Vertical -> bounds.copy(top = layout.baseline, bottom = layout.baseline)
+            AxisOrientation.Horizontal -> bounds.copy(left = layout.baseline, right = layout.baseline)
+        }
+        is SceneLayout.Polar, SceneLayout.Free -> bounds.onto(bar.base)
+    }
+
+    /**
+     * The row a line or area without a floor rises from: the baseline of an upright value axis. A
+     * polar scene grows its lines from the centre instead; any other scene has no such row and uses
+     * the plot's bottom.
+     */
+    private fun riseRow(scene: ChartScene): Float = when (val layout = scene.layout) {
+        is SceneLayout.Cartesian -> when (layout.valueAxis) {
+            AxisOrientation.Vertical -> layout.baseline
+            AxisOrientation.Horizontal -> scene.plot.bottom
+        }
+        is SceneLayout.Polar -> layout.center.y
+        SceneLayout.Free -> scene.plot.bottom
+    }
+
+    private fun Bounds.centre() = Bounds(centerX, centerY, centerX, centerY)
+
+    /** These bounds collapsed onto their [edge]. */
+    private fun Bounds.onto(edge: Edge): Bounds = when (edge) {
+        Edge.Top -> copy(bottom = top)
+        Edge.Bottom -> copy(top = bottom)
+        Edge.Left -> copy(right = left)
+        Edge.Right -> copy(left = right)
     }
 
     /** Drops a point onto the baseline. Missing points stay missing, so gaps hold through a reveal. */
@@ -211,20 +335,35 @@ object SceneMotion {
         is TextNode -> node.copy(alpha = alpha)
     }
 
-    private fun lerpNode(a: Node, b: Node, t: Float, polar: Boolean): Node = when (b) {
-        is RectNode -> b.copy(bounds = lerp((a as RectNode).bounds, b.bounds, t), alpha = lerp(a.alpha, b.alpha, t))
-        is LineNode -> b.copy(
-            points = if (polar) byIndex((a as LineNode).points, b.points, t) else lerpPoints((a as LineNode).points, b.points, t),
-            alpha = lerp(a.alpha, b.alpha, t),
-            signSplit = lerpSplit(a.signSplit, b.signSplit, t),
-            floor = lerpFloor(a.floor, b.floor, t),
-        )
+    /** [lerpNode] of an area edge whose points are already tweened, as its area's [top]. */
+    private fun edgeAlong(a: LineNode, b: LineNode, top: List<XY>, t: Float): LineNode = b.copy(
+        points = top,
+        alpha = lerp(a.alpha, b.alpha, t),
+        signSplit = lerpSplit(a.signSplit, b.signSplit, t),
+        floor = lerpFloor(a.floor, b.floor, t),
+    )
+
+    private fun lerpNode(a: Node, b: Node, t: Float): Node = when (b) {
+        is RectNode -> {
+            a as RectNode
+            b.copy(bounds = lerp(a.bounds, b.bounds, t), kind = lerpKind(a.kind, b.kind, t), alpha = lerp(a.alpha, b.alpha, t))
+        }
+        is LineNode -> {
+            a as LineNode
+            b.copy(
+                points = if (a.polar || b.polar) byIndex(a.points, b.points, t) else lerpPoints(a.points, b.points, t),
+                alpha = lerp(a.alpha, b.alpha, t),
+                signSplit = lerpSplit(a.signSplit, b.signSplit, t),
+                floor = lerpFloor(a.floor, b.floor, t),
+            )
+        }
         is AreaNode -> {
             a as AreaNode
+            val polar = a.kind.isPolar() || b.kind.isPolar()
             val (top, bottom) = if (polar) listOf(byIndex(a.top, b.top, t), byIndex(a.bottom, b.bottom, t))
             else morph(listOf(a.top, a.bottom), listOf(b.top, b.bottom), t)
             b.copy(
-                top = top, bottom = bottom, alpha = lerp(a.alpha, b.alpha, t),
+                top = top, bottom = bottom, kind = lerpKind(a.kind, b.kind, t), alpha = lerp(a.alpha, b.alpha, t),
                 signSplit = lerpSplit(a.signSplit, b.signSplit, t), floor = lerpFloor(a.floor, b.floor, t),
             )
         }
@@ -243,6 +382,38 @@ object SceneMotion {
         is RuleNode -> b.copy(from = lerp((a as RuleNode).from, b.from, t), to = lerp(a.to, b.to, t), alpha = lerp(a.alpha, b.alpha, t))
         is TextNode -> b.copy(at = lerp((a as TextNode).at, b.at, t), alpha = lerp(a.alpha, b.alpha, t))
     }
+
+    private fun AreaKind.isPolar(): Boolean = when (this) {
+        AreaKind.Polar -> true
+        is AreaKind.Upright -> false
+    }
+
+    /**
+     * An upright area's baseline and plot move with its points (a resize), so its gradient stays on
+     * them. The edge it fades from moves too: while an area whose values cross over zero turns its
+     * gradient over, it lies between the plot's edges, and the renderer crossfades the two fades by
+     * how far it has come, rather than turning the gradient over in one frame.
+     */
+    private fun lerpKind(a: AreaKind, b: AreaKind, t: Float): AreaKind =
+        if (a is AreaKind.Upright && b is AreaKind.Upright) {
+            AreaKind.Upright(lerp(a.baseline, b.baseline, t), lerp(a.plot, b.plot, t), lerp(a.fadeFrom, b.fadeFrom, t))
+        } else {
+            b
+        }
+
+    /**
+     * A bar's track moves with the plot it spans, as the bar does. Only between bars lying the same
+     * way: a row's track is a stretch of x and a column's of y, so a bar that turns takes its
+     * target's track outright. An unchanged track is shared, not rebuilt each frame.
+     */
+    private fun lerpKind(a: RectKind, b: RectKind, t: Float): RectKind =
+        if (a is RectKind.Bar && b is RectKind.Bar && a.track != b.track && a.base.isHorizontal() == b.base.isHorizontal()) {
+            b.copy(track = lerp(a.track, b.track, t))
+        } else {
+            b
+        }
+
+    private fun Edge.isHorizontal(): Boolean = this == Edge.Left || this == Edge.Right
 
     /** Zero moves with the points that cross it, so colours stay with their side mid-tween. */
     private fun lerpSplit(a: SignSplit?, b: SignSplit?, t: Float): SignSplit? =
@@ -355,5 +526,31 @@ object SceneMotion {
         val span = r.x - p.x
         val f = if (span > 0f) (q - p.x) / span else 0f
         return p.y + (r.y - p.y) * f
+    }
+}
+
+/**
+ * A transition from [from] to [to], for drawing it frame by frame: [at] is exactly
+ * [SceneMotion.lerp]`(from, to, t)`, with the pairing of the two scenes' nodes (and the collapsed
+ * state each arriving node grows from) worked out once, here, rather than on every frame. Make one
+ * per transition: a transition retargeted mid-flight starts from a new scene, and so a new tween.
+ *
+ * Immutable, like the scenes it holds: safe to share across threads and to keep while other
+ * transitions run.
+ */
+public class SceneTween(public val from: ChartScene, public val to: ChartScene) {
+    private val guides = SceneMotion.LayerTween(from.guides, to.guides, to)
+    private val marks = SceneMotion.LayerTween(from.marks, to.marks, to)
+    private val labels = SceneMotion.LayerTween(from.labels, to.labels, to)
+
+    /**
+     * The scene at [t] (0..1) on the way from [from] to [to]; [to] itself from 1 on. Its marks start
+     * with the ones leaving, as many as [ChartScene.leavingMarks] says: every target node is drawn, so
+     * the rest are those still fading out.
+     */
+    public fun at(t: Float): ChartScene {
+        if (t >= 1f) return to
+        val drawn = marks.at(t)
+        return to.copy(guides = guides.at(t), marks = drawn, labels = labels.at(t), leavingMarks = drawn.size - to.marks.size)
     }
 }

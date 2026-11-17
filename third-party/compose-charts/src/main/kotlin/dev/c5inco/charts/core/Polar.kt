@@ -10,7 +10,8 @@ import kotlin.math.sqrt
 
 /*
  * Polar charts: radar and rose. Both reuse existing nodes (areas, lines, dots, arcs, rules, text)
- * and set ChartScene.origin, which motion and the renderer read as "this scene is polar".
+ * and lay their scene out as [SceneLayout.Polar] around the centre, which motion and the renderer
+ * read as "this scene is polar". With nothing to draw, a scene has no centre: [SceneLayout.Free].
  */
 
 private const val TURN = (2 * PI).toFloat()
@@ -109,15 +110,15 @@ private fun ring(key: String, center: XY, radius: Float, segments: Int): List<Ru
  * - **Range.** A vertex's radius is its value over [RadarChart.max], clamped to 0..1: negatives on
  *   the centre, values above the maximum on the rim. The focus point keeps the raw value.
  * - **Focus.** [FocusMode.NearestXY]: the nearest defined vertex within reach. Its label is the
- *   axis, its value raw, `share` NaN and `domainX` null.
+ *   axis, its value raw, and its detail a [FocusDetail.Dot] with no `domainX`.
  * - **Empty.** Fewer than three axes, or no room for a positive radius (labels are cut first), give
  *   an empty scene.
  */
 internal fun compileRadar(spec: RadarChart, size: Extent, measure: TextMeasure, m: ChartMetrics): ChartScene {
     val n = spec.axes.size
-    if (n < 3) return emptyScene(size, spec, FocusMode.NearestXY)
+    if (n < 3) return emptyScene(size, spec, SceneLayout.Free, FocusMode.NearestXY)
     val frame = polarFrame(spec.axes, size, measure, m, inset = max(0f, m.markerRadius))
-        ?: return emptyScene(size, spec, FocusMode.NearestXY)
+        ?: return emptyScene(size, spec, SceneLayout.Free, FocusMode.NearestXY)
     val center = frame.center
     val radius = frame.radius
     val step = TURN / n
@@ -133,6 +134,8 @@ internal fun compileRadar(spec: RadarChart, size: Extent, measure: TextMeasure, 
         if (text.isEmpty()) null else polarLabel("axis:$i", text, center.around(radius + m.labelGap, i * step), i * step, size, measure)
     }
 
+    // Each series' nodes carry its palette slot, so they paint the same in any scene.
+    val legend = spec.legend()
     val fills = mutableListOf<Node>()
     val edges = mutableListOf<Node>()
     val markers = mutableListOf<Node>()
@@ -144,19 +147,30 @@ internal fun compileRadar(spec: RadarChart, size: Extent, measure: TextMeasure, 
             else center.around(radius * (v / spec.max).coerceIn(0.0, 1.0).toFloat(), i * step)
         }
         val closed = vertices + vertices[0]
-        fills += AreaNode("radar:$s", closed, List(closed.size) { center }, s, Curve.Linear)
-        edges += LineNode("radar-edge:$s", closed, s, Curve.Linear, isAreaEdge = true)
+        fills += AreaNode("radar:$s", closed, List(closed.size) { center }, s, legend[s].color, AreaKind.Polar, Curve.Linear)
+        edges += LineNode("radar-edge:$s", closed, s, legend[s].color, Curve.Linear, isAreaEdge = true, polar = true)
         vertices.forEachIndexed { i, p ->
             if (!p.isDefined) return@forEachIndexed
             val v = series.values[i]
-            markers += DotNode("radar-dot:$s:$i", p, m.markerRadius, s, i, isMarker = true)
-            points += FocusPoint(s, i, MarkKind.Dot, p.x, p.y, i.toFloat(), spec.axes[i], v, format.format(v))
+            markers += DotNode("radar-dot:$s:$i", p, m.markerRadius, s, legend[s].color, i, isMarker = true)
+            points += FocusPoint(
+                series = s, datum = i, x = p.x, y = p.y, slot = i.toFloat(),
+                label = spec.axes[i], value = v, valueText = format.format(v), detail = FocusDetail.Dot(),
+            )
         }
     }
     val plot = Bounds(center.x - radius, center.y - radius, center.x + radius, center.y + radius)
     return ChartScene(
-        size, plot, center.y, spec.legend(), guides, fills + edges + markers, labels, points,
-        FocusMode.NearestXY, spec.description, origin = center,
+        size = size,
+        plot = plot,
+        layout = SceneLayout.Polar(center),
+        series = legend,
+        guides = guides,
+        marks = fills + edges + markers,
+        labels = labels,
+        points = points,
+        focusMode = FocusMode.NearestXY,
+        description = spec.description,
     )
 }
 
@@ -177,14 +191,14 @@ internal fun compileRadar(spec: RadarChart, size: Extent, measure: TextMeasure, 
  *   radius or [ChartMetrics.petalMinHit] beyond the inner radius, whichever is further, never past
  *   the rim. The centre hole, the gaps between wedges and the label ring hit nothing.
  * - **Focus.** [FocusMode.Containment]; a [MarkKind.Petal] point anchored mid-way along its hit
- *   region, labelled with the wedge's label, with the raw value, `share` NaN and `domainX` null.
+ *   region, labelled with the wedge's label, with the raw value and no share.
  * - **Empty.** No labels, or no room for a positive radius (labels are cut first), give an empty
  *   scene.
  */
 internal fun compileRose(spec: RoseChart, size: Extent, measure: TextMeasure, m: ChartMetrics): ChartScene {
     val n = spec.labels.size
-    if (n == 0) return emptyScene(size, spec, FocusMode.Containment)
-    val frame = polarFrame(spec.labels, size, measure, m, inset = 0f) ?: return emptyScene(size, spec, FocusMode.Containment)
+    if (n == 0) return emptyScene(size, spec, SceneLayout.Free, FocusMode.Containment)
+    val frame = polarFrame(spec.labels, size, measure, m, inset = 0f) ?: return emptyScene(size, spec, SceneLayout.Free, FocusMode.Containment)
     val center = frame.center
     val radius = frame.radius
     val inner = radius * m.roseInnerRatio.coerceIn(0f, 1f)
@@ -201,6 +215,8 @@ internal fun compileRose(spec: RoseChart, size: Extent, measure: TextMeasure, m:
     val labels = frame.texts.mapIndexedNotNull { i, text ->
         if (text.isEmpty()) null else polarLabel("label:$i", text, center.around(radius + m.labelGap, i * step), i * step, size, measure)
     }
+    // Each petal carries its wedge's palette slot, so it paints the same in any scene.
+    val legend = spec.legend()
     val marks = mutableListOf<Node>()
     val points = mutableListOf<FocusPoint>()
     spec.values.forEachIndexed { i, v ->
@@ -208,14 +224,25 @@ internal fun compileRose(spec: RoseChart, size: Extent, measure: TextMeasure, m:
         val a0 = i * step - step / 2f + pad
         val a1 = i * step + step / 2f - pad
         val outer = petal(v / top)
-        marks += ArcNode("petal:$i", center, inner, outer, a0, a1, i, i)
+        marks += ArcNode("petal:$i", center, inner, outer, a0, a1, i, legend[i].color, i, ArcKind.Petal)
         val reach = min(radius, max(outer, inner + m.petalMinHit))
         val at = center.around((inner + reach) / 2f, i * step)
         points += FocusPoint(
-            i, i, MarkKind.Petal, at.x, at.y, i * step, spec.labels[i], v, format.format(v),
-            hit = ArcHit(center, inner, reach, a0, a1),
+            series = i, datum = i, x = at.x, y = at.y, slot = i * step,
+            label = spec.labels[i], value = v, valueText = format.format(v), detail = FocusDetail.Petal(ArcHit(center, inner, reach, a0, a1)),
         )
     }
     val plot = Bounds(center.x - radius, center.y - radius, center.x + radius, center.y + radius)
-    return ChartScene(size, plot, center.y, spec.legend(), guides, marks, labels, points, FocusMode.Containment, spec.description, origin = center)
+    return ChartScene(
+        size = size,
+        plot = plot,
+        layout = SceneLayout.Polar(center),
+        series = legend,
+        guides = guides,
+        marks = marks,
+        labels = labels,
+        points = points,
+        focusMode = FocusMode.Containment,
+        description = spec.description,
+    )
 }

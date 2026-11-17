@@ -13,16 +13,16 @@ import kotlin.math.abs
  * `java.time` formatters are; a shared `java.text.DecimalFormat` or `SimpleDateFormat` is not (give
  * each thread its own, with a `ThreadLocal`).
  */
-fun interface ValueFormat {
-    fun format(value: Double): String
+public fun interface ValueFormat {
+    public fun format(value: Double): String
 }
 
-object Formats {
+public object Formats {
     /**
      * Compact tick labels for a set of ticks: `0, 2.5k, 5k` or `0, 0.25, 0.5`. Retains enough
      * decimal precision to distinguish the supplied ticks, including after suffix scaling.
      */
-    fun forTicks(ticks: List<Double>): ValueFormat {
+    public fun forTicks(ticks: List<Double>): ValueFormat {
         val finite = ticks.filter { it.isFinite() }
         val maxAbs = finite.maxOfOrNull { abs(it) } ?: 0.0
         val (divisor, suffix) = suffixFor(maxAbs)
@@ -51,7 +51,7 @@ object Formats {
      * per datum in every compile, where the formatter's pattern parsing cost about 4 ms per 288
      * values on a Pixel 4 XL; this costs about 0.16 ms.
      */
-    val Readable = ValueFormat { value ->
+    public val Readable: ValueFormat = ValueFormat { value ->
         val absValue = abs(value)
         val (divisor, suffix) = if (absValue >= 1e6) suffixFor(absValue) else 1.0 to ""
         val scaled = value / divisor
@@ -64,7 +64,7 @@ object Formats {
      * minus, U+2212), and `0.00%` unsigned for anything that rounds to zero. For values that are a
      * change, such as a treemap tile's day move. A missing (non-finite) value prints nothing.
      */
-    val Change = ValueFormat { value ->
+    public val Change: ValueFormat = ValueFormat { value ->
         if (!value.isFinite()) return@ValueFormat ""
         val text = String.format(Locale.ROOT, "%.2f", abs(value))
         when {
@@ -74,7 +74,7 @@ object Formats {
         }
     }
 
-    fun percent(share: Double): String {
+    public fun percent(share: Double): String {
         val pct = share * 100
         return trim(String.format(Locale.ROOT, "%.${if (pct < 10) 1 else 0}f", pct)) + "%"
     }

@@ -14,7 +14,7 @@ import kotlin.math.max
  * Calendar-aware ticks and labels for time axes. A port of d3-scale's `scaleTime().ticks()`
  * interval choice and its multi-scale tick format, on java.time. Times are epoch milliseconds.
  */
-object TimeTicks {
+public object TimeTicks {
     private const val SECOND = 1_000L
     private const val MINUTE = 60 * SECOND
     private const val HOUR = 60 * MINUTE
@@ -53,7 +53,7 @@ object TimeTicks {
         }
     }
 
-    fun ticks(start: Double, stop: Double, count: Int, zone: ZoneId): List<Double> {
+    public fun ticks(start: Double, stop: Double, count: Int, zone: ZoneId): List<Double> {
         if (!(stop > start) || count <= 0) return if (start == stop) listOf(start) else emptyList()
         val interval = interval(start, stop, count) ?: return Ticks.ticks(start, stop, count)
         val unit = interval.unit
@@ -117,7 +117,7 @@ object TimeTicks {
      * d3's multi-scale tick format: each label shows the coarsest field that changed at its tick, so
      * a day's ticks read `Oct 5, 06:00, 12:00, 18:00, Oct 6` and a year's read `2026, Feb, Mar`.
      */
-    fun tickFormat(zone: ZoneId, locale: Locale = Locale.getDefault()): ValueFormat {
+    public fun tickFormat(zone: ZoneId, locale: Locale = Locale.getDefault()): ValueFormat {
         val millis = DateTimeFormatter.ofPattern(".SSS", locale)
         val seconds = DateTimeFormatter.ofPattern(":ss", locale)
         val time = DateTimeFormatter.ofPattern("HH:mm", locale)
@@ -139,7 +139,7 @@ object TimeTicks {
     }
 
     /** A tooltip format with enough precision to tell neighbouring points apart. */
-    fun pointFormat(spacing: Double, zone: ZoneId, locale: Locale = Locale.getDefault()): ValueFormat {
+    public fun pointFormat(spacing: Double, zone: ZoneId, locale: Locale = Locale.getDefault()): ValueFormat {
         val pattern = when {
             spacing < SECOND -> "MMM d, HH:mm:ss.SSS"
             spacing < MINUTE -> "MMM d, HH:mm:ss"

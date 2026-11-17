@@ -15,15 +15,22 @@ COMMIT_SHA="$(git -C "$REPO_DIR" rev-parse "${REF}^{commit}")"
 SHORT_SHA="$(git -C "$REPO_DIR" rev-parse --short=7 "$COMMIT_SHA")"
 COMMIT_DATE="$(git -C "$REPO_DIR" show -s --format=%cs "$COMMIT_SHA")"
 
-rm -rf "$SCRIPT_DIR/src/main/kotlin"
+rm -rf "$SCRIPT_DIR/src/main/kotlin" "$SCRIPT_DIR/src/commonMain/kotlin"
 mkdir -p "$SCRIPT_DIR/src/main/kotlin"
 
 git -C "$REPO_DIR" archive "$COMMIT_SHA" charts-core/src/main/kotlin \
     | tar -x -C "$SCRIPT_DIR/src/main/kotlin" --strip-components=4
-git -C "$REPO_DIR" archive "$COMMIT_SHA" charts-compose/src/main/kotlin \
+mkdir -p "$SCRIPT_DIR/src/commonMain/kotlin"
+git -C "$REPO_DIR" archive "$COMMIT_SHA" charts-compose/src/commonMain/kotlin \
+    | tar -x -C "$SCRIPT_DIR/src/commonMain/kotlin" --strip-components=4
+git -C "$REPO_DIR" archive "$COMMIT_SHA" charts-compose/src/androidMain/kotlin \
     | tar -x -C "$SCRIPT_DIR/src/main/kotlin" --strip-components=4
 git -C "$REPO_DIR" show "$COMMIT_SHA:LICENSE" > "$SCRIPT_DIR/LICENSE"
 git -C "$REPO_DIR" show "$COMMIT_SHA:NOTICE" > "$SCRIPT_DIR/NOTICE"
+
+# Fail rather than silently lose the scoped Lint suppression when upstream changes.
+git -C "$ROOT_DIR" apply --check "$SCRIPT_DIR/trace-lint.patch"
+git -C "$ROOT_DIR" apply "$SCRIPT_DIR/trace-lint.patch"
 
 perl -pi -e "s/^- Upstream commit: \`[0-9a-f]+\` \([0-9-]+\)\./- Upstream commit: \`$COMMIT_SHA\` ($COMMIT_DATE)./" \
     "$SCRIPT_DIR/README.md"

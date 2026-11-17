@@ -5,15 +5,15 @@ import java.time.ZoneId
 import java.util.Locale
 
 /** What to draw. A chart is a declaration; [compile] turns it into a [ChartScene]. */
-sealed interface ChartSpec {
-    val description: String?
+public sealed interface ChartSpec {
+    public val description: String?
 }
 
 /**
  * What a screen reader says for the chart: [ChartSpec.description], or the series names. A
  * [HeatmapChart] has no series and says "Heatmap"; give it a description.
  */
-fun ChartSpec.contentDescription(): String {
+public fun ChartSpec.contentDescription(): String {
     description?.let { return it }
     if (this is HeatmapChart) return "Heatmap"
     val names = legend().map { it.name }
@@ -37,24 +37,24 @@ fun ChartSpec.contentDescription(): String {
  * [colorBelow] is the palette slot for the part of a [AreaMark.diverging] area below zero; null
  * takes the slot after the series' own. Other marks ignore it.
  */
-data class Series(val name: String, val values: List<Double>, val color: Int? = null, val colorBelow: Int? = null)
+public data class Series(val name: String, val values: List<Double>, val color: Int? = null, val colorBelow: Int? = null)
 
-data class Datum(val x: Double, val y: Double)
+public data class Datum(val x: Double, val y: Double)
 
 /** Free x/y points, for dots on a [NumericAxis] or [TimeAxis] (x in epoch milliseconds). */
-data class XYSeries(val name: String, val points: List<Datum>, val color: Int? = null)
+public data class XYSeries(val name: String, val points: List<Datum>, val color: Int? = null)
 
-sealed interface XAxis {
+public sealed interface XAxis {
     /**
      * False hides tick labels, vertical grid lines and the axis line, skips measuring labels, and
      * gives their space to the plot. With both axes hidden the plot reaches the chart's edge, inset
      * only by [ChartMetrics.strokeInset] (or a marker's or dot's radius): a sparkline.
      */
-    val visible: Boolean
+    public val visible: Boolean
 }
 
 /** Discrete, evenly spaced positions. Bars get bands; lines and areas run edge to edge. */
-data class CategoryAxis(val labels: List<String>, override val visible: Boolean = true) : XAxis
+public data class CategoryAxis(val labels: List<String>, override val visible: Boolean = true) : XAxis
 
 /**
  * A continuous numeric x axis. [values] are the x positions series values align to, in ascending
@@ -63,7 +63,7 @@ data class CategoryAxis(val labels: List<String>, override val visible: Boolean 
  * throw [IllegalArgumentException] at construction. Represent a missing aligned sample with a
  * non-finite series value, while keeping its x position finite.
  */
-data class NumericAxis(
+public data class NumericAxis(
     val values: List<Double> = emptyList(),
     val min: Double? = null,
     val max: Double? = null,
@@ -89,7 +89,7 @@ data class NumericAxis(
  * Ticks land on calendar boundaries (hours, days, months, years) in [zone], and labels show only
  * what changed: `Oct 5, 03:00, 06:00` or `Jul, Aug, Sep`. Formats receive epoch milliseconds.
  */
-data class TimeAxis(
+public data class TimeAxis(
     val times: List<Instant>,
     val min: Instant? = null,
     val max: Instant? = null,
@@ -111,13 +111,38 @@ data class TimeAxis(
         TimeTicks.tickFormat(zone, locale)
     }
 
+    /** The spacing [defaultPointFormat] is matched to: the smallest step, or a day for one time. */
+    internal val pointStep: Double get() = if (minStep > 0.0) minStep else 86_400_000.0
+
     internal val defaultPointFormat: ValueFormat by lazy(LazyThreadSafetyMode.PUBLICATION) {
-        TimeTicks.pointFormat(if (minStep > 0.0) minStep else 86_400_000.0, zone, locale)
+        TimeTicks.pointFormat(pointStep, zone, locale)
     }
 }
 
-data class ValueAxis(
+/**
+ * The value axis of a [CartesianChart] (y) or [HorizontalBarChart] (x).
+ *
+ * [min] and [max] fix the ends of the domain the data would otherwise give it, and switch off nice
+ * rounding. Each must be finite when set: a NaN or infinite limit throws
+ * [IllegalArgumentException] at construction (and on [copy]), since it would leave no domain to
+ * draw on. Both set are taken as given, and [min] above [max] reverses the axis, the only way to
+ * reverse it; equal limits have no range and are widened like flat data (one unit up on a shown
+ * axis, one unit each way on a hidden one). One set alone is always an end of the domain and
+ * never reverses it: when that limit lies at or past the data's far end (a [min] at or above the
+ * largest value, or a [max] at or below the smallest, counting zero when it is included and after
+ * [padding]), the free end is put one unit beyond the limit, so the axis keeps its natural
+ * direction and the data lies off the plot.
+ */
+public data class ValueAxis(
+    /**
+     * The domain's start (the bottom, or the left for horizontal bars). Null: from the data.
+     * Must be finite when set.
+     */
     val min: Double? = null,
+    /**
+     * The domain's end (the top, or the right for horizontal bars). Null: from the data. Must be
+     * finite when set.
+     */
     val max: Double? = null,
     /** Null: include zero when a mark has a length (bars, areas). */
     val includeZero: Boolean? = null,
@@ -139,14 +164,20 @@ data class ValueAxis(
      * cross: all-positive data keeps its floor at 0 and all-negative data its ceiling at 0, so
      * bars and areas sit on the plot edge; only the far side is padded. Without zero, both sides
      * are padded, so a line starting at 0 dips below it. Flat data has no range to pad. Zero (the
-     * default) changes nothing.
+     * default) changes nothing. Must be finite and not negative.
      */
     val padding: Double = 0.0,
-)
+) {
+    init {
+        require(min == null || min.isFinite()) { "ValueAxis.min must be finite when specified, was $min" }
+        require(max == null || max.isFinite()) { "ValueAxis.max must be finite when specified, was $max" }
+        require(padding.isFinite() && padding >= 0.0) { "ValueAxis.padding must be finite and not negative, was $padding" }
+    }
+}
 
-enum class BarLayout { Grouped, Stacked }
+public enum class BarLayout { Grouped, Stacked }
 
-enum class Markers { None, Last, All }
+public enum class Markers { None, Last, All }
 
 /**
  * How a [LineMark] or non-stacked [AreaMark] handles non-finite (`Double.NaN`) values.
@@ -154,23 +185,23 @@ enum class Markers { None, Last, All }
  * Missing values never get a [FocusPoint] or a marker dot, whatever the gap policy: only the drawn
  * line or area changes.
  */
-sealed interface Gaps {
+public sealed interface Gaps {
     /** A non-finite value breaks the line or area into separate runs. */
-    data object Break : Gaps
+    public data object Break : Gaps
 
     /**
      * Non-finite values are skipped and their finite neighbours are joined directly, for overlaid
      * series sampled at different times and aligned to one merged x axis with `NaN` holes.
      */
-    data object Connect : Gaps
+    public data object Connect : Gaps
 
     /**
      * Connects across a run of non-finite values when the x distance between the finite points on
      * either side is at most [maxGap] (in x-axis units: numeric span, epoch milliseconds on a
      * [TimeAxis], or category steps on a [CategoryAxis]), and breaks across longer outages.
      */
-    data class ConnectWithin(val maxGap: Double) : Gaps {
-        constructor(maxGap: java.time.Duration) : this(maxGap.toMillis().toDouble())
+    public data class ConnectWithin(val maxGap: Double) : Gaps {
+        public constructor(maxGap: java.time.Duration) : this(maxGap.toMillis().toDouble())
 
         init {
             require(maxGap.isFinite() && maxGap >= 0.0) {
@@ -181,17 +212,17 @@ sealed interface Gaps {
 }
 
 /** How a [LineMark]'s stroke is patterned. Dash and dot lengths scale with the line's stroke width. */
-enum class LinePattern { Solid, Dashed, Dotted }
+public enum class LinePattern { Solid, Dashed, Dotted }
 
 /**
  * A mark is one visual encoding of data. Marks compose: a chart may hold bars, a line and a
  * reference rule at once, all sharing scales.
  */
-sealed interface Mark
+public sealed interface Mark
 
-data class BarMark(val series: List<Series>, val layout: BarLayout = BarLayout.Grouped) : Mark
+public data class BarMark(val series: List<Series>, val layout: BarLayout = BarLayout.Grouped) : Mark
 
-data class LineMark(
+public data class LineMark(
     val series: List<Series>,
     val curve: Curve? = null,
     val markers: Markers = Markers.None,
@@ -215,7 +246,7 @@ data class LineMark(
  * neighbouring finite points ([Gaps.Connect], [Gaps.ConnectWithin]). Connecting gaps needs
  * `stacked = false`, since stacked layers must share x positions with the series below.
  */
-data class AreaMark(
+public data class AreaMark(
     val series: List<Series>,
     val stacked: Boolean = true,
     val curve: Curve? = null,
@@ -251,15 +282,27 @@ data class AreaMark(
  *   direction of the value axis: a silhouette, like terrain below a ride that dips under sea level.
  *   Its gradient fades toward the plot's bottom and its entrance rises from it.
  */
-enum class AreaBase { Zero, PlotBottom }
+public enum class AreaBase { Zero, PlotBottom }
 
-data class DotMark(val series: List<XYSeries>) : Mark
+/**
+ * Free x/y points (a scatter plot), each placed at its own [Datum.x] rather than at an axis
+ * position, so it needs a continuous x axis: a value on a [NumericAxis], or epoch milliseconds on a
+ * [TimeAxis]. A [CategoryAxis] has no numeric x and is rejected by [CartesianChart] with `require`;
+ * for points at categories, use a [LineMark] with [Markers.All]. A [Datum] with a non-finite x or
+ * y is missing: it is not drawn, has no focus point and widens neither domain.
+ */
+public data class DotMark(val series: List<XYSeries>) : Mark
 
 /**
  * A reference line at value [y], such as a target or an average: horizontal in a [CartesianChart],
- * vertical in a [HorizontalBarChart], where the value axis runs across.
+ * vertical in a [HorizontalBarChart], where the value axis runs across. [y] must be finite; a
+ * non-finite value throws [IllegalArgumentException] at construction, as [XRuleMark.x] does.
  */
-data class RuleMark(val y: Double, val label: String? = null) : Mark
+public data class RuleMark(val y: Double, val label: String? = null) : Mark {
+    init {
+        require(y.isFinite()) { "RuleMark.y must be finite, was $y" }
+    }
+}
 
 /**
  * A vertical reference line at [x] on a continuous x axis: a value on a [NumericAxis], or epoch
@@ -275,13 +318,13 @@ data class RuleMark(val y: Double, val label: String? = null) : Mark
  * domain is culled. An `XRuleMark` is an annotation: it is not focusable by scrubbing and does not
  * appear in [legend], and is included in the default [contentDescription] only when [label] is set.
  */
-data class XRuleMark(
+public data class XRuleMark(
     val x: Double,
     val label: String? = null,
     val color: Int? = null,
     val pattern: LinePattern? = null,
 ) : Mark {
-    constructor(
+    public constructor(
         x: Instant,
         label: String? = null,
         color: Int? = null,
@@ -306,14 +349,18 @@ data class XRuleMark(
  * culled, and partially visible bands are clipped to the plot's x range. Like [XRuleMark], a band
  * is an annotation: it is not focusable by scrubbing, does not appear in [legend], and is included
  * in the default [contentDescription] only when [label] is set.
+ *
+ * Bounds must be finite with [from] not above [to]; otherwise construction throws
+ * [IllegalArgumentException]. A zero-width band ([from] equal to [to]) is valid, so a band built
+ * from data may collapse, but it is empty: it draws no fill or label and widens no x domain.
  */
-data class XBandMark(
+public data class XBandMark(
     val from: Double,
     val to: Double,
     val label: String? = null,
     val color: Int? = null,
 ) : Mark {
-    constructor(
+    public constructor(
         from: Instant,
         to: Instant,
         label: String? = null,
@@ -333,7 +380,7 @@ data class XBandMark(
  * data: a period with any price that is not finite is missing, and inconsistent extremes are
  * widened to cover the body. Prices need not be positive.
  */
-data class Ohlc(
+public data class Ohlc(
     val open: Double,
     val high: Double,
     val low: Double,
@@ -354,7 +401,7 @@ data class Ohlc(
      *   extends the wick. Open and close are kept, so direction never changes.
      * - [volume] not finite or negative: no volume (null); the prices still draw.
      */
-    fun normalized(): Ohlc? {
+    public fun normalized(): Ohlc? {
         if (!open.isFinite() || !high.isFinite() || !low.isFinite() || !close.isFinite()) return null
         val top = maxOf(open, high, low, close)
         val bottom = minOf(open, high, low, close)
@@ -381,7 +428,7 @@ data class Ohlc(
  * unique among them). [color] is the mark's legend slot; candles themselves are painted by
  * direction, not by palette.
  */
-data class CandleMark(
+public data class CandleMark(
     val candles: List<Ohlc>,
     val name: String = "Price",
     val volumeFraction: Float = 0f,
@@ -392,7 +439,14 @@ data class CandleMark(
     }
 }
 
-data class CartesianChart(
+/**
+ * Marks on shared x and value scales. Bars, lines, areas, candles and [RuleMark]s align to the
+ * positions of any [x] axis. [DotMark], [XRuleMark] and [XBandMark] carry their own numeric x, so
+ * they need a [NumericAxis] or [TimeAxis]; on a [CategoryAxis] they fail a `require` when the chart
+ * is built, so nothing is silently dropped. Candle marks need distinct names, and at most one may
+ * have a volume strip.
+ */
+public data class CartesianChart(
     val x: XAxis,
     val marks: List<Mark>,
     val y: ValueAxis = ValueAxis(),
@@ -408,6 +462,10 @@ data class CartesianChart(
         }
         require(x !is CategoryAxis || marks.none { it is XRuleMark || it is XBandMark }) {
             "XRuleMark and XBandMark need a NumericAxis or TimeAxis; categories have no numeric x"
+        }
+        require(x !is CategoryAxis || marks.none { it is DotMark }) {
+            "DotMark needs a NumericAxis or TimeAxis; categories have no numeric x to place a dot at. " +
+                "For points at categories, use a LineMark with markers = Markers.All"
         }
     }
 
@@ -428,7 +486,7 @@ data class CartesianChart(
  * style shows vertical grid lines), and the zero baseline as a vertical line. Category labels
  * longer than 40% of the width are cut short with an ellipsis; the tooltip keeps the full label.
  */
-data class HorizontalBarChart(
+public data class HorizontalBarChart(
     val categories: CategoryAxis,
     val bars: BarMark,
     val value: ValueAxis = ValueAxis(),
@@ -442,14 +500,14 @@ data class HorizontalBarChart(
  * today's change).
  *
  * [id] is the leaf's identity, unique among every leaf of the chart: motion pairs tiles across
- * updates by it, and a focus reports it as [FocusPoint.id], so a tap resolves without reading the
+ * updates by it, and a focus reports it as [FocusDetail.Tile.id], so a tap resolves without reading the
  * [label]. Labels are display text and may repeat (two groups may each have an "Other").
  *
  * A [size] that is zero, negative or not finite takes no area: the leaf is left out of the scene
  * (no tile, no label, no focus point) and out of the whole that shares are taken of. A NaN [value]
  * is "no value": the tile takes the scale's neutral colour and the tooltip shows no value.
  */
-data class TreemapLeaf(
+public data class TreemapLeaf(
     val id: String,
     val size: Double,
     val value: Double = Double.NaN,
@@ -463,7 +521,7 @@ data class TreemapLeaf(
  * among the chart's groups (a group and a leaf may share an id). [color] is the group's palette
  * slot as `legend()` reports it, like a series' slot; tiles themselves are coloured by value.
  */
-data class TreemapGroup(
+public data class TreemapGroup(
     val id: String,
     val leaves: List<TreemapLeaf>,
     val label: String = id,
@@ -478,7 +536,7 @@ data class TreemapGroup(
  * Groups with no leaf that takes area are left out, and a chart with none gives an empty scene.
  * Every group id and every leaf id must be unique.
  */
-data class TreemapChart(
+public data class TreemapChart(
     val groups: List<TreemapGroup>,
     /** A header strip with each group's label, where it fits. */
     val groupLabels: Boolean = true,
@@ -526,7 +584,7 @@ private fun List<String>.repeated(): List<String> = groupingBy { it }.eachCount(
  * a calendar can name only the first week of each month, and a label that would run into the one
  * before it is left out. Row labels sit on the left; blank ones are skipped too.
  */
-data class HeatmapChart(
+public data class HeatmapChart(
     val columns: List<String>,
     val rows: List<String>,
     val values: List<List<Double>>,
@@ -569,7 +627,7 @@ data class HeatmapChart(
  *   tooltip prints the raw value.
  * - Fewer than three axes, or no room for a radius, give an empty scene.
  */
-data class RadarChart(
+public data class RadarChart(
     val axes: List<String>,
     val series: List<Series>,
     val max: Double = 1.0,
@@ -603,7 +661,7 @@ data class RadarChart(
  *   above [max] reach the rim; the tooltip prints the raw value. A petal is not a part of a whole,
  *   so its focus has no share.
  */
-data class RoseChart(
+public data class RoseChart(
     val labels: List<String>,
     val values: List<Double>,
     val max: Double? = null,
@@ -625,9 +683,9 @@ data class RoseChart(
  * A pie slice. Only positive, finite [value]s take area or have a focus point; zero, negative and
  * missing values stay in the legend but do not contribute to the total.
  */
-data class Slice(val label: String, val value: Double, val color: Int? = null)
+public data class Slice(val label: String, val value: Double, val color: Int? = null)
 
-data class PieChart(
+public data class PieChart(
     val slices: List<Slice>,
     /** Largest first, as d3's pie does by default. */
     val sort: Boolean = false,
@@ -636,7 +694,7 @@ data class PieChart(
 ) : ChartSpec
 
 /** Legend entries in palette order, for building a legend without compiling. */
-fun ChartSpec.legend(): List<SeriesInfo> = when (this) {
+public fun ChartSpec.legend(): List<SeriesInfo> = when (this) {
     is PieChart -> (if (sort) slices.sortedByDescending { it.value } else slices)
         .mapIndexed { i, s -> SeriesInfo(s.label, s.color ?: i) }
     is HorizontalBarChart -> bars.series.mapIndexed { i, s -> SeriesInfo(s.name, s.color ?: i) }
