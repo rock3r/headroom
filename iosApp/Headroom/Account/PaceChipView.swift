@@ -8,7 +8,7 @@ struct PaceChipView: View {
     var body: some View {
         if let chip = window.paceChip {
             Text(text(chip))
-                .font(.caption.bold())
+                .alloFont(.caption, weight: 700)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .foregroundStyle(foreground(chip))

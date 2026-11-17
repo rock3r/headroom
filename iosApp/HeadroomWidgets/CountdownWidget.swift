@@ -34,18 +34,20 @@ private struct CompatibleCountdownView: View {
         } else if let next = snapshot.nextReset {
             if family == .accessoryInline {
                 Text("\(next.accountTitle) · \(next.resetsAt, style: .relative)")
+                    .alloFont(.body, tabular: true)
                     .widgetURL(next.destination)
             } else {
                 VStack(alignment: .leading) {
                     Text("\(next.accountTitle) · \(WidgetTexts.nextReset(next.kind))")
-                        .font(.caption)
+                        .alloFont(.caption)
                     Text(next.resetsAt, style: .relative)
-                        .monospacedDigit()
+                        .alloFont(.body, tabular: true)
                 }
                 .widgetURL(next.destination)
             }
         } else {
             Text("No reset coming up")
+                .alloFont(.body)
                 .widgetURL(DeepLink.overview)
         }
     }
@@ -60,14 +62,14 @@ struct CountdownView: View {
         } else if let next = snapshot.nextReset {
             VStack(alignment: .leading, spacing: 4) {
                 Text(WidgetTexts.nextReset(next.kind))
-                    .font(.caption)
+                    .alloFont(.caption)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 Text(next.resetsAt, style: .relative)
-                    .font(.title2.bold().monospacedDigit())
+                    .alloFont(.title2, weight: 700, tabular: true)
                     .minimumScaleFactor(0.6)
                 Text("\(next.accountTitle) · \(next.resetsAt.formatted(.dateTime.weekday().hour().minute()))")
-                    .font(.caption)
+                    .alloFont(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -75,7 +77,7 @@ struct CountdownView: View {
             .widgetURL(next.destination)
         } else {
             Text("No reset coming up")
-                .font(.footnote)
+                .alloFont(.footnote)
                 .foregroundStyle(.secondary)
                 .widgetURL(DeepLink.overview)
         }

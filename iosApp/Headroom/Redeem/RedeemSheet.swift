@@ -46,14 +46,16 @@ struct RedeemSheet: View {
                     HStack(spacing: 8) {
                         ProviderAvatar(provider: model.provider(id: account.providerId), size: 26)
                         Text("Resets")
-                            .font(.headline)
+                            .alloFont(.headline)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Resets for \(account.title)")
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", action: close)
-                        .disabled(isBusy)
+                    Button(action: close) {
+                        Text("Close").alloFont(.body, weight: 600)
+                    }
+                    .disabled(isBusy)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)

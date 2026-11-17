@@ -31,6 +31,7 @@ struct DelightsSettings: View {
             Text("Delights")
         } footer: {
             Text("Refresh shimmer and reset confetti do not play while motion is reduced.")
+                .alloFont(.footnote)
         }
     }
 
@@ -42,6 +43,7 @@ struct DelightsSettings: View {
         Toggle(isOn: Binding(get: { isOn }, set: { model.headroom.settings.setSwitch(id: id, enabled: $0) })) {
             Text(title)
             Text(body)
+                .alloFont(.subheadline)
         }
     }
 }

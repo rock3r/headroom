@@ -15,11 +15,11 @@ struct SignInExpiredRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline.bold())
+                    .alloFont(.subheadline, weight: 700)
                     .foregroundStyle(.red)
                 if keyExpired {
                     Text(Texts.apiKeyExpiredBody(providerId: providerId, providerName: providerName))
-                        .font(.caption)
+                        .alloFont(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Group {
@@ -29,7 +29,7 @@ struct SignInExpiredRow: View {
                         Text("Not updated yet")
                     }
                 }
-                .font(.caption)
+                .alloFont(.caption)
                 .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .ignore)

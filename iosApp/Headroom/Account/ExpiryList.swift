@@ -11,7 +11,7 @@ struct ExpiryList: View {
                 Text(text(line))
             }
         }
-        .font(.footnote)
+        .alloFont(.footnote)
         .foregroundStyle(.secondary)
     }
 

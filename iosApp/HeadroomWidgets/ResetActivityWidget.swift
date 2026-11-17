@@ -14,22 +14,22 @@ struct ResetActivityWidget: Widget {
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Text(state.accountTitle)
-                        .font(.headline)
+                        .alloFont(.headline)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ResetCountdown(state: state)
-                        .font(.headline.monospacedDigit())
+                        .alloFont(.headline, tabular: true)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     Text(state.hasReset ? "\(state.windowLabel) limit reset" : "\(state.windowLabel) limit resets soon")
-                        .font(.caption)
+                        .alloFont(.caption)
                         .foregroundStyle(.secondary)
                 }
             } compactLeading: {
                 Image(systemName: "arrow.counterclockwise")
             } compactTrailing: {
                 ResetCountdown(state: state)
-                    .monospacedDigit()
+                    .alloFont(.body, tabular: true)
                     .frame(maxWidth: 56)
             } minimal: {
                 Image(systemName: state.hasReset ? "checkmark" : "arrow.counterclockwise")

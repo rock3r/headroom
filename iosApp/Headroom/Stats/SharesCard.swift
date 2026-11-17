@@ -11,7 +11,7 @@ struct SharesCard: View {
         StatCard(title: "Usage by provider", empty: shares.isEmpty ? "No quota use recorded yet. Usage appears after a few updates." : nil) {
             if let top = shares.first {
                 Text("\(top.providerName) accounts for \(percent(top.fraction))% of quota use")
-                    .font(.headline)
+                    .alloFont(.headline)
                 HStack(spacing: 20) {
                     Chart(shares, id: \.providerId) { share in
                         SectorMark(angle: .value("Share", share.fraction), innerRadius: .ratio(0.6), angularInset: 1.5)
@@ -33,7 +33,7 @@ struct SharesCard: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Share of quota use: \(description)")
                 Text("Share of quota use, in percentage points of each limit.")
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

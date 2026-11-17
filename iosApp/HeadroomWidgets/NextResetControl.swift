@@ -10,6 +10,7 @@ struct NextResetControl: ControlWidget {
             ControlWidgetButton(action: OpenHeadroomIntent()) {
                 Label(tile.map { "\($0.name) · \($0.value)" } ?? String(localized: "Open Headroom"),
                       systemImage: "gauge.with.dots.needle.33percent")
+                    .alloFont(.body)
             }
         }
         .displayName("Headroom")

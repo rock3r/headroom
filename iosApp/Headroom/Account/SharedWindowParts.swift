@@ -27,12 +27,12 @@ struct SharedWindowParts: View {
                     HStack(spacing: 6) {
                         Circle().fill(colors[index]).frame(width: 8, height: 8)
                         Text("\(part.label) \(Int(part.usedPercent.rounded()))%")
-                            .font(.footnote.monospacedDigit())
+                            .alloFont(.footnote, tabular: true)
                     }
                 }
             }
             Text("\(Int(window.usedPercent.rounded()))% used in total")
-                .font(.footnote)
+                .alloFont(.footnote)
                 .foregroundStyle(.secondary)
         }
     }

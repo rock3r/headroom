@@ -7,6 +7,7 @@ struct HeadroomApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        Allo.configureControls()
         let model = AppModel.live()
         _model = State(initialValue: model)
         _services = State(initialValue: AppServices(model: model))
@@ -23,6 +24,7 @@ struct HeadroomApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .alloFont(.body)
                 .environment(model)
                 .preferredColorScheme(Appearance.colorScheme(model.settings?.theme))
                 .tint(Appearance.tint(model.settings?.palette))

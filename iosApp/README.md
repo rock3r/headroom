@@ -62,6 +62,15 @@ Sign-in tests stop before contacting a provider.
   Debug builds also accept `-openURL <link>` at launch for UI tests and screenshots.
 - Settings > Open-source licences lists HeadroomKit's libraries.
   The build runs AboutLibraries' `:shared:exportLibraryDefinitions` and copies its output into the app.
+- App and widget text uses rounded [Allo](https://github.com/joshpuckett/allo) 1.0 by Josh Puckett.
+  `Headroom/Fonts` bundles the unmodified variable TTF and SIL Open Font License from upstream commit
+  `4bef023e21d938ab2b6982d3dda5fa334e1e5a9b`. The licence also appears in Settings.
+  `Shared/Allo.swift` keeps roundness at 100, varies weight by role, tracks optical size with the scaled
+  point size, and uses tabular figures for numbers. Native navigation, toolbar, tab and segmented
+  controls use their public font attributes; iOS-owned menus, alerts and keyboards keep system fonts.
+  Device codes use Allo's disambiguated letter and digit alternates.
+  The widget extension bundles and registers the same font for Home Screen and Lock Screen widgets,
+  Live Activities and the Dynamic Island. iOS may override fonts on system-owned control labels.
 - Sign-in follows the Android steps. `BrowserSignIn` opens provider pages in `ASWebAuthenticationSession`.
   Opening Safari would background Headroom. iOS would suspend the app and stop its loopback redirect listener from answering.
 - The app owns display text and matches Android wording. HeadroomKit's `Texts` sends identifiers such as `"network"`.

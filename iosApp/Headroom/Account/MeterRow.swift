@@ -12,14 +12,15 @@ struct MeterRow: View {
     var wavy = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppModel.self) private var model
+    @ScaledMetric(relativeTo: .caption) private var labelScale = 1.0
 
     var body: some View {
         HStack(spacing: 10) {
             Text(label)
-                .font(.caption)
+                .alloFont(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .frame(width: labelWidth, alignment: .leading)
+                .frame(width: labelWidth * labelScale, alignment: .leading)
             QuotaBar(
                 window: window,
                 color: ProviderColors(providerId: providerId, colorScheme: colorScheme).accent,
@@ -29,7 +30,7 @@ struct MeterRow: View {
             )
             if let trailing {
                 Text(trailing)
-                    .font(.caption.monospacedDigit())
+                    .alloFont(.caption, tabular: true)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()

@@ -16,7 +16,7 @@ struct OverviewList: View {
         List {
             Section {
                 Text(subtitle)
-                    .font(.subheadline)
+                    .alloFont(.subheadline)
                     .foregroundStyle(.secondary)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))

@@ -7,9 +7,9 @@ struct DemoBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Demo data", systemImage: "sparkles")
-                .font(.headline)
+                .alloFont(.heading, size: 17, relativeTo: .headline)
             Text("These numbers are examples. Add an account to see your own limits.")
-                .font(.subheadline)
+                .alloFont(.subheadline)
                 .foregroundStyle(.secondary)
             Button("Add account", action: onAdd)
                 .buttonStyle(.borderedProminent)

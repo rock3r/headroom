@@ -14,7 +14,7 @@ struct DetailWindowRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(window.label)
-                    .font(.subheadline)
+                    .alloFont(.subheadline)
                 if !window.isRecognised {
                     Button("About this quota", systemImage: "info.circle") { explaining = true }
                         .labelStyle(.iconOnly)
@@ -28,7 +28,7 @@ struct DetailWindowRow: View {
                 }
                 Spacer()
                 Text("\(Int((model.showsLeft ? window.leftPercent : window.usedPercent).rounded()))%")
-                    .font(.title3.bold().monospacedDigit())
+                    .alloFont(.number, size: 20, relativeTo: .title3)
                     .foregroundStyle(window.needsAttention && !account.signInExpired ? .red : .primary)
                     .accessibilityLabel(Texts.percent(window, left: model.showsLeft))
             }
@@ -48,12 +48,12 @@ struct DetailWindowRow: View {
             }
             if let amount = amountLine {
                 Text(amount)
-                    .font(.footnote.monospacedDigit())
+                    .alloFont(.footnote, tabular: true)
                     .foregroundStyle(.secondary)
             }
             if let time = timeLine {
                 Text(time)
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

@@ -36,7 +36,7 @@ struct BarsView: View {
                 if more > 0 {
                     Link(destination: DeepLink.overview) {
                         Text("+\(more) more")
-                            .font(.caption)
+                            .alloFont(.caption)
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel(more == 1 ? "1 more account. Open Headroom." : "\(more) more accounts. Open Headroom.")
@@ -51,7 +51,7 @@ struct BarsView: View {
         let fraction = snapshot.shown(account.usedPercent) / 100
         return HStack(spacing: 8) {
             Text(account.name)
-                .font(.caption)
+                .alloFont(.caption)
                 .lineLimit(1)
                 .frame(width: 70, alignment: .leading)
             GeometryReader { proxy in
@@ -72,7 +72,7 @@ struct BarsView: View {
             .opacity(account.signInExpired ? 0.6 : 1)
             if let used = account.currentUsedPercent {
                 Text(WidgetTexts.percent(snapshot.shown(used)))
-                    .font(.caption.monospacedDigit().bold())
+                    .alloFont(.caption, weight: 700, tabular: true)
                     .frame(width: 38, alignment: .trailing)
             }
             WidgetBadge(account: account)

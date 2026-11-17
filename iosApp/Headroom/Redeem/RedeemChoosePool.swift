@@ -9,16 +9,16 @@ struct RedeemChoosePool: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Which limit do you want to reset?")
-                .font(.title2.bold())
+                .alloFont(.title2, weight: 700)
             ForEach(pools) { pool in
                 Button {
                     onChoose(pool)
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(pool.label) · ^[\(pool.available) available](inflect: true)")
-                            .font(.headline)
+                            .alloFont(.headline)
                         Text(RedeemTexts.scope(pool))
-                            .font(.footnote)
+                            .alloFont(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -65,6 +65,7 @@ targets:
     sources:
       - path: HeadroomWidgets
       - path: Shared
+      - path: Headroom/Fonts
     settings:
       base:
         PRODUCT_NAME: HeadroomWidgets

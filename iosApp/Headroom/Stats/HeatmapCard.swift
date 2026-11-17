@@ -14,7 +14,7 @@ struct HeatmapCard: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(StatsTexts.persona(heatmap.persona))
-                        .font(.caption.bold())
+                        .alloFont(.caption, weight: 700)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(.tint.opacity(0.15), in: .capsule)
@@ -23,7 +23,7 @@ struct HeatmapCard: View {
                     VStack(alignment: .trailing, spacing: 0) {
                         ForEach(1 ... 7, id: \.self) { day in
                             Text(Self.shortDay(day))
-                                .font(.caption2)
+                                .alloFont(.caption2)
                                 .foregroundStyle(.secondary)
                                 .frame(height: 14)
                         }
@@ -34,7 +34,7 @@ struct HeatmapCard: View {
                         HStack {
                             ForEach([0, 6, 12, 18], id: \.self) { hour in
                                 Text(Self.hourName(hour))
-                                    .font(.caption2)
+                                    .alloFont(.caption2)
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -44,7 +44,7 @@ struct HeatmapCard: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(description(heatmap))
                 Text("Local time, all accounts together. Darker means more quota used.")
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

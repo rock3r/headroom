@@ -17,7 +17,7 @@ struct RefillBars: View {
                 let isCleared = cleared.contains(window.id)
                 HStack(spacing: 10) {
                     Text(window.label)
-                        .font(.caption)
+                        .alloFont(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .frame(width: 92, alignment: .leading)
@@ -30,7 +30,7 @@ struct RefillBars: View {
                     )
                     .shimmer(working && isCleared)
                     Text(Texts.percent(window, left: model.showsLeft))
-                        .font(.caption.monospacedDigit())
+                        .alloFont(.caption, tabular: true)
                         .contentTransition(.numericText())
                 }
                 .opacity(isCleared || cleared.isEmpty ? 1 : 0.4)

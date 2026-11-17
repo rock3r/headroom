@@ -25,7 +25,7 @@ struct ResetsCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("No resets available")
                     Text("New resets show here when \(account.providerName) gives them out.")
-                        .font(.footnote)
+                        .alloFont(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 if resets.canAskForMore { footer }
@@ -56,7 +56,7 @@ struct ResetsCard: View {
                       ? "Queued resets become usable after the ones before them."
                       : "You can use this reset once you reach a limit. You are not at a limit now.",
                       systemImage: "info.circle")
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
             if resets.pools.contains(where: \.isOffered) {
@@ -73,9 +73,9 @@ struct ResetsCard: View {
         let service = RedeemTexts.signInService(account.providerId, providerName: account.providerName)
         return VStack(alignment: .leading, spacing: 6) {
             Text("Want to see your resets?")
-                .font(.headline)
+                .alloFont(.headline)
             Text("\(account.providerName) resets need a separate sign-in to \(service).")
-                .font(.subheadline)
+                .alloFont(.subheadline)
                 .foregroundStyle(.secondary)
             if canAct {
                 Button("Sign in to \(service)", action: onUse)

@@ -11,16 +11,16 @@ struct ResetScoreCard: View {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading) {
                         Text("\(score.clean) of \(score.total)")
-                            .font(.largeTitle.bold().monospacedDigit())
+                            .alloFont(.number, size: 34, relativeTo: .largeTitle)
                         Text("resets came without hitting the limit")
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     VStack(spacing: 0) {
                         Text("\(score.streak)")
-                            .font(.title2.bold().monospacedDigit())
+                            .alloFont(.number, size: 22, relativeTo: .title2)
                         Text("in a row")
-                            .font(.caption)
+                            .alloFont(.caption)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -32,7 +32,7 @@ struct ResetScoreCard: View {
                     : "\(score.clean) of \(score.total) resets came without hitting the limit. Current streak: \(score.streak).")
                 TimelineMarks(timeline: score.timeline.map(\.boolValue))
                 Text("One mark per reset, oldest first. Squares hit the limit.")
-                    .font(.footnote)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

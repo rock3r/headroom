@@ -14,7 +14,7 @@ struct WidgetEmpty: View {
                 .widgetURL(DeepLink.overview)
         default:
             Text(message)
-                .font(.footnote)
+                .alloFont(.footnote)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .widgetURL(DeepLink.overview)

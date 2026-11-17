@@ -8,6 +8,10 @@ struct HeroRing: View {
     let session: WindowUi?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppModel.self) private var model
+    @ScaledMetric(relativeTo: .largeTitle) private var ringSize = 190.0
+
+    // Grow with the type, but leave room for list insets on the narrowest phone.
+    private var diameter: Double { min(ringSize, 284) }
 
     var body: some View {
         if let primary = account.primary {
@@ -19,20 +23,24 @@ struct HeroRing: View {
                     }
                     VStack(spacing: 0) {
                         Text("\(Int(shown(primary).rounded()))%")
-                            .font(.system(size: 44, weight: .bold).monospacedDigit())
+                            .alloFont(.number, size: 44, relativeTo: .largeTitle)
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
                             .contentTransition(.numericText())
                         Text(Texts.quotaLabel(primary.kind, left: model.showsLeft))
-                            .font(.caption)
+                            .alloFont(.caption)
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
+                    .frame(maxWidth: diameter - 80)
                 }
-                .frame(width: 190, height: 190)
+                .frame(width: diameter, height: diameter)
                 if session != nil {
                     HStack(spacing: 16) {
                         legend(Texts.windowKind(primary.kind), color: primaryColor(primary))
                         legend("Session", color: colors.accent.opacity(0.6))
                     }
-                    .font(.caption)
+                    .alloFont(.caption)
                 }
             }
             .frame(maxWidth: .infinity)

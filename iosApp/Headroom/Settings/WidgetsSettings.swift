@@ -13,6 +13,7 @@ struct WidgetsSettings: View {
             Text("Home screen widgets")
         } footer: {
             Text("Touch and hold your Home Screen or Lock Screen, tap Edit, then Add Widget, and choose Headroom. Touch and hold a widget, then Edit Widget, to choose its accounts.")
+                .alloFont(.footnote)
         }
     }
 
@@ -20,7 +21,7 @@ struct WidgetsSettings: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
             Text(body)
-                .font(.footnote)
+                .alloFont(.footnote)
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)

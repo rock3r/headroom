@@ -12,15 +12,15 @@ struct NextResetCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(next.kind == "weekly" ? "Next weekly reset" : "Next reset")
-                .font(.subheadline)
+                .alloFont(.subheadline)
                 .foregroundStyle(.secondary)
             TimelineView(.everyMinute) { context in
                 Text(Formats.countdown(to: resetsAt, now: context.date))
-                    .font(.largeTitle.bold().monospacedDigit())
+                    .alloFont(.number, size: 38, relativeTo: .largeTitle)
                     .contentTransition(.numericText())
             }
             Text("\(next.accountTitle) · \(Formats.long(resetsAt))")
-                .font(.subheadline)
+                .alloFont(.subheadline)
             HStack {
                 if canToggleAlert {
                     Button(action: toggleAlert) {

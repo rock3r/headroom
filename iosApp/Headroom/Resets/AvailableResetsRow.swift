@@ -20,14 +20,14 @@ struct AvailableResetsRow: View {
                             HStack(spacing: 4) {
                                 Text("\(account.title) ·")
                                 ResetCount(resets: resets)
-                                    .font(.body)
+                                    .alloFont(.body)
                             }
                             Text(scope(resets))
-                                .font(.footnote)
+                                .alloFont(.footnote)
                                 .foregroundStyle(.secondary)
                             if let expiry = Self.soonestExpiry(in: resets.pools) {
                                 Text("The first one expires \(Formats.long(Date(epochSeconds: expiry)))")
-                                    .font(.footnote)
+                                    .alloFont(.footnote)
                                     .foregroundStyle(.secondary)
                             }
                         }

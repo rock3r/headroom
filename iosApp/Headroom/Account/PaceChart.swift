@@ -37,7 +37,7 @@ struct PaceChart: View {
                 .foregroundStyle(.red.opacity(0.5))
                 .annotation(position: showsLeft ? .top : .bottom, alignment: .trailing) {
                     Text("limit")
-                        .font(.caption2)
+                        .alloFont(.caption2)
                         .foregroundStyle(.red)
                 }
         }

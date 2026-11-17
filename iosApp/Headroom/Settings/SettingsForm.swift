@@ -31,6 +31,7 @@ struct SettingsForm: View {
                 Text(settings.quotaDisplay == "left"
                     ? "Numbers, rings and bars show how much of each limit you have left."
                     : "Numbers, rings and bars show how much of each limit you have used.")
+                    .alloFont(.footnote)
             }
             Section("Appearance") {
                 Picker("Theme", selection: binding(settings.theme) { settingsApi.setTheme(id: $0) }) {
@@ -53,6 +54,7 @@ struct SettingsForm: View {
                 Toggle(isOn: Binding(get: { settings.reduceMotion }, set: { settingsApi.setReduceMotion(enabled: $0) })) {
                     Text("Reduce motion")
                     Text("Short fades instead of moving transitions, and no looping animations. Always on when animations are off on your device.")
+                        .alloFont(.subheadline)
                 }
             }
             DelightsSettings(settings: settings)
@@ -73,6 +75,7 @@ struct SettingsForm: View {
                 Text("Background updates")
             } footer: {
                 Text("iOS decides when background updates run, no sooner than this. Reset alerts arrive on time whatever you choose here.")
+                    .alloFont(.footnote)
             }
             Section("Usage history") {
                 switchRow("keepLongHistory", "Keep long-term history", settings.keepLongHistory,
@@ -98,6 +101,7 @@ struct SettingsForm: View {
                 Text("Control Center")
             } footer: {
                 Text("Add the Headroom control from Control Center's gallery: touch and hold an empty space in Control Center, then tap Add a Control.")
+                    .alloFont(.footnote)
             }
             .onChange(of: controlMode) { _, mode in
                 ControlSettings.mode = mode
@@ -110,7 +114,7 @@ struct SettingsForm: View {
                     VStack(alignment: .leading) {
                         Text("Open-source licences")
                         Text("The libraries Headroom is built with")
-                            .font(.footnote)
+                            .alloFont(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -133,6 +137,7 @@ struct SettingsForm: View {
         Toggle(isOn: Binding(get: { isOn }, set: { settingsApi.setSwitch(id: id, enabled: $0) })) {
             Text(title)
             Text(body)
+                .alloFont(.subheadline)
         }
     }
 

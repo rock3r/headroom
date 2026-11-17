@@ -11,8 +11,7 @@ struct DeviceCodeStep: View {
             Section {
                 Text("Go to this address on any device and enter the code.")
                 Text(userCode)
-                    .font(.largeTitle.monospaced())
-                    .bold()
+                    .alloFont(.code, size: 34, relativeTo: .largeTitle)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity)
                 Button("Copy code", systemImage: "doc.on.doc", action: copyCode)
