@@ -4,10 +4,17 @@ import SwiftUI
 /// How many resets came without hitting the limit, the streak, and one mark per reset.
 struct ResetScoreCard: View {
     let score: ResetScoreUi?
+    @State private var availableWidth = 0.0
 
     var body: some View {
         StatCard(title: "Resets without reaching the limit", empty: empty) {
             if let score {
+                let timeline = score.timeline.map(\.boolValue)
+                let perRow = availableWidth > 0 ? TimelineMarks.perRow(width: availableWidth) : 1
+                let shown = availableWidth > 0
+                    ? TimelineMarks.visible(timeline, capacity: TimelineMarks.maxMarks(width: availableWidth))
+                    : []
+                let marksHeight = TimelineMarks.height(count: shown.count, perRow: perRow)
                 HStack(alignment: .center) {
                     VStack(alignment: .leading) {
                         Text("\(score.clean) of \(score.total)")
@@ -30,12 +37,29 @@ struct ResetScoreCard: View {
                 .accessibilityLabel(score.total == 1
                     ? "\(score.clean) of 1 reset came without hitting the limit. Current streak: \(score.streak)."
                     : "\(score.clean) of \(score.total) resets came without hitting the limit. Current streak: \(score.streak).")
-                TimelineMarks(timeline: score.timeline.map(\.boolValue))
-                Text("One mark per reset, oldest first. Squares hit the limit.")
+                Color.clear
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .frame(height: marksHeight)
+                    .onGeometryChange(for: Double.self) { $0.size.width } action: { availableWidth = $0 }
+                    .overlay(alignment: .topLeading) {
+                        TimelineMarks(timeline: shown, perRow: perRow)
+                    }
+                Text(availableWidth > 0
+                    ? Self.legend(shownCount: shown.count, totalCount: timeline.count)
+                    : String(localized: "One mark per reset, oldest first. Squares hit the limit."))
                     .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    nonisolated static func legend(shownCount: Int, totalCount: Int) -> String {
+        if shownCount < totalCount {
+            return shownCount == 1
+                ? String(localized: "Your latest 1 reset, oldest first. Squares hit the limit.")
+                : String(localized: "Your latest \(shownCount) resets, oldest first. Squares hit the limit.")
+        }
+        return String(localized: "One mark per reset, oldest first. Squares hit the limit.")
     }
 
     private var empty: LocalizedStringKey? {
