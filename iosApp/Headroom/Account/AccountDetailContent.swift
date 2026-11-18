@@ -23,8 +23,18 @@ struct AccountDetailContent: View {
         ScrollViewReader { proxy in
             List {
                 Section {
-                    HeroRing(account: account, session: session)
-                        .padding(.vertical, 8)
+                    VStack(spacing: 10) {
+                        HeroRing(account: account, session: session)
+                        if let updated = account.updatedAtEpochSeconds?.int64Value {
+                            Text("Updated \(Date(epochSeconds: updated), format: .relative(presentation: .named))")
+                                .alloFont(.footnote)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .listRowSeparator(.hidden)
                     if account.signInExpired {
                         SignInExpiredNotice(
                             providerName: account.providerName,
@@ -34,11 +44,6 @@ struct AccountDetailContent: View {
                         ) { signingInAgain = true }
                     } else if let error = account.error {
                         Label(Texts.syncError(error), systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.secondary)
-                    }
-                    if let updated = account.updatedAtEpochSeconds?.int64Value {
-                        Text("Updated \(Date(epochSeconds: updated), format: .relative(presentation: .named))")
-                            .alloFont(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }

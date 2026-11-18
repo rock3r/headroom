@@ -16,30 +16,32 @@ struct PaceChartSection: View {
 
     private var chartSection: some View {
         Section {
-            if charted.count > 1 {
-                Picker("Window", selection: $windowId) {
-                    ForEach(charted) { window in
-                        Text(window.label).tag(Optional(window.id))
+            VStack(alignment: .leading, spacing: 10) {
+                if charted.count > 1 {
+                    Picker("Window", selection: $windowId) {
+                        ForEach(charted) { window in
+                            Text(window.label).tag(Optional(window.id))
+                        }
                     }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
-            }
-            if let chart = chartModel.chart {
-                PaceChart(chart: chart, showsLeft: model.showsLeft, providerId: account.providerId)
-                    .frame(height: 180)
-                    .padding(.vertical, 8)
-                Text("dashed = even pace")
-                    .alloFont(.caption)
-                    .foregroundStyle(.secondary)
-                Text(PaceTexts.projection(chart, showsLeft: model.showsLeft))
-                    .alloFont(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if chartModel.loaded {
-                Text("No history for this window yet.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 180)
+                if let chart = chartModel.chart {
+                    PaceChart(chart: chart, showsLeft: model.showsLeft, providerId: account.providerId)
+                        .frame(height: 180)
+                        .padding(.vertical, 8)
+                    Text("dashed = even pace")
+                        .alloFont(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(PaceTexts.projection(chart, showsLeft: model.showsLeft))
+                        .alloFont(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if chartModel.loaded {
+                    Text("No history for this window yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 180)
+                }
             }
         } header: {
             Text(chartModel.chart.map { PaceTexts.title($0.kind) } ?? "This window")

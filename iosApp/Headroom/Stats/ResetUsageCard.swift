@@ -9,47 +9,52 @@ struct ResetUsageCard: View {
 
     var body: some View {
         Section {
-            Picker("Period", selection: $period) {
-                ForEach(periods, id: \.period) { usage in
-                    Text(StatsTexts.period(usage.period)).tag(usage.period)
-                }
-            }
-            .pickerStyle(.segmented)
-            if let usage = periods.first(where: { $0.period == period }) {
-                if usage.used == 0 && usage.expired == 0 {
-                    Text("No resets were used or expired in this period.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .firstTextBaseline, spacing: 24) {
-                            number(usage.used, "used")
-                            number(usage.expired, "expired unused")
-                        }
-                        Text("\(usage.usedInHeadroom) in Headroom, \(usage.usedElsewhere) elsewhere.")
-                            .foregroundStyle(.secondary)
-                        if let givenBack = Self.givenBack(usage.givenBack) {
-                            Text(givenBack)
-                        }
+            let selected = periods.first(where: { $0.period == period })
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("Period", selection: $period) {
+                    ForEach(periods, id: \.period) { usage in
+                        Text(StatsTexts.period(usage.period)).tag(usage.period)
                     }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(description(usage))
-                    ForEach(usage.providers, id: \.providerId) { provider in
-                        HStack(alignment: .top, spacing: 10) {
-                            ProviderAvatar(provider: model.provider(id: provider.providerId), size: 24)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(provider.providerName)
-                                Text("\(provider.used) used, \(provider.expired) expired")
-                                    .alloFont(.footnote)
-                                    .foregroundStyle(.secondary)
-                                if let givenBack = Self.givenBack(provider.givenBack) {
-                                    Text(givenBack)
-                                        .alloFont(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
+                }
+                .pickerStyle(.segmented)
+                if let usage = selected {
+                    if usage.used == 0 && usage.expired == 0 {
+                        Text("No resets were used or expired in this period.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .firstTextBaseline, spacing: 24) {
+                                number(usage.used, "used")
+                                number(usage.expired, "expired unused")
+                            }
+                            Text("\(usage.usedInHeadroom) in Headroom, \(usage.usedElsewhere) elsewhere.")
+                                .foregroundStyle(.secondary)
+                            if let givenBack = Self.givenBack(usage.givenBack) {
+                                Text(givenBack)
                             }
                         }
-                        .accessibilityElement(children: .combine)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(description(usage))
                     }
+                }
+            }
+            if let usage = selected, usage.used != 0 || usage.expired != 0 {
+                ForEach(usage.providers, id: \.providerId) { provider in
+                    HStack(alignment: .top, spacing: 10) {
+                        ProviderAvatar(provider: model.provider(id: provider.providerId), size: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(provider.providerName)
+                            Text("\(provider.used) used, \(provider.expired) expired")
+                                .alloFont(.footnote)
+                                .foregroundStyle(.secondary)
+                            if let givenBack = Self.givenBack(provider.givenBack) {
+                                Text(givenBack)
+                                    .alloFont(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             }
         } header: {
