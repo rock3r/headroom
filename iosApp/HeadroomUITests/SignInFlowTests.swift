@@ -13,7 +13,7 @@ final class SignInFlowTests: XCTestCase {
     }
 
     func testTheDemoOverviewShowsExampleAccounts() {
-        XCTAssertTrue(app.staticTexts["Demo data"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Demo data'")).firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Claude"].exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'over pace'")).firstMatch.exists)
     }
@@ -36,7 +36,7 @@ final class SignInFlowTests: XCTestCase {
         XCTAssertFalse(app.buttons["Save key"].isEnabled)
 
         app.buttons["Cancel"].tap()
-        XCTAssertTrue(app.staticTexts["Demo data"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Demo data'")).firstMatch.waitForExistence(timeout: 5))
     }
 
     /// A browser sign-in starts the loopback listener and asks iOS for the sign-in sheet. The test

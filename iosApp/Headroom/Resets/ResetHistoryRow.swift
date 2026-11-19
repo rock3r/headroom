@@ -24,14 +24,17 @@ struct ResetHistoryRow: View {
                 }
                 BarMark(x: .value("Reset", history.peaks.count), y: .value("Used", shown(history.current)))
                     .foregroundStyle(accent)
-                    .annotation(position: .top) {
-                        Text("now")
+            }
+            .chartYScale(domain: 0 ... 100)
+            .chartXAxis {
+                AxisMarks(values: [history.peaks.count]) { _ in
+                    AxisValueLabel(centered: true) {
+                        Text("Now")
                             .alloFont(.caption2)
                             .foregroundStyle(.secondary)
                     }
+                }
             }
-            .chartYScale(domain: 0 ... 100)
-            .chartXAxis(.hidden)
             .chartYAxis {
                 AxisMarks(values: [0, 100]) { value in
                     AxisGridLine()

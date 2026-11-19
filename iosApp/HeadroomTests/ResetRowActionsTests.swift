@@ -45,7 +45,7 @@ struct ResetRowActionsTests {
         )
         try withRenderedList(tab) { collection in
             try #require(collection.numberOfSections == 2)
-            #expect(collection.numberOfItems(inSection: 0) == 2)
+            #expect(collection.numberOfItems(inSection: 0) == rowsBeforeHistory)
             #expect(collection.numberOfItems(inSection: 1) == 1)
             #expect(collection.cellForItem(at: IndexPath(item: 0, section: 1)) != nil)
         }
@@ -58,8 +58,14 @@ struct ResetRowActionsTests {
         )
         try withRenderedList(tab) { collection in
             #expect(collection.numberOfSections == 1)
-            #expect(collection.numberOfItems(inSection: 0) == 2)
+            #expect(collection.numberOfItems(inSection: 0) == rowsBeforeHistory)
         }
+    }
+
+    private var rowsBeforeHistory: Int {
+        // On iOS 26 and later the alert summary is a navigation subtitle.
+        if #available(iOS 26, *) { return 1 }
+        return 2
     }
 
     @MainActor private func withRenderedList(

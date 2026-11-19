@@ -8,7 +8,7 @@ struct HeroRing: View {
     let session: WindowUi?
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppModel.self) private var model
-    @ScaledMetric(relativeTo: .largeTitle) private var ringSize = 190.0
+    @ScaledMetric(relativeTo: .largeTitle) private var ringSize = 160.0
 
     // Grow with the type, but leave room for list insets on the narrowest phone.
     private var diameter: Double { min(ringSize, 284) }

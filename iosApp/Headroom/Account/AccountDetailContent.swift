@@ -20,6 +20,14 @@ struct AccountDetailContent: View {
     }
 
     var body: some View {
+        if #available(iOS 26, *) {
+            detail.navigationSubtitle(subtitle)
+        } else {
+            detail
+        }
+    }
+
+    private var detail: some View {
         ScrollViewReader { proxy in
             List {
                 Section {
@@ -45,6 +53,11 @@ struct AccountDetailContent: View {
                     } else if let error = account.error {
                         Label(Texts.syncError(error), systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    if #unavailable(iOS 26) {
+                        Text(subtitle)
+                            .textCase(nil)
                     }
                 }
                 Section("Limits") {
@@ -90,25 +103,14 @@ struct AccountDetailContent: View {
                     AccountActions(account: account)
                 }
             }
+            .listSectionSpacing(.compact)
             .task(id: showsResets) {
                 guard showsResets, account.resets != nil else { return }
                 try? await Task.sleep(for: .milliseconds(300))
                 withAnimation { proxy.scrollTo(Self.resetsAnchor, anchor: .top) }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 0) {
-                    Text(account.title)
-                        .alloFont(.headline)
-                    Text(subtitle)
-                        .alloFont(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
-        }
+        .toolbarTitleDisplayMode(.large)
         .navigationTitle(account.title)
         .sheet(item: $redeeming) { redeeming in
             RedeemSheet(account: account, askForMore: redeeming.askForMore)

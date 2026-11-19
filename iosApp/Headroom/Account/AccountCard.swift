@@ -6,6 +6,7 @@ import SwiftUI
 struct AccountCard: View {
     let account: AccountUi
     let provider: ProviderUi?
+    var showsDisclosure = false
     var onSignIn: () -> Void = {}
     @Environment(AppModel.self) private var model
 
@@ -23,6 +24,12 @@ struct AccountCard: View {
                             .foregroundStyle(.secondary)
                     }
                     .opacity(account.signInExpired ? 0.55 : 1)
+                }
+                if showsDisclosure {
+                    Image(systemName: "chevron.forward")
+                        .alloFont(.caption2, weight: 700)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
             }
             CardMeters(account: account)
