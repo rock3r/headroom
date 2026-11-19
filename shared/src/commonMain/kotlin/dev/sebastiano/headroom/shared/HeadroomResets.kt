@@ -66,6 +66,7 @@ public data class UpcomingResetUi(
     val providerId: String,
     val windowId: String,
     val windowLabel: String,
+    val kind: String,
     val resetsAtEpochSeconds: Long,
     val alertOn: Boolean,
     /** The account's label when another account has the same name: "Claude (sam@work)". */
@@ -455,6 +456,7 @@ internal object ResetsMapping {
                         account.providerId,
                         window.id,
                         window.label,
+                        window.kind,
                         checkNotNull(window.resetsAtEpochSeconds),
                         window.alertOn,
                         account.distinctLabel(),

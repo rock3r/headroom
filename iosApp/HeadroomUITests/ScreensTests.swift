@@ -9,7 +9,7 @@ final class ScreensTests: XCTestCase {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.staticTexts["Demo data"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Demo data'")).firstMatch.waitForExistence(timeout: 10))
     }
 
     func testTheResetsTabListsTheUpcomingResets() {
@@ -17,6 +17,34 @@ final class ScreensTests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Upcoming"].waitForExistence(timeout: 5))
         XCTAssertTrue(scrollTo(app.staticTexts["Used when each window reset"]))
+    }
+
+    func testUpcomingResetsShowCadenceBeforeOptionalWindowName() {
+        app.tabBars.buttons["Resets"].tap()
+
+        let claudeRows = app.staticTexts.matching(identifier: "Claude · Weekly")
+        XCTAssertTrue(claudeRows.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(claudeRows.count, 2)
+        XCTAssertTrue(app.staticTexts["all models"].exists)
+        XCTAssertTrue(app.staticTexts["Opus"].exists)
+        XCTAssertTrue(app.staticTexts["ChatGPT Codex · Weekly"].exists)
+        XCTAssertFalse(app.staticTexts["Weekly · all models"].exists)
+    }
+
+    func testDemoResetAlertsShowTheirStateWithoutAllowingChanges() {
+        app.tabBars.buttons["Resets"].tap()
+
+        let label = "Demo reset alert for Grok, on"
+        XCTAssertTrue(app.staticTexts[label].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons[label].exists)
+    }
+
+    func testTheDetailShowsPaceInLimits() {
+        app.staticTexts["Claude"].firstMatch.tap()
+
+        XCTAssertTrue(app.staticTexts["Limits"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'over pace'"))
+            .firstMatch.waitForExistence(timeout: 5))
     }
 
     func testTheStatsTabShowsExampleStats() {

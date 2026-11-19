@@ -13,17 +13,24 @@ struct OverviewList: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        if #available(iOS 26, *) {
+            list.navigationSubtitle(subtitle)
+        } else {
+            list
+        }
+    }
+
+    private var list: some View {
         List {
-            Section {
+            if #unavailable(iOS 26) {
                 Text(subtitle)
-                    .alloFont(.subheadline)
+                    .alloFont(.footnote)
                     .foregroundStyle(.secondary)
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
             }
             if overview.isDemo {
                 Section {
-                    DemoBanner(onAdd: onAdd)
+                    DemoBanner()
                 }
             }
             if let next = overview.nextReset {
@@ -54,18 +61,21 @@ struct OverviewList: View {
                             .listRowBackground(selected == account.id ? Color.accentColor.opacity(0.15) : nil)
                         } else {
                             NavigationLink(value: AccountLink(accountId: account.id)) {
-                                card(account)
+                                card(account, showsDisclosure: true)
                             }
+                            .navigationLinkIndicatorVisibility(.hidden)
                         }
                     }
                 }
             }
         }
+        .listSectionSpacing(.compact)
         .animation(.default, value: overview.accounts.map(\.id))
     }
 
-    private func card(_ account: AccountUi) -> some View {
-        AccountCard(account: account, provider: model.provider(id: account.providerId)) {
+    private func card(_ account: AccountUi, showsDisclosure: Bool = false) -> some View {
+        AccountCard(account: account, provider: model.provider(id: account.providerId),
+                    showsDisclosure: showsDisclosure) {
             onSignIn(account)
         }
         .delightAnchor(account.id)

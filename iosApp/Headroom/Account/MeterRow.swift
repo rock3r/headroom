@@ -7,6 +7,7 @@ struct MeterRow: View {
     let window: WindowUi
     let providerId: String
     let trailing: String?
+    var trailingLabels: [String] = []
     var labelWidth = 58.0
     var showsPace = true
     var wavy = false
@@ -46,12 +47,27 @@ struct MeterRow: View {
             )
             // Stack before the labels squeeze the meter into an unreadable sliver.
             .frame(minWidth: stacked ? nil : 40)
-            if let trailing {
-                Text(trailing)
-                    .alloFont(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(stacked ? nil : 1)
-                    .fixedSize(horizontal: !stacked, vertical: true)
+            if stacked {
+                if let trailing {
+                    Text(trailing)
+                        .alloFont(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else if trailing != nil || !trailingLabels.isEmpty {
+                // Every row reserves the width of the longest reset label in its card.
+                ZStack(alignment: .trailing) {
+                    ForEach(trailingLabels.indices, id: \.self) { index in
+                        Text(trailingLabels[index]).hidden()
+                    }
+                    if let trailing {
+                        Text(trailing)
+                    }
+                }
+                .alloFont(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize()
             }
         }
     }

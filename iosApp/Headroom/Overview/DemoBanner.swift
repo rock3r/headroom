@@ -2,18 +2,15 @@ import SwiftUI
 
 /// Shown while no account is signed in and the overview shows example numbers.
 struct DemoBanner: View {
-    let onAdd: () -> Void
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Demo data", systemImage: "sparkles")
-                .alloFont(.heading, size: 17, relativeTo: .headline)
-            Text("These numbers are examples. Add an account to see your own limits.")
-                .alloFont(.subheadline)
-                .foregroundStyle(.secondary)
-            Button("Add account", action: onAdd)
-                .buttonStyle(.borderedProminent)
+        Label {
+            Text("**Demo data** · Add an account with +")
+        } icon: {
+            Image(systemName: "sparkles")
         }
-        .padding(.vertical, 4)
+        .alloFont(.footnote)
+        .foregroundStyle(Color.accentColor)
+        .accessibilityIdentifier("demo-data-banner")
+        .listRowBackground(Color.accentColor.opacity(0.12))
     }
 }

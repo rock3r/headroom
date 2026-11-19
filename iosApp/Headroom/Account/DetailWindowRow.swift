@@ -37,13 +37,14 @@ struct DetailWindowRow: View {
                     window: window,
                     color: ProviderColors(providerId: account.providerId, colorScheme: colorScheme).accent,
                     showsLeft: model.showsLeft,
-                    showsPace: window.id == account.primary?.id
+                    showsPace: isPrimary,
+                    wavy: isPrimary && window.needsAttention && !account.signInExpired
                 )
             } else {
                 SharedWindowParts(
                     window: window,
                     providerId: account.providerId,
-                    showsPace: window.id == account.primary?.id
+                    showsPace: isPrimary
                 )
             }
             if let amount = amountLine {
@@ -56,10 +57,15 @@ struct DetailWindowRow: View {
                     .alloFont(.footnote)
                     .foregroundStyle(.secondary)
             }
+            if isPrimary && !account.signInExpired {
+                PaceChipView(window: window)
+            }
         }
         .opacity(account.signInExpired ? 0.55 : 1)
         .padding(.vertical, 4)
     }
+
+    private var isPrimary: Bool { window.id == account.primary?.id }
 
     /// "12 / 200 credits used", or for a credit "$2 of $10 used".
     private var amountLine: String? {

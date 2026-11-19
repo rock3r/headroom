@@ -9,12 +9,27 @@ struct ResetsList: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        if #available(iOS 26, *) {
+            list.navigationSubtitle(alertSummary)
+        } else {
+            list
+        }
+    }
+
+    private var alertSummary: Text {
+        Text(tab.alertWindows == 1
+             ? "Alerts are on for \(tab.alertsOn) of 1 window"
+             : "Alerts are on for \(tab.alertsOn) of \(tab.alertWindows) windows")
+    }
+
+    private var list: some View {
         List {
-            Text(tab.alertWindows == 1
-                 ? "Alerts are on for \(tab.alertsOn) of 1 window"
-                 : "Alerts are on for \(tab.alertsOn) of \(tab.alertWindows) windows")
-                .foregroundStyle(.secondary)
-                .listRowBackground(Color.clear)
+            if #unavailable(iOS 26) {
+                alertSummary
+                    .alloFont(.footnote)
+                    .foregroundStyle(.secondary)
+                    .listRowBackground(Color.clear)
+            }
             if !tab.withResets.isEmpty {
                 Section("Available resets") {
                     ForEach(tab.withResets) { account in
@@ -45,5 +60,6 @@ struct ResetsList: View {
                 }
             }
         }
+        .listSectionSpacing(.compact)
     }
 }

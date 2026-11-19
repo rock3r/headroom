@@ -7,6 +7,8 @@ struct CardMeters: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        let trailingLabels = resetLabels
+        let labelWidth = account.separateAllowances && !allowances.isEmpty ? 96.0 : 58.0
         VStack(alignment: .leading, spacing: 8) {
             if account.primary == nil, let balance = account.balance {
                 Text("Balance · \(Formats.balance(balance.amount, unit: balance.unit))")
@@ -15,12 +17,14 @@ struct CardMeters: View {
                 ForEach(allowances) { window in
                     let isPrimary = window.id == account.primary?.id
                     MeterRow(label: window.label, window: window, providerId: account.providerId,
-                             trailing: resetLabel(window, countdown: false), labelWidth: 96,
+                             trailing: resetLabel(window, countdown: false), trailingLabels: trailingLabels,
+                             labelWidth: labelWidth,
                              wavy: isPrimary && window.needsAttention)
                 }
             } else if let primary = account.primary {
                 MeterRow(label: kindLabel(primary.kind), window: primary, providerId: account.providerId,
-                         trailing: resetLabel(primary, countdown: false),
+                         trailing: resetLabel(primary, countdown: false), trailingLabels: trailingLabels,
+                         labelWidth: labelWidth,
                          wavy: primary.needsAttention)
             } else {
                 Text("No usage data yet.")
@@ -29,12 +33,20 @@ struct CardMeters: View {
             }
             if let session {
                 MeterRow(label: kindLabel(session.kind), window: session, providerId: account.providerId,
-                         trailing: resetLabel(session, countdown: true), showsPace: false)
+                         trailing: resetLabel(session, countdown: true), trailingLabels: trailingLabels,
+                         labelWidth: labelWidth, showsPace: false)
             }
             if let primary = account.primary {
                 PaceChipView(window: primary)
             }
         }
+    }
+
+    private var resetLabels: [String] {
+        let mainWindows = account.separateAllowances && !allowances.isEmpty
+            ? allowances : [account.primary].compactMap { $0 }
+        return mainWindows.compactMap { resetLabel($0, countdown: false) }
+            + [session.flatMap { resetLabel($0, countdown: true) }].compactMap { $0 }
     }
 
     /// Each window is its own allowance: the main one first, sessions and unlimited ones left out.

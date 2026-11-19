@@ -14,28 +14,48 @@ struct NextResetCard: View {
             Text(next.kind == "weekly" ? "Next weekly reset" : "Next reset")
                 .alloFont(.subheadline)
                 .foregroundStyle(.secondary)
-            TimelineView(.everyMinute) { context in
-                Text(Formats.countdown(to: resetsAt, now: context.date))
-                    .alloFont(.number, size: 38, relativeTo: .largeTitle)
-                    .contentTransition(.numericText())
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    countdown
+                    Spacer(minLength: 12)
+                    allResets
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    countdown
+                    allResets
+                }
             }
             Text("\(next.accountTitle) · \(Formats.long(resetsAt))")
                 .alloFont(.subheadline)
-            HStack {
-                if canToggleAlert {
-                    Button(action: toggleAlert) {
-                        Label(next.alertOn ? "Alert on" : "Alert off",
-                              systemImage: next.alertOn ? "bell.fill" : "bell.slash")
-                    }
-                    .buttonStyle(.bordered)
+            if canToggleAlert {
+                Button(action: toggleAlert) {
+                    Label(next.alertOn ? "Alert on" : "Alert off",
+                          systemImage: next.alertOn ? "bell.fill" : "bell.slash")
                 }
-                Spacer()
-                Button("All resets", action: openResets)
-                    .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
             }
-            .padding(.top, 4)
         }
         .padding(.vertical, 6)
+    }
+
+    private var countdown: some View {
+        TimelineView(.everyMinute) { context in
+            Text(Formats.countdown(to: resetsAt, now: context.date))
+                .alloFont(.number, size: 34, relativeTo: .largeTitle)
+                .contentTransition(.numericText())
+        }
+    }
+
+    private var allResets: some View {
+        Button(action: openResets) {
+            HStack(spacing: 4) {
+                Text("All resets")
+                Image(systemName: "chevron.forward")
+                    .accessibilityHidden(true)
+            }
+            .alloFont(.subheadline)
+        }
+        .buttonStyle(.borderless)
     }
 
     private var resetsAt: Date {

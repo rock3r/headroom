@@ -395,6 +395,8 @@ class HeadroomTest {
 
         assertTrue(tab.isDemo)
         assertTrue(tab.upcoming.isNotEmpty())
+        assertEquals("monthly", tab.upcoming.first { it.providerId == "copilot" }.kind)
+        assertEquals("weekly", tab.upcoming.first { it.providerId == "claude" }.kind)
         assertEquals(tab.upcoming.sortedBy { it.resetsAtEpochSeconds }, tab.upcoming)
         assertEquals(
             listOf(82.0, 95.0, 100.0, 88.0, 100.0),
