@@ -10,7 +10,7 @@ struct ChartModelTests {
         #expect(PaceTexts.chartWindowLabel("Weekly · Fable", providerId: "claude") == "Fable")
     }
 
-    @MainActor @Test func `returning to the same chart keeps its content while switching charts clears it`() async throws {
+    @MainActor @Test func `switching windows retains the visible chart until its replacement arrives`() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let headroom = OpenHeadroomKt.openHeadroom(directory: directory.path,
@@ -35,7 +35,15 @@ struct ChartModelTests {
         #expect(model.chart == chart)
 
         model.show(headroom, accountId: "demo-claude", windowId: "five_hour")
-        #expect(!model.loaded)
-        #expect(model.chart == nil)
+        #expect(model.loaded)
+        #expect(model.chart == chart)
+        #expect(model.displayedWindowId == "seven_day")
+
+        let switchDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while model.displayedWindowId != "five_hour" && ContinuousClock.now < switchDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.displayedWindowId == "five_hour")
+        #expect(model.chart?.kind == "session")
     }
 }

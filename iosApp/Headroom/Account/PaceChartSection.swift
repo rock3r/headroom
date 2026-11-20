@@ -8,6 +8,7 @@ struct PaceChartSection: View {
     @Environment(AppModel.self) private var model
     @State private var windowId: String?
     @State private var chartModel = ChartModel()
+    @ScaledMetric(relativeTo: .footnote) private var projectionMinHeight = 34.0
 
     var body: some View {
         if !charted.isEmpty {
@@ -27,26 +28,39 @@ struct PaceChartSection: View {
                     }
                     .pickerStyle(.segmented)
                 }
+                ZStack {
+                    if let chart = chartModel.chart {
+                        PaceChart(chart: chart, showsLeft: model.showsLeft, providerId: account.providerId)
+                            .frame(height: 180)
+                            .id(chartModel.displayedWindowId)
+                            .transition(.opacity)
+                    } else if chartModel.loaded {
+                        Text("No history for this window yet.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ProgressView()
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 196)
+                .animation(.easeInOut(duration: 0.2), value: chartModel.displayedWindowId)
+
                 if let chart = chartModel.chart {
-                    PaceChart(chart: chart, showsLeft: model.showsLeft, providerId: account.providerId)
-                        .frame(height: 180)
-                        .padding(.vertical, 8)
                     Text("dashed = even pace")
                         .alloFont(.caption)
                         .foregroundStyle(.secondary)
                     Text(PaceTexts.projection(chart, showsLeft: model.showsLeft))
                         .alloFont(.footnote)
                         .foregroundStyle(.secondary)
-                } else if chartModel.loaded {
-                    Text("No history for this window yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 180)
+                        .frame(minHeight: projectionMinHeight, alignment: .topLeading)
+                        .contentTransition(.opacity)
+                        .animation(.easeInOut(duration: 0.2), value: chartModel.displayedWindowId)
                 }
             }
         } header: {
             Text(chartModel.chart.map { PaceTexts.title($0.kind) } ?? "This window")
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.2), value: chartModel.displayedWindowId)
         }
         .onChange(of: selectedWindowId, initial: true) { _, id in
             if let id { chartModel.show(model.headroom, accountId: account.id, windowId: id) }

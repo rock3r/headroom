@@ -1,3 +1,4 @@
+import Foundation
 import HeadroomKit
 import Observation
 
@@ -8,27 +9,34 @@ final class ChartModel {
     private(set) var chart: ChartUi?
     /// HeadroomKit answered: a nil chart now means the window has nothing to chart.
     private(set) var loaded = false
+    private(set) var displayedWindowId: String?
     @ObservationIgnored private var watch: Watch?
-    @ObservationIgnored private var selection: (accountId: String, windowId: String)?
+    @ObservationIgnored private var displayedAccountId: String?
+    @ObservationIgnored private var requestId: UUID?
 
     func show(_ headroom: Headroom, accountId: String, windowId: String) {
-        watch?.cancel()
-        // List restarts observation as the chart scrolls back into view. Replacing its rows with
-        // a loading row then changes their height mid-scroll and traps upward scrolling.
-        if selection?.accountId != accountId || selection?.windowId != windowId {
+        stop()
+        // Keep the current window on screen until HeadroomKit has answered for the next one.
+        if displayedAccountId != accountId {
             chart = nil
             loaded = false
-            selection = (accountId, windowId)
+            displayedWindowId = nil
+            displayedAccountId = accountId
         }
+        let requestId = UUID()
+        self.requestId = requestId
         watch = headroom.accounts.watchChart(accountId: accountId, windowId: windowId) { [weak self] chart in
             MainActor.assumeIsolated {
-                self?.chart = chart
-                self?.loaded = true
+                guard let self, self.requestId == requestId else { return }
+                self.chart = chart
+                self.loaded = true
+                self.displayedWindowId = windowId
             }
         }
     }
 
     func stop() {
+        requestId = nil
         watch?.cancel()
         watch = nil
     }
