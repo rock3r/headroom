@@ -53,6 +53,10 @@ internal class Sources(
         if (real.current().isEmpty()) demo.refresh(accountId) else real.refresh(accountId)
     }
 
+    /** Whether the user keeps a year of history rather than the short-term retention. */
+    val keepLongHistory: Flow<Boolean> =
+        settings.settings.map { it.keepLongHistory }.distinctUntilChanged()
+
     /** The usage history of [window], oldest point first. */
     fun history(accountId: String, window: QuotaWindow): Flow<List<UsagePoint>> =
         combine(

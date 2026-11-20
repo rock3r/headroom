@@ -2,7 +2,6 @@ package dev.sebastiano.headroom.shared
 
 import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.model.AlertPreferences
-import dev.sebastiano.headroom.model.chartSummary
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.CancellationException
@@ -61,34 +60,38 @@ internal constructor(
     }
 
     /**
-     * Calls [onChange] with the pace chart of the window, as its history grows, or null when the
-     * window has no reset time or length, until [Watch.cancel].
+     * Calls [onChange] with the usage history chart of the account's weekly and monthly windows, as
+     * their history grows, or null when it has none, until [Watch.cancel].
      */
-    public fun watchChart(
-        accountId: String,
-        windowId: String,
-        onChange: (ChartUi?) -> Unit,
-    ): Watch {
-        val chart =
+    public fun watchHistory(accountId: String, onChange: (HistoryChartUi?) -> Unit): Watch {
+        val account =
             sources.accounts
-                .map { accounts ->
-                    accounts
-                        .firstOrNull { it.account.id == accountId }
-                        ?.snapshot
-                        ?.windows
-                        ?.firstOrNull { it.id == windowId }
-                }
+                .map { accounts -> accounts.firstOrNull { it.account.id == accountId } }
                 .distinctUntilChanged()
-                .flatMapLatest { window ->
-                    if (window == null) flowOf(null)
+        val histories =
+            account
+                .map { state -> state?.let(HistoryMapping::chartableWindows).orEmpty() }
+                .distinctUntilChanged()
+                .flatMapLatest { windows ->
+                    if (windows.isEmpty()) flowOf(emptyMap())
                     else
-                        combine(flowOf(window), sources.history(accountId, window), clockTicks()) {
-                            w,
-                            points,
-                            now ->
-                            chartSummary(w, points, now)?.let { StatsMapping.chart(w.id, it) }
+                        combine(
+                            windows.map { window ->
+                                sources.history(accountId, window).map { window.id to it }
+                            }
+                        ) { pairs ->
+                            pairs.toMap()
                         }
                 }
+        val chart =
+            combine(account, histories, sources.keepLongHistory, clockTicks()) {
+                    state,
+                    points,
+                    keepLong,
+                    now ->
+                    state?.let { HistoryMapping.history(it, points, now, keepLong) }
+                }
+                .distinctUntilChanged()
         return scope.watch(chart, onChange)
     }
 

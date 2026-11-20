@@ -56,7 +56,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.datetime.TimeZone
 import kotlinx.io.IOException
@@ -453,20 +452,19 @@ class HeadroomTest {
     }
 
     @Test
-    fun `an open chart advances its pace without new account or history emissions`() {
+    fun `an open history chart has every long window of the account`() {
         repository.accounts.value = DemoData.accounts(now)
-        val state = repository.accounts.value.first()
-        var chart: ChartUi? = null
-        val watch =
-            headroom.accounts.watchChart(state.account.id, state.primaryWindow!!.id) { chart = it }
-        scope.runCurrent()
-        val before = checkNotNull(chart).expectedPercent
-
-        now += 1.minutes
-        scope.advanceTimeBy(1.minutes.inWholeMilliseconds)
+        val state =
+            repository.accounts.value.first { s ->
+                s.snapshot!!.windows.count { it.kind == WindowKind.Weekly } > 1
+            }
+        var chart: HistoryChartUi? = null
+        val watch = headroom.accounts.watchHistory(state.account.id) { chart = it }
         scope.runCurrent()
 
-        assertTrue(checkNotNull(chart).expectedPercent > before)
+        val ids = checkNotNull(chart).windows.map { it.id }
+        assertEquals(state.primaryWindow!!.id, ids.first())
+        assertTrue(ids.size > 1)
         watch.cancel()
     }
 

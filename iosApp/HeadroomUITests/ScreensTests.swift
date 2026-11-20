@@ -138,6 +138,16 @@ final class ScreensTests: XCTestCase {
         XCTAssertTrue(try sheetBackgroundIsDark())
     }
 
+    func testDelightPreviewIsBelowItsSwitch() {
+        app.buttons["Settings"].tap()
+        let preview = app.buttons["Try the refresh shimmer"]
+        XCTAssertTrue(scrollTo(preview))
+        let toggle = app.switches["Refresh shimmer"].firstMatch
+        XCTAssertTrue(toggle.exists)
+        XCTAssertGreaterThan(preview.frame.minY, toggle.frame.midY)
+        XCTAssertEqual(preview.frame.maxX, toggle.frame.maxX, accuracy: 8)
+    }
+
     private func sheetBackgroundIsDark() throws -> Bool {
         let image = try XCTUnwrap(XCUIScreen.main.screenshot().image.cgImage)
         let pixel = try XCTUnwrap(image.cropping(to: CGRect(
@@ -162,17 +172,36 @@ final class ScreensTests: XCTestCase {
         XCTAssertTrue(projection.waitForExistence(timeout: 10))
     }
 
-    func testThePaceChartPickerFollowsLimitsOrder() {
+    func testTheHistoryChartTogglesLimitsInLimitsOrder() {
         app.staticTexts["Claude"].firstMatch.tap()
 
-        let picker = app.segmentedControls.firstMatch
-        let session = picker.buttons["Session"]
-        let weekly = picker.buttons["Weekly"]
-        XCTAssertTrue(scrollTo(session))
-        XCTAssertEqual(picker.buttons.allElementsBoundByIndex.map(\.label), ["Session", "Weekly", "Opus"])
+        let weekly = app.buttons["chart-limit-Weekly"]
+        let opus = app.buttons["chart-limit-Opus"]
+        XCTAssertTrue(scrollTo(opus))
+        XCTAssertLessThan(weekly.frame.minX, opus.frame.minX)
+        XCTAssertFalse(app.buttons["chart-limit-Session"].exists)
         XCTAssertTrue(weekly.isSelected)
-        session.tap()
-        XCTAssertTrue(session.isSelected)
+        XCTAssertTrue(opus.isSelected)
+
+        opus.tap()
+        XCTAssertFalse(opus.isSelected)
+        // The last limit on the chart stays on.
+        weekly.tap()
+        XCTAssertTrue(weekly.isSelected)
+        opus.tap()
+        XCTAssertTrue(opus.isSelected)
+    }
+
+    func testTheHistoryChartLetsTheListScroll() {
+        app.staticTexts["Claude"].firstMatch.tap()
+        let weekly = app.buttons["chart-limit-Weekly"]
+        XCTAssertTrue(scrollTo(weekly))
+        app.swipeUp()
+        let chart = app.otherElements["usage-history-chart"].firstMatch
+        let before = chart.frame.minY
+        chart.swipeDown()
+        // The list scrolled back up: the chart moved down, or off the screen.
+        XCTAssertTrue(!chart.exists || chart.frame.minY > before + 40)
     }
 
     func testSettingsSwitchesTheOverviewToWhatIsLeft() {

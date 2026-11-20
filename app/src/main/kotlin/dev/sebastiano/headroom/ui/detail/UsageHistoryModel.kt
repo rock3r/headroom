@@ -18,10 +18,12 @@ import dev.c5inco.charts.core.XBandMark
 import dev.c5inco.charts.core.XRuleMark
 import dev.sebastiano.headroom.model.ChartSummary
 import dev.sebastiano.headroom.model.QuotaWindow
-import dev.sebastiano.headroom.model.ResetBoundary
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
 import dev.sebastiano.headroom.model.chartSummary
+import dev.sebastiano.headroom.model.detectResets
+import dev.sebastiano.headroom.model.isChartableHistoryWindow
+import dev.sebastiano.headroom.model.prepareHistoryPoints
 import dev.sebastiano.headroom.ui.ResetFormatter
 import java.time.Instant as JavaInstant
 import kotlin.math.roundToInt
@@ -254,54 +256,6 @@ private fun firstIndexAfter(sorted: LongArray, value: Long): Int {
 }
 
 /**
- * True when a quota window is a long reset window (weekly or monthly) that can be plotted on the
- * usage history chart. Excludes session, daily, credit, unlimited and informational windows.
- */
-internal val QuotaWindow.isChartableHistoryWindow: Boolean
-    get() =
-        (kind == WindowKind.Weekly || kind == WindowKind.Monthly) &&
-            resetsAt != null &&
-            length?.let { it > Duration.ZERO } == true &&
-            !isUnlimited &&
-            !isInformational
-
-/**
- * Finds every reset instant in [points] (ordered oldest first) using [ResetBoundary.isReset], so
- * the chart's reset markers agree with history compaction and ignore relative countdown jitter.
- */
-internal fun detectResets(
-    points: List<UsagePoint>,
-    windowLength: Duration? = null,
-): List<Instant> {
-    if (points.size < 2) return emptyList()
-    val resets = mutableListOf<Instant>()
-    var periodResetsAt: Instant? = points.first().resetsAt
-    var periodPeak: Double = points.first().usedPercent
-    var lastAt: Instant = points.first().at
-    for (index in 1 until points.size) {
-        val point = points[index]
-        val previous =
-            UsagePoint(
-                at = lastAt,
-                usedPercent = periodPeak,
-                resetsAt = periodResetsAt,
-            )
-        if (ResetBoundary.isReset(previous, point, windowLength)) {
-            resets += point.at
-            periodResetsAt = point.resetsAt
-            periodPeak = point.usedPercent
-        } else {
-            if (periodResetsAt == null && point.resetsAt != null) {
-                periodResetsAt = point.resetsAt
-            }
-            if (point.usedPercent > periodPeak) periodPeak = point.usedPercent
-        }
-        lastAt = point.at
-    }
-    return resets
-}
-
-/**
  * Builds the [UsageHistoryModel] for an account from its [windows] and per-window [histories], or
  * null when the account has no chartable long windows.
  *
@@ -332,7 +286,7 @@ internal fun buildUsageHistoryModel(
         val length = window.length ?: return@mapIndexedNotNull null
         val periodStart = resetsAt.minus(length)
         val raw = histories[window.id].orEmpty()
-        val prepared = prepareSeriesPoints(window, raw, now, dataFrom)
+        val prepared = prepareHistoryPoints(window, raw, now, dataFrom)
         val sampleAt =
             prepared.lastOrNull()?.at?.takeIf { it in periodStart..resetsAt }
                 ?: (dataFrom ?: now).coerceIn(periodStart, resetsAt)
@@ -360,40 +314,6 @@ internal fun buildUsageHistoryModel(
         selectedWindowIds = validSelected,
         keepLongHistory = keepLongHistory,
     )
-}
-
-private fun prepareSeriesPoints(
-    window: QuotaWindow,
-    raw: List<UsagePoint>,
-    now: Instant,
-    dataFrom: Instant?,
-): List<UsagePoint> {
-    val resetsAt = window.resetsAt ?: return emptyList()
-    val length = window.length ?: return emptyList()
-    val start = resetsAt.minus(length)
-    val sorted = raw.filter { it.at <= now }.sortedBy { it.at }
-    val deduped = ArrayList<UsagePoint>(sorted.size + 1)
-    for (point in sorted) {
-        if (deduped.isNotEmpty() && deduped.last().at == point.at) {
-            deduped[deduped.lastIndex] = point
-        } else {
-            deduped += point
-        }
-    }
-    val sampleAt = dataFrom ?: now
-    val hasCurrentPeriodSample =
-        deduped.isNotEmpty() &&
-            deduped.last().at >= start &&
-            (dataFrom == null || deduped.last().at >= dataFrom) &&
-            deduped.last().usedPercent == window.usedPercent
-    if (
-        !hasCurrentPeriodSample &&
-            sampleAt in start..resetsAt &&
-            (deduped.isEmpty() || deduped.last().at < sampleAt)
-    ) {
-        deduped += UsagePoint(at = sampleAt, usedPercent = window.usedPercent, resetsAt = resetsAt)
-    }
-    return deduped
 }
 
 internal data class UsageHistorySpecs(

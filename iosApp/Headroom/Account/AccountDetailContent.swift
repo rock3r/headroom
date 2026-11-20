@@ -88,7 +88,7 @@ struct AccountDetailContent: View {
                         }
                     }
                 }
-                PaceChartSection(account: account, windows: orderedWindows)
+                HistoryChartSection(account: account)
                 if let resets = account.resets {
                     ResetsCard(
                         account: account,
