@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 /// The tabs, the detail screen and Settings, over the demo data.
@@ -118,6 +119,47 @@ final class ScreensTests: XCTestCase {
         choice.tap()
     }
 
+    func testSystemThemeRestoresTheOpenSheetAppearance() throws {
+        let device = XCUIDevice.shared
+        let originalAppearance = device.appearance
+        defer { device.appearance = originalAppearance }
+        device.appearance = .dark
+        app.buttons["Settings"].tap()
+        chooseTheme("System")
+        XCTAssertTrue(try sheetBackgroundIsDark())
+        app.buttons["Light"].tap()
+        XCTAssertFalse(try sheetBackgroundIsDark())
+
+        app.buttons["System"].tap()
+        XCTAssertTrue(app.buttons["System"].isSelected)
+        XCTAssertTrue(try sheetBackgroundIsDark())
+        app.navigationBars["Theme"].buttons["Settings"].tap()
+        app.buttons["Done"].tap()
+        XCTAssertTrue(try sheetBackgroundIsDark())
+    }
+
+    func testDelightPreviewIsBelowItsSwitch() {
+        app.buttons["Settings"].tap()
+        let preview = app.buttons["Try the refresh shimmer"]
+        XCTAssertTrue(scrollTo(preview))
+        let toggle = app.switches["Refresh shimmer"].firstMatch
+        XCTAssertTrue(toggle.exists)
+        XCTAssertGreaterThan(preview.frame.minY, toggle.frame.midY)
+        XCTAssertEqual(preview.frame.maxX, toggle.frame.maxX, accuracy: 8)
+    }
+
+    private func sheetBackgroundIsDark() throws -> Bool {
+        let image = try XCTUnwrap(XCUIScreen.main.screenshot().image.cgImage)
+        let pixel = try XCTUnwrap(image.cropping(to: CGRect(
+            x: image.width / 2, y: image.height * 3 / 4, width: 1, height: 1
+        )))
+        let context = try XCTUnwrap(CGContext(data: nil, width: 1, height: 1,
+            bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        return try XCTUnwrap(context.data).load(as: UInt8.self) < 128
+    }
+
     func testTheDetailShowsWhereTheWindowIsHeading() {
         app.staticTexts["Claude"].firstMatch.tap()
 
@@ -133,19 +175,11 @@ final class ScreensTests: XCTestCase {
     func testThePaceChartPickerFollowsLimitsOrder() {
         app.staticTexts["Claude"].firstMatch.tap()
 
-        let session = app.buttons["Pace chart window: five_hour"]
-        let weekly = app.buttons["Pace chart window: seven_day"]
-        let opus = app.buttons["Pace chart window: seven_day_opus"]
+        let picker = app.segmentedControls.firstMatch
+        let session = picker.buttons["Session"]
+        let weekly = picker.buttons["Weekly"]
         XCTAssertTrue(scrollTo(session))
-        XCTAssertEqual(weekly.label, "Weekly · all models")
-        XCTAssertEqual(opus.label, "Weekly · Opus")
-        let options = [session, weekly, opus]
-        let positions = options.map { $0.frame }
-        if positions[0].midY == positions[1].midY {
-            XCTAssertEqual(positions.map(\.minX), positions.map(\.minX).sorted())
-        } else {
-            XCTAssertEqual(positions.map(\.minY), positions.map(\.minY).sorted())
-        }
+        XCTAssertEqual(picker.buttons.allElementsBoundByIndex.map(\.label), ["Session", "Weekly", "Opus"])
         XCTAssertTrue(weekly.isSelected)
         session.tap()
         XCTAssertTrue(session.isSelected)

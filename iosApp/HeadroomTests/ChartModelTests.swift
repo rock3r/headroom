@@ -4,6 +4,12 @@ import Foundation
 @testable import HeadroomApp
 
 struct ChartModelTests {
+    @Test func `Claude chart segments use compact quota labels`() {
+        #expect(PaceTexts.chartWindowLabel("Session", providerId: "claude") == "Session")
+        #expect(PaceTexts.chartWindowLabel("Weekly · all models", providerId: "claude") == "Weekly")
+        #expect(PaceTexts.chartWindowLabel("Weekly · Fable", providerId: "claude") == "Fable")
+    }
+
     @MainActor @Test func `returning to the same chart keeps its content while switching charts clears it`() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

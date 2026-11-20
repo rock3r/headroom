@@ -19,16 +19,13 @@ struct PaceChartSection: View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
                 if charted.count > 1 {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 6) {
-                            windowOptions
-                        }
-                        .fixedSize(horizontal: true, vertical: false)
-                        VStack(alignment: .leading, spacing: 6) {
-                            windowOptions
+                    Picker("Window", selection: Binding(get: { selectedWindowId }, set: { windowId = $0 })) {
+                        ForEach(charted) { window in
+                            Text(PaceTexts.chartWindowLabel(window.label, providerId: account.providerId))
+                                .tag(Optional(window.id))
                         }
                     }
-                    .buttonStyle(.bordered)
+                    .pickerStyle(.segmented)
                 }
                 if let chart = chartModel.chart {
                     PaceChart(chart: chart, showsLeft: model.showsLeft, providerId: account.providerId)
@@ -55,29 +52,6 @@ struct PaceChartSection: View {
             if let id { chartModel.show(model.headroom, accountId: account.id, windowId: id) }
         }
         .onDisappear(perform: chartModel.stop)
-    }
-
-    private var windowOptions: some View {
-        ForEach(charted) { window in
-            let selected = window.id == selectedWindowId
-            Button {
-                windowId = window.id
-            } label: {
-                HStack(spacing: 4) {
-                    if selected {
-                        Image(systemName: "checkmark")
-                            .accessibilityHidden(true)
-                    }
-                    Text(window.label)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .alloFont(.subheadline)
-            }
-            .accessibilityLabel(window.label)
-            .accessibilityAddTraits(selected ? .isSelected : [])
-            .accessibilityIdentifier("Pace chart window: \(window.id)")
-        }
     }
 
     private var selectedWindowId: String? {
