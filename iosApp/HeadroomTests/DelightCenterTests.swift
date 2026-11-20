@@ -8,8 +8,8 @@ struct DelightCenterTests {
 
         delights.previewShimmer(reduced: false)
 
-        #expect(delights.previewShimmers == 1)
-        #expect(delights.shimmers == 0)
+        #expect(delights.previewShimmerStartedAt != nil)
+        #expect(delights.shimmerStartedAt == nil)
     }
 
     @Test func `a confetti preview is played by Settings, not the overview`() {
@@ -27,7 +27,27 @@ struct DelightCenterTests {
         delights.previewShimmer(reduced: true)
         delights.previewBurst(providerId: "claude", reduced: true)
 
-        #expect(delights.previewShimmers == 0)
+        #expect(delights.previewShimmerStartedAt == nil)
         #expect(delights.bursts.isEmpty)
+    }
+
+    @Test func `refreshes during a sweep do not restart it`() {
+        let delights = DelightCenter()
+        let start = ContinuousClock.now
+        let next = start.advanced(by: .seconds(2))
+
+        delights.shimmer(enabled: true, reduced: false, now: start)
+        delights.shimmer(enabled: true, reduced: false, now: start.advanced(by: .milliseconds(500)))
+        #expect(delights.shimmerStartedAt == start)
+
+        delights.shimmer(enabled: true, reduced: false, now: next)
+        #expect(delights.shimmerStartedAt == next)
+    }
+
+    @Test func `a sweep expires even when the view is rebuilt later`() {
+        let start = ContinuousClock.now
+        #expect(RefreshShimmer.progress(from: start, at: start) == 0)
+        #expect(RefreshShimmer.progress(from: start, at: start.advanced(by: .milliseconds(550))) == 0.5)
+        #expect(RefreshShimmer.progress(from: start, at: start.advanced(by: .seconds(2))) == nil)
     }
 }

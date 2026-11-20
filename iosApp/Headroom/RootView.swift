@@ -24,7 +24,7 @@ struct RootView: View {
         // A sidebar on a wide screen, as the Android navigation rail; a tab bar on a phone.
         .tabViewStyle(.sidebarAdaptable)
         .overlay {
-            RefreshShimmer(trigger: model.delights.shimmers)
+            RefreshShimmer(startedAt: model.delights.shimmerStartedAt)
                 .ignoresSafeArea()
         }
         .onChange(of: model.route, initial: true) { _, route in
