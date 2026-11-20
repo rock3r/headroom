@@ -28,7 +28,8 @@ struct AccountDetailContent: View {
     }
 
     private var detail: some View {
-        ScrollViewReader { proxy in
+        let orderedWindows = windows
+        return ScrollViewReader { proxy in
             List {
                 Section {
                     VStack(spacing: 10) {
@@ -61,7 +62,7 @@ struct AccountDetailContent: View {
                     }
                 }
                 Section("Limits") {
-                    ForEach(windows) { window in
+                    ForEach(orderedWindows) { window in
                         DetailWindowRow(window: window, account: account)
                     }
                     if let balance = account.balance {
@@ -87,7 +88,7 @@ struct AccountDetailContent: View {
                         }
                     }
                 }
-                PaceChartSection(account: account)
+                PaceChartSection(account: account, windows: orderedWindows)
                 if let resets = account.resets {
                     ResetsCard(
                         account: account,

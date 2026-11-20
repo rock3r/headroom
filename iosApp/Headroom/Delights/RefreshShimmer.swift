@@ -3,22 +3,26 @@ import SwiftUI
 /// The refresh shimmer: a soft sheen that sweeps once across the screen when new numbers arrive.
 struct RefreshShimmer: View {
     let trigger: Int
-    @State private var progress = -0.4
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { proxy in
-            LinearGradient(colors: [.clear, .white.opacity(0.28), .clear], startPoint: .topLeading, endPoint: .bottomTrailing)
+            let sheen: Color = colorScheme == .dark ? .white.opacity(0.28) : .accentColor.opacity(0.18)
+            LinearGradient(colors: [.clear, sheen, .clear], startPoint: .leading, endPoint: .trailing)
                 .frame(width: proxy.size.width * 0.6, height: proxy.size.height * 1.4)
                 .rotationEffect(.degrees(12))
-                .offset(x: proxy.size.width * progress, y: -proxy.size.height * 0.2)
-                .blendMode(.plusLighter)
-                .opacity(progress > -0.4 && progress < 1.2 ? 1 : 0)
+                .keyframeAnimator(initialValue: 0.0, trigger: trigger) { band, progress in
+                    let overhang = proxy.size.height * 0.2
+                    let start = -proxy.size.width * 0.6 - overhang
+                    let end = proxy.size.width + overhang
+                    band.offset(x: start + (end - start) * progress, y: -proxy.size.height * 0.2)
+                } keyframes: { _ in
+                    MoveKeyframe(0.0)
+                    CubicKeyframe(1.0, duration: 1.1)
+                }
         }
+        .clipped()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .onChange(of: trigger) {
-            progress = -0.6
-            withAnimation(.easeInOut(duration: 1.1)) { progress = 1.3 }
-        }
     }
 }

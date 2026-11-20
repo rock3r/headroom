@@ -34,6 +34,7 @@ struct SettingsView: View {
             RefreshShimmer(trigger: model.delights.previewShimmers)
                 .ignoresSafeArea()
         }
+        .preferredColorScheme(Appearance.colorScheme(model.settings?.theme))
     }
 
     private func close() {

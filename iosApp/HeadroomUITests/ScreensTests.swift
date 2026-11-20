@@ -54,6 +54,70 @@ final class ScreensTests: XCTestCase {
         XCTAssertTrue(scrollTo(app.staticTexts["Usage by provider"]))
     }
 
+    func testTappingTheHeatmapShowsTheSelectedHour() {
+        app.terminate()
+        app.launchArguments = ["-openURL", "headroom://stats"]
+        app.launch()
+
+        let grid = app.descendants(matching: .any)["Usage heatmap"].firstMatch
+        XCTAssertTrue(scrollTo(grid))
+        if grid.frame.minY < app.frame.height * 0.2 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            start.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65)))
+        } else if grid.frame.maxY > app.frame.height * 0.85 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+            start.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        }
+        grid.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
+        let firstHour = grid.value as? String
+        XCTAssertTrue(firstHour?.contains("percentage points used") == true)
+        grid.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.55)).tap()
+        let nextHour = grid.value as? String
+        XCTAssertTrue(nextHour?.contains("percentage points used") == true)
+        XCTAssertNotEqual(firstHour, nextHour)
+    }
+
+    func testTheColoursListSelectsAPalette() {
+        app.buttons["Settings"].tap()
+        let colours = app.staticTexts["Colours"]
+        XCTAssertTrue(scrollTo(colours))
+        colours.tap()
+
+        let coral = app.buttons["Coral"]
+        XCTAssertTrue(coral.waitForExistence(timeout: 5))
+        coral.tap()
+        XCTAssertTrue(coral.isSelected)
+        let system = app.buttons["System"]
+        system.tap()
+        XCTAssertTrue(system.isSelected)
+    }
+
+    func testTheThemeSelectionPersistsWhenSettingsReopens() {
+        app.buttons["Settings"].tap()
+        chooseTheme("Dark")
+        app.buttons["Light"].tap()
+        app.navigationBars["Theme"].buttons["Settings"].tap()
+        app.buttons["Done"].tap()
+
+        app.buttons["Settings"].tap()
+        let theme = app.staticTexts["Theme"]
+        XCTAssertTrue(scrollTo(theme))
+        theme.tap()
+        let light = app.buttons["Light"]
+        XCTAssertTrue(light.waitForExistence(timeout: 5))
+        XCTAssertTrue(light.isSelected)
+        app.buttons["System"].tap()
+    }
+
+    private func chooseTheme(_ name: String) {
+        let theme = app.staticTexts["Theme"]
+        XCTAssertTrue(scrollTo(theme))
+        theme.tap()
+        let choice = app.buttons[name]
+        XCTAssertTrue(choice.waitForExistence(timeout: 5))
+        choice.tap()
+    }
+
     func testTheDetailShowsWhereTheWindowIsHeading() {
         app.staticTexts["Claude"].firstMatch.tap()
 
@@ -64,6 +128,27 @@ final class ScreensTests: XCTestCase {
             app.swipeUp()
         }
         XCTAssertTrue(projection.waitForExistence(timeout: 10))
+    }
+
+    func testThePaceChartPickerFollowsLimitsOrder() {
+        app.staticTexts["Claude"].firstMatch.tap()
+
+        let session = app.buttons["Pace chart window: five_hour"]
+        let weekly = app.buttons["Pace chart window: seven_day"]
+        let opus = app.buttons["Pace chart window: seven_day_opus"]
+        XCTAssertTrue(scrollTo(session))
+        XCTAssertEqual(weekly.label, "Weekly · all models")
+        XCTAssertEqual(opus.label, "Weekly · Opus")
+        let options = [session, weekly, opus]
+        let positions = options.map { $0.frame }
+        if positions[0].midY == positions[1].midY {
+            XCTAssertEqual(positions.map(\.minX), positions.map(\.minX).sorted())
+        } else {
+            XCTAssertEqual(positions.map(\.minY), positions.map(\.minY).sorted())
+        }
+        XCTAssertTrue(weekly.isSelected)
+        session.tap()
+        XCTAssertTrue(session.isSelected)
     }
 
     func testSettingsSwitchesTheOverviewToWhatIsLeft() {
@@ -103,6 +188,8 @@ final class ScreensTests: XCTestCase {
 
     func testSettingsListsTheOpenSourceLicences() {
         app.buttons["Settings"].tap()
+        XCTAssertTrue(app.staticTexts["Accounts"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Accounts, display and updates"].exists)
         let historyToggle = app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Keep long-term history'")).firstMatch
         for _ in 0 ..< 6 where !historyToggle.exists {
             app.swipeUp()

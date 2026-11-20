@@ -4,6 +4,7 @@ import SwiftUI
 /// The detail screen's pace chart, for the window the user picks, and where the window is heading.
 struct PaceChartSection: View {
     let account: AccountUi
+    let windows: [WindowUi]
     @Environment(AppModel.self) private var model
     @State private var windowId: String?
     @State private var chartModel = ChartModel()
@@ -18,12 +19,16 @@ struct PaceChartSection: View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
                 if charted.count > 1 {
-                    Picker("Window", selection: $windowId) {
-                        ForEach(charted) { window in
-                            Text(window.label).tag(Optional(window.id))
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) {
+                            windowOptions
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 6) {
+                            windowOptions
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .buttonStyle(.bordered)
                 }
                 if let chart = chartModel.chart {
                     PaceChart(chart: chart, showsLeft: model.showsLeft, providerId: account.providerId)
@@ -46,17 +51,42 @@ struct PaceChartSection: View {
         } header: {
             Text(chartModel.chart.map { PaceTexts.title($0.kind) } ?? "This window")
         }
-        .onAppear {
-            if windowId == nil { windowId = charted.first?.id }
-        }
-        .onChange(of: windowId, initial: true) { _, id in
+        .onChange(of: selectedWindowId, initial: true) { _, id in
             if let id { chartModel.show(model.headroom, accountId: account.id, windowId: id) }
         }
         .onDisappear(perform: chartModel.stop)
     }
 
+    private var windowOptions: some View {
+        ForEach(charted) { window in
+            let selected = window.id == selectedWindowId
+            Button {
+                windowId = window.id
+            } label: {
+                HStack(spacing: 4) {
+                    if selected {
+                        Image(systemName: "checkmark")
+                            .accessibilityHidden(true)
+                    }
+                    Text(window.label)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .alloFont(.subheadline)
+            }
+            .accessibilityLabel(window.label)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+            .accessibilityIdentifier("Pace chart window: \(window.id)")
+        }
+    }
+
+    private var selectedWindowId: String? {
+        let preferred = windowId ?? account.primary?.id
+        return charted.first { $0.id == preferred }?.id ?? charted.first?.id
+    }
+
     /// The windows a chart makes sense for: those that reset, with a pace.
     private var charted: [WindowUi] {
-        account.windows.filter { $0.resetsAtEpochSeconds != nil && !$0.isInformational && !$0.isUnlimited }
+        windows.filter { $0.resetsAtEpochSeconds != nil && !$0.isInformational }
     }
 }

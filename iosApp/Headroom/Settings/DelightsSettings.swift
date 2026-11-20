@@ -8,7 +8,7 @@ struct DelightsSettings: View {
 
     var body: some View {
         Section {
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 toggle("refreshShimmer", "Refresh shimmer", settings.refreshShimmer,
                        body: "A soft sheen sweeps across the screen when new numbers arrive.")
                 Button("Try", action: model.tryShimmer)
@@ -16,7 +16,7 @@ struct DelightsSettings: View {
                     .accessibilityLabel("Try the refresh shimmer")
                     .disabled(reduced)
             }
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 toggle("resetConfetti", "Reset confetti", settings.resetConfetti,
                        body: "Confetti bursts from an account when its limit resets while the app is open.")
                 Button("Try", action: model.tryConfetti)
@@ -40,10 +40,15 @@ struct DelightsSettings: View {
     }
 
     private func toggle(_ id: String, _ title: LocalizedStringKey, _ isOn: Bool, body: LocalizedStringKey) -> some View {
-        Toggle(isOn: Binding(get: { isOn }, set: { model.headroom.settings.setSwitch(id: id, enabled: $0) })) {
-            Text(title)
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(isOn: Binding(get: { isOn }, set: { model.headroom.settings.setSwitch(id: id, enabled: $0) })) {
+                Text(title)
+            }
+            .accessibilityHint(Text(body))
             Text(body)
                 .alloFont(.subheadline)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         }
     }
 }
