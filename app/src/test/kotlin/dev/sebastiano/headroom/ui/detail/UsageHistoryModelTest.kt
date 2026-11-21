@@ -11,6 +11,7 @@ import dev.c5inco.charts.core.XRuleMark
 import dev.sebastiano.headroom.model.QuotaWindow
 import dev.sebastiano.headroom.model.UsagePoint
 import dev.sebastiano.headroom.model.WindowKind
+import dev.sebastiano.headroom.model.detectResets
 import dev.sebastiano.headroom.ui.ResetFormatter
 import java.time.ZoneId
 import java.time.ZoneOffset

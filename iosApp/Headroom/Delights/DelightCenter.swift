@@ -18,17 +18,16 @@ final class DelightCenter {
         var preview = false
     }
 
-    /// Grows by one each time the shimmer should sweep.
-    private(set) var shimmers = 0
-    /// Grows by one each time Settings previews the shimmer, which sweeps over Settings.
-    private(set) var previewShimmers = 0
+    private(set) var shimmerStartedAt: ContinuousClock.Instant?
+    private(set) var previewShimmerStartedAt: ContinuousClock.Instant?
     private(set) var bursts: [Burst] = []
     /// Accounts whose confetti a sheet in front already played, such as the redeem sheet.
     @ObservationIgnored private var claimed: [String: Date] = [:]
 
-    func shimmer(enabled: Bool, reduced: Bool) {
+    func shimmer(enabled: Bool, reduced: Bool, now: ContinuousClock.Instant = .now) {
         guard enabled, !Self.motionReduced(reduced) else { return }
-        shimmers += 1
+        if let shimmerStartedAt, now < shimmerStartedAt.advanced(by: RefreshShimmer.duration) { return }
+        shimmerStartedAt = now
     }
 
     func burst(accountId: String, fromNextReset: Bool, providerId: String, enabled: Bool, reduced: Bool) {
@@ -40,7 +39,7 @@ final class DelightCenter {
     /// "Try" in Settings: the shimmer over Settings, even while its switch is off.
     func previewShimmer(reduced: Bool) {
         guard !Self.motionReduced(reduced) else { return }
-        previewShimmers += 1
+        previewShimmerStartedAt = .now
     }
 
     /// "Try" in Settings: confetti from its button, in `providerId`'s colours.

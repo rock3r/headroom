@@ -31,7 +31,7 @@ struct SettingsView: View {
             ConfettiLayer(anchors: anchors, previews: true)
         }
         .overlay {
-            RefreshShimmer(trigger: model.delights.previewShimmers)
+            RefreshShimmer(startedAt: model.delights.previewShimmerStartedAt)
                 .ignoresSafeArea()
         }
     }

@@ -2,14 +2,13 @@ import Foundation
 import HeadroomKit
 import SwiftUI
 
-/// The pace chart's title and sentences, worded as in the Android app.
+/// The usage history chart's labels and sentences, worded as in the Android app.
 enum PaceTexts {
-    static func title(_ kind: String) -> LocalizedStringKey {
-        switch kind {
-        case "weekly": "This week"
-        case "monthly": "This month"
-        default: "This window"
-        }
+    static func chartWindowLabel(_ label: String, providerId: String) -> String {
+        let prefix = "Weekly · "
+        guard providerId == "claude", label.hasPrefix(prefix) else { return label }
+        let scope = label.dropFirst(prefix.count)
+        return scope == "all models" ? String(localized: Texts.windowKindResource("weekly")) : String(scope)
     }
 
     static func description(_ chart: ChartUi, showsLeft: Bool) -> Text {
@@ -24,8 +23,8 @@ enum PaceTexts {
     }
 
     /// Where the window is heading at the current rate.
-    static func projection(_ chart: ChartUi, showsLeft: Bool) -> LocalizedStringKey {
-        let now = Int64(Date.now.timeIntervalSince1970)
+    static func projection(_ chart: ChartUi, showsLeft: Bool, at date: Date = .now) -> LocalizedStringKey {
+        let now = Int64(date.timeIntervalSince1970)
         if let limit = chart.projectedLimitAtEpochSeconds?.int64Value {
             let until = ViewModelsKt.countdown(epochSeconds: limit, nowEpochSeconds: now)
             let before = ViewModelsKt.countdown(epochSeconds: chart.endEpochSeconds, nowEpochSeconds: limit)

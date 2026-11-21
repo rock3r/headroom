@@ -1,13 +1,41 @@
 import SwiftUI
+import UIKit
 
 /// The theme and colours the user picked in Settings, as the Android app's palettes.
 enum Appearance {
-    /// The colour scheme to force, or nil to follow the system.
-    static func colorScheme(_ theme: String?) -> ColorScheme? {
-        switch theme {
-        case "light": .light
-        case "dark": .dark
-        default: nil
+    /// Apply one style to the window so already presented sheets inherit it too.
+    struct WindowStyle: UIViewRepresentable {
+        let theme: String?
+
+        func makeUIView(context: Context) -> StyleView {
+            StyleView()
+        }
+
+        func updateUIView(_ view: StyleView, context: Context) {
+            switch theme {
+            case "light": view.style = .light
+            case "dark": view.style = .dark
+            default: view.style = .unspecified
+            }
+        }
+
+        final class StyleView: UIView {
+            var style: UIUserInterfaceStyle = .unspecified {
+                didSet {
+                    if style != oldValue { applyStyle() }
+                }
+            }
+
+            override func didMoveToWindow() {
+                super.didMoveToWindow()
+                applyStyle()
+            }
+
+            private func applyStyle() {
+                if let window, window.overrideUserInterfaceStyle != style {
+                    window.overrideUserInterfaceStyle = style
+                }
+            }
         }
     }
 

@@ -27,7 +27,11 @@ struct HeadroomApp: App {
             RootView()
                 .alloFont(.body)
                 .environment(model)
-                .preferredColorScheme(Appearance.colorScheme(model.settings?.theme))
+                .background {
+                    Appearance.WindowStyle(theme: model.settings?.theme)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 .tint(Appearance.tint(model.settings?.palette))
                 .transaction { transaction in
                     // "Reduce motion" in Settings turns Headroom's own animations off.

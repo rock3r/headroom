@@ -10,9 +10,6 @@ struct SettingsForm: View {
 
     var body: some View {
         Form {
-            Text("Accounts, display and updates")
-                .foregroundStyle(.secondary)
-                .listRowBackground(Color.clear)
             Section("Accounts") {
                 NavigationLink {
                     AccountsSettings()
@@ -34,21 +31,18 @@ struct SettingsForm: View {
                     .alloFont(.footnote)
             }
             Section("Appearance") {
-                Picker("Theme", selection: binding(settings.theme) { settingsApi.setTheme(id: $0) }) {
-                    Text("System").tag("system")
-                    Text("Light").tag("light")
-                    Text("Dark").tag("dark")
+                NavigationLink {
+                    themeSettings
+                } label: {
+                    LabeledContent("Theme", value: String(localized: themeName(settings.theme)))
                 }
-                Picker("Colours", selection: binding(settings.palette) { settingsApi.setPalette(id: $0) }) {
-                    ForEach(Appearance.palettes) { palette in
-                        Label {
-                            Text(palette.name)
-                        } icon: {
-                            Image(systemName: "circle.fill")
-                                .foregroundStyle(Appearance.tint(palette.id) ?? .accentColor)
-                                .accessibilityHidden(true)
-                        }
-                        .tag(palette.id)
+                NavigationLink {
+                    paletteSettings
+                } label: {
+                    LabeledContent {
+                        Text((Appearance.palettes.first { $0.id == settings.palette } ?? Appearance.palettes[0]).name)
+                    } label: {
+                        Text("Colours")
                     }
                 }
                 Toggle(isOn: Binding(get: { settings.reduceMotion }, set: { settingsApi.setReduceMotion(enabled: $0) })) {
@@ -126,6 +120,68 @@ struct SettingsForm: View {
 
     private var settingsApi: HeadroomSettings {
         model.headroom.settings
+    }
+
+    private var themeSettings: some View {
+        List(["system", "light", "dark"], id: \.self) { theme in
+            let selected = theme == model.settings?.theme
+            Button {
+                settingsApi.setTheme(id: theme)
+            } label: {
+                HStack {
+                    Text(themeName(theme))
+                    Spacer()
+                    if selected {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(.tint)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+        }
+        .navigationTitle("Theme")
+    }
+
+    private func themeName(_ id: String) -> LocalizedStringResource {
+        switch id {
+        case "light": "Light"
+        case "dark": "Dark"
+        default: "System"
+        }
+    }
+
+    private var paletteSettings: some View {
+        List(Appearance.palettes) { palette in
+            let selected = palette.id == model.settings?.palette
+            Button {
+                settingsApi.setPalette(id: palette.id)
+            } label: {
+                HStack(spacing: 12) {
+                    if let tint = Appearance.tint(palette.id) {
+                        Circle().fill(tint).frame(width: 14, height: 14)
+                    } else {
+                        Image(systemName: "circle.lefthalf.filled")
+                            .font(.system(size: 14))
+                            .frame(width: 14, height: 14)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(palette.name)
+                    Spacer()
+                    if selected {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(.tint)
+                    }
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(palette.name))
+            .accessibilityAddTraits(selected ? .isSelected : [])
+        }
+        .navigationTitle("Colours")
     }
 
     private func binding(_ value: String, _ set: @escaping @MainActor (String) -> Void) -> Binding<String> {

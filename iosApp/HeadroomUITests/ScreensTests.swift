@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 /// The tabs, the detail screen and Settings, over the demo data.
@@ -54,6 +55,117 @@ final class ScreensTests: XCTestCase {
         XCTAssertTrue(scrollTo(app.staticTexts["Usage by provider"]))
     }
 
+    func testTappingTheHeatmapShowsTheSelectedHour() {
+        app.terminate()
+        app.launchArguments = ["-openURL", "headroom://stats"]
+        app.launch()
+
+        let grid = app.descendants(matching: .any)["Usage heatmap"].firstMatch
+        XCTAssertTrue(scrollTo(grid))
+        if grid.frame.minY < app.frame.height * 0.2 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            start.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65)))
+        } else if grid.frame.maxY > app.frame.height * 0.85 {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+            start.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        }
+        grid.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).tap()
+        let firstHour = grid.value as? String
+        XCTAssertTrue(firstHour?.contains("percentage points used") == true)
+        grid.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.55)).tap()
+        let nextHour = grid.value as? String
+        XCTAssertTrue(nextHour?.contains("percentage points used") == true)
+        XCTAssertNotEqual(firstHour, nextHour)
+    }
+
+    func testTheColoursListSelectsAPalette() {
+        app.buttons["Settings"].tap()
+        let colours = app.staticTexts["Colours"]
+        XCTAssertTrue(scrollTo(colours))
+        colours.tap()
+
+        let coral = app.buttons["Coral"]
+        XCTAssertTrue(coral.waitForExistence(timeout: 5))
+        coral.tap()
+        XCTAssertTrue(coral.isSelected)
+        let system = app.buttons["System"]
+        system.tap()
+        XCTAssertTrue(system.isSelected)
+    }
+
+    func testTheThemeSelectionPersistsWhenSettingsReopens() {
+        app.buttons["Settings"].tap()
+        chooseTheme("Dark")
+        app.buttons["Light"].tap()
+        app.navigationBars["Theme"].buttons["Settings"].tap()
+        app.buttons["Done"].tap()
+
+        app.buttons["Settings"].tap()
+        let theme = app.staticTexts["Theme"]
+        XCTAssertTrue(scrollTo(theme))
+        theme.tap()
+        let light = app.buttons["Light"]
+        XCTAssertTrue(light.waitForExistence(timeout: 5))
+        XCTAssertTrue(light.isSelected)
+        app.buttons["System"].tap()
+    }
+
+    private func chooseTheme(_ name: String) {
+        let theme = app.staticTexts["Theme"]
+        XCTAssertTrue(scrollTo(theme))
+        theme.tap()
+        let choice = app.buttons[name]
+        XCTAssertTrue(choice.waitForExistence(timeout: 5))
+        choice.tap()
+    }
+
+    func testSystemThemeRestoresTheOpenSheetAppearance() throws {
+        // Headless CI simulators ignore XCUIDevice.appearance writes, so test against
+        // whichever system appearance the simulator is already running in.
+        app.buttons["Settings"].tap()
+        chooseTheme("System")
+        let systemIsDark = switch XCUIDevice.shared.appearance {
+        case .dark: true
+        case .light: false
+        default: try screenIsDark()
+        }
+        XCTAssertTrue(try waitForScreen(dark: systemIsDark))
+
+        let opposite = systemIsDark ? "Light" : "Dark"
+        app.buttons[opposite].tap()
+        XCTAssertTrue(try waitForScreen(dark: !systemIsDark))
+
+        app.buttons["System"].tap()
+        XCTAssertTrue(app.buttons["System"].isSelected)
+        XCTAssertTrue(try waitForScreen(dark: systemIsDark))
+        app.navigationBars["Theme"].buttons["Settings"].tap()
+        app.buttons["Done"].tap()
+        XCTAssertTrue(try waitForScreen(dark: systemIsDark))
+    }
+
+    private func waitForScreen(dark: Bool, timeout: TimeInterval = 3) throws -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while true {
+            if try screenIsDark() == dark { return true }
+            if Date() >= deadline { return false }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+    }
+
+    private func screenIsDark() throws -> Bool {
+        let image = try XCTUnwrap(XCUIScreen.main.screenshot().image.cgImage)
+        let body = try XCTUnwrap(image.cropping(to: CGRect(
+            x: 0, y: image.height / 4, width: image.width, height: image.height * 3 / 4
+        )))
+        let context = try XCTUnwrap(CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 1,
+            space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ))
+        context.interpolationQuality = .medium
+        context.draw(body, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        return try XCTUnwrap(context.data).load(as: UInt8.self) < 128
+    }
+
     func testTheDetailShowsWhereTheWindowIsHeading() {
         app.staticTexts["Claude"].firstMatch.tap()
 
@@ -64,6 +176,38 @@ final class ScreensTests: XCTestCase {
             app.swipeUp()
         }
         XCTAssertTrue(projection.waitForExistence(timeout: 10))
+    }
+
+    func testTheHistoryChartTogglesLimitsInLimitsOrder() {
+        app.staticTexts["Claude"].firstMatch.tap()
+
+        let weekly = app.buttons["chart-limit-Weekly"]
+        let opus = app.buttons["chart-limit-Opus"]
+        XCTAssertTrue(scrollTo(opus))
+        XCTAssertLessThan(weekly.frame.minX, opus.frame.minX)
+        XCTAssertFalse(app.buttons["chart-limit-Session"].exists)
+        XCTAssertTrue(weekly.isSelected)
+        XCTAssertTrue(opus.isSelected)
+
+        opus.tap()
+        XCTAssertFalse(opus.isSelected)
+        // The last limit on the chart stays on.
+        weekly.tap()
+        XCTAssertTrue(weekly.isSelected)
+        opus.tap()
+        XCTAssertTrue(opus.isSelected)
+    }
+
+    func testTheHistoryChartLetsTheListScroll() {
+        app.staticTexts["Claude"].firstMatch.tap()
+        let weekly = app.buttons["chart-limit-Weekly"]
+        XCTAssertTrue(scrollTo(weekly))
+        app.swipeUp()
+        let chart = app.otherElements["usage-history-chart"].firstMatch
+        let before = chart.frame.minY
+        chart.swipeDown()
+        // The list scrolled back up: the chart moved down, or off the screen.
+        XCTAssertTrue(!chart.exists || chart.frame.minY > before + 40)
     }
 
     func testSettingsSwitchesTheOverviewToWhatIsLeft() {
@@ -103,6 +247,8 @@ final class ScreensTests: XCTestCase {
 
     func testSettingsListsTheOpenSourceLicences() {
         app.buttons["Settings"].tap()
+        XCTAssertTrue(app.staticTexts["Accounts"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Accounts, display and updates"].exists)
         let historyToggle = app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Keep long-term history'")).firstMatch
         for _ in 0 ..< 6 where !historyToggle.exists {
             app.swipeUp()

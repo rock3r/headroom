@@ -23,10 +23,11 @@ struct HeroRing: View {
                     }
                     VStack(spacing: 0) {
                         Text("\(Int(shown(primary).rounded()))%")
-                            .alloFont(.number, size: 44, relativeTo: .largeTitle)
+                            .alloFont(.number, size: session == nil ? 44 : 38, relativeTo: .largeTitle)
                             .minimumScaleFactor(0.5)
                             .lineLimit(1)
                             .contentTransition(.numericText())
+                            .padding(.horizontal, session == nil ? 0 : 6)
                         Text(Texts.quotaLabel(primary.kind, left: model.showsLeft))
                             .alloFont(.caption)
                             .foregroundStyle(.secondary)

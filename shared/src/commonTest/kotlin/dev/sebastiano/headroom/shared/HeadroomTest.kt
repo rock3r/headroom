@@ -49,6 +49,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -56,7 +57,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.datetime.TimeZone
 import kotlinx.io.IOException
@@ -415,6 +415,41 @@ class HeadroomTest {
     private fun latestOverview(): OverviewUi = latest(headroom::watchOverview)
 
     @Test
+    fun `a sync that only changes usage keeps the history chart's history subscriptions`() {
+        repository.accounts.value = DemoData.accounts(now)
+        val state =
+            repository.accounts.value.first { HistoryMapping.chartableWindows(it).isNotEmpty() }
+        val primary = HistoryMapping.chartableWindows(state).first()
+        var chart: HistoryChartUi? = null
+        val watch = headroom.accounts.watchHistory(state.account.id) { chart = it }
+        scope.runCurrent()
+        val collections = repository.historyCollections
+
+        val used = primary.usedPercent + 5
+        val snapshot = state.snapshot!!
+        repository.accounts.value =
+            repository.accounts.value.map { s ->
+                if (s.account.id != state.account.id) s
+                else
+                    s.copy(
+                        snapshot =
+                            snapshot.copy(
+                                windows =
+                                    snapshot.windows.map {
+                                        if (it.id == primary.id) it.copy(usedPercent = used) else it
+                                    }
+                            )
+                    )
+            }
+        scope.runCurrent()
+
+        assertEquals(collections, repository.historyCollections)
+        val window = checkNotNull(chart).windows.first { it.id == primary.id }
+        assertEquals(used, window.summary.usedPercent)
+        watch.cancel()
+    }
+
+    @Test
     fun `closing a redeem sheet cancels a start waiting for storage`() {
         repository.stored =
             DemoData.accounts(now).map { state ->
@@ -453,20 +488,19 @@ class HeadroomTest {
     }
 
     @Test
-    fun `an open chart advances its pace without new account or history emissions`() {
+    fun `an open history chart has every long window of the account`() {
         repository.accounts.value = DemoData.accounts(now)
-        val state = repository.accounts.value.first()
-        var chart: ChartUi? = null
-        val watch =
-            headroom.accounts.watchChart(state.account.id, state.primaryWindow!!.id) { chart = it }
-        scope.runCurrent()
-        val before = checkNotNull(chart).expectedPercent
-
-        now += 1.minutes
-        scope.advanceTimeBy(1.minutes.inWholeMilliseconds)
+        val state =
+            repository.accounts.value.first { s ->
+                s.snapshot!!.windows.count { it.kind == WindowKind.Weekly } > 1
+            }
+        var chart: HistoryChartUi? = null
+        val watch = headroom.accounts.watchHistory(state.account.id) { chart = it }
         scope.runCurrent()
 
-        assertTrue(checkNotNull(chart).expectedPercent > before)
+        val ids = checkNotNull(chart).windows.map { it.id }
+        assertEquals(state.primaryWindow!!.id, ids.first())
+        assertTrue(ids.size > 1)
         watch.cancel()
     }
 
@@ -717,8 +751,13 @@ private class MemoryAccountsRepository : AccountsRepository {
         refreshes += accountId
     }
 
-    override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
-        flowOf(emptyList())
+    /** How many times a history flow was collected. */
+    var historyCollections = 0
+
+    override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> = flow {
+        historyCollections++
+        emit(emptyList())
+    }
 }
 
 /** A keychain that refuses to delete, as iOS's can. */

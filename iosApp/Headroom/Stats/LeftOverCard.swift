@@ -10,7 +10,7 @@ struct LeftOverCard: View {
     var body: some View {
         StatCard(title: "Unused quota at reset", empty: leftOver == nil ? "No resets recorded yet. Unused quota appears after the first reset." : nil) {
             if let leftOver {
-                HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("\(Int(leftOver.averageLeft.rounded()))%")
                         .alloFont(.number, size: 34, relativeTo: .largeTitle)
                     Text(leftOver.resets == 1
@@ -19,11 +19,16 @@ struct LeftOverCard: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(leftOver.accounts, id: \.account.id) { account in
-                    HStack(spacing: 10) {
-                        ProviderAvatar(provider: model.provider(id: account.account.providerId), size: 24)
-                        Text(account.account.name)
-                            .frame(width: 100, alignment: .leading)
-                            .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            ProviderAvatar(provider: model.provider(id: account.account.providerId), size: 24)
+                            Text(account.account.name)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 8)
+                            Text("\(Int(account.averageLeft.rounded()))%")
+                                .monospacedDigit()
+                                .fixedSize()
+                        }
                         GeometryReader { proxy in
                             Capsule().fill(.quaternary)
                                 .overlay(alignment: .leading) {
@@ -33,18 +38,11 @@ struct LeftOverCard: View {
                                 }
                         }
                         .frame(height: 8)
-                        Text("\(Int(account.averageLeft.rounded()))%")
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(account.account.name), \(Int(account.averageLeft.rounded()))% unused")
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(description(leftOver))
             }
         }
-    }
-
-    private func description(_ leftOver: LeftOverUi) -> String {
-        let accounts = leftOver.accounts.map { "\($0.account.name) \(Int($0.averageLeft.rounded()))%" }
-            .formatted(.list(type: .and))
-        return String(localized: "On average, \(Int(leftOver.averageLeft.rounded()))% of each limit was left unused at reset. \(accounts).")
     }
 }

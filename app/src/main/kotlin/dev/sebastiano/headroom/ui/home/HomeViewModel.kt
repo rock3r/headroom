@@ -16,8 +16,8 @@ import dev.sebastiano.headroom.model.QuotaRepository
 import dev.sebastiano.headroom.model.ResetBurst
 import dev.sebastiano.headroom.model.ResetPolicy
 import dev.sebastiano.headroom.model.ResetTracker
+import dev.sebastiano.headroom.model.isChartableHistoryWindow
 import dev.sebastiano.headroom.ui.detail.buildUsageHistoryModel
-import dev.sebastiano.headroom.ui.detail.isChartableHistoryWindow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
