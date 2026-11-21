@@ -120,33 +120,49 @@ final class ScreensTests: XCTestCase {
     }
 
     func testSystemThemeRestoresTheOpenSheetAppearance() throws {
-        let device = XCUIDevice.shared
-        let originalAppearance = device.appearance
-        defer { device.appearance = originalAppearance }
-        device.appearance = .dark
+        // Headless CI simulators ignore XCUIDevice.appearance writes, so test against
+        // whichever system appearance the simulator is already running in.
         app.buttons["Settings"].tap()
         chooseTheme("System")
-        XCTAssertTrue(try sheetBackgroundIsDark())
-        app.buttons["Light"].tap()
-        XCTAssertFalse(try sheetBackgroundIsDark())
+        let systemIsDark = switch XCUIDevice.shared.appearance {
+        case .dark: true
+        case .light: false
+        default: try screenIsDark()
+        }
+        XCTAssertTrue(try waitForScreen(dark: systemIsDark))
+
+        let opposite = systemIsDark ? "Light" : "Dark"
+        app.buttons[opposite].tap()
+        XCTAssertTrue(try waitForScreen(dark: !systemIsDark))
 
         app.buttons["System"].tap()
         XCTAssertTrue(app.buttons["System"].isSelected)
-        XCTAssertTrue(try sheetBackgroundIsDark())
+        XCTAssertTrue(try waitForScreen(dark: systemIsDark))
         app.navigationBars["Theme"].buttons["Settings"].tap()
         app.buttons["Done"].tap()
-        XCTAssertTrue(try sheetBackgroundIsDark())
+        XCTAssertTrue(try waitForScreen(dark: systemIsDark))
     }
 
-    private func sheetBackgroundIsDark() throws -> Bool {
+    private func waitForScreen(dark: Bool, timeout: TimeInterval = 3) throws -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while true {
+            if try screenIsDark() == dark { return true }
+            if Date() >= deadline { return false }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+    }
+
+    private func screenIsDark() throws -> Bool {
         let image = try XCTUnwrap(XCUIScreen.main.screenshot().image.cgImage)
-        let pixel = try XCTUnwrap(image.cropping(to: CGRect(
-            x: image.width / 2, y: image.height * 3 / 4, width: 1, height: 1
+        let body = try XCTUnwrap(image.cropping(to: CGRect(
+            x: 0, y: image.height / 4, width: image.width, height: image.height * 3 / 4
         )))
-        let context = try XCTUnwrap(CGContext(data: nil, width: 1, height: 1,
-            bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        let context = try XCTUnwrap(CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 1,
+            space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ))
+        context.interpolationQuality = .medium
+        context.draw(body, in: CGRect(x: 0, y: 0, width: 1, height: 1))
         return try XCTUnwrap(context.data).load(as: UInt8.self) < 128
     }
 
