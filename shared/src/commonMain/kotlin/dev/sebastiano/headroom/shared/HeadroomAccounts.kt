@@ -69,29 +69,33 @@ internal constructor(
             sources.accounts
                 .map { accounts -> accounts.firstOrNull { it.account.id == accountId } }
                 .distinctUntilChanged()
-        val histories =
-            account
-                .map { state -> state?.let(HistoryMapping::chartableWindows).orEmpty() }
-                // A sync that only moves usage keeps the windows, so their histories stay
-                // collected.
-                .distinctUntilChanged { old, new -> old.map { it.id } == new.map { it.id } }
-                .flatMapLatest { windows ->
-                    if (windows.isEmpty()) flowOf(emptyMap())
-                    else
-                        combine(
-                            windows.map { window ->
-                                sources.history(accountId, window).map { window.id to it }
-                            }
-                        ) { pairs ->
-                            pairs.toMap()
-                        }
+        val windows =
+            combine(account, sources.isDemo) { state, demo ->
+                    state?.let(HistoryMapping::chartableWindows).orEmpty() to demo
                 }
+                // A sync that only moves usage keeps the windows, so their stored histories stay
+                // collected. The demo history is drawn from the window itself, so it follows it.
+                .distinctUntilChanged { (old, wasDemo), (new, demo) ->
+                    !demo && !wasDemo && old.map { it.id } == new.map { it.id }
+                }
+        val histories = windows.flatMapLatest { (windows, _) ->
+            if (windows.isEmpty()) flowOf(emptyMap())
+            else
+                combine(
+                    windows.map { window ->
+                        sources.history(accountId, window).map { window.id to it }
+                    }
+                ) { pairs ->
+                    pairs.toMap()
+                }
+        }
         val chart =
             combine(account, histories, sources.keepLongHistory) { state, points, keepLong ->
                     state?.let { HistoryMapping.history(it, points, clock(), keepLong) }
                 }
-                .flowOn(compute)
+                // Comparing whole histories is work too, so it stays off the main thread.
                 .distinctUntilChanged()
+                .flowOn(compute)
         return scope.watch(chart, onChange)
     }
 }

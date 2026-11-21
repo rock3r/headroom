@@ -96,7 +96,8 @@ struct SidewaysPan: UIGestureRecognizerRepresentable {
     }
 }
 
-/// A long press that then follows the finger. Reports where the finger is, then nil when it lifts.
+/// A long press that then follows the finger. Reports where the finger is, in the space of the
+/// view the gesture is on, then nil when it lifts.
 struct PressAndDrag: UIGestureRecognizerRepresentable {
     let onChange: (CGPoint?) -> Void
 
@@ -108,7 +109,7 @@ struct PressAndDrag: UIGestureRecognizerRepresentable {
 
     func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
         switch recognizer.state {
-        case .began, .changed: onChange(recognizer.location(in: recognizer.view))
+        case .began, .changed: onChange(context.converter.localLocation)
         case .ended, .cancelled, .failed: onChange(nil)
         default: break
         }

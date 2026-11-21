@@ -5,43 +5,46 @@ import SwiftUI
 /// toggled on or off, with range presets that slide the chart through the history.
 struct HistoryChartSection: View {
     let account: AccountUi
+    let history: HistoryChartModel
     @Environment(AppModel.self) private var model
-    @State private var history = HistoryChartModel()
     @State private var domain = Date.now ... Date.now.addingTimeInterval(7 * 86_400)
     /// The preset the chart sits on, or nil once the user drags it away.
     @State private var placedRange: String?
-    /// The chart has been placed on its first range: later charts keep the user's place.
-    @State private var hasPlaced = false
+    /// The account whose chart was placed on its first range: later charts keep the user's place.
+    @State private var placedAccountId: String?
 
     var body: some View {
         Group {
             if let chart = history.chart {
                 section(chart)
-            } else if !history.loaded {
+            } else if !history.loaded && hasLongWindow {
                 Section("Usage history") {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 196)
                 }
             }
         }
-        // A List drops rows that scroll away, so the watch restarts whenever the section reappears.
-        .onAppear { history.show(model.headroom, accountId: account.id) }
-        .onChange(of: account.id) { _, id in history.show(model.headroom, accountId: id) }
-        .onChange(of: history.chart, initial: true) { _, chart in
-            guard chart != nil else {
-                hasPlaced = false
-                return
-            }
-            // The first chart opens on the current period. A newer one keeps the preset the chart
-            // sits on, so a new period moves it along, and leaves a chart the user dragged alone.
-            if !hasPlaced {
-                hasPlaced = true
-                place(HistoryRanges.shared.PERIOD, animated: false)
-            } else if let placedRange {
-                place(placedRange, animated: false)
-            }
+    }
+
+    /// Whether the account has a weekly or monthly limit, so the history is worth waiting for.
+    private var hasLongWindow: Bool {
+        account.windows.contains { window in
+            (window.kind == "weekly" || window.kind == "monthly") && window.resetsAtEpochSeconds != nil
+                && !window.isUnlimited && !window.isInformational
         }
-        .onDisappear(perform: history.stop)
+    }
+
+    /// The first chart of an account opens on the current period. A newer one keeps the preset the
+    /// chart sits on, so a new period moves it along, or the longest one left when that preset went.
+    /// A chart the user dragged stays where it is.
+    private func placeChart(_ chart: HistoryChartUi) {
+        if placedAccountId != account.id {
+            placedAccountId = account.id
+            place(HistoryRanges.shared.PERIOD, animated: false)
+        } else if let placedRange {
+            let range = chart.ranges.contains(placedRange) ? placedRange : chart.ranges.last ?? HistoryRanges.shared.PERIOD
+            place(range, animated: false)
+        }
     }
 
     private func section(_ chart: HistoryChartUi) -> some View {
@@ -75,6 +78,7 @@ struct HistoryChartSection: View {
                     ProjectionText(lead: lead, showsLeft: model.showsLeft)
                 }
             }
+            .onChange(of: chart, initial: true) { _, chart in placeChart(chart) }
         } header: {
             HStack {
                 Text("Usage history")
@@ -152,7 +156,10 @@ private struct ProjectionText: View {
     @ScaledMetric(relativeTo: .footnote) private var minHeight = 34.0
 
     var body: some View {
-        Text(PaceTexts.projection(lead.summary, showsLeft: showsLeft))
+        // The countdown to the limit moves on between syncs.
+        TimelineView(.everyMinute) { context in
+            Text(PaceTexts.projection(lead.summary, showsLeft: showsLeft, at: context.date))
+        }
             .alloFont(.footnote)
             .foregroundStyle(.secondary)
             .frame(minHeight: minHeight, alignment: .topLeading)

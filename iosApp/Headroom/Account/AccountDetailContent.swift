@@ -12,6 +12,7 @@ struct AccountDetailContent: View {
     @State private var signingInAgain = false
     @State private var connectingCursor = false
     @State private var redeeming: Redeeming?
+    @State private var history = HistoryChartModel()
 
     /// What the redeem sheet opens for.
     struct Redeeming: Identifiable {
@@ -88,7 +89,7 @@ struct AccountDetailContent: View {
                         }
                     }
                 }
-                HistoryChartSection(account: account)
+                HistoryChartSection(account: account, history: history)
                 if let resets = account.resets {
                     ResetsCard(
                         account: account,
@@ -105,6 +106,10 @@ struct AccountDetailContent: View {
                 }
             }
             .listSectionSpacing(.compact)
+            // The history is watched while the screen shows, whether or not its section has rows.
+            .onAppear { history.show(model.headroom, accountId: account.id) }
+            .onChange(of: account.id) { _, id in history.show(model.headroom, accountId: id) }
+            .onDisappear(perform: history.stop)
             .task(id: showsResets) {
                 guard showsResets, account.resets != nil else { return }
                 try? await Task.sleep(for: .milliseconds(300))

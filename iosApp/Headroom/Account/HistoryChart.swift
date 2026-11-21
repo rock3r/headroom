@@ -25,6 +25,8 @@ struct HistoryChart: View {
     @State private var panOrigin: ClosedRange<Date>?
     /// The domain the drag or its glide last set, to notice something else moving the chart.
     @State private var panned: ClosedRange<Date>?
+    /// The drag has moved the chart, and said so through `onPan`.
+    @State private var hasMoved = false
 
     var body: some View {
         Chart {
@@ -155,11 +157,11 @@ struct HistoryChart: View {
         guard let travel, selected == nil, width > 0 else {
             panOrigin = nil
             panned = nil
+            hasMoved = false
             return false
         }
         // A range preset or a new period moved the chart: it wins over the drag and its glide.
         if let panned, panned != domain { return false }
-        if panOrigin == nil { onPan() }
         let origin = panOrigin ?? domain
         panOrigin = origin
         let span = origin.upperBound.timeIntervalSince(origin.lowerBound)
@@ -167,6 +169,11 @@ struct HistoryChart: View {
         let upper = date(chart.maxEpochSeconds).timeIntervalSince(origin.upperBound)
         let wanted = -travel / width * span
         let shift = min(max(wanted, min(lower, 0)), max(upper, 0))
+        // Only a drag that moves the chart takes it off its preset: one against an edge does not.
+        if shift != 0, !hasMoved {
+            hasMoved = true
+            onPan()
+        }
         domain = origin.lowerBound.addingTimeInterval(shift) ... origin.upperBound.addingTimeInterval(shift)
         panned = domain
         return shift == wanted

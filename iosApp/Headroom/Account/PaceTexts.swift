@@ -23,8 +23,8 @@ enum PaceTexts {
     }
 
     /// Where the window is heading at the current rate.
-    static func projection(_ chart: ChartUi, showsLeft: Bool) -> LocalizedStringKey {
-        let now = Int64(Date.now.timeIntervalSince1970)
+    static func projection(_ chart: ChartUi, showsLeft: Bool, at date: Date = .now) -> LocalizedStringKey {
+        let now = Int64(date.timeIntervalSince1970)
         if let limit = chart.projectedLimitAtEpochSeconds?.int64Value {
             let until = ViewModelsKt.countdown(epochSeconds: limit, nowEpochSeconds: now)
             let before = ViewModelsKt.countdown(epochSeconds: chart.endEpochSeconds, nowEpochSeconds: limit)
