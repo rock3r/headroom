@@ -2,17 +2,16 @@ package dev.sebastiano.headroom.shared
 
 import dev.sebastiano.headroom.data.account.SignInManager
 import dev.sebastiano.headroom.model.AlertPreferences
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.io.IOException
@@ -26,6 +25,7 @@ internal constructor(
     private val alerts: AlertPreferences,
     private val scope: CoroutineScope,
     private val clock: () -> Instant,
+    private val compute: CoroutineDispatcher,
 ) {
     /** Signs the account out: its tokens and its history go. */
     public fun remove(accountId: String) {
@@ -61,7 +61,8 @@ internal constructor(
 
     /**
      * Calls [onChange] with the usage history chart of the account's weekly and monthly windows, as
-     * their history grows, or null when it has none, until [Watch.cancel].
+     * their history grows, or null when it has none, until [Watch.cancel]. The chart is built off
+     * the main thread, and only when the account or a stored history changes.
      */
     public fun watchHistory(accountId: String, onChange: (HistoryChartUi?) -> Unit): Watch {
         val account =
@@ -71,7 +72,9 @@ internal constructor(
         val histories =
             account
                 .map { state -> state?.let(HistoryMapping::chartableWindows).orEmpty() }
-                .distinctUntilChanged()
+                // A sync that only moves usage keeps the windows, so their histories stay
+                // collected.
+                .distinctUntilChanged { old, new -> old.map { it.id } == new.map { it.id } }
                 .flatMapLatest { windows ->
                     if (windows.isEmpty()) flowOf(emptyMap())
                     else
@@ -84,21 +87,11 @@ internal constructor(
                         }
                 }
         val chart =
-            combine(account, histories, sources.keepLongHistory, clockTicks()) {
-                    state,
-                    points,
-                    keepLong,
-                    now ->
-                    state?.let { HistoryMapping.history(it, points, now, keepLong) }
+            combine(account, histories, sources.keepLongHistory) { state, points, keepLong ->
+                    state?.let { HistoryMapping.history(it, points, clock(), keepLong) }
                 }
+                .flowOn(compute)
                 .distinctUntilChanged()
         return scope.watch(chart, onChange)
-    }
-
-    private fun clockTicks() = flow {
-        while (true) {
-            emit(clock())
-            delay(1.minutes)
-        }
     }
 }

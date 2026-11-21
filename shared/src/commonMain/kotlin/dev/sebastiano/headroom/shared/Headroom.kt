@@ -48,7 +48,7 @@ internal class HeadroomParts(
     val startCursor: suspend () -> DeviceSession = { error("No Cursor sign-in here") },
     val clock: () -> Instant = Clock.System::now,
     val zone: () -> TimeZone = TimeZone::currentSystemDefault,
-    /** Where the stats maths runs: off the main thread. */
+    /** Where the stats and history chart maths runs: off the main thread. */
     val compute: CoroutineDispatcher = Dispatchers.Default,
     val onClose: () -> Unit = {},
 )
@@ -93,7 +93,7 @@ internal constructor(parts: HeadroomParts, private val scope: CoroutineScope) {
     public val settings: HeadroomSettings = HeadroomSettings(parts.settings, scope)
 
     public val accounts: HeadroomAccounts =
-        HeadroomAccounts(sources, signInManager, parts.alerts, scope, clock)
+        HeadroomAccounts(sources, signInManager, parts.alerts, scope, clock, parts.compute)
 
     public val stats: HeadroomStats =
         HeadroomStats(sources, scope, clock, parts.zone, parts.compute)

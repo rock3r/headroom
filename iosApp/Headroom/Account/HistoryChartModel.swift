@@ -83,6 +83,19 @@ struct HistorySeries {
     let samples: [HistorySample]
     /// When the window reset, in epoch seconds, oldest first.
     let resets: [Int64]
+
+    /// The usage at `date`: the latest sample by then, or nil before the history starts and after
+    /// its latest sample, where there is no reading yet.
+    func sample(at date: Date) -> HistorySample? {
+        guard let last = samples.last, date <= last.date else { return nil }
+        var low = 0
+        var high = samples.count
+        while low < high {
+            let middle = (low + high) / 2
+            if samples[middle].date <= date { low = middle + 1 } else { high = middle }
+        }
+        return low > 0 ? samples[low - 1] : nil
+    }
 }
 
 struct HistorySample {

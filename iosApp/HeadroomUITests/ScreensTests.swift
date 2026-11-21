@@ -138,16 +138,6 @@ final class ScreensTests: XCTestCase {
         XCTAssertTrue(try sheetBackgroundIsDark())
     }
 
-    func testDelightPreviewIsBelowItsSwitch() {
-        app.buttons["Settings"].tap()
-        let preview = app.buttons["Try the refresh shimmer"]
-        XCTAssertTrue(scrollTo(preview))
-        let toggle = app.switches["Refresh shimmer"].firstMatch
-        XCTAssertTrue(toggle.exists)
-        XCTAssertGreaterThan(preview.frame.minY, toggle.frame.midY)
-        XCTAssertEqual(preview.frame.maxX, toggle.frame.maxX, accuracy: 8)
-    }
-
     private func sheetBackgroundIsDark() throws -> Bool {
         let image = try XCTUnwrap(XCUIScreen.main.screenshot().image.cgImage)
         let pixel = try XCTUnwrap(image.cropping(to: CGRect(

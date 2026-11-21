@@ -8,9 +8,10 @@ struct HistoryChartSection: View {
     @Environment(AppModel.self) private var model
     @State private var history = HistoryChartModel()
     @State private var domain = Date.now ... Date.now.addingTimeInterval(7 * 86_400)
-    /// The range the chart was last moved to, while the chart has not been scrolled away from it.
+    /// The preset the chart sits on, or nil once the user drags it away.
     @State private var placedRange: String?
-    @ScaledMetric(relativeTo: .footnote) private var projectionMinHeight = 34.0
+    /// The chart has been placed on its first range: later charts keep the user's place.
+    @State private var hasPlaced = false
 
     var body: some View {
         Group {
@@ -23,12 +24,22 @@ struct HistoryChartSection: View {
                 }
             }
         }
-        .onChange(of: account.id, initial: true) { _, id in
-            history.show(model.headroom, accountId: id)
-        }
-        .onChange(of: history.chart?.maxEpochSeconds, initial: true) { old, new in
-            // The first chart, or one that moved on to a new period, opens on the current period.
-            if old != new || placedRange == nil { place(HistoryRanges.shared.PERIOD, animated: false) }
+        // A List drops rows that scroll away, so the watch restarts whenever the section reappears.
+        .onAppear { history.show(model.headroom, accountId: account.id) }
+        .onChange(of: account.id) { _, id in history.show(model.headroom, accountId: id) }
+        .onChange(of: history.chart, initial: true) { _, chart in
+            guard chart != nil else {
+                hasPlaced = false
+                return
+            }
+            // The first chart opens on the current period. A newer one keeps the preset the chart
+            // sits on, so a new period moves it along, and leaves a chart the user dragged alone.
+            if !hasPlaced {
+                hasPlaced = true
+                place(HistoryRanges.shared.PERIOD, animated: false)
+            } else if let placedRange {
+                place(placedRange, animated: false)
+            }
         }
         .onDisappear(perform: history.stop)
     }
@@ -54,18 +65,14 @@ struct HistoryChartSection: View {
                     series: history.series,
                     showsLeft: model.showsLeft,
                     providerId: account.providerId,
-                    domain: $domain
+                    domain: $domain,
+                    onPan: { placedRange = nil }
                 )
                 .frame(height: 196)
                 .animation(.smooth(duration: 0.35), value: history.shownIds)
 
                 if let lead = history.leadWindow {
-                    Text(PaceTexts.projection(lead.summary, showsLeft: model.showsLeft))
-                        .alloFont(.footnote)
-                        .foregroundStyle(.secondary)
-                        .frame(minHeight: projectionMinHeight, alignment: .topLeading)
-                        .contentTransition(.opacity)
-                        .animation(.easeInOut(duration: 0.2), value: lead.id)
+                    ProjectionText(lead: lead, showsLeft: model.showsLeft)
                 }
             }
         } header: {
@@ -89,9 +96,10 @@ struct HistoryChartSection: View {
                         isOn: history.shownIds.contains(window.id)
                     ) {
                         withAnimation(.smooth(duration: 0.35)) {
+                            let shown = history.shownIds
                             history.toggle(window.id)
                             // The period follows the shortest limit shown, so it moves with them.
-                            if placedRange == HistoryRanges.shared.PERIOD {
+                            if history.shownIds != shown, placedRange == HistoryRanges.shared.PERIOD {
                                 place(HistoryRanges.shared.PERIOD, animated: false)
                             }
                         }
@@ -106,7 +114,7 @@ struct HistoryChartSection: View {
     /// The preset the chart sits on, or none once the user scrolls away from it.
     private var rangeBinding: Binding<String?> {
         Binding(
-            get: { placedRange.flatMap { range in isAt(range) ? range : nil } },
+            get: { placedRange },
             set: { range in if let range { place(range, animated: true) } }
         )
     }
@@ -127,15 +135,6 @@ struct HistoryChartSection: View {
         }
     }
 
-    private func isAt(_ range: String) -> Bool {
-        guard let chart = history.chart else { return false }
-        let start = TimeInterval(chart.rangeStartEpochSeconds(range: range, shownIds: history.shownIds))
-        let end = TimeInterval(chart.rangeEndEpochSeconds(range: range, shownIds: history.shownIds))
-        let tolerance = max(3600, (end - start) * 0.02)
-        return abs(domain.lowerBound.timeIntervalSince1970 - start) <= tolerance
-            && abs(domain.upperBound.timeIntervalSince1970 - end) <= tolerance
-    }
-
     static func rangeLabel(_ range: String) -> LocalizedStringKey {
         switch range {
         case HistoryRanges.shared.ONE_MONTH: "1M"
@@ -143,6 +142,22 @@ struct HistoryChartSection: View {
         case HistoryRanges.shared.ONE_YEAR: "1Y"
         default: "Period"
         }
+    }
+}
+
+/// Where the lead limit is heading. Its own view, so sliding the chart does not redo the sentence.
+private struct ProjectionText: View {
+    let lead: HistoryWindowUi
+    let showsLeft: Bool
+    @ScaledMetric(relativeTo: .footnote) private var minHeight = 34.0
+
+    var body: some View {
+        Text(PaceTexts.projection(lead.summary, showsLeft: showsLeft))
+            .alloFont(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(minHeight: minHeight, alignment: .topLeading)
+            .contentTransition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: lead.id)
     }
 }
 

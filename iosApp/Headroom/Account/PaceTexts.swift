@@ -2,21 +2,13 @@ import Foundation
 import HeadroomKit
 import SwiftUI
 
-/// The pace chart's title and sentences, worded as in the Android app.
+/// The usage history chart's labels and sentences, worded as in the Android app.
 enum PaceTexts {
     static func chartWindowLabel(_ label: String, providerId: String) -> String {
         let prefix = "Weekly · "
         guard providerId == "claude", label.hasPrefix(prefix) else { return label }
         let scope = label.dropFirst(prefix.count)
         return scope == "all models" ? String(localized: Texts.windowKindResource("weekly")) : String(scope)
-    }
-
-    static func title(_ kind: String) -> LocalizedStringKey {
-        switch kind {
-        case "weekly": "This week"
-        case "monthly": "This month"
-        default: "This window"
-        }
     }
 
     static func description(_ chart: ChartUi, showsLeft: Bool) -> Text {

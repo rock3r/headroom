@@ -17,10 +17,14 @@ struct HistoryChart: View {
     let providerId: String
     /// The stretch of time on screen. Changing it inside an animation slides the plot there.
     @Binding var domain: ClosedRange<Date>
+    /// The user started dragging the chart away from where it was placed.
+    var onPan: () -> Void = {}
     @Environment(\.colorScheme) private var colorScheme
     @State private var selected: Date?
     /// Where the domain was when a sideways drag started, or nil while no drag is moving it.
     @State private var panOrigin: ClosedRange<Date>?
+    /// The domain the drag or its glide last set, to notice something else moving the chart.
+    @State private var panned: ClosedRange<Date>?
 
     var body: some View {
         Chart {
@@ -150,8 +154,12 @@ struct HistoryChart: View {
     private func pan(by travel: CGFloat?, width: CGFloat) -> Bool {
         guard let travel, selected == nil, width > 0 else {
             panOrigin = nil
+            panned = nil
             return false
         }
+        // A range preset or a new period moved the chart: it wins over the drag and its glide.
+        if let panned, panned != domain { return false }
+        if panOrigin == nil { onPan() }
         let origin = panOrigin ?? domain
         panOrigin = origin
         let span = origin.upperBound.timeIntervalSince(origin.lowerBound)
@@ -160,6 +168,7 @@ struct HistoryChart: View {
         let wanted = -travel / width * span
         let shift = min(max(wanted, min(lower, 0)), max(upper, 0))
         domain = origin.lowerBound.addingTimeInterval(shift) ... origin.upperBound.addingTimeInterval(shift)
+        panned = domain
         return shift == wanted
     }
 
@@ -191,7 +200,7 @@ struct HistoryChart: View {
                 .alloFont(.caption2)
                 .foregroundStyle(.secondary)
             ForEach(shown, id: \.id) { window in
-                if let point = samples(of: window).last(where: { $0.date <= selected }) {
+                if let point = series[window.id]?.sample(at: selected) {
                     HStack(spacing: 4) {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 6))

@@ -30,7 +30,7 @@ struct SidewaysPan: UIGestureRecognizerRepresentable {
             coordinator.stopGlide(report: false)
             _ = coordinator.onChange(recognizer.translation(in: recognizer.view).x)
         case .ended:
-            coordinator.glide(from: recognizer.translation(in: recognizer.view).x,
+            coordinator.glide(in: recognizer.view, from: recognizer.translation(in: recognizer.view).x,
                               velocity: recognizer.velocity(in: recognizer.view).x)
         case .cancelled, .failed:
             _ = coordinator.onChange(nil)
@@ -41,6 +41,7 @@ struct SidewaysPan: UIGestureRecognizerRepresentable {
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var onChange: (CGFloat?) -> Bool = { _ in false }
         private var link: CADisplayLink?
+        private weak var view: UIView?
         private var travel: CGFloat = 0
         private var velocity: CGFloat = 0
 
@@ -60,7 +61,8 @@ struct SidewaysPan: UIGestureRecognizerRepresentable {
             return true
         }
 
-        func glide(from travel: CGFloat, velocity: CGFloat) {
+        func glide(in view: UIView?, from travel: CGFloat, velocity: CGFloat) {
+            self.view = view
             self.travel = travel
             self.velocity = velocity
             guard abs(velocity) > Self.restingSpeed, onChange(travel) else {
@@ -86,7 +88,8 @@ struct SidewaysPan: UIGestureRecognizerRepresentable {
             // The distance covered while the speed decays over this frame.
             travel += velocity * (decay - 1) / log(Self.decelerationRate) / 1000
             velocity *= decay
-            if !onChange(travel) || abs(velocity) < Self.restingSpeed {
+            // The chart left the screen: stop rather than keep moving it unseen.
+            if view?.window == nil || !onChange(travel) || abs(velocity) < Self.restingSpeed {
                 stopGlide(report: true)
             }
         }

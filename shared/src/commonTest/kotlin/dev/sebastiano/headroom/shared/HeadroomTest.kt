@@ -49,6 +49,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -414,6 +415,41 @@ class HeadroomTest {
     private fun latestOverview(): OverviewUi = latest(headroom::watchOverview)
 
     @Test
+    fun `a sync that only changes usage keeps the history chart's history subscriptions`() {
+        repository.accounts.value = DemoData.accounts(now)
+        val state =
+            repository.accounts.value.first { HistoryMapping.chartableWindows(it).isNotEmpty() }
+        val primary = HistoryMapping.chartableWindows(state).first()
+        var chart: HistoryChartUi? = null
+        val watch = headroom.accounts.watchHistory(state.account.id) { chart = it }
+        scope.runCurrent()
+        val collections = repository.historyCollections
+
+        val used = primary.usedPercent + 5
+        val snapshot = state.snapshot!!
+        repository.accounts.value =
+            repository.accounts.value.map { s ->
+                if (s.account.id != state.account.id) s
+                else
+                    s.copy(
+                        snapshot =
+                            snapshot.copy(
+                                windows =
+                                    snapshot.windows.map {
+                                        if (it.id == primary.id) it.copy(usedPercent = used) else it
+                                    }
+                            )
+                    )
+            }
+        scope.runCurrent()
+
+        assertEquals(collections, repository.historyCollections)
+        val window = checkNotNull(chart).windows.first { it.id == primary.id }
+        assertEquals(used, window.summary.usedPercent)
+        watch.cancel()
+    }
+
+    @Test
     fun `closing a redeem sheet cancels a start waiting for storage`() {
         repository.stored =
             DemoData.accounts(now).map { state ->
@@ -715,8 +751,13 @@ private class MemoryAccountsRepository : AccountsRepository {
         refreshes += accountId
     }
 
-    override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> =
-        flowOf(emptyList())
+    /** How many times a history flow was collected. */
+    var historyCollections = 0
+
+    override fun history(accountId: String, windowId: String): Flow<List<UsagePoint>> = flow {
+        historyCollections++
+        emit(emptyList())
+    }
 }
 
 /** A keychain that refuses to delete, as iOS's can. */
