@@ -1,5 +1,7 @@
 import HeadroomKit
+import SwiftUI
 import Testing
+import UIKit
 import Foundation
 @testable import HeadroomApp
 
@@ -13,7 +15,7 @@ struct HistoryChartModelTests {
     @Test func `the tooltip reads the latest sample and nothing past the history`() {
         let start = Date(timeIntervalSince1970: 1_000_000)
         let series = HistorySeries(
-            samples: [0, 10, 20].map { HistorySample(date: start.addingTimeInterval(Double($0) * 60), used: Double($0)) },
+            samples: [0, 10, 20].map { HistorySample(series: "weekly", date: start.addingTimeInterval(Double($0) * 60), used: Double($0)) },
             resets: []
         )
         #expect(series.sample(at: start.addingTimeInterval(-1)) == nil)
@@ -54,5 +56,165 @@ struct HistoryChartModelTests {
 
         model.toggle(ids[0])
         #expect(model.shownIds.contains(ids[0]))
+    }
+
+    @MainActor @Test func `multiple windows draw separate coloured lines without connecting end to start`() throws {
+        let origin: Int64 = 1_700_000_000
+        let day: Int64 = 86_400
+        let start = origin
+        let end = origin + 6 * day
+        let domainEnd = origin + 7 * day
+        let weekly = HistoryWindowUi(
+            id: "weekly",
+            label: "Weekly · all models",
+            isPrimary: true,
+            summary: ChartUi(
+                windowId: "weekly",
+                startEpochSeconds: domainEnd,
+                endEpochSeconds: domainEnd,
+                usedPercent: 85,
+                expectedPercent: 0,
+                kind: "weekly",
+                points: [],
+                projectedLimitAtEpochSeconds: nil,
+                projectedEndPercent: nil
+            ),
+            points: [PointUi(atEpochSeconds: start, usedPercent: 85), PointUi(atEpochSeconds: end, usedPercent: 85)],
+            resetsEpochSeconds: [],
+            sampleAtEpochSeconds: end
+        )
+        let fable = HistoryWindowUi(
+            id: "fable",
+            label: "Weekly · Fable",
+            isPrimary: false,
+            summary: ChartUi(
+                windowId: "fable",
+                startEpochSeconds: domainEnd,
+                endEpochSeconds: domainEnd,
+                usedPercent: 15,
+                expectedPercent: 0,
+                kind: "weekly",
+                points: [],
+                projectedLimitAtEpochSeconds: nil,
+                projectedEndPercent: nil
+            ),
+            points: [PointUi(atEpochSeconds: start, usedPercent: 15), PointUi(atEpochSeconds: end, usedPercent: 15)],
+            resetsEpochSeconds: [],
+            sampleAtEpochSeconds: end
+        )
+        let chart = HistoryChartUi(
+            minEpochSeconds: origin,
+            maxEpochSeconds: domainEnd,
+            ranges: [HistoryRanges.shared.PERIOD],
+            windows: [weekly, fable]
+        )
+        let series = HistoryChartModel.series(of: chart)
+        #expect(series["weekly"]?.samples.map(\.series) == ["usage-weekly", "usage-weekly"])
+        #expect(series["fable"]?.samples.map(\.series) == ["usage-fable", "usage-fable"])
+
+        let domain = Date(epochSeconds: origin) ... Date(epochSeconds: domainEnd)
+        // Use a provider whose slot 0 (cyan) and slot 1 (orange) stay far apart even when anti-aliased on white.
+        let providerId = "zai"
+        let view = HistoryChart(
+            chart: chart,
+            shown: [weekly, fable],
+            lead: nil,
+            series: series,
+            showsLeft: false,
+            providerId: providerId,
+            domain: .constant(domain)
+        )
+        .frame(width: 320, height: 200)
+        .background(.white)
+        .environment(\.colorScheme, .light)
+        .environment(\.dynamicTypeSize, .large)
+
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1
+        let image = try #require(renderer.cgImage)
+        let bytes = try rgbaBytes(of: image)
+
+        let weeklyRgb = rgb(of: ProviderColors.part(providerId: providerId, slot: 0, colorScheme: .light))
+        let fableRgb = rgb(of: ProviderColors.part(providerId: providerId, slot: 1, colorScheme: .light))
+        let tolerance = 35
+        try #require(maxChannelDistance(weeklyRgb, fableRgb) > tolerance * 2)
+
+        // Sample the interior horizontally (25%..60%), away from endpoints and trailing y-axis labels.
+        let xRange = (image.width / 4) ..< (image.width * 3 / 5)
+        let topBand = 0 ..< (image.height * 35 / 100)
+        let middleBand = (image.height * 38 / 100) ..< (image.height * 62 / 100)
+        let bottomBand = (image.height * 65 / 100) ..< (image.height * 92 / 100)
+
+        let topWeekly = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: topBand, matching: weeklyRgb, tolerance: tolerance
+        )
+        let bottomFable = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: bottomBand, matching: fableRgb, tolerance: tolerance
+        )
+        let bottomWeekly = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: bottomBand, matching: weeklyRgb, tolerance: tolerance
+        )
+        let middleSeries = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: middleBand, matching: weeklyRgb, tolerance: tolerance
+        ) + countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: middleBand, matching: fableRgb, tolerance: tolerance
+        )
+
+        #expect(topWeekly > 20)
+        #expect(bottomFable > 20)
+        #expect(bottomWeekly == 0)
+        #expect(middleSeries == 0)
+    }
+
+    private func rgb(of color: Color) -> (r: Int, g: Int, b: Int) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
+    }
+
+    private func maxChannelDistance(_ a: (r: Int, g: Int, b: Int), _ b: (r: Int, g: Int, b: Int)) -> Int {
+        max(abs(a.r - b.r), max(abs(a.g - b.g), abs(a.b - b.b)))
+    }
+
+    private func rgbaBytes(of image: CGImage) throws -> [UInt8] {
+        let width = image.width
+        let height = image.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        try bytes.withUnsafeMutableBytes { buffer in
+            let context = try #require(CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return bytes
+    }
+
+    private func countPixels(
+        in bytes: [UInt8],
+        width: Int,
+        xRange: Range<Int>,
+        yRange: Range<Int>,
+        matching target: (r: Int, g: Int, b: Int),
+        tolerance: Int
+    ) -> Int {
+        var count = 0
+        for y in yRange {
+            for x in xRange {
+                let offset = (y * width + x) * 4
+                let dr = abs(Int(bytes[offset]) - target.r)
+                let dg = abs(Int(bytes[offset + 1]) - target.g)
+                let db = abs(Int(bytes[offset + 2]) - target.b)
+                if dr <= tolerance && dg <= tolerance && db <= tolerance {
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 }
