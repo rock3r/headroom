@@ -109,6 +109,9 @@ struct HistoryChartModelTests {
             windows: [weekly, fable]
         )
         let series = HistoryChartModel.series(of: chart)
+        #expect(series["weekly"]?.samples.map(\.series) == ["usage-weekly", "usage-weekly"])
+        #expect(series["fable"]?.samples.map(\.series) == ["usage-fable", "usage-fable"])
+
         let domain = Date(epochSeconds: origin) ... Date(epochSeconds: domainEnd)
         // Use a provider whose slot 0 (cyan) and slot 1 (orange) stay far apart even when anti-aliased on white.
         let providerId = "zai"
@@ -124,25 +127,38 @@ struct HistoryChartModelTests {
         .frame(width: 320, height: 200)
         .background(.white)
         .environment(\.colorScheme, .light)
+        .environment(\.dynamicTypeSize, .large)
 
         let renderer = ImageRenderer(content: view)
         renderer.scale = 1
         let image = try #require(renderer.cgImage)
+        let bytes = try rgbaBytes(of: image)
 
         let weeklyRgb = rgb(of: ProviderColors.part(providerId: providerId, slot: 0, colorScheme: .light))
         let fableRgb = rgb(of: ProviderColors.part(providerId: providerId, slot: 1, colorScheme: .light))
+        let tolerance = 35
+        try #require(maxChannelDistance(weeklyRgb, fableRgb) > tolerance * 2)
 
-        // Sample the middle third horizontally (away from endpoints and y-axis labels).
+        // Sample the interior horizontally (25%..60%), away from endpoints and trailing y-axis labels.
         let xRange = (image.width / 4) ..< (image.width * 3 / 5)
         let topBand = 0 ..< (image.height * 35 / 100)
         let middleBand = (image.height * 38 / 100) ..< (image.height * 62 / 100)
         let bottomBand = (image.height * 65 / 100) ..< (image.height * 92 / 100)
 
-        let topWeekly = countPixels(in: image, xRange: xRange, yRange: topBand, matching: weeklyRgb)
-        let bottomFable = countPixels(in: image, xRange: xRange, yRange: bottomBand, matching: fableRgb)
-        let bottomWeekly = countPixels(in: image, xRange: xRange, yRange: bottomBand, matching: weeklyRgb)
-        let middleSeries = countPixels(in: image, xRange: xRange, yRange: middleBand, matching: weeklyRgb)
-            + countPixels(in: image, xRange: xRange, yRange: middleBand, matching: fableRgb)
+        let topWeekly = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: topBand, matching: weeklyRgb, tolerance: tolerance
+        )
+        let bottomFable = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: bottomBand, matching: fableRgb, tolerance: tolerance
+        )
+        let bottomWeekly = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: bottomBand, matching: weeklyRgb, tolerance: tolerance
+        )
+        let middleSeries = countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: middleBand, matching: weeklyRgb, tolerance: tolerance
+        ) + countPixels(
+            in: bytes, width: image.width, xRange: xRange, yRange: middleBand, matching: fableRgb, tolerance: tolerance
+        )
 
         #expect(topWeekly > 20)
         #expect(bottomFable > 20)
@@ -156,26 +172,37 @@ struct HistoryChartModelTests {
         return (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
     }
 
-    private func countPixels(
-        in image: CGImage,
-        xRange: Range<Int>,
-        yRange: Range<Int>,
-        matching target: (r: Int, g: Int, b: Int),
-        tolerance: Int = 35
-    ) -> Int {
+    private func maxChannelDistance(_ a: (r: Int, g: Int, b: Int), _ b: (r: Int, g: Int, b: Int)) -> Int {
+        max(abs(a.r - b.r), max(abs(a.g - b.g), abs(a.b - b.b)))
+    }
+
+    private func rgbaBytes(of image: CGImage) throws -> [UInt8] {
         let width = image.width
         let height = image.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        let context = CGContext(
-            data: &bytes,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )!
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        try bytes.withUnsafeMutableBytes { buffer in
+            let context = try #require(CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        return bytes
+    }
+
+    private func countPixels(
+        in bytes: [UInt8],
+        width: Int,
+        xRange: Range<Int>,
+        yRange: Range<Int>,
+        matching target: (r: Int, g: Int, b: Int),
+        tolerance: Int
+    ) -> Int {
         var count = 0
         for y in yRange {
             for x in xRange {

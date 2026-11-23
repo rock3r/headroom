@@ -105,7 +105,7 @@ struct HistoryChart: View {
             samples,
             x: .value("Time", \.date),
             y: .value("Usage", showsLeft ? \.left : \.used),
-            series: .value("Limit", \.series)
+            series: .value("Window", \.series)
         )
             .foregroundStyle(color)
             .lineStyle(StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
