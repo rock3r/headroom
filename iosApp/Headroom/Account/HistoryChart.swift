@@ -100,7 +100,13 @@ struct HistoryChart: View {
         let color = color(of: window)
         let samples = samples(of: window)
         // One vectorized plot per line: thousands of separate marks make sliding the chart stutter.
-        LinePlot(samples, x: .value("Time", \.date), y: .value("Usage", showsLeft ? \.left : \.used))
+        // Each window carries its own series id so Swift Charts never joins one window's end to the next's start.
+        LinePlot(
+            samples,
+            x: .value("Time", \.date),
+            y: .value("Usage", showsLeft ? \.left : \.used),
+            series: .value("Limit", \.series)
+        )
             .foregroundStyle(color)
             .lineStyle(StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
         if let last = samples.last {

@@ -61,11 +61,18 @@ final class HistoryChartModel {
         }
     }
 
-    private static func series(of chart: HistoryChartUi?) -> [String: HistorySeries] {
+    static func series(of chart: HistoryChartUi?) -> [String: HistorySeries] {
         var all: [String: HistorySeries] = [:]
         for window in chart?.windows ?? [] {
+            let seriesId = "usage-\(window.id)"
             all[window.id] = HistorySeries(
-                samples: window.points.map { HistorySample(date: Date(epochSeconds: $0.atEpochSeconds), used: $0.usedPercent) },
+                samples: window.points.map {
+                    HistorySample(
+                        series: seriesId,
+                        date: Date(epochSeconds: $0.atEpochSeconds),
+                        used: $0.usedPercent
+                    )
+                },
                 resets: window.resetsEpochSeconds.map(\.int64Value)
             )
         }
@@ -99,6 +106,7 @@ struct HistorySeries {
 }
 
 struct HistorySample {
+    let series: String
     let date: Date
     let used: Double
     var left: Double { 100 - used }
