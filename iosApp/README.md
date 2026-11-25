@@ -62,9 +62,9 @@ Sign-in tests stop before contacting a provider.
   Debug builds also accept `-openURL <link>` at launch for UI tests and screenshots.
 - Settings > Open-source licences lists HeadroomKit's libraries.
   The build runs AboutLibraries' `:shared:exportLibraryDefinitions` and copies its output into the app.
-- App and widget text uses rounded [Allo](https://github.com/joshpuckett/allo) 1.0 by Josh Puckett.
+- App and widget text uses rounded [Allo](https://github.com/joshpuckett/allo) 1.1.0 by Josh Puckett.
   `Headroom/Fonts` bundles the unmodified variable TTF and SIL Open Font License from upstream commit
-  `4bef023e21d938ab2b6982d3dda5fa334e1e5a9b`. The licence also appears in Settings.
+  `dae2bd43f4fa6ef5f5438114d416d528e57e46e8`. The licence also appears in Settings.
   `Shared/Allo.swift` keeps roundness at 100, varies weight by role, tracks optical size with the scaled
   point size, and uses proportional digits throughout the UI, including timers, counts and widgets.
   Only sign-in codes explicitly request tabular digits. SwiftUI's system-driven Live Activity countdown

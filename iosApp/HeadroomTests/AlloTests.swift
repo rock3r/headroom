@@ -82,6 +82,8 @@ struct AlloTests {
 
     @Test func `the bundled font has all three variable axes`() throws {
         let font = try #require(UIFont(name: "AlloVariable-Regular", size: 17))
+        let version = try #require(CTFontCopyName(font, kCTFontVersionNameKey) as String?)
+        #expect(version.hasPrefix("Version 1.100"))
         let axes = try #require(CTFontCopyVariationAxes(font) as? [[String: Any]])
         let names = Set(axes.compactMap { $0[kCTFontVariationAxisNameKey as String] as? String })
         #expect(names == ["Optical size", "Weight", "Roundness"])
@@ -144,6 +146,7 @@ struct AlloTests {
     @Test func `Allo attribution ships alongside the library licences`() throws {
         let licences = try #require(Licences.load())
         let allo = try #require(licences.libraries.first { $0.name == "Allo" })
+        #expect(allo.artifactVersion == "1.1.0")
         let id = try #require(allo.licenses.first)
         let licence = try #require(licences.licenses[id])
         #expect(licence.content?.contains("Copyright 2026 Josh Puckett") == true)

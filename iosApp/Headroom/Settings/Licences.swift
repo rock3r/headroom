@@ -29,7 +29,7 @@ struct Licences: Decodable {
         guard let fontURL = bundle.url(forResource: "Allo-OFL", withExtension: "txt"),
               let fontLicence = try? String(contentsOf: fontURL, encoding: .utf8) else { return libraries }
         let allo = Library(
-            uniqueId: "allo", name: "Allo", artifactVersion: "1.0",
+            uniqueId: "allo", name: "Allo", artifactVersion: "1.1.0",
             description: "Typeface by Josh Puckett, built on Inter by Rasmus Andersson.",
             website: "https://github.com/joshpuckett/allo", licenses: ["Allo-OFL"]
         )
