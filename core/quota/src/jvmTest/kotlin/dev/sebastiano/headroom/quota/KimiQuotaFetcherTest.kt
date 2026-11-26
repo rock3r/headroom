@@ -20,6 +20,9 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+/** Ratios reach `usedPercent` through a multiply, so compare with a tolerance. */
+private const val PERCENT_TOLERANCE = 1e-9
+
 class KimiQuotaFetcherTest {
     private val server = MockWebServer()
     private val fetcher = KimiQuotaFetcher(KtorQuotaHttpClient(), FIXED_CLOCK)
@@ -73,6 +76,56 @@ class KimiQuotaFetcherTest {
         assertEquals(WindowKind.Session, rateLimit.kind)
         assertEquals(300.minutes, rateLimit.length)
         assertEquals(Instant.parse("2026-04-03T15:08:27.033436Z"), rateLimit.resetsAt)
+    }
+
+    @Test
+    fun `maps the plan usages block to the 5 hour and monthly windows`() = runTest {
+        val snapshot = snapshotFor(fixture("kimi/usages_plan.json"))
+
+        // The limits[] entry duplicates the 5h window the usages block reports, and the two month
+        // keys carry the same pool on a single-product account: each window appears once.
+        assertEquals(listOf("limit_5h", "limit_month_total"), snapshot.windows.map { it.id })
+        assertEquals(listOf("5h limit", "Monthly"), snapshot.windows.map { it.label })
+        assertEquals(
+            listOf(WindowKind.Session, WindowKind.Monthly),
+            snapshot.windows.map { it.kind },
+        )
+        assertEquals(listOf(5.hours, 30.days), snapshot.windows.map { it.length })
+        assertEquals(29.08, snapshot.windows[0].usedPercent, PERCENT_TOLERANCE)
+        assertEquals(1.77, snapshot.windows[1].usedPercent, PERCENT_TOLERANCE)
+        assertEquals(
+            listOf(
+                Instant.parse("2026-11-04T02:27:02Z"),
+                Instant.parse("2026-12-04T00:00:00Z"),
+            ),
+            snapshot.windows.map { it.resetsAt },
+        )
+    }
+
+    @Test
+    fun `keeps the monthly code window when it reports its own pool`() = runTest {
+        val snapshot =
+            snapshotFor(
+                """
+                {
+                  "usages": {
+                    "limit_5h": { "used_ratio": 0.5, "reset_time": "2026-11-04T02:27:02Z" },
+                    "limit_month_total": { "used_ratio": 0.4, "reset_time": "2026-12-04T00:00:00Z" },
+                    "limit_month_code": { "used_ratio": 0.9, "reset_time": "2026-12-04T00:00:00Z" }
+                  }
+                }
+                """
+            )
+
+        assertEquals(
+            listOf("limit_5h", "limit_month_total", "limit_month_code"),
+            snapshot.windows.map { it.id },
+        )
+        assertEquals(
+            listOf("5h limit", "Monthly", "Monthly (Code)"),
+            snapshot.windows.map { it.label },
+        )
+        assertEquals(listOf(50.0, 40.0, 90.0), snapshot.windows.map { it.usedPercent })
     }
 
     @Test
