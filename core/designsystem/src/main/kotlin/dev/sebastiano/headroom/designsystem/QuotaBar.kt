@@ -52,7 +52,7 @@ fun QuotaBar(
         modifier =
             modifier.height(BarHeight).drawWithContent {
                 drawContent()
-                if (paceFraction != null) {
+                if (paceFraction != null && size.width >= TickWidth.toPx()) {
                     val tickWidth = TickWidth.toPx()
                     val x = (paceFraction.coerceIn(0f, 1f) * size.width - tickWidth / 2)
                     drawRoundRect(

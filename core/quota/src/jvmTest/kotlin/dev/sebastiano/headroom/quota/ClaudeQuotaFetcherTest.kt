@@ -1,5 +1,7 @@
 package dev.sebastiano.headroom.quota
 
+import dev.sebastiano.headroom.model.Account
+import dev.sebastiano.headroom.model.AccountState
 import dev.sebastiano.headroom.model.Provider
 import dev.sebastiano.headroom.model.QuotaErrorKind
 import dev.sebastiano.headroom.model.QuotaResult
@@ -307,7 +309,7 @@ class ClaudeQuotaFetcherTest {
     }
 
     @Test
-    fun `maps enabled extra usage to a monthly window`() = runTest {
+    fun `maps enabled extra usage to a secondary monthly window`() = runTest {
         server.enqueueJson(fixture("claude/usage_extra_enabled.json"))
         server.enqueueJson("{}")
 
@@ -318,6 +320,10 @@ class ClaudeQuotaFetcherTest {
         assertEquals(25.0, extra.usedPercent)
         assertEquals(WindowKind.Monthly, extra.kind)
         assertNull(extra.resetsAt)
+        assertTrue(extra.isSecondary)
+        val state = AccountState(Account("c1", Provider.Claude, "sam@example.com"), snapshot)
+        assertEquals("five_hour", state.primaryWindow?.id)
+        assertNull(state.monthlyWindow)
     }
 
     @Test

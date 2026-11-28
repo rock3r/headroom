@@ -121,6 +121,8 @@ public data class AccountUi(
     val authReason: String? = null,
     /** `notLinked` or `readFailed` for Grok's Cursor connection; null when no prompt is needed. */
     val cursorPrompt: String? = null,
+    /** The account's own monthly window when [primary] is not already monthly. */
+    val monthly: WindowUi? = null,
 ) {
     public constructor(
         id: String,
@@ -160,6 +162,8 @@ public data class AccountUi(
         justReset = justReset,
         usesApiKey = false,
         authReason = null,
+        cursorPrompt = null,
+        monthly = null,
     )
 }
 
@@ -382,6 +386,7 @@ internal object UiMapping {
     ): AccountUi {
         val snapshot = state.snapshot
         val primary = state.primaryWindow
+        val monthly = state.monthlyWindow
         // The pace of a stale account is worked out at the time of its last good sync.
         val paceTime = if (state.isSignInExpired) snapshot?.fetchedAt ?: now else now
         val windows = snapshot?.windows.orEmpty().sortedByDescending { it.id == primary?.id }
@@ -400,6 +405,7 @@ internal object UiMapping {
                     else it
                 }
         val primaryUi = windowUis.firstOrNull { it.id == primary?.id }
+        val monthlyUi = monthly?.let { m -> windowUis.firstOrNull { it.id == m.id } }
         return AccountUi(
             id = state.account.id,
             providerId = state.account.provider.id,
@@ -427,6 +433,7 @@ internal object UiMapping {
                     CursorPrompt.ReadFailed -> "readFailed"
                     null -> null
                 },
+            monthly = monthlyUi,
         )
     }
 

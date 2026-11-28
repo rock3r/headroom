@@ -17,14 +17,33 @@ struct MeterRow: View {
     @ScaledMetric(relativeTo: .caption) private var labelScale = 1.0
 
     var body: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            row(stacked: true)
-        } else {
-            ViewThatFits(in: .horizontal) {
-                row(stacked: false)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
                 row(stacked: true)
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    row(stacked: false)
+                    row(stacked: true)
+                }
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.accessibilityLabel(label: label, window: window,
+                                                    trailing: trailing, showsLeft: model.showsLeft))
+    }
+
+    /// What VoiceOver reads for this row: its name, how much is used or left, and when it resets.
+    static func accessibilityLabel(
+        label: String,
+        window: WindowUi,
+        trailing: String?,
+        showsLeft: Bool
+    ) -> String {
+        let percent = Texts.percent(window, left: showsLeft)
+        if let trailing {
+            return "\(label), \(percent), \(trailing)"
+        }
+        return "\(label), \(percent)"
     }
 
     private func row(stacked: Bool) -> some View {

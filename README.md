@@ -72,7 +72,7 @@ These images come from the Android 16 widget player:
 
 ### Quotas, pace and history
 
-- The overview shows each account's weekly or monthly usage, session usage, and difference from an even usage rate.
+- The overview shows each account's weekly and/or monthly usage, session usage, and difference from an even usage rate.
   Drag accounts to set their order, or sort them by usage or next reset.
 - A tick on each bar marks the even usage rate. Bars become wavy when the account exceeds that rate or reaches 85% usage, and stay flat otherwise.
 - Account details plot weekly and monthly windows together over time.

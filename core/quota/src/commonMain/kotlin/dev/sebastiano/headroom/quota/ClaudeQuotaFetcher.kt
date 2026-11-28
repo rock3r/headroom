@@ -111,12 +111,14 @@ public class ClaudeQuotaFetcher(
     private fun JsonObject.toResetWindow(id: String, label: String): QuotaWindow? {
         val usedPercent = doubleOrNull("utilization") ?: doubleOrNull("used_percent") ?: return null
         return quotaWindow(
-            id = id,
-            label = label,
-            usedPercent = usedPercent,
-            resetsAt = stringOrNull("resets_at")?.let(::parseInstant),
-            length = windowLength(id),
-        )
+                id = id,
+                label = label,
+                usedPercent = usedPercent,
+                resetsAt = stringOrNull("resets_at")?.let(::parseInstant),
+                length = windowLength(id),
+            )
+            // Extra usage is pay-as-you-go overage spending, not an included subscription quota.
+            .copy(isSecondary = id == EXTRA_USAGE_ID)
     }
 
     /**
