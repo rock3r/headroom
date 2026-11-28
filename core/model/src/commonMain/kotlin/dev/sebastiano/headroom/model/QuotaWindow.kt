@@ -45,7 +45,7 @@ public data class QuotaWindow(
      * never becomes the account's [dev.sebastiano.headroom.model.AccountState.primaryWindow]: the
      * headline, the pace and the sorting describe the account's own limit, which signing in to
      * something else must not change. JetBrains licenses and seats set it too, when a window that
-     * pools their credits leads the account instead.
+     * pools their credits leads the account instead, as does Claude's pay-as-you-go extra usage.
      */
     val isSecondary: Boolean = false,
     /**

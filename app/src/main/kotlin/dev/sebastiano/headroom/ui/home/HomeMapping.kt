@@ -80,7 +80,8 @@ internal fun AccountState.toSummary(
         plan = snapshot?.planLabel,
         balance = snapshot?.balance,
         primary = primary?.let(summary),
-        session = sessionWindow?.let(summary),
+        monthly = monthlyWindow?.let(summary),
+        session = sessionWindow?.takeIf { it.id != primary?.id }?.let(summary),
         windows =
             snapshot
                 ?.windows

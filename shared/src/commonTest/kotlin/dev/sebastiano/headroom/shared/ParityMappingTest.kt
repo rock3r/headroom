@@ -20,6 +20,7 @@ import dev.sebastiano.headroom.model.WindowKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -98,6 +99,73 @@ class ParityMappingTest {
         assertEquals(BalanceUi(12.5, "credits"), jetBrains.balance)
         assertTrue(jetBrains.separateAllowances)
         assertFalse(UiMapping.account(state("c"), now).separateAllowances)
+    }
+
+    @Test
+    fun `an account carries its own monthly window when primary is weekly`() {
+        val monthly =
+            QuotaWindow("monthly", "Monthly", WindowKind.Monthly, 50.0, now + 15.days, 30.days)
+        val opencode =
+            UiMapping.account(
+                state("oc", Provider.OpenCodeGo, windows = listOf(weekly(80.0), monthly)),
+                now,
+            )
+        val copilot =
+            UiMapping.account(state("cp", Provider.Copilot, windows = listOf(monthly)), now)
+        val grokWithCursor =
+            UiMapping.account(
+                state(
+                    "g",
+                    Provider.Grok,
+                    windows =
+                        listOf(
+                            weekly(40.0),
+                            monthly.copy(id = "cursor-models", isSecondary = true),
+                        ),
+                ),
+                now,
+            )
+
+        val claudeExtra =
+            UiMapping.account(
+                state(
+                    "c",
+                    Provider.Claude,
+                    windows =
+                        listOf(
+                            weekly(60.0),
+                            monthly.copy(id = "extra_usage", label = "Extra usage"),
+                        ),
+                ),
+                now,
+            )
+
+        assertEquals("monthly", opencode.monthly?.id)
+        assertEquals(50.0, opencode.monthly?.usedPercent)
+        assertNull(copilot.monthly)
+        assertNull(grokWithCursor.monthly)
+        assertNull(claudeExtra.monthly)
+
+        val stale =
+            UiMapping.account(
+                state(
+                    "oc-stale",
+                    Provider.OpenCodeGo,
+                    windows = listOf(weekly(80.0), monthly.copy(usedPercent = 95.0)),
+                    error = QuotaErrorKind.Auth,
+                ),
+                now,
+            )
+        assertFalse(stale.monthly!!.needsAttention)
+
+        val reset =
+            UiMapping.account(
+                state("oc-reset", Provider.OpenCodeGo, windows = listOf(weekly(80.0), monthly)),
+                now,
+                justReset = true,
+            )
+        assertEquals("justReset", reset.primary?.paceChip)
+        assertNotEquals("justReset", assertNotNull(reset.monthly).paceChip)
     }
 
     @Test

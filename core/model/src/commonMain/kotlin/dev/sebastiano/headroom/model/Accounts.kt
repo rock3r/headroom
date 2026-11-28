@@ -34,7 +34,9 @@ public data class AccountState(
     val primaryWindow: QuotaWindow?
         get() {
             val windows =
-                snapshot?.windows.orEmpty().filterNot { it.isUnlimited || it.isInformational }
+                snapshot?.windows.orEmpty().filterNot {
+                    it.isUnlimited || it.isInformational || isClaudeExtraUsage(it)
+                }
             // A window a second sign-in added never leads: the account's own limit does, even when
             // the added one is weekly and the account's is monthly.
             val own = windows.filterNot { it.isSecondary }.ifEmpty { windows }
@@ -54,6 +56,32 @@ public data class AccountState(
     val sessionWindow: QuotaWindow?
         get() =
             snapshot?.windows?.firstOrNull { it.kind == WindowKind.Session && !it.isInformational }
+
+    /**
+     * The account's own monthly window when [primaryWindow] is not already monthly, such as
+     * OpenCode Go's monthly limit beside its weekly one. Unlimited, informational, secondary, and
+     * differently grouped windows are left out, as are separate-allowance providers and Claude's
+     * pay-as-you-go extra usage.
+     */
+    val monthlyWindow: QuotaWindow?
+        get() {
+            if (
+                account.provider == Provider.Claude || account.provider.windowsAreSeparateAllowances
+            ) {
+                return null
+            }
+            val primary = primaryWindow ?: return null
+            if (primary.kind == WindowKind.Monthly) return null
+            return snapshot
+                ?.windows
+                .orEmpty()
+                .filterNot { it.isUnlimited || it.isInformational || it.isSecondary }
+                .firstOrNull { it.kind == WindowKind.Monthly && it.group == primary.group }
+        }
+
+    /** Claude's pay-as-you-go overage cap never leads or appears as a monthly overview bar. */
+    private fun isClaudeExtraUsage(window: QuotaWindow): Boolean =
+        account.provider == Provider.Claude && window.id == CLAUDE_EXTRA_USAGE_ID
 
     /**
      * True when a second Cursor sign-in is linked to this account. Only Grok accounts can link one,
@@ -157,3 +185,5 @@ public data class NextReset(val account: Account, val window: QuotaWindow) {
         private data class Candidate(val reset: NextReset, val at: Instant)
     }
 }
+
+private const val CLAUDE_EXTRA_USAGE_ID = "extra_usage"

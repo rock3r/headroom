@@ -2,7 +2,8 @@ import HeadroomKit
 import SwiftUI
 
 /// One account on the overview, as the Android card: the big number, the main bar with its pace
-/// tick, the session bar and the pace chip. Stale numbers are faded; the way out is not.
+/// tick, any monthly bar beside it, the session bar and the pace chip. Stale numbers are faded; the
+/// way out is not.
 struct AccountCard: View {
     let account: AccountUi
     let provider: ProviderUi?

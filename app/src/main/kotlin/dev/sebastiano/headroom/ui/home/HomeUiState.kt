@@ -90,6 +90,8 @@ data class AccountSummary(
      * opened, still offers the connection, so a dismissal is never a dead end.
      */
     val cursorPromptDismissed: Boolean = false,
+    /** The account's own monthly window when [primary] is not already monthly. */
+    val monthly: WindowSummary? = null,
 ) {
     /**
      * The instant the numbers describe: now for fresh data, the last good sync for stale data. Pace

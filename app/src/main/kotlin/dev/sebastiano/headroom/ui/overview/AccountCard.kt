@@ -4,6 +4,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,10 +25,12 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -55,9 +59,10 @@ import kotlin.math.roundToInt
 import kotlin.time.Instant
 
 /**
- * One account on the overview: the big number, the primary window's bar with its pace tick, the
- * session bar, and the pace chip. The primary bar is wavy only when the account needs attention.
- * The number and the bars show how much is used or how much is left, as [display] says.
+ * One account on the overview: the big number, the primary window's bar with its pace tick, any
+ * monthly bar beside it, the session bar, and the pace chip. The primary bar is wavy only when the
+ * account needs attention. The number and the bars show how much is used or how much is left, as
+ * [display] says.
  */
 @Composable
 fun AccountCard(
@@ -154,6 +159,27 @@ private fun CardMeters(
 ) {
     val primary = account.primary
     val balance = account.balance
+    val primaryTrailing = primary?.let {
+        resetLabel(it, now, account.signInExpired) { at -> formatter.short(at, now) }
+    }
+    val monthlyTrailing =
+        account.monthly?.let {
+            resetLabel(it, now, account.signInExpired) { at -> formatter.short(at, now) }
+        }
+    val sessionTrailing =
+        account.session?.let {
+            resetLabel(it, now, account.signInExpired) { at -> formatter.countdown(now, at) }
+        }
+    val allowanceTrailings =
+        account.allowances.map {
+            resetLabel(it, now, account.signInExpired) { at -> formatter.short(at, now) }
+        }
+    val trailingLabels =
+        (if (account.allowances.isNotEmpty()) allowanceTrailings
+            else listOf(primaryTrailing, monthlyTrailing))
+            .plus(sessionTrailing)
+            .filterNotNull()
+            .distinct()
     if (primary == null && balance != null) {
         Text(
             text =
@@ -164,7 +190,7 @@ private fun CardMeters(
             style = MaterialTheme.typography.titleMedium,
         )
     } else if (account.allowances.isNotEmpty()) {
-        AllowanceRows(account, now, formatter, track, display, seen)
+        AllowanceRows(account, allowanceTrailings, trailingLabels, track, display, seen)
     } else if (primary == null) {
         Text(
             text = stringResource(R.string.account_no_data),
@@ -176,7 +202,8 @@ private fun CardMeters(
             label = windowKindLabel(primary.kind),
             window = primary,
             wavy = account.needsAttention,
-            trailing = resetLabel(primary, now, account.signInExpired) { formatter.short(it, now) },
+            trailing = primaryTrailing,
+            trailingLabels = trailingLabels,
             trackColor = track,
             display = display,
             draining = account.justReset && !account.signInExpired,
@@ -184,6 +211,20 @@ private fun CardMeters(
             seen = seen,
             seenKey = "${account.id}/${primary.id}",
         )
+        account.monthly?.let { monthly ->
+            MeterRow(
+                label = windowKindLabel(monthly.kind),
+                window = monthly,
+                wavy = false,
+                trailing = monthlyTrailing,
+                trailingLabels = trailingLabels,
+                trackColor = track,
+                display = display,
+                refreshing = refreshing,
+                seen = seen,
+                seenKey = "${account.id}/${monthly.id}",
+            )
+        }
     }
     account.session?.let { session ->
         MeterRow(
@@ -191,8 +232,8 @@ private fun CardMeters(
             window = session,
             wavy = false,
             showPace = false,
-            trailing =
-                resetLabel(session, now, account.signInExpired) { formatter.countdown(now, it) },
+            trailing = sessionTrailing,
+            trailingLabels = trailingLabels,
             trackColor = track,
             display = display,
             refreshing = refreshing,
@@ -225,19 +266,20 @@ private fun resetLabel(
 @Composable
 private fun AllowanceRows(
     account: AccountSummary,
-    now: Instant,
-    formatter: ResetFormatter,
+    trailings: List<String?>,
+    trailingLabels: List<String>,
     trackColor: Color,
     display: QuotaDisplay,
     seen: SeenValues?,
 ) {
-    account.allowances.forEach { window ->
+    account.allowances.forEachIndexed { index, window ->
         val isPrimary = window.id == account.primary?.id
         MeterRow(
             label = window.label,
             window = window,
             wavy = isPrimary && account.needsAttention,
-            trailing = resetLabel(window, now, account.signInExpired) { formatter.short(it, now) },
+            trailing = trailings[index],
+            trailingLabels = trailingLabels,
             trackColor = trackColor,
             display = display,
             draining = isPrimary && account.justReset,
@@ -252,6 +294,10 @@ private val KIND_LABEL_WIDTH = 58.dp
 
 // Allowance names such as "JetBrains Team" are longer than "Weekly".
 private val ALLOWANCE_LABEL_WIDTH = 96.dp
+private val METER_ROW_SPACING = 10.dp
+private val MIN_BAR_WIDTH = 40.dp
+private val MIN_TRAILING_WIDTH = 64.dp
+private val MAX_TRAILING_WIDTH = 112.dp
 
 @Composable
 private fun CardTop(
@@ -352,6 +398,7 @@ private fun MeterRow(
     window: WindowSummary,
     wavy: Boolean,
     trailing: String?,
+    trailingLabels: List<String>,
     trackColor: Color,
     display: QuotaDisplay,
     showPace: Boolean = true,
@@ -363,43 +410,67 @@ private fun MeterRow(
 ) {
     val progress = display.percent(window.usedPercent).asFraction()
     val shown = animatedValue(progress, draining, display, seen, seenKey)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(labelWidth),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        WorkingShimmer(
-            working = refreshing,
-            workingDescription = stringResource(R.string.redeem_bar_working),
-            modifier = Modifier.weight(1f),
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        // Reserve MIN_BAR_WIDTH before sizing the trailing column so long labels never crush bars.
+        val maxTrailing =
+            (maxWidth - labelWidth - MIN_BAR_WIDTH - METER_ROW_SPACING * 2)
+                .coerceAtLeast(0.dp)
+                .coerceAtMost(MAX_TRAILING_WIDTH)
+        val minTrailing = MIN_TRAILING_WIDTH.coerceAtMost(maxTrailing)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(METER_ROW_SPACING),
         ) {
-            QuotaBar(
-                progress = shown,
-                wavy = wavy,
-                trackColor = trackColor,
-                // The value is already animated here, from what the card last showed.
-                animationSpec = snap(),
-                paceFraction =
-                    if (showPace) window.expectedPercent?.let { display.percent(it).asFraction() }
-                    else null,
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(labelWidth),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            WorkingShimmer(
+                working = refreshing,
+                workingDescription = stringResource(R.string.redeem_bar_working),
+                modifier = Modifier.weight(1f),
+            ) {
+                QuotaBar(
+                    progress = shown,
+                    wavy = wavy,
+                    trackColor = trackColor,
+                    // The value is already animated here, from what the card last showed.
+                    animationSpec = snap(),
+                    paceFraction =
+                        if (showPace)
+                            window.expectedPercent?.let { display.percent(it).asFraction() }
+                        else null,
+                )
+            }
+            // Every row reserves the width of the longest reset label in its card so bars align.
+            Box(
+                modifier = Modifier.widthIn(min = minTrailing, max = maxTrailing),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                trailingLabels.forEach { sample ->
+                    Text(
+                        text = sample,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.alpha(0f).clearAndSetSemantics {},
+                    )
+                }
+                Text(
+                    text = trailing.orEmpty(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        Text(
-            text = trailing.orEmpty(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            modifier = Modifier.widthIn(min = 64.dp),
-        )
     }
 }
 

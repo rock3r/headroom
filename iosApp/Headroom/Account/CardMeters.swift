@@ -21,17 +21,20 @@ struct CardMeters: View {
                              labelWidth: labelWidth,
                              wavy: isPrimary && window.needsAttention)
                 }
-            } else if let primary = account.primary {
-                MeterRow(label: kindLabel(primary.kind), window: primary, providerId: account.providerId,
-                         trailing: resetLabel(primary, countdown: false), trailingLabels: trailingLabels,
-                         labelWidth: labelWidth,
-                         wavy: primary.needsAttention)
+            } else if !primaryRows.isEmpty {
+                ForEach(primaryRows) { window in
+                    let isPrimary = window.id == account.primary?.id
+                    MeterRow(label: kindLabel(window.kind), window: window, providerId: account.providerId,
+                             trailing: resetLabel(window, countdown: false), trailingLabels: trailingLabels,
+                             labelWidth: labelWidth,
+                             wavy: isPrimary && window.needsAttention)
+                }
             } else {
                 Text("No usage data yet.")
                     .alloFont(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            if let session {
+            if let session = sessionWindow {
                 MeterRow(label: kindLabel(session.kind), window: session, providerId: account.providerId,
                          trailing: resetLabel(session, countdown: true), trailingLabels: trailingLabels,
                          labelWidth: labelWidth, showsPace: false)
@@ -42,11 +45,21 @@ struct CardMeters: View {
         }
     }
 
-    private var resetLabels: [String] {
-        let mainWindows = account.separateAllowances && !allowances.isEmpty
-            ? allowances : [account.primary].compactMap { $0 }
-        return mainWindows.compactMap { resetLabel($0, countdown: false) }
-            + [session.flatMap { resetLabel($0, countdown: true) }].compactMap { $0 }
+    /// Reset labels reserved across the card so every bar shares one width. Internal for tests.
+    var resetLabels: [String] {
+        primaryRows.compactMap { resetLabel($0, countdown: false) }
+            + [sessionWindow.flatMap { resetLabel($0, countdown: true) }].compactMap { $0 }
+    }
+
+    /// The main rows shown above the session bar: every allowance for separate-allowance
+    /// providers, otherwise the primary window followed by any monthly window beside it.
+    /// Internal for tests.
+    var primaryRows: [WindowUi] {
+        if account.separateAllowances, !allowances.isEmpty {
+            return allowances
+        }
+        guard let primary = account.primary else { return [] }
+        return [primary, account.monthly].compactMap { $0 }
     }
 
     /// Each window is its own allowance: the main one first, sessions and unlimited ones left out.
@@ -54,8 +67,9 @@ struct CardMeters: View {
         account.windows.filter { !$0.isUnlimited && $0.kind != "session" }
     }
 
-    /// The session window, shown under the main bar when the main one is not the session.
-    private var session: WindowUi? {
+    /// The session window, shown under the main bars when the main one is not the session.
+    /// Internal for tests.
+    var sessionWindow: WindowUi? {
         account.windows.first { $0.kind == "session" && !$0.isInformational && $0.id != account.primary?.id }
     }
 
